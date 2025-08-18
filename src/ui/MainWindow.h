@@ -62,4 +62,5 @@ private:
     QPushButton* applyBtn;
     QPushButton* undoBtn;
     QPushButton* browseBtn;
+    DevAssManager m_dev_manager;
 };

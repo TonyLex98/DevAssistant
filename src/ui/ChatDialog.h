@@ -13,6 +13,8 @@ public:
 
     void appendAssistantChunk(const QString& s);
     void finishAssistantMessage();
+    void sendMessageToChat(const QString& text);
+
 
 signals:
     void sendMessage(const QString& text);

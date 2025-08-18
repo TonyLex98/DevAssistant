@@ -42,8 +42,14 @@ class DevAssManager : public QObject
 {
     Q_OBJECT
 public:
-    explicit DevAssManager(const QString &projectRoot,
+    DevAssManager(const QString &projectRoot,
                            QObject *parent = nullptr);
+
+    DevAssManager(){
+
+    };
+
+    void setProjectRoot(const QString &projectRoot);
 
     /* 1. Создать каталог DevAss (если его ещё нет) */
     bool createFolder();

@@ -57,3 +57,8 @@ void ChatDialog::finishAssistantMessage(){
     m_chat->appendPlainText("\n<< stream finished >>");
     appendAssistantChunk("");
 }
+
+void ChatDialog::sendMessageToChat(const QString &text)
+{
+    emit sendMessage(text);
+}

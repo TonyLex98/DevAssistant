@@ -33,6 +33,41 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     m_files = new QListWidget(this);
     left->addWidget(m_files,1);
 
+    connect(m_files, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item){
+
+        // Полный путь к файлу (предположим, что item->text() – относительный путь)
+        QString filePath = QDir(m_projectRoot).filePath(item->text());
+
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::warning(this,
+                                 tr("Не удалось открыть файл"),
+                                 tr("Файл %1 не может быть открыт. Ошибка: %2")
+                                 .arg(filePath)
+                                 .arg(file.errorString()));
+            return;
+        }
+
+        // Читаем всё содержимое в строку
+        QTextStream in(&file);
+        // Если вы хотите кодировку, задайте её явно, например:
+        // in.setCodec("UTF-8");
+        QString fileContent = in.readAll();   // теперь fileContent содержит весь текст
+
+        // Здесь вы можете сделать что‑угодно с содержимым
+        // Например, вывести в текстовый виджет:
+        // ui->textEdit->setPlainText(fileContent);
+
+        // Или просто вывести в консоль (для отладки)
+        qDebug() << "Содержимое файла:" << filePath << "\n" << fileContent;
+
+        QString prompt = "Опиши кратко что находится в фйле, кратко его основные методы функции если это связано с кодом. Если нет то просто краткое описание: \n";
+
+        m_chat->sendMessageToChat(prompt + fileContent);
+
+
+    });
+
     auto btns = new QHBoxLayout();
 
     rescanBtn = new QPushButton("Rescan", this);
@@ -80,14 +115,14 @@ void MainWindow::browse(){
     if (d.isEmpty()) return;
     m_projectRoot = d;
     m_rootEdit->setText(d);
-    DevAssManager manager(m_projectRoot);
-    if (!manager.createFolder() || !manager.createDaproFile())
+    m_dev_manager.setProjectRoot(m_projectRoot);
+    if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {
         qCritical() << "Не удалось подготовить DevAss / .dapro";
         //return -1;
     }
 
-    if (!manager.generateDescrFiles())
+    if (!m_dev_manager.generateDescrFiles())
     {
         qCritical() << "Ошибка при создании .dadescr файлов";
     }
@@ -149,7 +184,7 @@ void MainWindow::sendUserMessage(const QString& text){
     QString full = m_promptMgr.buildPrompt(text, buildProjectContext(), capabilities, m_history);
 
     m_streamBuf.clear();
-    m_model.startStream(full);
+    m_model.startStream(text);
     m_history.push_back(qMakePair(QString("user"), text));
 }
 

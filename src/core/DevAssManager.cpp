@@ -9,6 +9,15 @@ DevAssManager::DevAssManager(const QString &projectRoot,
 {
 }
 
+void DevAssManager::setProjectRoot(const QString &projectRoot)
+{
+    m_projectRoot = QDir(projectRoot);
+    m_devAssDir = QDir(projectRoot + "/DevAss");
+    m_daproFile.setFileName(m_devAssDir.absoluteFilePath("project.dapro"));
+    //m_daproFile.open()
+
+}
+
 /* --------------------------------------------------------------- */
 /* 1. Создание каталога DevAss                                    */
 /* --------------------------------------------------------------- */
