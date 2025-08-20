@@ -249,3 +249,30 @@ bool DevAssManager::load()
 
     return true;
 }
+
+FileDescription* DevAssManager::findFileDescription(const QString& path)
+{
+    for (FileDescription& fd : m_fileDescriptions) {
+        if (fd.filePath == path)
+            return &fd;
+    }
+    return nullptr;
+}
+
+void DevAssManager::updateFileDescription(const QString& path,
+                                          const QDateTime& modTime,
+                                          bool upToDate)
+{
+    FileDescription* fd = findFileDescription(path);
+    if (fd) {
+        fd->lastModTime = modTime;
+        fd->isDescriptionUpToDate = upToDate;
+    } else {
+        FileDescription newFd;
+        newFd.filePath = path;
+        newFd.lastModTime = modTime;
+        newFd.isDescriptionUpToDate = upToDate;
+        m_fileDescriptions.append(newFd);
+    }
+}
+

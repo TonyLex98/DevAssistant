@@ -10,6 +10,8 @@
 #include "../utils/PromptManager.h"
 #include <QPushButton>
 #include <DevAssManager.h>
+#include <QProgressDialog>
+#include "DescriptionDialog.h"      // ← новый диалог
 
 class ChatDialog;
 class ModelsDialog;
@@ -31,6 +33,8 @@ private slots:
     void undoLast();
 
     void handleAssistantFinished();
+
+    void generateDescriptions();      // <‑‑ новый слот
 
 private:
     QString buildProjectContext() const;
@@ -63,4 +67,5 @@ private:
     QPushButton* undoBtn;
     QPushButton* browseBtn;
     DevAssManager m_dev_manager;
+    QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
 };

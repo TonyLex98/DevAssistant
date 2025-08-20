@@ -19,6 +19,7 @@ SOURCES += \
     src/scenarios/DeleteFileScenario.cpp \
     src/scenarios/EditInRangeScenario.cpp \
     src/scenarios/ScenarioRegistry.cpp \
+    src/ui/DescriptionDialog.cpp \
     src/ui/MainWindow.cpp \
     src/ui/ChatDialog.cpp \
     src/ui/ModelsDialog.cpp \
@@ -41,6 +42,7 @@ HEADERS += \
     src/scenarios/DeleteFileScenario.h \
     src/scenarios/EditInRangeScenario.h \
     src/scenarios/ScenarioRegistry.h \
+    src/ui/DescriptionDialog.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
     src/ui/ModelsDialog.h \

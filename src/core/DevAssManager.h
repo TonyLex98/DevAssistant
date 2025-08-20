@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QDirIterator>
 #include <QDateTime>
+#include "../core/ChangeApplier.h"
 
 /* Описание отдельного файла проекта (для сохранения в .dapro) */
 struct FileDescription
@@ -45,37 +46,38 @@ public:
     DevAssManager(const QString &projectRoot,
                            QObject *parent = nullptr);
 
-    DevAssManager(){
 
-    };
+    // Конструктор‑по‑умолчанию
+    DevAssManager() {}
 
-    void setProjectRoot(const QString &projectRoot);
-
-    /* 1. Создать каталог DevAss (если его ещё нет) */
+    /* Операции с DevAss */
     bool createFolder();
-
-    /* 2. Создать/обновить .dapro (см. описание выше) */
     bool createDaproFile();
-
-    /* 3. Создать файлы‑дескрипторы (*.dadescr) */
     bool generateDescrFiles();
 
-    /* 4. Установить базовый промпт */
+    /* Конфигурация */
     void setBasePrompt(const QString &path, const QString &label);
-
-    /* 5. Добавить/обновить описание файла (для .dapro) */
     void addFileDescription(const QString &filePath);
     void markFileChanged(const QString &filePath);
     void setHistoryFile(const QString &historyPath);
 
-
-    /* 6. Сохранить/загрузить .dapro */
+    /* Сохраняем/загружаем .dapro */
     bool save();
     bool load();
 
     /* Вспомогательные геттеры */
     QDir devAssDir() const { return m_devAssDir; }
+    QDir projectRoot() const { return m_projectRoot; }
     QList<FileDescription> fileDescriptions() const { return m_fileDescriptions; }
+
+    /* Новые методы для работы с описанием файлов */
+    FileDescription* findFileDescription(const QString& path);
+    void updateFileDescription(const QString& path,
+                               const QDateTime& modTime,
+                               bool upToDate);
+
+    void setProjectRoot(const QString &projectRoot);
+
 
 private:
     QDir m_projectRoot;   // Корень выбранного проекта

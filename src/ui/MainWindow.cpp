@@ -33,39 +33,16 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     m_files = new QListWidget(this);
     left->addWidget(m_files,1);
 
-    connect(m_files, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *item){
+    // Заменяем обработчик двойного клика
+    connect(m_files, &QListWidget::itemDoubleClicked,
+            this, [this](QListWidgetItem* item) {
 
-        // Полный путь к файлу (предположим, что item->text() – относительный путь)
+        // Полный путь к файлу
         QString filePath = QDir(m_projectRoot).filePath(item->text());
 
-        QFile file(filePath);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QMessageBox::warning(this,
-                                 tr("Не удалось открыть файл"),
-                                 tr("Файл %1 не может быть открыт. Ошибка: %2")
-                                 .arg(filePath)
-                                 .arg(file.errorString()));
-            return;
-        }
-
-        // Читаем всё содержимое в строку
-        QTextStream in(&file);
-        // Если вы хотите кодировку, задайте её явно, например:
-        // in.setCodec("UTF-8");
-        QString fileContent = in.readAll();   // теперь fileContent содержит весь текст
-
-        // Здесь вы можете сделать что‑угодно с содержимым
-        // Например, вывести в текстовый виджет:
-        // ui->textEdit->setPlainText(fileContent);
-
-        // Или просто вывести в консоль (для отладки)
-        qDebug() << "Содержимое файла:" << filePath << "\n" << fileContent;
-
-        QString prompt = "Опиши кратко что находится в фйле, кратко его основные методы функции если это связано с кодом. Если нет то просто краткое описание: \n";
-
-        m_chat->sendMessageToChat(prompt + fileContent);
-
-
+        // Открываем диалог описания
+        DescriptionDialog dlg(filePath, &m_model, &m_dev_manager, this);
+        dlg.exec();          // модальный
     });
 
     auto btns = new QHBoxLayout();
@@ -76,11 +53,18 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     applyBtn = new QPushButton("Apply changes", this);
     undoBtn = new QPushButton("Undo", this);
 
+    // ---------- Добавляем кнопку «Generate Descriptions» ----------
+    descBtn = new QPushButton("Generate Descriptions", this);
+
+    connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
+    // ----------------------------------------------------------------
+
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
     btns->addWidget(promptBtn);
     btns->addWidget(applyBtn);
     btns->addWidget(undoBtn);
+    btns->addWidget(descBtn);
     left->addLayout(btns);
 
 
@@ -110,6 +94,8 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     left->addWidget(m_chat);
 }
 
+
+
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
     if (d.isEmpty()) return;
@@ -130,12 +116,43 @@ void MainWindow::browse(){
     rescan();
 }
 
-void MainWindow::rescan(){
+void MainWindow::rescan()
+{
+    // 0. Подгружаем .dapro перед сканированием
+    m_dev_manager.load();
+
     m_index.setRoot(m_projectRoot);
     m_files->clear();
-    for (const QString& f : m_index.files()) m_files->addItem(QDir::fromNativeSeparators(f));
+
+    for (const QString& f : m_index.files()) {
+        const QString absPath = QDir(m_projectRoot).filePath(f);
+        QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(f), m_files);
+
+        // Получаем данные из .dapro
+        FileDescription* fd = m_dev_manager.findFileDescription(absPath);
+        QDateTime fileMod = QFileInfo(absPath).lastModified();
+
+        bool needRed = false;
+        if (!fd) {
+            // Файл не описан – красный
+            needRed = true;
+        } else if (fileMod > fd->lastModTime) {
+            // Файл изменён после последнего описания – красный
+            needRed = true;
+        }
+
+        if (needRed)
+            item->setBackgroundColor(Qt::red);
+        else
+            item->setBackgroundColor(Qt::green);   // можно оставить default
+
+        // Храним абсолютный путь в UserRole
+        item->setData(Qt::UserRole, absPath);
+    }
+
     log("Rescanned project.");
 }
+
 
 void MainWindow::openSettings(){
     OllamaSettingsDialog d(this);
@@ -203,6 +220,111 @@ void MainWindow::handleAssistantFinished(){
     m_pending = changes.toList();
     if (m_pending.isEmpty()) { log("No changes parsed."); return; }
     applyChanges();
+}
+
+void MainWindow::generateDescriptions()
+{
+    // 1. Подготовка DevAss
+    if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile()) {
+        QMessageBox::critical(this, "Ошибка",
+                              "Не удалось подготовить каталог DevAss.");
+        return;
+    }
+
+    // 2. Сбор списка файлов проекта (без DevAss)
+    QStringList fileList;
+    QDirIterator it(m_projectRoot,
+                    QDir::Files,
+                    QDirIterator::Subdirectories);
+
+    const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
+
+    while (it.hasNext()) {
+        const QString fp = it.next();
+        if (fp.startsWith(devAssPath))        // игнорируем DevAss
+            continue;
+
+        /* --------‑ Фильтр: только если файл ещё не описан ----------
+           или описан, но не синхронизирован с изменениями. -------- */
+        FileDescription* fd = m_dev_manager.findFileDescription(fp);
+        if (fd && fd->isDescriptionUpToDate)
+            continue;   // уже актуально
+
+        fileList << fp;
+    }
+
+    if (fileList.isEmpty()) {
+        QMessageBox::information(this, "Готово",
+                                 "В проекте нет файлов, требующих описания.");
+        return;
+    }
+
+    // 3. Создание прогресс‑диалога
+    QProgressDialog prog("Генерация описаний…", "Отмена",
+                         0, fileList.size(), this);
+    prog.setWindowModality(Qt::WindowModal);
+    prog.setMinimumDuration(0);
+    prog.show();
+
+    int processed = 0, failed = 0;
+
+    for (const QString &srcFilePath : fileList) {
+        if (prog.wasCanceled())
+            break;
+
+        // 3.1 Чтение содержимого файла
+        QFile f(srcFilePath);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qWarning() << "Не удалось прочитать:" << srcFilePath;
+            ++failed; ++processed; prog.setValue(processed); continue;
+        }
+        const QString content = QString::fromUtf8(f.readAll());
+        f.close();
+
+        // 3.2 Формируем русский запрос к модели
+        const QString prompt =
+            "Пожалуйста, дайте краткое описание следующего содержимого файла.\n"
+            "Если содержит код, перечислите основные классы/функции.\n"
+            "Если это не код, дайте краткое резюме.\n\n" + content;
+
+        // 3.3 Запрос к Ollama
+        const QString description = m_model.generate(prompt);
+        if (description.isEmpty()) {
+            qWarning() << "Пустое описание для:" << srcFilePath;
+            ++failed; ++processed; prog.setValue(processed); continue;
+        }
+
+        // 3.4 Путь к файлу‑дескриптору *.dadescr
+        const QString rel   = QDir(m_projectRoot).relativeFilePath(srcFilePath);
+        const QString descr = m_dev_manager.devAssDir().filePath(rel + ".dadescr");
+
+        // 3.5 Создаём нужные подкаталоги
+        QDir().mkpath(QFileInfo(descr).absolutePath());
+
+        QFile df(descr);
+        if (!df.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qWarning() << "Не удалось записать дескриптор:" << descr;
+            ++failed; ++processed; prog.setValue(processed); continue;
+        }
+        df.write(description.toUtf8());
+        df.close();
+
+        // 3.6 Обновляем .dapro: запись времени и флага «актуально»
+        QDateTime now = QDateTime::currentDateTime();
+        m_dev_manager.updateFileDescription(srcFilePath, now, true);
+        m_dev_manager.save();   // запись в .dapro
+
+        ++processed;
+        log(QString("✓ Описан %1 → %2")
+            .arg(rel, QFileInfo(descr).fileName()));
+
+        prog.setValue(processed);
+    }
+
+    prog.setValue(fileList.size());   // закрываем прогресс‑диалог
+
+    log(QString("Генерация завершена: %1 успешно, %2 ошибок.")
+        .arg(processed - failed).arg(failed));
 }
 
 void MainWindow::log(const QString& m){ m_log->appendPlainText(m); }
