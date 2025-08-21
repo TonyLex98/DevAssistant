@@ -12,6 +12,8 @@
 #include <DevAssManager.h>
 #include <QProgressDialog>
 #include "DescriptionDialog.h"      // ← новый диалог
+#include <CommandParser.h>
+#include <CommandConfirmDialog.h>
 
 class ChatDialog;
 class ModelsDialog;

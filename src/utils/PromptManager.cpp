@@ -1,54 +1,105 @@
+// PromptManager.cpp
 #include "PromptManager.h"
-#include <QStandardPaths>
-#include <QDir>
 #include <QFile>
+#include <QFileInfo>
+#include <QDirIterator>
+#include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
-PromptManager::PromptManager(){}
-
-QString PromptManager::basePromptPath() const {
-    QString dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    if (dir.isEmpty()) dir = QDir::homePath()+"/DevAssistantQt";
-    QDir().mkpath(dir);
-    return dir + "/base_prompt.txt";
+PromptManager::PromptManager()
+{
+    // по‑умолчанию можно задать текущий каталог
+    m_projectRoot = QDir::current();
+    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevAss"));
 }
 
-QString PromptManager::loadBasePrompt() const {
-    QFile f(basePromptPath());
-    if (!f.exists()) {
-        QString def =
-            "Представь, что ты AI-ассистент, который может выполнять ЗАРАНЕЕ ОПРЕДЕЛЕННЫЕ КОМАНДЫ DSL.\n"
-            "Всегда отвечай ТОЛЬКО этими командами. Никаких объяснений.\n"
-            "Если действие невозможно — верни пустой ответ.\n";
-        QFile w(basePromptPath()); if (w.open(QIODevice::WriteOnly|QIODevice::Truncate)) { w.write(def.toUtf8()); w.close(); }
-        return def;
+void PromptManager::setProjectRoot(const QString& path)
+{
+    m_projectRoot = QDir(path);
+    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevAss"));
+}
+
+/* ---------- Вспомогательная функция – список файлов ---------- */
+QString PromptManager::fileListText() const
+{
+    QStringList lines;
+    QDirIterator it(m_projectRoot.absolutePath(),
+                    QDir::Files,
+                    QDirIterator::Subdirectories);
+
+    const QString devAssPath = m_devAssDir.absolutePath();
+
+    while (it.hasNext()) {
+        const QString file = it.next();
+
+        /* пропускаем файлы из каталога DevAss */
+        if (file.startsWith(devAssPath))
+            continue;
+
+        QString rel = QDir(m_projectRoot.absolutePath()).relativeFilePath(file);
+        lines.append(rel);
     }
-    if (!f.open(QIODevice::ReadOnly)) return QString();
-    QString s = QString::fromUtf8(f.readAll()); f.close();
-    return s;
+
+    return lines.join("\n");
 }
 
-void PromptManager::saveBasePrompt(const QString& text) const {
-    QFile f(basePromptPath()); if (f.open(QIODevice::WriteOnly|QIODevice::Truncate)) { f.write(text.toUtf8()); f.close(); }
-}
-
+/* ---------- Полный промпт ---------- */
 QString PromptManager::buildPrompt(const QString& userText,
-                                   const QString& projectContext,
-                                   const QString& capabilities,
-                                   const QList<QPair<QString,QString>>& history) const
+                                  const QString& capabilities, const QString&  buildProjectContext,
+                                  const QList<QPair<QString,QString>>& history)
 {
     QString p;
-    p += loadBasePrompt();
+
+    /* 1. Роль ассистента */
+    p += "Вы – AI‑ассистент, который может выполнять только команды DSL, перечисленные ниже.\n";
+    p += "Если выполнить запрос нельзя – верните пустой ответ.\n\n";
+
+    /* 2. Поддерживаемые команды*/
+    p += "Поддерживаемые команды:\n";
+    p += supportedCommandsText();
+    p += "Ответьте **только** массивом JSON‑объектов, по одному объекту на команду, без лишних слов. Пути всегда указывай абсолютные!\n\n";
+
+    /* 3. Список всех файлов проекта (без DevAss) */
+    p += "Корневой путь и список всех файлов проекта:\n";
+    p += buildProjectContext;
     p += "\n\n";
-    p += capabilities;
-    p += "\n\nPROJECT CONTEXT:\n";
-    p += projectContext;
-    p += "\n\nPREVIOUS MESSAGES (latest "+QString::number(m_historySize)+"):\n";
-    int start = history.size() > m_historySize ? history.size()-m_historySize : 0;
-    for (int i=start;i<history.size();++i) {
-        const auto& h = history[i];
-        p += h.first + ": " + h.second + "\n";
-    }
-    p += "\nUSER NOW: " + userText + "\n";
-    p += "Ответь ТОЛЬКО командами DSL без пояснений.\n";
+
+    /* 4. История диалога */
+    p += QString("Последняя история (последние %1 сообщений):\n").arg(m_historySize);
+    int start = history.size() > m_historySize ? history.size() - m_historySize : 0;
+    for (int i = start; i < history.size(); ++i)
+        p += history[i].first + ": " + history[i].second + "\n";
+
+    /* 5. Текущий запрос */
+    p += "\nТекущий запрос:\n" + userText + "\n\n";
+
+    /* 6. Ожидаемый ответ */
+    p += "Ответьте в чистом JSON‑формате (массив объектов):\n";
+
+    current_all_prompt = p;
     return p;
 }
+
+// PromptManager.cpp (или отдельный helper)
+QString PromptManager::supportedCommandsText() const
+{
+    QString result;
+
+    for (Command* cmd : CommandRegistry::all()) {
+        QString name = cmd->name();
+
+        /* Получаем «пример» JSON‑объекта.  Можно взять сразу fromJson
+           или вручную сконструировать – здесь берём просто команду‑шаблон. */
+        QJsonObject example = cmd->toJson();
+
+        result += "- " + name + "\n";
+        result += "  Формат: " + QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString()) + "\n\n";
+
+        delete cmd; // шаблоны только для чтения – удаляем
+    }
+
+    return result;
+}
+

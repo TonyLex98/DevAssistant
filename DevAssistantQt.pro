@@ -5,9 +5,20 @@ CONFIG += qt warn_on release
 QT += widgets network
 QMAKE_CXXFLAGS += -std=gnu++1z
 
-INCLUDEPATH += src src/core src/adapters src/scenarios src/ui src/utils
+INCLUDEPATH += src src/core src/adapters src/scenarios src/ui src/utils src/command
 
 SOURCES += \
+    src/command/Command.cpp \
+    src/command/CommandConfirmDialog.cpp \
+    src/command/CommandFactory.cpp \
+    src/command/CommandParser.cpp \
+    src/command/CommandRegistry.cpp \
+    src/command/CreateFileCommand.cpp \
+    src/command/DeleteFileCommand.cpp \
+    src/command/EditInRangeCommand.cpp \
+    src/command/RenameFileCommand.cpp \
+    src/command/ReplaceInFileCommand.cpp \
+    src/command/WriteDescriptionCommand.cpp \
     src/core/DevAssManager.cpp \
     src/main.cpp \
     src/core/ProjectIndex.cpp \
@@ -30,6 +41,17 @@ SOURCES += \
     src/utils/PromptManager.cpp
 
 HEADERS += \
+    src/command/Command.h \
+    src/command/CommandConfirmDialog.h \
+    src/command/CommandFactory.h \
+    src/command/CommandParser.h \
+    src/command/CommandRegistry.h \
+    src/command/CreateFileCommand.h \
+    src/command/DeleteFileCommand.h \
+    src/command/EditInRangeCommand.h \
+    src/command/RenameFileCommand.h \
+    src/command/ReplaceInFileCommand.h \
+    src/command/WriteDescriptionCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \
     src/core/ChangeApplier.h \

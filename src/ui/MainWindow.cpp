@@ -169,11 +169,30 @@ void MainWindow::editBasePrompt(){
     d.exec();
 }
 
-QString MainWindow::buildProjectContext() const {
-    QString s = "Root: "+m_projectRoot+"\nFiles:\n";
-    for (const QString& f : m_index.files()) s += " - "+f+"\n";
+// MainWindow.cpp
+// --------------------------------------------
+
+QString MainWindow::buildProjectContext() const
+{
+    // ──────────────────────  Корневая папка ──────────────────────
+    QString s = "Корневая папка: " + m_projectRoot + "\nФайлы:\n";
+
+    // ──────────────────────  Перебираем файлы проекта ──────────────
+    for (const QString& f : m_index.files()) {
+        // Пропускаем файлы, которые лежат в каталоге DevAss
+        //   (f – относительный путь, например: "DevAss/README.md")
+        if (f.startsWith(QStringLiteral("DevAss") + QDir::separator()))
+            continue;
+
+        // Добавляем только валидные файлы (проверка не нужна, так как m_index
+        // уже гарантирует наличие файла, но можно добавить дополнительную
+        // проверку, если нужно)
+        s += " - " + f + '\n';
+    }
+
     return s;
 }
+
 
 void MainWindow::applyChanges(){
     if (m_pending.isEmpty()) { QMessageBox::information(this,"Nothing to apply","No pending changes."); return; }
@@ -197,12 +216,18 @@ void MainWindow::undoLast(){
 }
 
 void MainWindow::sendUserMessage(const QString& text){
+
     QString capabilities = ScenarioRegistry::capabilitiesText();
-    QString full = m_promptMgr.buildPrompt(text, buildProjectContext(), capabilities, m_history);
+    QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
 
     m_streamBuf.clear();
-    m_model.startStream(text);
+    m_model.startStream(full);
     m_history.push_back(qMakePair(QString("user"), text));
+
+    qDebug()<<" ------------- full prompt --------------";
+    qDebug()<<full;
+
+
 }
 
 void MainWindow::onModelChunk(const QString& s){
@@ -210,17 +235,40 @@ void MainWindow::onModelChunk(const QString& s){
     if (m_chat) m_chat->appendAssistantChunk(s);
 }
 
-void MainWindow::handleAssistantFinished(){
-    if (m_chat) m_chat->finishAssistantMessage();
-    m_history.push_back(qMakePair(QString("assistant"), m_streamBuf));
+void MainWindow::handleAssistantFinished()
+{
+    // 1. Ответ LLM в формате JSON
+    QByteArray jsonResp = m_streamBuf.toUtf8();  // ответ уже должен быть чистым JSON
+    QVector<Command*> cmds = CommandParser::parse(jsonResp);
 
-    QVector<Change> changes;
-    QString err = DslExtractor::extractAll(m_streamBuf, m_projectRoot, changes);
-    if (!err.isEmpty()) log("Parse: "+err);
-    m_pending = changes.toList();
-    if (m_pending.isEmpty()) { log("No changes parsed."); return; }
-    applyChanges();
+    if (cmds.isEmpty()) {
+        log("LLM не вернул ни одной команды");
+        return;
+    }
+
+    // 2. Подтверждение пользователем
+    CommandConfirmDialog dlg(cmds.toList(), this);
+    if (dlg.exec() != QDialog::Accepted) {
+        log("Пользователь отклонил команды");
+        qDeleteAll(cmds);
+        return;
+    }
+    QList<Command*> toRun = dlg.confirmed();
+
+    // 3. Применяем команды
+    QString err;
+    for (Command* c : toRun) {
+        if (!c->apply(&m_dev_manager, &err)) {
+            QMessageBox::warning(this, "Ошибка выполнения", err);
+            break;   // можно прервать остальные
+        }
+    }
+
+    // 4. После применения обновляем список
+    rescan();
+    qDeleteAll(toRun);
 }
+
 
 void MainWindow::generateDescriptions()
 {

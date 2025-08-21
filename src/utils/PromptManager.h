@@ -1,23 +1,44 @@
+// PromptManager.h
 #pragma once
 #include <QString>
 #include <QStringList>
+#include <QDir>
+#include <QDebug>
+#include <CommandRegistry.h>
 
-class PromptManager {
+class PromptManager
+{
 public:
     PromptManager();
 
-    QString basePromptPath() const;
-    QString loadBasePrompt() const;
-    void saveBasePrompt(const QString& text) const;
+    /* -------------  Настройка пути проекта ------------- */
+    void setProjectRoot(const QString& path);      // <-- новое
 
-    int historySize() const { return m_historySize; }
-    void setHistorySize(int n) { m_historySize = n; }
+    /* -------------  Поддерживаемые команды ------------- */
+    QString supportedCommandsText() const;         // ← существующая
+    QString capabilitiesText() const;             // ← существующая
 
+    /* -------------  Основной промпт ------------- */
     QString buildPrompt(const QString& userText,
-                        const QString& projectContext,
-                        const QString& capabilities,
-                        const QList<QPair<QString,QString>>& history) const;
+                        const QString& capabilities, const QString&  buildProjectContext,
+                        const QList<QPair<QString,QString>>& history);   // <-- изменено
+
+    /* -------------  Хранение путей ------------- */
+    QDir projectRoot() const { return m_projectRoot; }
+    QDir devAssDir()   const { return m_devAssDir; }
+
+    int historySize(){
+        return m_historySize;
+    }
+
+    QString current_all_prompt;
 
 private:
-    int m_historySize = 6;
+    /* -------------  Вспомогательный список файлов ------------- */
+    QString fileListText() const;  // <-- новое
+
+    /* -------------  Храним пути ------------- */
+    QDir m_projectRoot;   // корень проекта
+    QDir m_devAssDir;     // путь к <project>/DevAss
+    int m_historySize = 20;
 };
