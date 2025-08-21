@@ -297,9 +297,11 @@ void MainWindow::handleAssistantFinished()
     /* 3. Проверяем, что JSON найден */
     if (jsonResp.isEmpty()) {
         log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
-        m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
         return;
     }
+
+    m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
+
 
     /* 4. Парсим команды */
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
