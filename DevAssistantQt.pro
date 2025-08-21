@@ -5,7 +5,7 @@ CONFIG += qt warn_on release
 QT += widgets network
 QMAKE_CXXFLAGS += -std=gnu++1z
 
-INCLUDEPATH += src src/core src/adapters src/scenarios src/ui src/utils src/command
+INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command
 
 SOURCES += \
     src/command/Command.cpp \
@@ -24,12 +24,6 @@ SOURCES += \
     src/core/ProjectIndex.cpp \
     src/core/ChangeApplier.cpp \
     src/adapters/OllamaAdapter.cpp \
-    src/scenarios/CreateFileScenario.cpp \
-    src/scenarios/ReplaceInFileScenario.cpp \
-    src/scenarios/RenameFileScenario.cpp \
-    src/scenarios/DeleteFileScenario.cpp \
-    src/scenarios/EditInRangeScenario.cpp \
-    src/scenarios/ScenarioRegistry.cpp \
     src/ui/DescriptionDialog.cpp \
     src/ui/MainWindow.cpp \
     src/ui/ChatDialog.cpp \
@@ -37,7 +31,6 @@ SOURCES += \
     src/ui/OllamaSettingsDialog.cpp \
     src/ui/PromptEditorDialog.cpp \
     src/ui/ChangesDialog.cpp \
-    src/utils/DslExtractor.cpp \
     src/utils/PromptManager.cpp
 
 HEADERS += \
@@ -57,13 +50,6 @@ HEADERS += \
     src/core/ChangeApplier.h \
     src/core/ModelAdapter.h \
     src/adapters/OllamaAdapter.h \
-    src/scenarios/IScenario.h \
-    src/scenarios/CreateFileScenario.h \
-    src/scenarios/ReplaceInFileScenario.h \
-    src/scenarios/RenameFileScenario.h \
-    src/scenarios/DeleteFileScenario.h \
-    src/scenarios/EditInRangeScenario.h \
-    src/scenarios/ScenarioRegistry.h \
     src/ui/DescriptionDialog.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
@@ -71,5 +57,4 @@ HEADERS += \
     src/ui/OllamaSettingsDialog.h \
     src/ui/PromptEditorDialog.h \
     src/ui/ChangesDialog.h \
-    src/utils/DslExtractor.h \
     src/utils/PromptManager.h

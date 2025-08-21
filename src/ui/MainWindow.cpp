@@ -10,8 +10,6 @@
 #include "../ui/OllamaSettingsDialog.h"
 #include "../ui/PromptEditorDialog.h"
 #include "../ui/ChangesDialog.h"
-#include "../utils/DslExtractor.h"
-#include "../scenarios/ScenarioRegistry.h"
 #include <QDir>
 
 MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
@@ -217,7 +215,7 @@ void MainWindow::undoLast(){
 
 void MainWindow::sendUserMessage(const QString& text){
 
-    QString capabilities = ScenarioRegistry::capabilitiesText();
+    QString capabilities = "";
     QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
 
     m_streamBuf.clear();
