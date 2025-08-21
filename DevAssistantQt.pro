@@ -2,12 +2,19 @@
 TEMPLATE = app
 TARGET = DevAssistantQt
 CONFIG += qt warn_on release
-QT += widgets network
+QT += widgets network multimedia
 QMAKE_CXXFLAGS += -std=gnu++1z
 
-INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command
+INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio
 
 SOURCES += \
+    src/audio/MicStreamWidget.cpp \
+    src/audio/MicTranscriber.cpp \
+    src/audio/StreamRunner.cpp \
+    src/audio/VoskDyn.cpp \
+    src/audio/VoskRunner.cpp \
+    src/audio/VoskWidget.cpp \
+    src/audio/WavWriter.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandFactory.cpp \
@@ -35,6 +42,13 @@ SOURCES += \
     src/utils/PromptManager.cpp
 
 HEADERS += \
+    src/audio/MicStreamWidget.h \
+    src/audio/MicTranscriber.h \
+    src/audio/StreamRunner.h \
+    src/audio/VoskDyn.h \
+    src/audio/VoskRunner.h \
+    src/audio/VoskWidget.h \
+    src/audio/WavWriter.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \
     src/command/CommandFactory.h \
@@ -60,3 +74,8 @@ HEADERS += \
     src/ui/PromptEditorDialog.h \
     src/ui/ChangesDialog.h \
     src/utils/PromptManager.h
+
+
+#INCLUDEPATH += $$PWD/external/whisper.cpp
+#LIBS += -L$$PWD/external/whisper.cpp/bin -lwhisper
+
