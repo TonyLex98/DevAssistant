@@ -241,6 +241,8 @@ void MainWindow::handleAssistantFinished()
     QByteArray jsonResp = m_streamBuf.toUtf8();  // ответ уже должен быть чистым JSON
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
 
+    m_history.push_back(qMakePair(QString("assistant"), QString(jsonResp)));
+
     if (cmds.isEmpty()) {
         log("LLM не вернул ни одной команды");
         return;
