@@ -14,6 +14,7 @@
 #include "DescriptionDialog.h"      // ← новый диалог
 #include <CommandParser.h>
 #include <CommandConfirmDialog.h>
+#include <OpenFileContextCommand.h>
 
 class ChatDialog;
 class ModelsDialog;
@@ -44,6 +45,8 @@ private:
 
     void sendUserMessage(const QString& text);
     void onModelChunk(const QString& s);
+    QByteArray extractJsonPart(const QByteArray& txt) const;
+
 
 private:
     QString m_projectRoot;
@@ -70,4 +73,6 @@ private:
     QPushButton* browseBtn;
     DevAssManager m_dev_manager;
     QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
+
+    QString m_contextContent;
 };

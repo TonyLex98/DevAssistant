@@ -16,6 +16,7 @@ SOURCES += \
     src/command/CreateFileCommand.cpp \
     src/command/DeleteFileCommand.cpp \
     src/command/EditInRangeCommand.cpp \
+    src/command/OpenFileContextCommand.cpp \
     src/command/RenameFileCommand.cpp \
     src/command/ReplaceInFileCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
@@ -42,6 +43,7 @@ HEADERS += \
     src/command/CreateFileCommand.h \
     src/command/DeleteFileCommand.h \
     src/command/EditInRangeCommand.h \
+    src/command/OpenFileContextCommand.h \
     src/command/RenameFileCommand.h \
     src/command/ReplaceInFileCommand.h \
     src/command/WriteDescriptionCommand.h \

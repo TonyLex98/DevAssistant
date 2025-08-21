@@ -116,26 +116,40 @@ void MainWindow::browse(){
 
 void MainWindow::rescan()
 {
-    // 0. Подгружаем .dapro перед сканированием
+    /* 0. Подгружаем .dapro перед сканированием */
     m_dev_manager.load();
 
+    /* Путь к каталогу DevAss – будет использоваться для фильтрации */
+    const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
+
+    /* Корневой каталог проекта – просто строка, уже абсолютная */
+    const QString projectRootPath = m_projectRoot;   // m_projectRoot – QString
+
+    /* Пересканируем индекс проекта */
     m_index.setRoot(m_projectRoot);
     m_files->clear();
 
-    for (const QString& f : m_index.files()) {
-        const QString absPath = QDir(m_projectRoot).filePath(f);
-        QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(f), m_files);
+    /* Идем по списку файлов проекта */
+    for (const QString& rel : m_index.files()) {
+        /* Полный абсолютный путь к файлу */
+        const QString absPath = QDir(projectRootPath).filePath(rel);
 
-        // Получаем данные из .dapro
+        /* ---  Фильтр: игнорируем файлы из DevAss  --- */
+        if (absPath.startsWith(devAssPath))
+            continue;            // пропускаем файл, как будто его нет
+
+        /* Создаём элемент списка */
+        QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(rel), m_files);
+
+        /* Получаем данные из .dapro */
         FileDescription* fd = m_dev_manager.findFileDescription(absPath);
         QDateTime fileMod = QFileInfo(absPath).lastModified();
 
+        /* Отметка цвета: красный – файл не описан / устарел, зелёный – актуален */
         bool needRed = false;
         if (!fd) {
-            // Файл не описан – красный
             needRed = true;
         } else if (fileMod > fd->lastModTime) {
-            // Файл изменён после последнего описания – красный
             needRed = true;
         }
 
@@ -144,13 +158,12 @@ void MainWindow::rescan()
         else
             item->setBackgroundColor(Qt::green);   // можно оставить default
 
-        // Храним абсолютный путь в UserRole
+        /* Храним абсолютный путь в UserRole */
         item->setData(Qt::UserRole, absPath);
     }
 
     log("Rescanned project.");
 }
-
 
 void MainWindow::openSettings(){
     OllamaSettingsDialog d(this);
@@ -170,27 +183,43 @@ void MainWindow::editBasePrompt(){
 // MainWindow.cpp
 // --------------------------------------------
 
+// MainWindow.cpp
 QString MainWindow::buildProjectContext() const
 {
-    // ──────────────────────  Корневая папка ──────────────────────
-    QString s = "Корневая папка: " + m_projectRoot + "\nФайлы:\n";
+    const QString projectRootPath = m_projectRoot;   // QString
+    const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
 
-    // ──────────────────────  Перебираем файлы проекта ──────────────
+    QString s = "Корневая папка: " + projectRootPath + "\nФайлы:\n";
+
+    int file_counter = 0;
     for (const QString& f : m_index.files()) {
-        // Пропускаем файлы, которые лежат в каталоге DevAss
-        //   (f – относительный путь, например: "DevAss/README.md")
+        /* Полный путь */
+        const QString abs = QDir(projectRootPath).filePath(f);
+
+        /* Пропускаем файлы из DevAss */
+        if (abs.startsWith(devAssPath))
+            continue;
+
+        /* Пропускаем файлы, которые лежат в каталоге DevAss
+           (это дублирующий фильтр, но обеспечивает надёжность) */
         if (f.startsWith(QStringLiteral("DevAss") + QDir::separator()))
             continue;
 
-        // Добавляем только валидные файлы (проверка не нужна, так как m_index
-        // уже гарантирует наличие файла, но можно добавить дополнительную
-        // проверку, если нужно)
         s += " - " + f + '\n';
+        file_counter++;
     }
+
+    if(file_counter == 0){
+         s += "Файлов в проекте пока нет." + '\n';
+    }
+
+
+    /* Добавляем содержимое файлов, открытых командой OPEN_FILE */
+    if (!m_contextContent.isEmpty())
+        s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
 
     return s;
 }
-
 
 void MainWindow::applyChanges(){
     if (m_pending.isEmpty()) { QMessageBox::information(this,"Nothing to apply","No pending changes."); return; }
@@ -233,20 +262,57 @@ void MainWindow::onModelChunk(const QString& s){
     if (m_chat) m_chat->appendAssistantChunk(s);
 }
 
+QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
+{
+    /* Ищем массив … */
+    int start = txt.indexOf('[');
+    int end   = txt.lastIndexOf(']');
+
+    if (start >= 0 && end >= start) {
+        return txt.mid(start, end - start + 1);           // [ … ]
+    }
+
+    /* Ищем объект … */
+    start = txt.indexOf('{');
+    end   = txt.lastIndexOf('}');
+    if (start >= 0 && end >= start) {
+        QByteArray obj = txt.mid(start, end - start + 1);
+        // оборачиваем в массив, чтобы CommandParser работал
+        return QByteArray("[") + obj + QByteArray("]");
+    }
+
+    // если ничего не найдено – возвращаем пустую строку
+    return QByteArray();
+}
+
+
 void MainWindow::handleAssistantFinished()
 {
-    // 1. Ответ LLM в формате JSON
-    QByteArray jsonResp = m_streamBuf.toUtf8();  // ответ уже должен быть чистым JSON
+    /* 1. Ответ LLM – полный текст (включая «лишние» строки) */
+    QByteArray fullResp = m_streamBuf.toUtf8();
+
+    /* 2. Выбираем только JSON‑часть */
+    QByteArray jsonResp = extractJsonPart(fullResp);
+
+    /* 3. Проверяем, что JSON найден */
+    if (jsonResp.isEmpty()) {
+        log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
+        m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
+        return;
+    }
+
+    /* 4. Парсим команды */
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
 
-    m_history.push_back(qMakePair(QString("assistant"), QString(jsonResp)));
+    /* ... остальная часть функции остаётся без изменений ... */
+    //m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
 
     if (cmds.isEmpty()) {
         log("LLM не вернул ни одной команды");
         return;
     }
 
-    // 2. Подтверждение пользователем
+    /* 5. Подтверждение пользователем */
     CommandConfirmDialog dlg(cmds.toList(), this);
     if (dlg.exec() != QDialog::Accepted) {
         log("Пользователь отклонил команды");
@@ -255,20 +321,31 @@ void MainWindow::handleAssistantFinished()
     }
     QList<Command*> toRun = dlg.confirmed();
 
-    // 3. Применяем команды
+    /* 6. Применяем команды */
     QString err;
     for (Command* c : toRun) {
         if (!c->apply(&m_dev_manager, &err)) {
             QMessageBox::warning(this, "Ошибка выполнения", err);
-            break;   // можно прервать остальные
+            break;
         }
+
+        if (c->name() == "OPEN_FILE") {
+            auto* oc = static_cast<OpenFileContextCommand*>(c);
+            if (!oc->content().isEmpty()) {
+                m_contextContent += "Содержимое файла " + QString("\"") + oc->path() +"\"\n";
+
+                if (!m_contextContent.isEmpty())
+                    m_contextContent += "\n---\n";
+                m_contextContent += oc->content() + "\n";
+            }
+        }
+        /* … дополнительная логика для OPEN_FILE … */
     }
 
-    // 4. После применения обновляем список
+    /* 7. После применения обновляем список */
     rescan();
     qDeleteAll(toRun);
 }
-
 
 void MainWindow::generateDescriptions()
 {

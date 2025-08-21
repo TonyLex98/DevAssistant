@@ -45,6 +45,7 @@ QString PromptManager::fileListText() const
     return lines.join("\n");
 }
 
+
 /* ---------- Полный промпт ---------- */
 QString PromptManager::buildPrompt(const QString& userText,
                                   const QString& capabilities, const QString&  buildProjectContext,

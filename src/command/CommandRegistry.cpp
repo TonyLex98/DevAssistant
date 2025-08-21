@@ -6,6 +6,7 @@
 #include "RenameFileCommand.h"
 #include "EditInRangeCommand.h"
 #include "WriteDescriptionCommand.h"
+#include "OpenFileContextCommand.h"
 
 QVector<Command*> CommandRegistry::all()
 {
@@ -15,7 +16,8 @@ QVector<Command*> CommandRegistry::all()
         new DeleteFileCommand(QString()),
         new RenameFileCommand(QString(), QString()),
         new EditInRangeCommand(QString(), 0, 0, QByteArray()),
-        new WriteDescriptionCommand(QString(), QString())
+        new WriteDescriptionCommand(QString(), QString()),
+        new OpenFileContextCommand(QString())
     };
 }
 
@@ -75,6 +77,15 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         return new WriteDescriptionCommand(
             p["sourceFilePath"].toString(),
             p["description"].toString()
+        );
+    }
+
+    // +++ в CommandRegistry::create()
+    if (cmd == "OPEN_FILE") {
+        const QJsonObject p = obj["params"].toObject();
+        return new OpenFileContextCommand(
+            p["path"].toString(),
+            obj["description"].toString()
         );
     }
 
