@@ -193,33 +193,46 @@ QString MainWindow::buildProjectContext() const
 
     int file_counter = 0;
     for (const QString& f : m_index.files()) {
-        /* Полный путь */
         const QString abs = QDir(projectRootPath).filePath(f);
 
-        /* Пропускаем файлы из DevAss */
-        if (abs.startsWith(devAssPath))
-            continue;
-
-        /* Пропускаем файлы, которые лежат в каталоге DevAss
-           (это дублирующий фильтр, но обеспечивает надёжность) */
-        if (f.startsWith(QStringLiteral("DevAss") + QDir::separator()))
+        if (abs.startsWith(devAssPath) ||
+            f.startsWith(QStringLiteral("DevAss") + QDir::separator()))
             continue;
 
         s += " - " + f + '\n';
-        file_counter++;
+        ++file_counter;
+
+        /* ---------- Читаем описание, если оно есть ---------- */
+        const QString rel = QDir(projectRootPath).relativeFilePath(abs);
+        const QString descrPath =
+            m_dev_manager.devAssDir().filePath(rel + ".dadescr");
+
+        QFile descrFile(descrPath);
+        if (descrFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString descr = QString::fromUtf8(descrFile.readAll());
+            descrFile.close();
+
+            if (!descr.isEmpty()) {
+                // отступим 3 пробела и «Описан» в кавычках
+                s += "   Описание:\n";
+                // красиво отформатируем, заменяя \n на \n   (отступ)
+                s += "   " + descr.replace("\n", "\n   ") + "\n";
+            }
+        }
     }
 
     if(file_counter == 0){
-         s += "Файлов в проекте пока нет." + '\n';
+        s += "Файлов в проекте пока нет." + '\n';
     }
 
-
-    /* Добавляем содержимое файлов, открытых командой OPEN_FILE */
+    /* Добавляем контент файлов, открытых командой OPEN_FILE */
     if (!m_contextContent.isEmpty())
         s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
 
     return s;
 }
+
+
 
 void MainWindow::applyChanges(){
     if (m_pending.isEmpty()) { QMessageBox::information(this,"Nothing to apply","No pending changes."); return; }
@@ -250,6 +263,11 @@ void MainWindow::sendUserMessage(const QString& text){
     m_streamBuf.clear();
     m_model.startStream(full);
     m_history.push_back(qMakePair(QString("user"), text));
+
+    // ***  Оценка количества токенов ***
+    int tokens = m_promptMgr.tokenCount(full);
+    log(QString("Отправляем запрос (%1 токенов) → %2")
+            .arg(tokens).arg(text));
 
     qDebug()<<" ------------- full prompt --------------";
     qDebug()<<full;
@@ -351,33 +369,25 @@ void MainWindow::handleAssistantFinished()
 
 void MainWindow::generateDescriptions()
 {
-    // 1. Подготовка DevAss
-    if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile()) {
-        QMessageBox::critical(this, "Ошибка",
-                              "Не удалось подготовить каталог DevAss.");
-        return;
-    }
+    DescriptionGenerator generator(&m_model, &m_dev_manager, this);
 
-    // 2. Сбор списка файлов проекта (без DevAss)
+    // 1. Перебираем файлы проекта
     QStringList fileList;
-    QDirIterator it(m_projectRoot,
-                    QDir::Files,
-                    QDirIterator::Subdirectories);
-
+    QDirIterator it(m_projectRoot, QDir::Files, QDirIterator::Subdirectories);
     const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
 
     while (it.hasNext()) {
-        const QString fp = it.next();
-        if (fp.startsWith(devAssPath))        // игнорируем DevAss
-            continue;
+        const QString srcFilePath = it.next();
+        if (srcFilePath.startsWith(devAssPath))
+            continue; // игнорируем DevAss
 
-        /* --------‑ Фильтр: только если файл ещё не описан ----------
-           или описан, но не синхронизирован с изменениями. -------- */
-        FileDescription* fd = m_dev_manager.findFileDescription(fp);
-        if (fd && fd->isDescriptionUpToDate)
-            continue;   // уже актуально
+        FileDescription* fd = m_dev_manager.findFileDescription(srcFilePath);
+        QDateTime fileMod = QFileInfo(srcFilePath).lastModified();
 
-        fileList << fp;
+        if (fd && fd->isDescriptionUpToDate && fileMod <= fd->lastModTime)
+            continue; // уже актуально
+
+        fileList << srcFilePath;
     }
 
     if (fileList.isEmpty()) {
@@ -386,72 +396,44 @@ void MainWindow::generateDescriptions()
         return;
     }
 
-    // 3. Создание прогресс‑диалога
+    // 2. Генерация с прогресс‑диалогом
     QProgressDialog prog("Генерация описаний…", "Отмена",
                          0, fileList.size(), this);
     prog.setWindowModality(Qt::WindowModal);
     prog.setMinimumDuration(0);
-    prog.show();
 
     int processed = 0, failed = 0;
-
     for (const QString &srcFilePath : fileList) {
-        if (prog.wasCanceled())
-            break;
+        if (prog.wasCanceled()) break;
 
-        // 3.1 Чтение содержимого файла
-        QFile f(srcFilePath);
-        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qWarning() << "Не удалось прочитать:" << srcFilePath;
-            ++failed; ++processed; prog.setValue(processed); continue;
+        QString descr = generator.generateAndSave(srcFilePath);
+        if (descr.isEmpty()){
+            ++failed;
         }
-        const QString content = QString::fromUtf8(f.readAll());
-        f.close();
+        else{
+            // 1. Относительный путь к исходному файлу
+            QString relPath = QDir(m_projectRoot).relativeFilePath(srcFilePath);
 
-        // 3.2 Формируем русский запрос к модели
-        const QString prompt =
-            "Пожалуйста, дайте краткое описание следующего содержимого файла.\n"
-            "Если содержит код, перечислите основные классы/функции.\n"
-            "Если это не код, дайте краткое резюме.\n\n" + content;
+            // 2. Путь к файлу‑дескриптору *.dadescr
+            QString descrPath = m_dev_manager.devAssDir().filePath(relPath + ".dadescr");
 
-        // 3.3 Запрос к Ollama
-        const QString description = m_model.generate(prompt);
-        if (description.isEmpty()) {
-            qWarning() << "Пустое описание для:" << srcFilePath;
-            ++failed; ++processed; prog.setValue(processed); continue;
+            // 3. Имя файла дескриптора
+            QString descrFileName = QFileInfo(descrPath).fileName();
+
+            // 4. Логируем
+            log(QString("✓ Описан %1 → %2")
+                    .arg(relPath)
+                    .arg(descrFileName));
         }
-
-        // 3.4 Путь к файлу‑дескриптору *.dadescr
-        const QString rel   = QDir(m_projectRoot).relativeFilePath(srcFilePath);
-        const QString descr = m_dev_manager.devAssDir().filePath(rel + ".dadescr");
-
-        // 3.5 Создаём нужные подкаталоги
-        QDir().mkpath(QFileInfo(descr).absolutePath());
-
-        QFile df(descr);
-        if (!df.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            qWarning() << "Не удалось записать дескриптор:" << descr;
-            ++failed; ++processed; prog.setValue(processed); continue;
-        }
-        df.write(description.toUtf8());
-        df.close();
-
-        // 3.6 Обновляем .dapro: запись времени и флага «актуально»
-        QDateTime now = QDateTime::currentDateTime();
-        m_dev_manager.updateFileDescription(srcFilePath, now, true);
-        m_dev_manager.save();   // запись в .dapro
-
         ++processed;
-        log(QString("✓ Описан %1 → %2")
-            .arg(rel, QFileInfo(descr).fileName()));
-
         prog.setValue(processed);
     }
 
-    prog.setValue(fileList.size());   // закрываем прогресс‑диалог
-
+    prog.setValue(fileList.size());
     log(QString("Генерация завершена: %1 успешно, %2 ошибок.")
         .arg(processed - failed).arg(failed));
+
+    rescan();
 }
 
 void MainWindow::log(const QString& m){ m_log->appendPlainText(m); }

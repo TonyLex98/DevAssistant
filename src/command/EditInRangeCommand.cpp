@@ -14,7 +14,7 @@ EditInRangeCommand::EditInRangeCommand(const QString& path,
     m_params["content"]   = QString::fromUtf8(content);
 
     m_description = descr.isEmpty()
-        ? QString("Редактировать диапазон строк %1–%2 в файле «%3»")
+        ? QString("Редактировать диапазон строк %1–%2 в файле «%3». Лучше переписывать файл полностью.")
               .arg(startLine).arg(endLine).arg(path)
         : descr;
 }

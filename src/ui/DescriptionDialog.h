@@ -6,6 +6,8 @@
 #include <QPushButton>
 #include "../adapters/OllamaAdapter.h"
 #include "../core/DevAssManager.h"
+#include <DescriptionGenerator.h>
+
 
 class DescriptionDialog : public QDialog
 {
@@ -26,4 +28,5 @@ private:
     DevAssManager*   m_devAss;
     QLabel*          m_infoLabel = nullptr;
     QPushButton*     m_genBtn = nullptr;
+
 };

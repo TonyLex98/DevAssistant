@@ -39,6 +39,7 @@ SOURCES += \
     src/ui/OllamaSettingsDialog.cpp \
     src/ui/PromptEditorDialog.cpp \
     src/ui/ChangesDialog.cpp \
+    src/utils/DescriptionGenerator.cpp \
     src/utils/PromptManager.cpp
 
 HEADERS += \
@@ -73,6 +74,7 @@ HEADERS += \
     src/ui/OllamaSettingsDialog.h \
     src/ui/PromptEditorDialog.h \
     src/ui/ChangesDialog.h \
+    src/utils/DescriptionGenerator.h \
     src/utils/PromptManager.h
 
 

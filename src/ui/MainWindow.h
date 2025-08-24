@@ -15,6 +15,7 @@
 #include <CommandParser.h>
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
+#include <QString>
 
 class ChatDialog;
 class ModelsDialog;

@@ -31,6 +31,14 @@ public:
         return m_historySize;
     }
 
+    /** @brief Оценка количества токенов строки.
+     *
+     *  Формула: ceil(text.length() / 4)
+     *  @param text Текст, который нужно посчитать
+     *  @return Приблизительное число токенов
+     */
+    int tokenCount(const QString& text) const;
+
     QString current_all_prompt;
 
 private:
