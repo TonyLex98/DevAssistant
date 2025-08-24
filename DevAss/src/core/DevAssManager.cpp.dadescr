@@ -1,0 +1,34 @@
+**Краткое описание**
+
+Файл реализует класс `DevAssManager`, отвечающий за управление проектной «папкой DevAss» и файловой структурой проекта. В нём реализованы следующие ключевые возможности:
+
+| Модуль | Что делает |
+|--------|------------|
+| **Конструктор / `setProjectRoot`** | Инициализация путей к корню проекта, папке `DevAss` и файлу `project.dapro`. |
+| **Создание папки DevAss** | `createFolder()` – создаёт каталог `DevAss` при необходимости. |
+| **Файл‑конфигурация `.dapro`** | `createDaproFile()` – создаёт пустой файл `project.dapro`. |
+| **Генерация дескрипторов `*.dadescr`** | `generateDescrFiles()` – проходит по всем файлам проекта (исключая `DevAss`), создает соответствующие пустые файлы‑дескрипторы с расширением `.dadescr`. |
+| **Настройка конфигурации** | Методы `setBasePrompt`, `addFileDescription`, `markFileChanged`, `setHistoryFile` – задают пути к базовому prompt, хранят описания файлов и помечают их как устаревшие при изменении. |
+| **Сохранение/загрузка `.dapro`** | `save()` – сериализует всю конфигурацию в JSON и пишет в `project.dapro`. `load()` – читает файл, парсит JSON и восстанавливает состояние. |
+| **Работа с описаниями файлов** | `findFileDescription`, `updateFileDescription` – поиск и обновление записи о файле. |
+
+**Ключевые классы/структуры**
+
+- `DevAssManager` – главный класс, владеющий каталогом `DevAss` и файлом `project.dapro`.  
+- `FileDescription` (не показан полностью в этом фрагменте, но упомянут в коде) – хранит путь к файлу, время последней модификации и флаг «описание актуально».
+
+**Основные функции/методы**
+
+- `createFolder()`
+- `createDaproFile()`
+- `generateDescrFiles()`
+- `setBasePrompt(const QString&, const QString&)`
+- `addFileDescription(const QString&)`
+- `markFileChanged(const QString&)`
+- `setHistoryFile(const QString&)`
+- `save()`
+- `load()`
+- `findFileDescription(const QString&)`
+- `updateFileDescription(const QString&, const QDateTime&, bool)`
+
+Эти методы обеспечивают полное управление структурой проекта, конфигурацией и состоянием описаний файлов.

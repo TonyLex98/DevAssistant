@@ -1,0 +1,17 @@
+**Файл** – заголовочный файл C++ (`OllamaAdapter.h`), объявляющий класс адаптера для взаимодействия с Ollama‑сервером.  
+
+**Ключевые элементы:**
+
+| Элемент | Описание |
+|---------|----------|
+| **Класс `OllamaAdapter`** | Наследует `QObject` и `ModelAdapter`. Предоставляет интерфейс для конфигурации модели, генерации текста, оценки токенов и проверки доступности. |
+| **Конструктор** | `explicit OllamaAdapter(QObject* parent=nullptr);` |
+| **Методы конфигурации** | `void setEndpoint(const QUrl& url);` – задаёт URL‑конечную точку.  `void configure(const QString& model, const QVariantMap& options)` – выбирает модель и опции. |
+| **Основные операции** | `QString generate(const QString& prompt, const QVariantMap& options = QVariantMap());` – синхронное генерирование.  `int estimateTokens(const QString& text) const;` – оценка количества токенов.  `bool isAvailable(QString* errorOut = nullptr);` – проверка доступности сервиса.  `QStringList listModels();` – список доступных моделей. |
+| **Получатели состояния** | `selectedModel()` – текущее название модели.  `lastRequestBody()` – JSON‑тело последнего запроса. |
+| **Сигналы** | `streamChunk(const QString&)`, `streamFinished()`, `streamError(const QString&)` – события для потоковой генерации. |
+| **Слоты** | `startStream(const QString& prompt, const QVariantMap& options = QVariantMap());` – запуск потоковой генерации.  `stopStream();` – остановка.  `onReadyRead()`, `onStreamFinished()` – внутренние обработчики ответа. |
+| **Частные данные** | `m_endpoint`, `m_model`, `m_params`, `m_nam` (указатель на `QNetworkAccessManager`), `m_streamReply` (указатель на активный reply), `m_buffer`, `m_lastBody`. |
+
+**Краткое резюме:**  
+Файл определяет класс адаптера, который обеспечивает взаимодействие клиентского приложения с Ollama‑сервисом, позволяя отправлять запросы на генерацию текста, получать потоковые ответы и управлять настройками модели. Класс использует `QNetworkAccessManager` для HTTP‑коммуникации и опирается на сигналы/слоты Qt для асинхронной обработки потоков.

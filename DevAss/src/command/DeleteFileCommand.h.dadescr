@@ -1,0 +1,15 @@
+**Краткое описание:**
+
+Файл `DeleteFileCommand.h` объявляет класс `DeleteFileCommand`, представляющий команду удаления файла в системе управления. Класс наследует от базового `Command` и реализует основные виртуальные функции для работы с командой.
+
+**Основные элементы класса:**
+
+| Секция | Описание |
+|--------|----------|
+| **Конструктор** | `DeleteFileCommand(const QString& path, const QString& descr = QString());` – принимает путь к удаляемому файлу и необязательное описание. |
+| **Виртуальные методы** | - `QString name() const override` возвращает название команды ("DELETE_FILE").  <br> - `QJsonObject params() const override` возвращает параметры команды (сохраняется в `m_params`).  <br> - `QString description() const override` возвращает описание команды (`m_description`).  <br> - `bool apply(DevAssManager* devAss, QString* err) override` выполняет удаление файла, используя объект `DevAssManager`.  <br> - `QJsonObject toJson() const override` сериализует команду в JSON. |
+| **Частные члены** | `QJsonObject m_params;` – хранит параметры команды.<br> `QString m_description;` – хранит описание команды. |
+
+**Контекст использования**
+
+`DeleteFileCommand` обычно создаётся в процессе формирования списка команд для выполнения, сериализуется в JSON, передаётся менеджеру `DevAssManager`, который затем вызывает `apply` для фактического удаления файла.

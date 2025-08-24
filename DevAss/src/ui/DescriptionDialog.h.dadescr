@@ -1,0 +1,23 @@
+**Краткое описание содержимого файла**
+
+Файл `DescriptionDialog.h` является заголовочным файлом, определяющим класс **`DescriptionDialog`** – диалоговое окно на Qt, которое используется для генерации описания файла.
+
+### Основные элементы класса
+
+| Элемент | Описание |
+|--------|----------|
+| **Класс** | `DescriptionDialog : public QDialog` |
+| **Конструктор** | `DescriptionDialog(const QString& filePath, OllamaAdapter* model, DevAssManager* devAss, QWidget* parent = nullptr);` – принимает путь к файлу, адаптер модели и менеджер DevAss. |
+| **Слот** | `void onGenerate();` – вызывается при нажатии кнопки «Сгенерировать описание». |
+| **Частные данные** | `QString m_filePath;` – путь к файлу.<br>`OllamaAdapter* m_model;` – указатель на адаптер модели.<br>`DevAssManager* m_devAss;` – указатель на менеджер DevAss.<br>`QLabel* m_infoLabel;` – метка для отображения информации.<br>`QPushButton* m_genBtn;` – кнопка генерации. |
+
+### Включенные заголовки
+
+* `<QDialog>` – базовый класс диалогов Qt.
+* `<QLabel>`, `<QPushButton>` – виджеты интерфейса.
+* `"../adapters/OllamaAdapter.h"` – адаптер модели Ollama.
+* `"../core/DevAssManager.h"` – менеджер DevAss.
+* `<DescriptionGenerator.h>` – генератор описаний (неявный в данном заголовке).
+
+**Вывод**  
+Файл содержит только определение класса `DescriptionDialog` с его интерфейсом и внутренними членами, предназначенным для взаимодействия с моделью генерации текста и менеджером DevAss внутри приложения на Qt.

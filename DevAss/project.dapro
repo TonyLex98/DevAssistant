@@ -1,0 +1,339 @@
+{
+    "fileDescriptions": [
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/.gitattributes",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:17"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/adapters/OllamaAdapter.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:25"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/adapters/OllamaAdapter.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:31"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/MicStreamWidget.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:39"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/MicStreamWidget.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:45"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/MicTranscriber.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:55:54"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/MicTranscriber.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:02"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/StreamRunner.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:10"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/StreamRunner.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:16"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskDyn.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:18"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskDyn.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:23"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskRunner.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:31"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskRunner.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:38"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskWidget.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:44"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/VoskWidget.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:54"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/WavWriter.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:56:58"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/audio/WavWriter.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:02"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/Command.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:05"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/Command.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:10"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandConfirmDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:14"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandConfirmDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:19"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandFactory.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:22"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandFactory.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:24"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandParser.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:27"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandParser.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:30"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandRegistry.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:36"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CommandRegistry.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:39"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CreateFileCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:43"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/CreateFileCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:50"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/DeleteFileCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:52"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/DeleteFileCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:57:57"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/EditInRangeCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:03"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/EditInRangeCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:07"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/OpenFileContextCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:10"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/OpenFileContextCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:15"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/RenameFileCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:19"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/RenameFileCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:24"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/ReplaceInFileCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:30"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/ReplaceInFileCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:35"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/WriteDescriptionCommand.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:38"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/command/WriteDescriptionCommand.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:43"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/ChangeApplier.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:50"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/ChangeApplier.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:58:54"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/DevAssManager.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:02"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/DevAssManager.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:08"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/ModelAdapter.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:12"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/ProjectIndex.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:16"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/core/ProjectIndex.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:19"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/main.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:25"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ChangesDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:31"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ChangesDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:33"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ChatDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:39"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ChatDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:46"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/DescriptionDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:51"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/DescriptionDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T15:59:56"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/MainWindow.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:11"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/MainWindow.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:20"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ModelsDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:24"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/ModelsDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:28"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/OllamaSettingsDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:33"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/OllamaSettingsDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:38"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/PromptEditorDialog.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:43"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/ui/PromptEditorDialog.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:48"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/utils/DescriptionGenerator.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:53"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/utils/DescriptionGenerator.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:00:59"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/utils/PromptManager.cpp",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:01:07"
+        },
+        {
+            "filePath": "C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/utils/PromptManager.h",
+            "isDescriptionUpToDate": true,
+            "lastModTime": "2025-08-24T16:01:14"
+        }
+    ]
+}

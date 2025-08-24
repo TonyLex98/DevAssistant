@@ -1,0 +1,22 @@
+**Краткое описание файла `WriteDescriptionCommand.h`**
+
+Файл объявляет класс **`WriteDescriptionCommand`**, который наследуется от базового `Command`.  
+Он предназначен для команды, добавляющей/обновляющей описание (строку) в файл‑описатель, например в файл с расширением `.dadescr`.
+
+**Ключевые члены класса**
+
+| Член | Тип | Описание |
+|------|-----|----------|
+| `WriteDescriptionCommand(const QString& sourceFilePath, const QString& description)` | Конструктор | Инициализирует параметры команды: путь к исходному файлу и текст описания. |
+| `QString name() const override` | Метод | Возвращает строку‑идентификатор команды: `"WRITE_DESCRIPTION"`. |
+| `QJsonObject params() const override` | Метод | Возвращает JSON‑объект с параметрами команды: `{"sourceFilePath":"...", "description":"..."}`. |
+| `QString description() const override` | Метод | Возвращает текст описания (поле `m_description`). |
+| `bool apply(DevAssManager* devAss, QString* err) override` | Метод | Реализует логику применения команды: записывает описание в целевой файл, возвращает `true` при успехе. |
+| `QJsonObject toJson() const override` | Метод | Сериализует объект команды в JSON‑формат. |
+
+**Поля класса**
+
+- `QJsonObject m_params` – содержит параметры команды (путь к файлу и текст описания).  
+- `QString m_description` – строка, которая будет записана в файл‑описатель (`*.dadescr`).  
+
+Таким образом, `WriteDescriptionCommand` представляет собой простую команду для добавления описания к файлу, поддерживающую сериализацию и возвращение имени команды.

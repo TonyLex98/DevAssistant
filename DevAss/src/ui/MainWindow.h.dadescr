@@ -1,0 +1,32 @@
+**Краткое описание файла**
+
+Файл – заголовочный (.h) для класса **`MainWindow`**, наследуемого от `QMainWindow`.  
+Он определяет пользовательский интерфейс и логику главного окна приложения, использующего Qt и собственные компоненты проекта.  
+
+---
+
+### Основные элементы класса
+
+| Раздел | Что содержится |
+|--------|----------------|
+| **Включения** | Qt‑виджеты (`QListWidget`, `QPlainTextEdit`, `QLineEdit`, `QPushButton`, `QProgressDialog`), собственные классы (`ProjectIndex`, `ChangeApplier`, `OllamaAdapter`, `PromptManager`, `DevAssManager`, `DescriptionDialog`, `CommandParser`, `CommandConfirmDialog`, `OpenFileContextCommand`) и forward‑деclaration для диалогов. |
+| **Конструктор** | `explicit MainWindow(QWidget* parent = nullptr);` – инициализация UI и основных компонентов. |
+| **Слоты (public slots)** | - `browse()` – открыть каталог проекта.<br>- `rescan()` – перезагрузить список файлов.<br>- `openSettings()` – открыть диалог настроек.<br>- `editBasePrompt()` – редактировать базовый промпт.<br>- `applyChanges()` – применить отложенные изменения.<br>- `undoLast()` – отменить последнее действие.<br>- `handleAssistantFinished()` – обработка завершения работы ассистента.<br>- `generateDescriptions()` – новый слот для генерации описаний. |
+| **Приватные слоты** | `onModelChunk(const QString& s)` – обработка частичного ответа модели. |
+| **Приватные методы** | `buildProjectContext() const`, `log(const QString&)`, `sendUserMessage(const QString&)`, `extractJsonPart(const QByteArray&) const`. |
+| **Члены данных** |  
+- `m_projectRoot`, `m_index`, `m_applier`, `m_model`, `m_promptMgr` – основной функционал проекта.  
+- UI‑элементы: `m_files`, `m_rootEdit`, `m_log`, `m_chat`, `m_pending`, `m_history`, `m_streamBuf`.  
+- Кнопки: `rescanBtn`, `settingsBtn`, `promptBtn`, `applyBtn`, `undoBtn`, `browseBtn`, `descBtn` (новый элемент).  
+- `m_dev_manager`, `m_contextContent`. |
+
+---
+
+### Ключевые особенности
+
+1. **Интеграция с Ollama** – через `OllamaAdapter` модель получает запросы и отдаёт ответы, которые обрабатываются в `onModelChunk`.
+2. **Управление изменениями** – `ChangeApplier` применяет изменения к проекту, а список `m_pending` хранит отложенные изменения.
+3. **Диалоги** – включены диалоги для описания (`DescriptionDialog`), подтверждения команд и настройки моделей.
+4. **Новая функциональность** – `generateDescriptions` и кнопка `descBtn` позволяют пользователю запустить генерацию описаний файлов/модулей.
+
+Таким образом, этот заголовочный файл описывает весь интерфейс главного окна и связанный с ним бизнес‑логики, связывая UI‑компоненты с бизнес‑слоем проекта.
