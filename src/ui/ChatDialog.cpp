@@ -1,6 +1,7 @@
 #include "ChatDialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 
 ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_model(model){
     setWindowTitle(tr("Chat / Instruction"));
@@ -10,7 +11,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_cb_model = new QComboBox(this);
     v->addWidget(m_chat,1);
     auto h = new QHBoxLayout();
-    m_input = new QLineEdit(this);
+    m_input = new InputTextEdit(this);
     m_send = new QPushButton("Send", this);
     m_stop = new QPushButton("Stop", this);
     h->addWidget(m_cb_model);
@@ -20,6 +21,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     v->addLayout(h);
     connect(m_send, &QPushButton::clicked, this, &ChatDialog::onSend);
     connect(m_stop, &QPushButton::clicked, this, &ChatDialog::onStop);
+    connect(m_input, &InputTextEdit::sendMessage, this, &ChatDialog::onSend);
 
     connect(m_cb_model, &QComboBox::currentTextChanged, this, [this](const QString &text){
         m_model->configure(text, QVariantMap());
@@ -29,7 +31,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 }
 
 void ChatDialog::onSend(){
-    QString t = m_input->text().trimmed();
+    QString t = m_input->toPlainText().trimmed();
     if (t.isEmpty()) return;
     m_chat->appendPlainText(QString("You: %1").arg(t));
     m_input->clear();
@@ -40,8 +42,7 @@ void ChatDialog::onStop(){
     if (m_model) m_model->stopStream();
 }
 
-void ChatDialog::pslot_updateModelsList()
-{
+void ChatDialog::pslot_updateModelsList(){
     m_cb_model->clear();
     m_cb_model->addItems(m_model->listModels());
 }
