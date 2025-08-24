@@ -4,7 +4,7 @@ DevAssManager::DevAssManager(const QString &projectRoot,
                              QObject *parent)
     : QObject(parent),
       m_projectRoot(projectRoot),
-      m_devAssDir(projectRoot + "/DevAss"),
+      m_devAssDir(projectRoot + "/DevelopersAssistant"),
       m_daproFile(m_devAssDir.absoluteFilePath("project.dapro"))
 {
 }
@@ -12,7 +12,7 @@ DevAssManager::DevAssManager(const QString &projectRoot,
 void DevAssManager::setProjectRoot(const QString &projectRoot)
 {
     m_projectRoot = QDir(projectRoot);
-    m_devAssDir = QDir(projectRoot + "/DevAss");
+    m_devAssDir = QDir(projectRoot + "/DevelopersAssistant");
     m_daproFile.setFileName(m_devAssDir.absoluteFilePath("project.dapro"));
     //m_daproFile.open()
 
@@ -27,7 +27,7 @@ bool DevAssManager::createFolder()
     {
         if (!m_devAssDir.mkpath("."))
         {
-            qWarning() << "Не удалось создать папку DevAss:" << m_devAssDir.absolutePath();
+            qWarning() << "Не удалось создать папку DevelopersAssistant:" << m_devAssDir.absolutePath();
             return false;
         }
     }
@@ -80,14 +80,14 @@ bool DevAssManager::generateDescrFiles()
 
         QString srcFilePath = it.filePath();
 
-        /* Не обрабатывать собственную папку DevAss (иначе зациклимся) */
+        /* Не обрабатывать собственную папку DevelopersAssistant (иначе зациклимся) */
         if (srcFilePath.startsWith(m_devAssDir.absolutePath()))
             continue;
 
         /* Полный относительный путь от корня проекта */
         QString relPath = m_projectRoot.relativeFilePath(srcFilePath);
 
-        /* Путь к файлу‑дескриптору в DevAss */
+        /* Путь к файлу‑дескриптору в DevelopersAssistant */
         QString descrPath = m_devAssDir.absoluteFilePath(relPath + ".dadescr");
         QFileInfo descrInfo(descrPath);
 

@@ -50,7 +50,7 @@ public:
     // Конструктор‑по‑умолчанию
     DevAssManager() {}
 
-    /* Операции с DevAss */
+    /* Операции с DevelopersAssistant */
     bool createFolder();
     bool createDaproFile();
     bool generateDescrFiles();
@@ -81,7 +81,7 @@ public:
 
 private:
     QDir m_projectRoot;   // Корень выбранного проекта
-    QDir m_devAssDir;     // Папка DevAss
+    QDir m_devAssDir;     // Папка DevelopersAssistant
     QFile m_daproFile;    // *.dapro
 
     QString m_basePromptPath;

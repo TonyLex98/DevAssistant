@@ -102,7 +102,7 @@ void MainWindow::browse(){
     m_dev_manager.setProjectRoot(m_projectRoot);
     if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {
-        qCritical() << "Не удалось подготовить DevAss / .dapro";
+        qCritical() << "Не удалось подготовить DevelopersAssistant / .dapro";
         //return -1;
     }
 
@@ -119,7 +119,7 @@ void MainWindow::rescan()
     /* 0. Подгружаем .dapro перед сканированием */
     m_dev_manager.load();
 
-    /* Путь к каталогу DevAss – будет использоваться для фильтрации */
+    /* Путь к каталогу DevelopersAssistant – будет использоваться для фильтрации */
     const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
 
     /* Корневой каталог проекта – просто строка, уже абсолютная */
@@ -134,7 +134,7 @@ void MainWindow::rescan()
         /* Полный абсолютный путь к файлу */
         const QString absPath = QDir(projectRootPath).filePath(rel);
 
-        /* ---  Фильтр: игнорируем файлы из DevAss  --- */
+        /* ---  Фильтр: игнорируем файлы из DevelopersAssistant  --- */
         if (absPath.startsWith(devAssPath))
             continue;            // пропускаем файл, как будто его нет
 
@@ -196,7 +196,7 @@ QString MainWindow::buildProjectContext() const
         const QString abs = QDir(projectRootPath).filePath(f);
 
         if (abs.startsWith(devAssPath) ||
-            f.startsWith(QStringLiteral("DevAss") + QDir::separator()))
+            f.startsWith(QStringLiteral("DevelopersAssistant") + QDir::separator()))
             continue;
 
         s += " - " + f + '\n';

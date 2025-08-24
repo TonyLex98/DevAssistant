@@ -12,13 +12,13 @@ PromptManager::PromptManager()
 {
     // по‑умолчанию можно задать текущий каталог
     m_projectRoot = QDir::current();
-    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevAss"));
+    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevelopersAssistant"));
 }
 
 void PromptManager::setProjectRoot(const QString& path)
 {
     m_projectRoot = QDir(path);
-    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevAss"));
+    m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevelopersAssistant"));
 }
 
 /* ---------- Вспомогательная функция – список файлов ---------- */
