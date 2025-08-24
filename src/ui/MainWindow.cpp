@@ -79,7 +79,7 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     // *** Добавляем VoskWidget на левую панель ***
     m_voskWidget = new VoskWidget();
     connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
-    left->addWidget(m_voskWidget,1);
+    //left->addWidget(m_voskWidget,1);
 
     left->addWidget(m_chat,1);
 
