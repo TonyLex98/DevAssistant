@@ -195,28 +195,42 @@ QString MainWindow::buildProjectContext() const
     for (const QString& f : m_index.files()) {
         const QString abs = QDir(projectRootPath).filePath(f);
 
+        // --- пропускаем файлы из DevelopersAssistant и .dadescr
         if (abs.startsWith(devAssPath) ||
-            f.startsWith(QStringLiteral("DevelopersAssistant") + QDir::separator()))
+            f.startsWith(QStringLiteral("DevelopersAssistant") + QDir::separator()) ||
+            f.endsWith(QStringLiteral(".dadescr")))
             continue;
 
         s += " - " + f + '\n';
         ++file_counter;
 
-        /* ---------- Читаем описание, если оно есть ---------- */
+        // ---------- 1. Считаем описание (если надо) ----------
+        // В этом примере описания оставляем как есть – но можно удалить
+        // или закомментировать блок ниже, если они вам не нужны.
+        /*
         const QString rel = QDir(projectRootPath).relativeFilePath(abs);
         const QString descrPath =
             m_dev_manager.devAssDir().filePath(rel + ".dadescr");
-
         QFile descrFile(descrPath);
         if (descrFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString descr = QString::fromUtf8(descrFile.readAll());
             descrFile.close();
 
             if (!descr.isEmpty()) {
-                // отступим 3 пробела и «Описан» в кавычках
                 s += "   Описание:\n";
-                // красиво отформатируем, заменяя \n на \n   (отступ)
                 s += "   " + descr.replace("\n", "\n   ") + "\n";
+            }
+        }*/
+
+        // ---------- 2. ЗАГРУЖАЕМ СОДЕРЖИМОЕ файла ----------
+        QFile fContent(abs);
+        if (fContent.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString content = QString::fromUtf8(fContent.readAll());
+            fContent.close();
+
+            if (!content.isEmpty()) {
+                s += "   Содержимое:\n";
+                s += "   " + content.replace("\n", "\n   ") + "\n";
             }
         }
     }
@@ -225,13 +239,12 @@ QString MainWindow::buildProjectContext() const
         s += "Файлов в проекте пока нет." + '\n';
     }
 
-    /* Добавляем контент файлов, открытых командой OPEN_FILE */
+    // ---------- Контент файлов, открытых командой OPEN_FILE ----------
     if (!m_contextContent.isEmpty())
         s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
 
     return s;
 }
-
 
 
 void MainWindow::applyChanges(){
@@ -260,6 +273,9 @@ void MainWindow::sendUserMessage(const QString& text){
     QString capabilities = "";
     QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
 
+    qDebug()<<" ------------- full prompt --------------";
+    qDebug()<<full;
+
     m_streamBuf.clear();
     m_model.startStream(full);
     m_history.push_back(qMakePair(QString("user"), text));
@@ -269,8 +285,7 @@ void MainWindow::sendUserMessage(const QString& text){
     log(QString("Отправляем запрос (%1 токенов) → %2")
             .arg(tokens).arg(text));
 
-    qDebug()<<" ------------- full prompt --------------";
-    qDebug()<<full;
+
 
 
 }
