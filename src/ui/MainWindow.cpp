@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     descBtn = new QPushButton("Generate Descriptions", this);
 
     connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
-    // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
@@ -76,6 +76,13 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     m_log->setReadOnly(true);
     left->addWidget(m_log,1);
 
+    // *** Добавляем VoskWidget на левую панель ***
+    m_voskWidget = new VoskWidget();
+    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
+    left->addWidget(m_voskWidget,1);
+
+    left->addWidget(m_chat,1);
+
     connect(browseBtn,&QPushButton::clicked,this,&MainWindow::browse);
     connect(rescanBtn,&QPushButton::clicked,this,&MainWindow::rescan);
     connect(settingsBtn,&QPushButton::clicked,this,&MainWindow::openSettings);
@@ -92,9 +99,9 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     left->addWidget(m_chat);
 
     // <‑‑ Инициализируем VoskWidget и показываем его
-    m_voskWidget = new VoskWidget();
-    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
-    m_voskWidget->show();
+    // m_voskWidget = new VoskWidget();
+    // connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
+    // m_voskWidget->show();
 }
 
 void MainWindow::browse(){
@@ -117,8 +124,7 @@ void MainWindow::browse(){
     rescan();
 }
 
-void MainWindow::rescan()
-{
+void MainWindow::rescan(){
     /* 0. Подгружаем .dapro перед сканированием */
     m_dev_manager.load();
 
@@ -184,7 +190,7 @@ void MainWindow::editBasePrompt(){
 }
 
 // MainWindow.cpp
-// ----------------------------------------------
+// ------------------------------------------
 
 QString MainWindow::buildProjectContext() const
 {
