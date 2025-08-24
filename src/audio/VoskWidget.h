@@ -1,4 +1,3 @@
-
 #pragma once
 #include <QWidget>
 #include <QLabel>
@@ -21,6 +20,8 @@ private slots:
     void onPartial(const QString& s);
     void onFinal(const QString& s);
     void onError(const QString& s);
+signals:
+    void voiceRecognized(const QString&);
 private:
     QLineEdit* m_dllEdit;
     QLineEdit* m_modelEdit;

@@ -1,4 +1,3 @@
-
 #include "VoskWidget.h"
 #include "VoskRunner.h"
 #include <QLineEdit>
@@ -21,7 +20,7 @@ VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
 
     // Prefill example paths (edit to your own)
     m_dllEdit->setText(QStringLiteral("C:/vosk/libvosk.dll"));
-    m_modelEdit->setText(QStringLiteral("C:/vosk/vosk-model-ru-0.22"));
+    m_modelEdit->setText(QStringLiteral("C:/vosk/vosk-model-small-ru-0.22"));
 
     m_startBtn = new QPushButton(tr("Start"), this);
     m_stopBtn  = new QPushButton(tr("Stop"), this);
@@ -62,6 +61,7 @@ VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
 
     connect(m_startBtn, &QPushButton::clicked, this, &VoskWidget::onStart);
     connect(m_stopBtn,  &QPushButton::clicked, this, &VoskWidget::onStop);
+
 }
 
 void VoskWidget::onStart() {
@@ -91,7 +91,10 @@ void VoskWidget::onPartial(const QString& s) {
 }
 
 void VoskWidget::onFinal(const QString& s) {
-    if (!s.isEmpty()) m_log->append(QStringLiteral("» %1").arg(s));
+    if (!s.isEmpty()) {
+        m_log->append(QStringLiteral("» %1").arg(s));
+        emit voiceRecognized(s);
+    }
 }
 
 void VoskWidget::onError(const QString& s) {

@@ -16,6 +16,7 @@
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
 #include <QString>
+#include "../audio/VoskWidget.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -39,6 +40,7 @@ private slots:
     void handleAssistantFinished();
 
     void generateDescriptions();      // <‑‑ новый слот
+    void onVoskText(const QString&);  // <‑‑ новый слот
 
 private:
     QString buildProjectContext() const;
@@ -74,6 +76,7 @@ private:
     QPushButton* browseBtn;
     DevAssManager m_dev_manager;
     QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
+    VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
 };

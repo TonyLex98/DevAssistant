@@ -55,7 +55,7 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     descBtn = new QPushButton("Generate Descriptions", this);
 
     connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
-    // ----------------------------------------------------------------
+    // -----------------------------------------------------------------------
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
@@ -90,9 +90,12 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     //rescan();
 
     left->addWidget(m_chat);
+
+    // <‑‑ Инициализируем VoskWidget и показываем его
+    m_voskWidget = new VoskWidget();
+    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
+    m_voskWidget->show();
 }
-
-
 
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
@@ -181,9 +184,8 @@ void MainWindow::editBasePrompt(){
 }
 
 // MainWindow.cpp
-// --------------------------------------------
+// ----------------------------------------------
 
-// MainWindow.cpp
 QString MainWindow::buildProjectContext() const
 {
     const QString projectRootPath = m_projectRoot;   // QString
@@ -207,7 +209,7 @@ QString MainWindow::buildProjectContext() const
         // ---------- 1. Считаем описание (если надо) ----------
         // В этом примере описания оставляем как есть – но можно удалить
         // или закомментировать блок ниже, если они вам не нужны.
-        /*
+
         const QString rel = QDir(projectRootPath).relativeFilePath(abs);
         const QString descrPath =
             m_dev_manager.devAssDir().filePath(rel + ".dadescr");
@@ -220,10 +222,10 @@ QString MainWindow::buildProjectContext() const
                 s += "   Описание:\n";
                 s += "   " + descr.replace("\n", "\n   ") + "\n";
             }
-        }*/
+        }
 
         // ---------- 2. ЗАГРУЖАЕМ СОДЕРЖИМОЕ файла ----------
-        QFile fContent(abs);
+        /*QFile fContent(abs);
         if (fContent.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString content = QString::fromUtf8(fContent.readAll());
             fContent.close();
@@ -232,7 +234,7 @@ QString MainWindow::buildProjectContext() const
                 s += "   Содержимое:\n";
                 s += "   " + content.replace("\n", "\n   ") + "\n";
             }
-        }
+        }*/
     }
 
     if(file_counter == 0){
@@ -246,7 +248,6 @@ QString MainWindow::buildProjectContext() const
     return s;
 }
 
-
 void MainWindow::applyChanges(){
     if (m_pending.isEmpty()) { QMessageBox::information(this,"Nothing to apply","No pending changes."); return; }
     ChangesDialog dlg(this);
@@ -255,7 +256,7 @@ void MainWindow::applyChanges(){
         QString err;
         QList<Change> copy = m_pending;
         if (!m_applier.apply(copy, &err)) { QMessageBox::critical(this,"Apply failed", err); return; }
-        log(QString("Applied %1 change(s).").arg(m_pending.size()));
+        log(QString("Applied %1 change(s). ").arg(m_pending.size()));
         m_pending.clear();
         rescan();
     } else {
@@ -282,10 +283,7 @@ void MainWindow::sendUserMessage(const QString& text){
 
     // ***  Оценка количества токенов ***
     int tokens = m_promptMgr.tokenCount(full);
-    log(QString("Отправляем запрос (%1 токенов) → %2")
-            .arg(tokens).arg(text));
-
-
+    log(QString("Отправляем запрос (%1 токенов) → %2").arg(tokens).arg(text));
 
 
 }
@@ -318,7 +316,6 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
     return QByteArray();
 }
 
-
 void MainWindow::handleAssistantFinished()
 {
     /* 1. Ответ LLM – полный текст (включая «лишние» строки) */
@@ -334,7 +331,6 @@ void MainWindow::handleAssistantFinished()
     }
 
     m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
-
 
     /* 4. Парсим команды */
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
@@ -436,9 +432,7 @@ void MainWindow::generateDescriptions()
             QString descrFileName = QFileInfo(descrPath).fileName();
 
             // 4. Логируем
-            log(QString("✓ Описан %1 → %2")
-                    .arg(relPath)
-                    .arg(descrFileName));
+            log(QString("✓ Описан %1 → %2").arg(relPath).arg(descrFileName));
         }
         ++processed;
         prog.setValue(processed);
@@ -452,3 +446,9 @@ void MainWindow::generateDescriptions()
 }
 
 void MainWindow::log(const QString& m){ m_log->appendPlainText(m); }
+
+// <‑‑ Добавлен новый слот для обработки текста от Vosk
+void MainWindow::onVoskText(const QString& text){
+    log("Vosk recognized: " + text);
+    sendUserMessage(text);
+}
