@@ -57,6 +57,18 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
     // -----------------------------------------------------------------
 
+    // в MainWindow.cpp  (конструктор)
+    runSeqBtn = new QPushButton("Run sequence…", this);
+    btns->addWidget(runSeqBtn);
+    connect(runSeqBtn, &QPushButton::clicked, this, &MainWindow::runSequenceDialog);
+
+    // В конструкторе MainWindow добавить кнопку
+    editSeqBtn = new QPushButton("Edit sequences…", this);
+    btns->addWidget(editSeqBtn);
+    connect(editSeqBtn, &QPushButton::clicked, this, &MainWindow::editSequences);
+
+
+
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
     btns->addWidget(promptBtn);
@@ -102,6 +114,14 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     // m_voskWidget = new VoskWidget();
     // connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
     // m_voskWidget->show();
+
+    // Папка, где будем хранить наборы
+    QString seqRoot = QDir(m_dev_manager.devAssDir())
+                        .filePath("PromptSequences");
+    m_seqMgr.setRoot(seqRoot);
+    m_seqMgr.refresh();
+    ensureDefaultSequence();
+
 }
 
 void MainWindow::browse(){
@@ -322,6 +342,98 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
     return QByteArray();
 }
 
+void MainWindow::editSequences()
+{
+    // Откроем отдельное окно‑диалог с PromptSequenceEditor
+    // Пользователь выбирает файл из списка, редактирует, сохраняет.
+    // Для простоты покажем только один набор (первый в списке) – можно доработать.
+    if (m_seqMgr.sequences().isEmpty()) {
+        QMessageBox::information(this, "Нет наборов", "В папке нет ни одного *.seq.json");
+        return;
+    }
+
+    qDebug()<< "m_seqMgr.root() = "<< m_seqMgr.root();
+
+
+    // Выберем первый (можно добавить отдельный QComboBox)
+    QString filePath = m_seqMgr.fileList().first();
+    PromptSequence seq = m_seqMgr.sequences().value(filePath);
+
+    // Окно‑редактор
+    QDialog dlg(this);
+    dlg.setWindowTitle("Редактор последовательности");
+    dlg.resize(720, 540);
+    auto *lay = new QVBoxLayout(&dlg);
+    auto *editor = new PromptSequenceEditor(&dlg);
+    editor->setSequence(seq);
+    lay->addWidget(editor);
+    auto *bb = new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel, &dlg);
+    lay->addWidget(bb);
+    connect(bb, &QDialogButtonBox::accepted, &dlg, [&]{
+        // Сохраняем
+        PromptSequence edited = editor->sequence();
+        if (m_seqMgr.save(edited, filePath))
+            QMessageBox::information(&dlg, "Сохранено", "Последовательность сохранена.");
+        else
+            QMessageBox::warning(&dlg, "Ошибка", "Не удалось сохранить файл.");
+        dlg.accept();
+    });
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    dlg.exec();
+
+    // После закрытия – обновляем кеш
+    m_seqMgr.refresh();
+    ensureDefaultSequence();
+}
+
+void MainWindow::runSequenceDialog()
+{
+    // Обновляем список (на случай, если пользователь добавил файлы вручную)
+    m_seqMgr.refresh();
+    ensureDefaultSequence();
+
+    RunSequenceDialog dlg(m_seqMgr.sequences(), this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    QString path = dlg.selectedFilePath();
+    if (!m_seqMgr.sequences().contains(path)) {
+        QMessageBox::warning(this, "Ошибка", "Файл последовательности не найден.");
+        return;
+    }
+
+    m_currentSeq = m_seqMgr.sequences().value(path);
+    m_currentStepIdx = 0;
+    m_sequenceMode = true;
+    runNextStep();   // сразу стартуем первый шаг
+}
+
+void MainWindow::runNextStep()
+{
+    if (!m_sequenceMode) return;
+    if (m_currentStepIdx < 0 ||
+            m_currentStepIdx >= m_currentSeq.steps().size()) {
+        // конец последовательности
+        QMessageBox::information(this, "Готово",
+                                 "Последовательность выполнена полностью.");
+        m_sequenceMode = false;
+        return;
+    }
+
+    const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
+    QString resolved = PromptResolver::resolve(step.tmpl(), step, this);
+
+    // Логируем, показываем пользователю
+    log(QString("\n--- Шаг %1 ------------------------------------------------")
+        .arg(m_currentStepIdx+1));
+    log(resolved);
+
+    // Отправляем запрос так же, как обычный ввод пользователя
+    m_streamBuf.clear();
+    m_model.startStream(resolved);
+    // В истории сохраняем только запрос (не пользовательский текст)
+    m_history.push_back(qMakePair(QString("system"), resolved));
+}
+
 void MainWindow::handleAssistantFinished()
 {
     /* 1. Ответ LLM – полный текст (включая «лишние» строки) */
@@ -381,6 +493,18 @@ void MainWindow::handleAssistantFinished()
 
     /* 7. После применения обновляем список */
     rescan();
+
+
+    // После выполнения всех подтверждённых команд:
+    rescan(); // обновляем UI
+
+    // Если мы в режиме последовательности – переходим к следующему шагу
+    if (m_sequenceMode) {
+        ++m_currentStepIdx;
+        QTimer::singleShot(200, this, &MainWindow::runNextStep); // небольшая пауза
+    }
+
+
     qDeleteAll(toRun);
 }
 
@@ -458,3 +582,67 @@ void MainWindow::onVoskText(const QString& text){
     log("Vosk recognized: " + text);
     sendUserMessage(text);
 }
+
+/* ────────────────────────────────────────────────────── */
+void MainWindow::ensureDefaultSequence()
+{
+    // Путь к файлу default.seq.json
+    QString defaultFile = QDir(m_seqMgr.root()).filePath("default.seq.json");
+
+    if (QFile::exists(defaultFile))
+        return;        // уже есть – ничего не делаем
+
+    // Создаём объект‑шаблон
+    PromptSequence seq = defaultSequenceTemplate();
+
+    // Сохраняем
+    if (!m_seqMgr.save(seq, defaultFile))
+        qWarning() << "Не удалось создать файл default.seq.json";
+}
+
+
+/* ────────────────────────────────────────────────────── */
+PromptSequence MainWindow::defaultSequenceTemplate()
+{
+    // Шаг 1 – показать базовую информацию о проекте
+    PromptStep step1;
+    step1.setTemplate(
+        "Кратко о проекте:\n"
+        "  Корневой путь: {{PROJECT_ROOT}}\n"
+        "  Список файлов: \n{{FILE_LIST}}\n"
+        "  Доступные команды:\n{{SUPPORTED_COMMANDS}}\n"
+        "  Введите запрос для следующего шага:"
+    );
+    // Разрешённые команды: все, которые умеет система
+    QStringList allNames;
+    for (Command* c : CommandRegistry::all()) {
+        allNames << c->name();
+        delete c;
+    }
+    step1.setAllowedCommands(allNames);
+
+    // Шаг 2 – открываем (и показываем) какой‑то примерный файл, чтобы пользователь видел, как работает OPEN_FILE
+    PromptStep step2;
+    step2.setTemplate(
+        "Откройте файл config.json и выведите его содержимое.\n"
+        "Только команда OPEN_FILE доступна сейчас."
+    );
+    step2.setAllowedCommands(QStringList{"OPEN_FILE"});
+
+    // Шаг 3 – генерируем README.md
+    PromptStep step3;
+    step3.setTemplate(
+        "Сгенерируйте README.md, в котором будет список всех файлов проекта.\n"
+        "Доступна команда CREATE_FILE."
+    );
+    step3.setAllowedCommands(QStringList{"CREATE_FILE"});
+
+    PromptSequence seq("Default");
+    seq.setDescription("Базовый набор, позволяющий быстро начать работать с любым проектом.");
+    seq.addStep(step1);
+    seq.addStep(step2);
+    seq.addStep(step3);
+
+    return seq;
+}
+

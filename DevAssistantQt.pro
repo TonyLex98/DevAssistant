@@ -28,6 +28,10 @@ SOURCES += \
     src/command/ReplaceInFileCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
     src/core/DevAssManager.cpp \
+    src/core/PromptResolver.cpp \
+    src/core/PromptSequence.cpp \
+    src/core/PromptSequenceManager.cpp \
+    src/core/PromptStep.cpp \
     src/main.cpp \
     src/core/ProjectIndex.cpp \
     src/core/ChangeApplier.cpp \
@@ -39,6 +43,9 @@ SOURCES += \
     src/ui/OllamaSettingsDialog.cpp \
     src/ui/PromptEditorDialog.cpp \
     src/ui/ChangesDialog.cpp \
+    src/ui/PromptSequenceEditor.cpp \
+    src/ui/PromptStepDialog.cpp \
+    src/ui/RunSequenceDialog.cpp \
     src/utils/DescriptionGenerator.cpp \
     src/utils/PromptManager.cpp
 
@@ -67,6 +74,10 @@ HEADERS += \
     src/core/ChangeApplier.h \
     src/core/ModelAdapter.h \
     src/adapters/OllamaAdapter.h \
+    src/core/PromptResolver.h \
+    src/core/PromptSequence.h \
+    src/core/PromptSequenceManager.h \
+    src/core/PromptStep.h \
     src/ui/DescriptionDialog.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
@@ -74,6 +85,9 @@ HEADERS += \
     src/ui/OllamaSettingsDialog.h \
     src/ui/PromptEditorDialog.h \
     src/ui/ChangesDialog.h \
+    src/ui/PromptSequenceEditor.h \
+    src/ui/PromptStepDialog.h \
+    src/ui/RunSequenceDialog.h \
     src/utils/DescriptionGenerator.h \
     src/utils/PromptManager.h
 

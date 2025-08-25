@@ -27,6 +27,9 @@ public:
     QDir projectRoot() const { return m_projectRoot; }
     QDir devAssDir()   const { return m_devAssDir; }
 
+    /* -------------  Вспомогательный список файлов ------------- */
+    QString fileListText() const;  // <-- новое
+
     int historySize(){
         return m_historySize;
     }
@@ -42,8 +45,7 @@ public:
     QString current_all_prompt;
 
 private:
-    /* -------------  Вспомогательный список файлов ------------- */
-    QString fileListText() const;  // <-- новое
+
 
     /* -------------  Храним пути ------------- */
     QDir m_projectRoot;   // корень проекта

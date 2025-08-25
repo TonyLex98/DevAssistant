@@ -4,6 +4,7 @@
 #include <QPlainTextEdit>
 #include <QLineEdit>
 #include <QPair>
+#include <runSequenceDialog.h>
 #include "../core/ProjectIndex.h"
 #include "../core/ChangeApplier.h"
 #include "../adapters/OllamaAdapter.h"
@@ -17,6 +18,12 @@
 #include <OpenFileContextCommand.h>
 #include <QString>
 #include "../audio/VoskWidget.h"
+#include <PromptSequenceManager.h>
+#include <QMessageBox>
+#include  <PromptResolver.h>
+#include <QTimer>
+#include <PromptSequenceEditor.h>
+#include <QDialogButtonBox>
 
 class ChatDialog;
 class ModelsDialog;
@@ -28,6 +35,12 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent=nullptr);
+
+    const QString& projectRootPath() const { return m_projectRoot; }
+    PromptManager*  promptManager() { return &m_promptMgr; }
+    const QList<QPair<QString,QString>>& history() const { return m_history; }
+    const QString& openedFilesContent() const { return m_contextContent; }
+
 
 private slots:
     void browse();
@@ -49,6 +62,7 @@ private:
     void sendUserMessage(const QString& text);
     void onModelChunk(const QString& s);
     QByteArray extractJsonPart(const QByteArray& txt) const;
+    void editSequences();
 
 
 private:
@@ -74,9 +88,26 @@ private:
     QPushButton* applyBtn;
     QPushButton* undoBtn;
     QPushButton* browseBtn;
+    QPushButton* runSeqBtn;
+    QPushButton *editSeqBtn;
     DevAssManager m_dev_manager;
     QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
     VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
+
+    // ... уже есть
+    PromptSequenceManager m_seqMgr;          // менеджер наборов
+    PromptSequence        m_currentSeq;     // текущая выбранная последовательность
+    bool                  m_sequenceMode = false;
+    int                   m_currentStepIdx = -1; // -1 = не запущено
+
+    void runSequenceDialog();
+    void runNextStep();
+    /* ────── NEW ────── */
+    static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
+    void ensureDefaultSequence();                      // создаём, если нет
+    /* ────── END ────── */
+
+
 };
