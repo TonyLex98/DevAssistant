@@ -285,7 +285,7 @@ void MainWindow::sendUserMessage(const QString& text){
 
     m_streamBuf.clear();
     m_model.startStream(full);
-    m_history.push_back(qMakePair(QString("<user>"), text));
+    m_history.push_back(qMakePair(QString("user"), text));
 
     // ***  Оценка количества токенов ***
     int tokens = m_promptMgr.tokenCount(full);
@@ -336,7 +336,7 @@ void MainWindow::handleAssistantFinished()
         return;
     }
 
-    m_history.push_back(qMakePair(QString("<assistant>"), QString(fullResp)));
+    m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
 
     /* 4. Парсим команды */
     QVector<Command*> cmds = CommandParser::parse(jsonResp);

@@ -73,7 +73,7 @@ QString PromptManager::buildPrompt(const QString& userText,
     p += QString("Последняя история (последние %1 сообщений):\n").arg(m_historySize);
     int start = history.size() > m_historySize ? history.size() - m_historySize : 0;
     for (int i = start; i < history.size(); ++i)
-        p += history[i].first + ": " + history[i].second + "\n";
+        p += history[i].first + ": " + "<|message|>{{" + history[i].second + "}}" + "\n";
 
     /* 5. Текущий запрос */
     p += "\nТекущий запрос, на который ты, AI‑ассистент **ОБЯЗАН** ответить:\n" + userText;
