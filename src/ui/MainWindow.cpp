@@ -136,6 +136,7 @@ void MainWindow::browse(){
     m_projectRoot = d;
     m_rootEdit->setText(d);
     m_dev_manager.setProjectRoot(m_projectRoot);
+    m_promptMgr.setProjectRoot(m_projectRoot);
 
     if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {

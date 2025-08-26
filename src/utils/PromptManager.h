@@ -24,7 +24,7 @@ public:
                         const QList<QPair<QString,QString>>& history);   // <-- изменено
 
     /* -------------  Хранение путей ------------- */
-    QDir projectRoot() const { return m_projectRoot; }
+    QDir projectRoot() const;
     QDir devAssDir()   const { return m_devAssDir; }
 
     /* -------------  Вспомогательный список файлов ------------- */

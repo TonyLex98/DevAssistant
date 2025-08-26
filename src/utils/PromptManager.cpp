@@ -83,6 +83,11 @@ QString PromptManager::buildPrompt(const QString& userText,
     return p;
 }
 
+QDir PromptManager::projectRoot() const
+{
+    return m_projectRoot;
+}
+
 int PromptManager::tokenCount(const QString& text) const
 {
     // 1 токен ≈ 4 символа → округляем вверх

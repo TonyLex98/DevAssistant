@@ -52,3 +52,16 @@ QString PromptResolver::resolve(const QString &tmpl,
 
     return result;
 }
+
+QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
+{
+    QVector<ResolverInfo> vec;
+
+    vec.append({"PROJECT_ROOT",    "Корневая папка проекта"});
+    vec.append({"FILE_LIST",       "Список файлов проекта"});
+    vec.append({"HISTORY",         "Последние 20 сообщений из чата"});
+    vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
+    vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
+
+    return vec;
+}
