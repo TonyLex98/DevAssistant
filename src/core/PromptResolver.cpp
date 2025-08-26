@@ -40,15 +40,21 @@ QString PromptResolver::resolve(const QString &tmpl,
         if (!allowedSet.contains(c->name()))
             continue;
         // Формат как в PromptManager::supportedCommandsText()
+
         QJsonObject example = c->toJson();
-        QString json = QString::fromUtf8(QJsonDocument(example).toJson(QJsonDocument::Compact));
+        QString json = QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString());
         allowedList += "- " + c->name() + "\n  Формат: " + json + "\n\n";
         delete c;
     }
     result.replace("{{SUPPORTED_COMMANDS}}", allowedList.trimmed());
 
-    // 6) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
+    // 6) {{USER_QUERY}} – текущий запрос пользователя
+    result.replace("{{USER_QUERY}}", ctx->lastUserMessage());
+
+    // 7) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
+
+
 
     return result;
 }
@@ -62,6 +68,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"HISTORY",         "Последние 20 сообщений из чата"});
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
+    vec.append({"USER_QUERY",      "Текущий запрос пользователя"});  // ← новый
 
     return vec;
 }

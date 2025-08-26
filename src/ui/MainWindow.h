@@ -41,6 +41,7 @@ public:
     PromptManager*  promptManager() { return &m_promptMgr; }
     const QList<QPair<QString,QString>>& history() const { return m_history; }
     const QString& openedFilesContent() const { return m_contextContent; }
+    const QString& lastUserMessage() const { return m_lastUserMessage; }
 
 
 private slots:
@@ -55,6 +56,8 @@ private slots:
 
     void generateDescriptions();      // <‑‑ новый слот
     void onVoskText(const QString&);  // <‑‑ новый слот
+
+    void slot_updatelastUserMessage(const QString& lastUserMessage);
 
 private:
     QString buildProjectContext() const;
@@ -110,5 +113,6 @@ private:
     void ensureDefaultSequence();                      // создаём, если нет
     /* ────── END ────── */
 
+    QString m_lastUserMessage;
 
 };

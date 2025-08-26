@@ -128,6 +128,8 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     m_seqMgr.refresh();
     ensureDefaultSequence();
 
+    connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
+
 }
 
 void MainWindow::browse(){
@@ -589,6 +591,12 @@ void MainWindow::log(const QString& m){ m_log->appendPlainText(m); }
 void MainWindow::onVoskText(const QString& text){
     log("Vosk recognized: " + text);
     sendUserMessage(text);
+}
+
+void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
+{
+    m_lastUserMessage = lastUserMessage;
+    qDebug()<<"m_lastUserMessage = "<<m_lastUserMessage;
 }
 
 /* ────────────────────────────────────────────────────── */

@@ -28,6 +28,12 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     });
 
     pslot_updateModelsList();
+
+    connect(m_input,  &InputTextEdit::signal_textEdited, this, [this](const QString &str){
+
+        emit signal_updatelastUserMessage(str);
+    });
+
 }
 
 void ChatDialog::onSend(){
@@ -62,4 +68,11 @@ void ChatDialog::finishAssistantMessage(){
 void ChatDialog::sendMessageToChat(const QString &text)
 {
     emit sendMessage(text);
+}
+
+InputTextEdit::InputTextEdit(QWidget *parent) : QTextEdit(parent)
+{
+    connect(this, &InputTextEdit::textChanged, this, [this](){
+        emit signal_textEdited(toPlainText());
+    });
 }

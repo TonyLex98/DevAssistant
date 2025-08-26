@@ -10,9 +10,10 @@
 class InputTextEdit : public QTextEdit {
     Q_OBJECT
 public:
-    explicit InputTextEdit(QWidget* parent = nullptr) : QTextEdit(parent) {}
+    explicit InputTextEdit(QWidget* parent = nullptr);
 signals:
     void sendMessage();
+    void signal_textEdited(const QString & text);
 protected:
     void keyPressEvent(QKeyEvent* e) override {
         if (e->key() == Qt::Key_Return && !(e->modifiers() & Qt::ShiftModifier)) {
@@ -34,6 +35,7 @@ public:
 
 signals:
     void sendMessage(const QString& text);
+    void signal_updatelastUserMessage(const QString& lastUserMessage);
 
 private slots:
     void onSend();
