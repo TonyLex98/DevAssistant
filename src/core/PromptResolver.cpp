@@ -51,7 +51,10 @@ QString PromptResolver::resolve(const QString &tmpl,
     // 6) {{USER_QUERY}} – текущий запрос пользователя
     result.replace("{{USER_QUERY}}", ctx->lastUserMessage());
 
-    // 7) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
+    // 7) {{OPEN_FILES}} – текущий запрос пользователя
+    result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
+
+    // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
 
 
@@ -68,7 +71,8 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"HISTORY",         "Последние 20 сообщений из чата"});
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
-    vec.append({"USER_QUERY",      "Текущий запрос пользователя"});  // ← новый
+    vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
+    vec.append({"OPEN_FILES",      "Открытые файлы"});
 
     return vec;
 }
