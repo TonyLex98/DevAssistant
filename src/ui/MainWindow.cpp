@@ -116,8 +116,14 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     // m_voskWidget->show();
 
     // Папка, где будем хранить наборы
-    QString seqRoot = QDir(m_dev_manager.devAssDir())
-                        .filePath("PromptSequences");
+    QString seqRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                        .append("/DevelopersAssistant/PromptSequences");
+
+    // Создаём каталог, если его нет
+    QDir seqDir(seqRoot);
+    if (!seqDir.exists())
+        seqDir.mkpath(".");
+
     m_seqMgr.setRoot(seqRoot);
     m_seqMgr.refresh();
     ensureDefaultSequence();
@@ -130,6 +136,7 @@ void MainWindow::browse(){
     m_projectRoot = d;
     m_rootEdit->setText(d);
     m_dev_manager.setProjectRoot(m_projectRoot);
+
     if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {
         qCritical() << "Не удалось подготовить DevelopersAssistant / .dapro";

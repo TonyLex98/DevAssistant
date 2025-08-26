@@ -24,6 +24,7 @@
 #include <QTimer>
 #include <PromptSequenceEditor.h>
 #include <QDialogButtonBox>
+#include <QStandardPaths>
 
 class ChatDialog;
 class ModelsDialog;
