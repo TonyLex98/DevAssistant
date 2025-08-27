@@ -2,6 +2,16 @@
 #include <QSettings>
 #include <QCoreApplication>
 
+const QVariantMap &AppConfig::getParams() const
+{
+    return params;
+}
+
+void AppConfig::setParams(const QVariantMap &newParams)
+{
+    params = newParams;
+}
+
 void AppConfig::load(){
     QSettings s;
     lastProjectPath = s.value("ui/lastProjectPath").toString();

@@ -46,8 +46,8 @@ static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
 }
 
 MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
-    AppConfig cfg_init; cfg_init.load();
-    if (!cfg_init.lastProjectPath.isEmpty()) m_projectRoot = cfg_init.lastProjectPath;
+    //AppConfig cfg_init; cfg_init.load();
+    //if (!cfg_init.lastProjectPath.isEmpty()) m_projectRoot = cfg_init.lastProjectPath;
     setWindowTitle("DevAssistantQt");
     QWidget* c = new QWidget(this);
     setCentralWidget(c);
@@ -242,7 +242,7 @@ void MainWindow::openSettings(){
         QVariantMap opts = d.params();
         if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
         // persist
-        { AppConfig cfg; cfg.load(); cfg.params = opts; cfg.save(); }
+        //{ AppConfig cfg; cfg.load(); cfg.params = opts; cfg.save(); }
         log("Settings applied.");
     }
 }
@@ -474,7 +474,7 @@ void MainWindow::runNextStep()
     m_streamBuf.clear();
     m_model.startStream(resolved);
     // В истории сохраняем только запрос (не пользовательский текст)
-    m_history.push_back(qMakePair(QString("system"), resolved));
+    //m_history.push_back(qMakePair(QString("system"), resolved));
 }
 
 void MainWindow::handleAssistantFinished()

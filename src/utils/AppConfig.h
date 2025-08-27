@@ -12,4 +12,6 @@ public:
 
     void load();
     void save() const;
+    const QVariantMap &getParams() const;
+    void setParams(const QVariantMap &newParams);
 };
