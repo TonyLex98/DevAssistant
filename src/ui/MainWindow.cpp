@@ -8,11 +8,46 @@
 #include "../ui/ChatDialog.h"
 #include "../ui/ModelsDialog.h"
 #include "../ui/OllamaSettingsDialog.h"
+#include "../utils/AppConfig.h"
 #include "../ui/PromptEditorDialog.h"
 #include "../ui/ChangesDialog.h"
 #include <QDir>
+#include <QInputDialog>
+#include <QRegularExpression>
+
+static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
+    QByteArray raw = text.toUtf8();
+    QList<QByteArray> parts;
+    const char* s = raw.constData();
+    int n = raw.size();
+    bool in_str=false, esc=false;
+    int depth=0, start=-1;
+    for (int i=0;i<n;i++){
+        char c = s[i];
+        if (in_str){
+            if (esc){ esc=false; continue; }
+            if (c=='\\') { esc=true; continue; }
+            if (c=='"') { in_str=false; continue; }
+            continue;
+        }
+        if (c=='"'){ in_str=true; continue; }
+        if (c=='{' || c=='['){
+            if (depth==0) start=i;
+            depth++;
+        } else if (c=='}' || c==']'){
+            depth--;
+            if (depth==0 && start!=-1){
+                parts.append(raw.mid(start, i-start+1));
+                start=-1;
+            }
+        }
+    }
+    return parts;
+}
 
 MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
+    AppConfig cfg_init; cfg_init.load();
+    if (!cfg_init.lastProjectPath.isEmpty()) m_projectRoot = cfg_init.lastProjectPath;
     setWindowTitle("DevAssistantQt");
     QWidget* c = new QWidget(this);
     setCentralWidget(c);
@@ -110,11 +145,6 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
 
     left->addWidget(m_chat);
 
-    // <‑‑ Инициализируем VoskWidget и показываем его
-    // m_voskWidget = new VoskWidget();
-    // connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
-    // m_voskWidget->show();
-
     // Папка, где будем хранить наборы
     QString seqRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
                         .append("/DevelopersAssistant/PromptSequences");
@@ -131,6 +161,7 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
 }
+
 
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
@@ -210,6 +241,8 @@ void MainWindow::openSettings(){
         m_model.setEndpoint(QUrl(d.endpoint()));
         QVariantMap opts = d.params();
         if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
+        // persist
+        { AppConfig cfg; cfg.load(); cfg.params = opts; cfg.save(); }
         log("Settings applied.");
     }
 }
@@ -339,19 +372,19 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
         return txt.mid(start, end - start + 1);           // [ … ]
     }
 
-    /* Ищем объект … */
-    start = txt.indexOf('{');
-    end   = txt.lastIndexOf('}');
-    if (start >= 0 && end >= start) {
-        QByteArray obj = txt.mid(start, end - start + 1);
-        // оборачиваем в массив, чтобы CommandParser работал
-        return QByteArray("[") + obj + QByteArray("]");
+    /* Ищем объект(ы) … */
+    QList<QByteArray> parts = splitConcatenatedJson_fromText(QString::fromUtf8(txt));
+    if (!parts.isEmpty()){
+        QByteArray joined = "[";
+        for (int i = 0; i < parts.size(); ++i) {
+            if (i) joined += ',';
+            joined += parts[i];
+        }
+        joined += "]";
+        return joined;
     }
-
-    // если ничего не найдено – возвращаем пустую строку
     return QByteArray();
 }
-
 void MainWindow::editSequences()
 {
     // Откроем отдельное окно‑диалог с PromptSequenceEditor
@@ -479,6 +512,39 @@ void MainWindow::handleAssistantFinished()
         return;
     }
     QList<Command*> toRun = dlg.confirmed();
+
+    /* 6. Обработка специальных команд (без изменений на диске) */
+    for (Command* c : toRun) {
+        if (c->name()=="ASK_USER") {
+            QString q = c->params().value("question").toString();
+            bool ok=false; QString ans = QInputDialog::getText(this, tr("Ответьте на вопрос нейросети"), q, QLineEdit::Normal, QString(), &ok);
+            if (ok) { m_history.push_back(qMakePair(QString("user"), ans)); }
+        } else if (c->name()=="OPEN_FILE_REGION" || c->name()=="OPEN_FILE") {
+            QJsonObject p = c->params(); QString path = p.value("path").toString(); QString abs = QDir(m_projectRoot).filePath(path);
+            QFile f(abs); if (f.open(QIODevice::ReadOnly)) {
+                QString txt = QString::fromUtf8(f.readAll()); f.close();
+                QString snippet;
+                if (c->name()=="OPEN_FILE_REGION") {
+                    int sLine = p.value("startLine").toInt(-1); int eLine = p.value("endLine").toInt(-1);
+                    QString region = p.value("region").toString();
+                    if (sLine>=1 && eLine>=sLine) {
+                        QStringList lines = txt.split("\n");
+                        sLine = qMax(1, sLine); eLine = qMin(eLine, lines.size());
+                        snippet = lines.mid(sLine-1, eLine-sLine+1).join("\n");
+                    } else if (!region.isEmpty()) {
+                        QRegularExpression re(region, QRegularExpression::DotMatchesEverythingOption|QRegularExpression::MultilineOption);
+                        auto m = re.match(txt);
+                        if (m.hasMatch()) snippet = m.captured(0);
+                    } else {
+                        snippet = txt;
+                    }
+                } else { snippet = txt; }
+                if (!snippet.isEmpty()) {
+                    m_contextContent += QString("\n==== %1 ====%2\n%3\n").arg(path).arg(c->name()=="OPEN_FILE_REGION"?" (region)":"").arg(snippet);
+                }
+            }
+        }
+    }
 
     /* 6. Применяем команды */
     QString err;
@@ -620,45 +686,66 @@ void MainWindow::ensureDefaultSequence()
 /* ────────────────────────────────────────────────────── */
 PromptSequence MainWindow::defaultSequenceTemplate()
 {
-    // Шаг 1 – показать базовую информацию о проекте
-    PromptStep step1;
-    step1.setTemplate(
-        "Кратко о проекте:\n"
-        "  Корневой путь: {{PROJECT_ROOT}}\n"
-        "  Список файлов: \n{{FILE_LIST}}\n"
-        "  Доступные команды:\n{{SUPPORTED_COMMANDS}}\n"
-        "  Введите запрос для следующего шага:"
+    // Step 1: Clarify the task if needed
+    PromptStep s1;
+    s1.setTemplate(
+        "Ты — ИИ-помощник по рефакторингу и правкам кода.\n"
+        "Контекст проекта:\n{{PROJECT_ROOT}}"
+        "Вот список файлов:\n{{FILE_LIST}}\n"
+        "\n{{HISTORY}}\n"
+        "Если задача пользователя не до конца ясна — задай до 3 уточняющих вопросов, используя команду ASK_USER (один JSON на вопрос)."
+        "Доступные команды: {{SUPPORTED_COMMANDS}}"
+        "Затем опиши краткий план действий."
     );
-    // Разрешённые команды: все, которые умеет система
-    QStringList allNames;
-    for (Command* c : CommandRegistry::all()) {
-        allNames << c->name();
-        delete c;
-    }
-    step1.setAllowedCommands(allNames);
+    s1.setAllowedCommands(QStringList{ "ASK_USER", "OPEN_FILE_REGION", "OPEN_FILE" });
 
-    // Шаг 2 – открываем (и показываем) какой‑то примерный файл, чтобы пользователь видел, как работает OPEN_FILE
-    PromptStep step2;
-    step2.setTemplate(
-        "Откройте файл config.json и выведите его содержимое.\n"
-        "Только команда OPEN_FILE доступна сейчас."
+    // Step 2: Gather minimal relevant context (snippets only)
+    PromptStep s2;
+    s2.setTemplate(
+        "На основе запроса и плана выбери минимальные необходимые участки кода."
+        "Используй OPEN_FILE_REGION (желательно c startLine/endLine или регуляркой) для точечных фрагментов."
+        "Если нужен целый файл (редко) — используй OPEN_FILE."
+        "Выведи только команды."
     );
-    step2.setAllowedCommands(QStringList{"OPEN_FILE"});
+    s2.setAllowedCommands(QStringList{ "OPEN_FILE_REGION", "OPEN_FILE" });
 
-    // Шаг 3 – генерируем README.md
-    PromptStep step3;
-    step3.setTemplate(
-        "Сгенерируйте README.md, в котором будет список всех файлов проекта.\n"
-        "Доступна команда CREATE_FILE."
+    // Step 3: Propose concrete edits as commands (dry‑run)
+    PromptStep s3;
+    s3.setTemplate(
+        "Сформируй набор правок."
+        "• Для замены — REPLACE_IN_FILE"
+        "• Для правки диапазона — EDIT_IN_RANGE"
+        "• Для создания — CREATE_FILE"
+        "• Для переименования/удаления — RENAME_FILE/DELETE_FILE"
+        "Покажи только список JSON-команд без пояснений.\n"
+        "Контекст:\n{{OPEN_FILES}}\n"
     );
-    step3.setAllowedCommands(QStringList{"CREATE_FILE"});
+    s3.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE" });
+
+    // Step 4: If compilation hints are needed, ask short questions (optional)
+    PromptStep s4;
+    s4.setTemplate(
+        "Если для точности правок не хватает 1-2 деталей — задай вопросы через ASK_USER, иначе верни пустой список."
+    );
+    s4.setAllowedCommands(QStringList{ "ASK_USER" });
+
+    // Step 5: Finalize edits
+    PromptStep s5;
+    s5.setTemplate(
+        "Выведи окончательные команды для применения изменений (повтори весь набор без пояснений)."
+    );
+    s5.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE" });
 
     PromptSequence seq("Default");
-    seq.setDescription("Базовый набор, позволяющий быстро начать работать с любым проектом.");
-    seq.addStep(step1);
-    seq.addStep(step2);
-    seq.addStep(step3);
-
+    seq.setDescription("Поэтапная последовательность правок: уточнение → сбор минимального контекста → черновик правок → уточнения → финальные команды.");
+    seq.addStep(s1);
+    seq.addStep(s2);
+    seq.addStep(s3);
+    seq.addStep(s4);
+    seq.addStep(s5);
     return seq;
-}
+};
+
+
+
 

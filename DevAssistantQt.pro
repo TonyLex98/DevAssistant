@@ -95,3 +95,10 @@ HEADERS += \
 #INCLUDEPATH += $$PWD/external/whisper.cpp
 #LIBS += -L$$PWD/external/whisper.cpp/bin -lwhisper
 
+
+SOURCES += src/utils/AppConfig.cpp
+SOURCES += src/command/OpenFileRegionCommand.cpp
+SOURCES += src/command/AskUserCommand.cpp
+HEADERS += src/utils/AppConfig.h
+HEADERS += src/command/OpenFileRegionCommand.h
+HEADERS += src/command/AskUserCommand.h

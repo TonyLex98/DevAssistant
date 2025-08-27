@@ -7,10 +7,14 @@
 #include "EditInRangeCommand.h"
 #include "WriteDescriptionCommand.h"
 #include "OpenFileContextCommand.h"
+#include "OpenFileRegionCommand.h"
+#include "AskUserCommand.h"
 
 QVector<Command*> CommandRegistry::all()
 {
     return {
+        new AskUserCommand(QString()),
+        new OpenFileRegionCommand(QString()),
         new CreateFileCommand(QString(), QByteArray()),
         new ReplaceInFileCommand(QString(), QByteArray()),
         new DeleteFileCommand(QString()),
@@ -81,12 +85,28 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     // +++ в CommandRegistry::create()
+    if (cmd == "OPEN_FILE_REGION") {
+        const QJsonObject p = obj["params"].toObject();
+        return new OpenFileRegionCommand(
+            p["path"].toString(),
+            p.value("region").toString(),
+            p.value("startLine").toInt(-1),
+            p.value("endLine").toInt(-1),
+            obj["description"].toString()
+        );
+    }
+
     if (cmd == "OPEN_FILE") {
         const QJsonObject p = obj["params"].toObject();
         return new OpenFileContextCommand(
             p["path"].toString(),
             obj["description"].toString()
         );
+    }
+
+        if (cmd == "ASK_USER") {
+        const QJsonObject p = obj["params"].toObject();
+        return new AskUserCommand(p.value("question").toString(), obj["description"].toString());
     }
 
     /* Неизвестная команда */
