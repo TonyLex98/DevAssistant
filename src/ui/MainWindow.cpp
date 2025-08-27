@@ -554,6 +554,7 @@ void MainWindow::handleAssistantFinished()
             break;
         }
 
+        /*
         if (c->name() == "OPEN_FILE") {
             auto* oc = static_cast<OpenFileContextCommand*>(c);
             if (!oc->content().isEmpty()) {
@@ -563,7 +564,7 @@ void MainWindow::handleAssistantFinished()
                     m_contextContent += "\n---\n";
                 m_contextContent += oc->content() + "\n";
             }
-        }
+        }*/
         /* … дополнительная логика для OPEN_FILE … */
     }
 

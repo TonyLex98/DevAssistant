@@ -8,30 +8,53 @@ static QList<QByteArray> splitConcatenatedJson(const QByteArray& raw)
     QList<QByteArray> parts;
     const char* s = raw.constData();
     int n = raw.size();
-    bool in_str=false, esc=false;
-    int depth=0, start=-1;
+    bool in_str = false, esc = false;
+    bool in_cmt = false, in_cpp_cmt = false; // C‑style и C++‑style комментарии
+    int depth = 0, start = -1;
     for (int i=0;i<n;i++){
         char c = s[i];
+        // 1) Строки (JSON‑строки)
         if (in_str){
-            if (esc){ esc=false; continue; }
-            if (c=='\\') { esc=true; continue; }
-            if (c=='"') { in_str=false; continue; }
+            if (esc){ esc = false; continue; }
+            if (c=='\\') { esc = true; continue; }
+            if (c=='"') { in_str = false; continue; }
             continue;
         }
-        if (c=='"'){ in_str=true; continue; }
+        // 2) C‑style комментарий /* ... */
+        if (in_cmt){
+            if (c=='*' && i+1<n && s[i+1]=='/'){
+                in_cmt = false;
+                ++i; continue;
+            }
+            continue;
+        }
+        // 3) C++‑style комментарий // ...
+        if (in_cpp_cmt){
+            if (c=='\n' || c=='\r'){ in_cpp_cmt = false; }
+            continue;
+        }
+        // 4) Начало комментария
+        if (c=='/' && i+1<n){
+            if (s[i+1]=='*'){ in_cmt = true; ++i; continue; }
+            if (s[i+1]=='/'){ in_cpp_cmt = true; ++i; continue; }
+        }
+        // 5) Строка начинается
+        if (c=='"'){ in_str = true; continue; }
+        // 6) Фигурные скобки
         if (c=='{' || c=='['){
-            if (depth==0) start=i;
+            if (depth==0) start = i;
             depth++;
         } else if (c=='}' || c==']'){
             depth--;
             if (depth==0 && start!=-1){
                 parts.append(raw.mid(start, i-start+1));
-                start=-1;
+                start = -1;
             }
         }
     }
     return parts;
 }
+
 
 
 QVector<Command*> CommandParser::parse(const QByteArray& json)
