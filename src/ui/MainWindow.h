@@ -59,6 +59,15 @@ private slots:
 
     void slot_updatelastUserMessage(const QString& lastUserMessage);
 
+
+public:
+    // Accessors used by PromptResolver
+    QString previousStepsText() const;
+    QString fileDescriptionsText() const;
+
+private slots:
+    void createNewSequence();
+
 private:
     QString buildProjectContext() const;
     void log(const QString& m);
@@ -94,11 +103,14 @@ private:
     QPushButton* browseBtn;
     QPushButton* runSeqBtn;
     QPushButton *editSeqBtn;
+    QPushButton *newSeqBtn;
     DevAssManager m_dev_manager;
     QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
     VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
+
+    QStringList m_prevSteps;
 
     // ... уже есть
     PromptSequenceManager m_seqMgr;          // менеджер наборов

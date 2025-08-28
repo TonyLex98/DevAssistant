@@ -102,6 +102,10 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     btns->addWidget(editSeqBtn);
     connect(editSeqBtn, &QPushButton::clicked, this, &MainWindow::editSequences);
 
+    newSeqBtn = new QPushButton("New sequence…", this);
+    btns->addWidget(newSeqBtn);
+    connect(newSeqBtn, &QPushButton::clicked, this, &MainWindow::createNewSequence);
+
 
 
     btns->addWidget(rescanBtn);
@@ -272,7 +276,7 @@ QString MainWindow::buildProjectContext() const
             f.endsWith(QStringLiteral(".dadescr")))
             continue;
 
-        s += " - " + f + '\n';
+        s += " - " + QDir::toNativeSeparators(abs) + '\n';
         ++file_counter;
 
         // ---------- 1. Считаем описание (если надо) ----------
@@ -465,6 +469,11 @@ void MainWindow::runNextStep()
     const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
     QString resolved = PromptResolver::resolve(step.tmpl(), step, this);
 
+    // Оценка токенов для контекста шага
+    {
+        int tokens = m_model.estimateTokens(resolved);
+        log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_currentStepIdx+1).arg(tokens));
+    }
     // Логируем, показываем пользователю
     log(QString("\n--- Шаг %1 ------------------------------------------------")
         .arg(m_currentStepIdx+1));
@@ -547,6 +556,20 @@ void MainWindow::handleAssistantFinished()
     }
 
     /* 6. Применяем команды */
+
+    /* Сводка для PREVIOUS_STEPS */
+    QStringList appliedSummary;
+    for (Command* c : toRun) {
+        QString one = c->name();
+        QJsonObject p = c->params();
+        if (p.contains("path")) one += QString(" path=%1").arg(p.value("path").toString());
+        if (p.contains("from") && p.contains("to")) one += QString(" %1→%2").arg(p.value("from").toString(), p.value("to").toString());
+        appliedSummary << one;
+    }
+    if (!appliedSummary.isEmpty()) {
+        m_prevSteps << QString("Шаг %1: %2").arg(m_currentStepIdx+1).arg(appliedSummary.join("; "));
+    }
+
     QString err;
     for (Command* c : toRun) {
         if (!c->apply(&m_dev_manager, &err)) {
@@ -750,3 +773,70 @@ PromptSequence MainWindow::defaultSequenceTemplate()
 
 
 
+
+
+
+QString MainWindow::previousStepsText() const
+{
+    if (m_prevSteps.isEmpty()) return QString("Пока ничего не выполнено.");
+    QString out;
+    for (const QString& s : m_prevSteps) out += " - " + s + "\n";
+    return out.trimmed();
+}
+
+QString MainWindow::fileDescriptionsText() const
+{
+    QString out;
+    QDir dev = m_dev_manager.devAssDir();
+    if (!dev.exists()) return out;
+
+    // Iterate through all *.dadescr files and include their content with absolute target path
+    QDirIterator it(dev.absolutePath(), QStringList()<<"*.dadescr", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()){
+        QString descrPath = it.next();
+        QFile f(descrPath);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        QString descr = QString::fromUtf8(f.readAll());
+        f.close();
+
+        // Derive original file path (without .dadescr) relative to project root
+        QString rel = dev.relativeFilePath(descrPath);
+        rel.chop(QString(".dadescr").size());
+        QString absTarget = QDir(m_projectRoot).filePath(rel);
+
+        out += "==== " + QDir::toNativeSeparators(absTarget) + " ====\n";
+        out += descr.trimmed() + "\n\n";
+    }
+    return out.trimmed();
+}
+
+void MainWindow::createNewSequence()
+{
+    // Ask user for name
+    bool ok=false;
+    QString name = QInputDialog::getText(this, "New sequence", "Name:", QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty()) return;
+
+    // Determine directory to save
+    QString dir;
+    if (!m_seqMgr.fileList().isEmpty()) {
+        dir = QFileInfo(m_seqMgr.fileList().first()).absolutePath();
+    } else {
+        dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                .append("/DevelopersAssistant/PromptSequences");
+        QDir().mkpath(dir);
+        m_seqMgr.setRoot(dir);
+    }
+    QString filePath = QDir(dir).filePath(name.trimmed() + ".seq.json");
+
+    // Create default template and save
+    PromptSequence seq = defaultSequenceTemplate();
+    seq.setName(name.trimmed());
+    if (!m_seqMgr.save(seq, filePath)) {
+        QMessageBox::warning(this, "Error", "Cannot save sequence to: " + filePath);
+        return;
+    }
+    m_seqMgr.refresh();
+    ensureDefaultSequence();
+    QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
+}

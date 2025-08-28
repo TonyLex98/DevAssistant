@@ -22,7 +22,7 @@ QString DescriptionGenerator::relativePath(const QString& absPath)
 QString DescriptionGenerator::createPrompt(const QString& content)
 {
     return QString(
-        "Составь формализованное, но краткое описание содержимого файла. Пиши по-русски и строго следуй формату ниже.\n"
+        "Составь формализованное, но очень краткое описание содержимого файла. Пиши по-русски и строго следуй формату ниже.\n"
         "\n"
         "Если файл содержит код, выполни статический разбор и выведи в Markdown:\n"
         "## Назначение файла\n"

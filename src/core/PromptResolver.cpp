@@ -54,7 +54,20 @@ QString PromptResolver::resolve(const QString &tmpl,
     // 7) {{OPEN_FILES}} – текущий запрос пользователя
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
 
-    // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
+    
+    // 6.1) {{FILE_DESCRIPTIONS}} — описания из папки DevelopersAssistant
+    result.replace("{{FILE_DESCRIPTIONS}}", ctx->fileDescriptionsText());
+
+    // 6.2) {{PREVIOUS_STEPS}} — краткая выжимка по уже выполненным шагам
+    result.replace("{{PREVIOUS_STEPS}}", ctx->previousStepsText());
+
+    // 6.3) {{TOKEN_COUNT}} — приблизительная оценка токенов для этого шаблона
+    {
+        // Простейшая эвристика: ~4 символа на токен
+        int approxTokens = (result.size() / 4) + 1;
+        result.replace("{{TOKEN_COUNT}}", QString::number(approxTokens));
+    }
+// 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
 
 
@@ -73,6 +86,9 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
     vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
     vec.append({"OPEN_FILES",      "Открытые файлы"});
+    vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
+    vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
+    vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
 
     return vec;
 }
