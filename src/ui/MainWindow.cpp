@@ -51,10 +51,21 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     setWindowTitle("DevAssistantQt");
     QWidget* c = new QWidget(this);
     setCentralWidget(c);
-    auto h = new QHBoxLayout(c);
+    auto h = new QHBoxLayout();
+
+    auto horizontalMain = new QHBoxLayout();
+    c->setLayout(horizontalMain);
+    ide_widget = new IDEWidget();
+    ide_widget->show();
+
+
 
     auto left = new QVBoxLayout();
+
+    //h->addWidget(ide_widget);
     h->addLayout(left,1);
+
+    //ide_widget->show();
 
     m_rootEdit = new QLineEdit(this);
     browseBtn = new QPushButton("Browse...", this);
@@ -62,6 +73,9 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     top->addWidget(m_rootEdit,1);
     top->addWidget(browseBtn);
     left->addLayout(top);
+
+
+
 
     m_files = new QListWidget(this);
     left->addWidget(m_files,1);
@@ -164,12 +178,19 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
 
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
+    horizontalMain->addWidget(ide_widget);
+    horizontalMain->addLayout(h);
+
+
+    //c->setLayout(horizontalMain);
 }
 
 
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
     if (d.isEmpty()) return;
+
+    ide_widget->openProjectbyPath(d);
     m_projectRoot = d;
     m_rootEdit->setText(d);
     m_dev_manager.setProjectRoot(m_projectRoot);

@@ -2,10 +2,18 @@
 TEMPLATE = app
 TARGET = DevAssistantQt
 CONFIG += qt warn_on release
-QT += widgets network multimedia
+QT += widgets network multimedia core gui widgets
 QMAKE_CXXFLAGS += -std=gnu++1z
 
-INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio
+CONFIG += c++17 object_parallel_to_source
+
+
+INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio src/uiide
+
+INCLUDEPATH += \
+    $$PWD/src/uiide/tree-sitter/lib/src \
+    $$PWD/src/uiide/tree-sitter/lib/include
+
 
 SOURCES += \
     src/audio/MicStreamWidget.cpp \
@@ -46,8 +54,16 @@ SOURCES += \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
     src/ui/RunSequenceDialog.cpp \
+    src/uiide/IDEWidget.cpp \
+    src/uiide/astgraphview.cpp \
+    src/uiide/codeeditor.cpp \
+    src/uiide/cpphighlighter.cpp \
+    src/uiide/methodeditdialog.cpp \
     src/utils/DescriptionGenerator.cpp \
-    src/utils/PromptManager.cpp
+    src/utils/PromptManager.cpp\
+    src/uiide/tree-sitter/lib/src/lib.c \
+    src/uiide/tree-sitter-cpp/src/parser.c \
+    src/uiide/tree-sitter-cpp/src/scanner.c
 
 HEADERS += \
     src/audio/MicStreamWidget.h \
@@ -88,6 +104,11 @@ HEADERS += \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \
+    src/uiide/IDEWidget.h \
+    src/uiide/astgraphview.h \
+    src/uiide/codeeditor.h \
+    src/uiide/cpphighlighter.h \
+    src/uiide/methodeditdialog.h \
     src/utils/DescriptionGenerator.h \
     src/utils/PromptManager.h
 
@@ -96,9 +117,13 @@ HEADERS += \
 #LIBS += -L$$PWD/external/whisper.cpp/bin -lwhisper
 
 
-SOURCES += src/utils/AppConfig.cpp
-SOURCES += src/command/OpenFileRegionCommand.cpp
-SOURCES += src/command/AskUserCommand.cpp
-HEADERS += src/utils/AppConfig.h
-HEADERS += src/command/OpenFileRegionCommand.h
-HEADERS += src/command/AskUserCommand.h
+SOURCES += $$PWD/src/utils/AppConfig.cpp
+SOURCES += $$PWD/src/command/OpenFileRegionCommand.cpp
+SOURCES += $$PWD/src/command/AskUserCommand.cpp
+HEADERS += $$PWD/src/utils/AppConfig.h
+HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
+HEADERS += $$PWD/src/command/AskUserCommand.h
+
+FORMS += \
+    src/uiide/IDEWidget.ui
+

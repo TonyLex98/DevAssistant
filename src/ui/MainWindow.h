@@ -25,6 +25,7 @@
 #include <PromptSequenceEditor.h>
 #include <QDialogButtonBox>
 #include <QStandardPaths>
+#include <IDEWidget.h>
 
 class ChatDialog;
 class ModelsDialog;
@@ -67,6 +68,7 @@ public:
 
 private slots:
     void createNewSequence();
+    //void onFileDoubleClicked(QListWidgetItem *item);
 
 private:
     QString buildProjectContext() const;
@@ -126,5 +128,6 @@ private:
     /* ────── END ────── */
 
     QString m_lastUserMessage;
+    IDEWidget *ide_widget;
 
 };
