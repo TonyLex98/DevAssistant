@@ -1,0 +1,5 @@
+src/uiide/tree-sitter-c/
+src/uiide/tree-sitter-cpp/
+src/uiide/tree-sitter-dart/
+src/uiide/tree-sitter-python/
+src/uiide/tree-sitter/
