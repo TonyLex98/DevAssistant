@@ -43,6 +43,8 @@ public:
     const QList<QPair<QString,QString>>& history() const { return m_history; }
     const QString& openedFilesContent() const { return m_contextContent; }
     const QString& lastUserMessage() const { return m_lastUserMessage; }
+    const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
+
 
 
 private slots:
@@ -128,6 +130,7 @@ private:
     /* ────── END ────── */
 
     QString m_lastUserMessage;
+    QString m_lastAssistantMessage;
     IDEWidget *ide_widget;
 
 };

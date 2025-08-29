@@ -506,27 +506,27 @@ void MainWindow::runNextStep()
     // В истории сохраняем только запрос (не пользовательский текст)
     //m_history.push_back(qMakePair(QString("system"), resolved));
 }
-
+/*
 void MainWindow::handleAssistantFinished()
 {
-    /* 1. Ответ LLM – полный текст (включая «лишние» строки) */
+    // 1. Ответ LLM – полный текст (включая «лишние» строки)
     QByteArray fullResp = m_streamBuf.toUtf8();
 
-    /* 2. Выбираем только JSON‑часть */
+    // 2. Выбираем только JSON‑часть
     QByteArray jsonResp = extractJsonPart(fullResp);
 
-    /* 3. Проверяем, что JSON найден */
+    // 3. Проверяем, что JSON найден
     if (jsonResp.isEmpty()) {
         log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
-        return;
+        //return;
     }
 
     m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
 
-    /* 4. Парсим команды */
+    // 4. Парсим команды
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
 
-    /* ... остальная часть функции остаётся без изменений ... */
+    // ... остальная часть функции остаётся без изменений ...
     //m_history.push_back(qMakePair(QString("<assistant>"), QString(fullResp)));
 
     if (cmds.isEmpty()) {
@@ -534,7 +534,7 @@ void MainWindow::handleAssistantFinished()
         return;
     }
 
-    /* 5. Подтверждение пользователем */
+    // 5. Подтверждение пользователем
     CommandConfirmDialog dlg(cmds.toList(), this);
     if (dlg.exec() != QDialog::Accepted) {
         log("Пользователь отклонил команды");
@@ -543,7 +543,7 @@ void MainWindow::handleAssistantFinished()
     }
     QList<Command*> toRun = dlg.confirmed();
 
-    /* 6. Обработка специальных команд (без изменений на диске) */
+    // 6. Обработка специальных команд (без изменений на диске)
     for (Command* c : toRun) {
         if (c->name()=="ASK_USER") {
             QString q = c->params().value("question").toString();
@@ -576,9 +576,9 @@ void MainWindow::handleAssistantFinished()
         }
     }
 
-    /* 6. Применяем команды */
+    // 6. Применяем команды
 
-    /* Сводка для PREVIOUS_STEPS */
+    // Сводка для PREVIOUS_STEPS
     QStringList appliedSummary;
     for (Command* c : toRun) {
         QString one = c->name();
@@ -598,26 +598,124 @@ void MainWindow::handleAssistantFinished()
             break;
         }
 
-        /*
-        if (c->name() == "OPEN_FILE") {
-            auto* oc = static_cast<OpenFileContextCommand*>(c);
-            if (!oc->content().isEmpty()) {
-                m_contextContent += "Содержимое файла " + QString("\"") + oc->path() +"\"\n";
-
-                if (!m_contextContent.isEmpty())
-                    m_contextContent += "\n---\n";
-                m_contextContent += oc->content() + "\n";
-            }
-        }*/
-        /* … дополнительная логика для OPEN_FILE … */
     }
 
-    /* 7. После применения обновляем список */
+    // 7. После применения обновляем список
     rescan();
 
 
     // После выполнения всех подтверждённых команд:
     rescan(); // обновляем UI
+
+    // Если мы в режиме последовательности – переходим к следующему шагу
+    if (m_sequenceMode) {
+        ++m_currentStepIdx;
+        QTimer::singleShot(200, this, &MainWindow::runNextStep); // небольшая пауза
+    }
+
+
+    qDeleteAll(toRun);
+}
+*/
+
+void MainWindow::handleAssistantFinished()
+{
+    // 1. Ответ LLM – полный текст (включая «лишние» строки)
+    QByteArray fullResp = m_streamBuf.toUtf8();
+
+    // 2. Выбираем только JSON‑часть
+    QByteArray jsonResp = extractJsonPart(fullResp);
+
+    // 3. Проверяем, что JSON найден
+    if (jsonResp.isEmpty()) {
+        log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
+        //return;
+    }
+
+    m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
+
+    m_lastAssistantMessage = fullResp;
+
+    // 4. Парсим команды
+    QVector<Command*> cmds = CommandParser::parse(jsonResp);
+
+    // ... остальная часть функции остаётся без изменений ...
+    //m_history.push_back(qMakePair(QString("<assistant>"), QString(fullResp)));
+
+    if (cmds.isEmpty()) {
+        log("LLM не вернул ни одной команды");
+        //return;
+    }
+
+    // 5. Подтверждение пользователем
+    CommandConfirmDialog dlg(cmds.toList(), this);
+    if (dlg.exec() != QDialog::Accepted) {
+        log("Пользователь отклонил команды");
+        qDeleteAll(cmds);
+        return;
+    }
+    QList<Command*> toRun = dlg.confirmed();
+
+    // 6. Обработка специальных команд (без изменений на диске)
+    for (Command* c : toRun) {
+        if (c->name()=="ASK_USER") {
+            QString q = c->params().value("question").toString();
+            bool ok=false; QString ans = QInputDialog::getText(this, tr("Ответьте на вопрос нейросети"), q, QLineEdit::Normal, QString(), &ok);
+            if (ok) { m_history.push_back(qMakePair(QString("user"), ans)); }
+        } else if (c->name()=="OPEN_FILE_REGION" || c->name()=="OPEN_FILE") {
+            QJsonObject p = c->params(); QString path = p.value("path").toString(); QString abs = QDir(m_projectRoot).filePath(path);
+            QFile f(abs); if (f.open(QIODevice::ReadOnly)) {
+                QString txt = QString::fromUtf8(f.readAll()); f.close();
+                QString snippet;
+                if (c->name()=="OPEN_FILE_REGION") {
+                    int sLine = p.value("startLine").toInt(-1); int eLine = p.value("endLine").toInt(-1);
+                    QString region = p.value("region").toString();
+                    if (sLine>=1 && eLine>=sLine) {
+                        QStringList lines = txt.split("\n");
+                        sLine = qMax(1, sLine); eLine = qMin(eLine, lines.size());
+                        snippet = lines.mid(sLine-1, eLine-sLine+1).join("\n");
+                    } else if (!region.isEmpty()) {
+                        QRegularExpression re(region, QRegularExpression::DotMatchesEverythingOption|QRegularExpression::MultilineOption);
+                        auto m = re.match(txt);
+                        if (m.hasMatch()) snippet = m.captured(0);
+                    } else {
+                        snippet = txt;
+                    }
+                } else { snippet = txt; }
+                if (!snippet.isEmpty()) {
+                    m_contextContent += QString("\n==== %1 ====%2\n%3\n").arg(path).arg(c->name()=="OPEN_FILE_REGION"?" (region)":"").arg(snippet);
+                }
+            }
+        }
+    }
+
+    // 6. Применяем команды
+
+    // Сводка для PREVIOUS_STEPS
+    QStringList appliedSummary;
+    for (Command* c : toRun) {
+        QString one = c->name();
+        QJsonObject p = c->params();
+        if (p.contains("path")) one += QString(" path=%1").arg(p.value("path").toString());
+        if (p.contains("from") && p.contains("to")) one += QString(" %1→%2").arg(p.value("from").toString(), p.value("to").toString());
+        appliedSummary << one;
+    }
+    if (!appliedSummary.isEmpty()) {
+        m_prevSteps << QString("Шаг %1: %2").arg(m_currentStepIdx+1).arg(appliedSummary.join("; "));
+    }
+
+    QString err;
+    for (Command* c : toRun) {
+        if (!c->apply(&m_dev_manager, &err)) {
+            QMessageBox::warning(this, "Ошибка выполнения", err);
+            break;
+        }
+
+    }
+
+    // 7. После применения обновляем список
+    rescan();
+
 
     // Если мы в режиме последовательности – переходим к следующему шагу
     if (m_sequenceMode) {

@@ -51,6 +51,9 @@ QString PromptResolver::resolve(const QString &tmpl,
     // 6) {{USER_QUERY}} – текущий запрос пользователя
     result.replace("{{USER_QUERY}}", ctx->lastUserMessage());
 
+    // Последний ответ ассистента
+    result.replace("{{LAST_ASSISTANTS_RESPONSE}}", ctx->lastAssistantMessage());
+
     // 7) {{OPEN_FILES}} – текущий запрос пользователя
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
 
@@ -85,6 +88,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
     vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
+    vec.append({"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистента"});
     vec.append({"OPEN_FILES",      "Открытые файлы"});
     vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
     vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
