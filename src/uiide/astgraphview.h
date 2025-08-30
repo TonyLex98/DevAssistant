@@ -13,9 +13,11 @@ public:
 
 signals:
     void openAt(int line, int column);
+    void nodeDoubleClicked(const QJsonObject &node);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+     void mouseDoubleClickEvent(QMouseEvent *event) override;   // добавлено
 
 private:
     QGraphicsScene *scene_;
@@ -23,6 +25,7 @@ private:
     QVector<Node> nodes;
 
     QJsonObject rootAst_;                          // ← хранит весь JSON‑объект
+    QMap<int, QJsonObject> nodeMap_;    // id → JSON‑узел
 
     // Вспомогательные функции для формирования надписей
     QString nodeLabel(const QJsonObject &node) const;

@@ -14,6 +14,7 @@
 #include <QTabWidget>
 #include <QStatusBar>
 #include <QApplication>
+#include <methodeditdialog.h>
 
 extern "C" const TSLanguage *tree_sitter_cpp();
 extern "C" const TSLanguage *tree_sitter_python();
@@ -71,6 +72,9 @@ IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
 
     //connect(openProjectBtn, &QPushButton::clicked, this, &IDEWidget::onOpenProjectBtnClicked);
     //statusBar()->showMessage("Ready");
+
+    connect(astGraph, &ASTGraphView::nodeDoubleClicked,
+            this, &IDEWidget::onGraphNodeDoubleClicked);
 
 
 }
@@ -287,6 +291,37 @@ void IDEWidget::handleSaveRequest() {
 
     // После сохранения обновляем AST/Graph
     parseFile(currentFilePath);
+}
+
+void IDEWidget::onGraphNodeDoubleClicked(const QJsonObject &node) {
+    // Повторяем логику двойного щелчка в Outline‑tree
+    const QString type = node["type"].toString();
+    if (type.contains("function") || type.contains("method") ||
+            type.contains("class") || type.contains("struct")) {
+
+        MethodEditDialog dialog(this);
+
+        size_t start = static_cast<size_t>(node["start_byte"].toInt());
+        size_t end   = static_cast<size_t>(node["end_byte"].toInt());
+        QString original = QString::fromStdString(sourceCode.substr(start, end - start));
+        dialog.setCode(original);
+
+        if (dialog.exec() == QDialog::Accepted) {
+            QString newCode = dialog.getCode();
+
+            size_t s = static_cast<size_t>(node["start_byte"].toInt());
+            size_t e = static_cast<size_t>(node["end_byte"].toInt());
+            std::string newSource = sourceCode.substr(0, s) + newCode.toStdString() + sourceCode.substr(e);
+
+            sourceCode = newSource;
+            QFile file(currentFilePath);
+            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                file.write(sourceCode.c_str());
+                file.close();
+            }
+            parseFile(currentFilePath);
+        }
+    }
 }
 
 

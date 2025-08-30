@@ -35,6 +35,9 @@ private slots:
     // Внутренний слот, обрабатывающий Ctrl+S
     void handleSaveRequest();
 
+    void onGraphNodeDoubleClicked(const QJsonObject &node);
+
+
 
 signals:
     void fileModified(bool modified);

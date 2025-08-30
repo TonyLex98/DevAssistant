@@ -57,12 +57,12 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
 */
 
 // Основная логика построения графа
+// ---------- построение графа ----------
 void ASTGraphView::setAST(const QJsonObject &ast) {
-    // Сохраняем полный AST
     rootAst_ = ast;
-
     scene_->clear();
     nodes.clear();
+    nodeMap_.clear();
 
     QJsonArray children = ast["children"].toArray();
     int x = 20, y = 20;
@@ -87,6 +87,8 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
             n.start_row = c["start_row"].toInt();
             n.start_col = c["start_column"].toInt();
             nodes.push_back(n);
+
+            nodeMap_[n.id] = c;    // <‑‑ храним объект
 
             x += dx;
             if (x > 1000) { x = 20; y += dy; }
@@ -223,3 +225,16 @@ QString ASTGraphView::nodeLabel(const QJsonObject &node) const {
     // Для остальных типов – просто имя типа
     return type;
 }
+
+// ---------- двойной щелчок ----------
+void ASTGraphView::mouseDoubleClickEvent(QMouseEvent *event) {
+    QPointF p = mapToScene(event->pos());
+    for (const auto &n : nodes) {
+        if (n.rect.contains(p)) {
+            emit nodeDoubleClicked(nodeMap_[n.id]);   // посылаем целый JSON‑узел
+            break;
+        }
+    }
+    QGraphicsView::mouseDoubleClickEvent(event);
+}
+
