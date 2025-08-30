@@ -12,7 +12,7 @@ public:
 private slots:
     void onAccept();
 
-private:
+private://[eq
     QListWidget* m_list=nullptr;
     QString m_selected;
     OllamaAdapter* m_adapter=nullptr;
