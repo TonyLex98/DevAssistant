@@ -33,6 +33,7 @@ public:
 
 signals:
     void foldToggled(int startLine, bool collapsed);
+    void requestSave();
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

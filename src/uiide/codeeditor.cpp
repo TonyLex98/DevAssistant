@@ -199,5 +199,9 @@ void CodeEditor::keyPressEvent(QKeyEvent *e) {
         textCursor().insertText("\t"); // вместо 4 пробелов
         return;
     }
+    if (e->modifiers() & Qt::ControlModifier && e->key() == Qt::Key_S) {
+        emit requestSave();   // пользователь нажал Ctrl+S
+        return;               // не обрабатываем дальше
+    }
     QPlainTextEdit::keyPressEvent(e);
 }

@@ -16,12 +16,17 @@
 #include <QApplication>
 
 extern "C" const TSLanguage *tree_sitter_cpp();
+extern "C" const TSLanguage *tree_sitter_python();
+extern "C" const TSLanguage *tree_sitter_dart();
 
 IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
     // Language map
     langMap[".h"] = tree_sitter_cpp;
     langMap[".cpp"] = tree_sitter_cpp;
     langMap[".hpp"] = tree_sitter_cpp;
+
+    langMap[".py"]   = tree_sitter_python;   // <‑‑ добавляем
+    langMap[".dart"] = tree_sitter_dart;    // <‑‑ добавляем
 
 
     //openProjectBtn = new QPushButton("Открыть проект");
@@ -56,8 +61,18 @@ IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
     //setCentralWidget(this);
     resize(1400, 900);
 
+// Подключаем сигнал о запросе сохранения
+    connect(codeEditor, &CodeEditor::requestSave,
+            this, &IDEWidget::handleSaveRequest);
+
+    // Сигнал о изменении документа
+    connect(codeEditor->document(), &QTextDocument::modificationChanged,
+            this, &IDEWidget::fileModified);
+
     //connect(openProjectBtn, &QPushButton::clicked, this, &IDEWidget::onOpenProjectBtnClicked);
     //statusBar()->showMessage("Ready");
+
+
 }
 
 IDEWidget::~IDEWidget() {}
@@ -79,6 +94,8 @@ void IDEWidget::onFileClicked(const QModelIndex &index) {
 void IDEWidget::parseFile(const QString &filePath) {
     currentFilePath = filePath;
 
+
+
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this, "Error", "Cannot open file");
@@ -87,8 +104,17 @@ void IDEWidget::parseFile(const QString &filePath) {
     sourceCode = file.readAll().toStdString();
     file.close();
 
+    // 1️⃣ Удаляем старый подсветчик
+    if (currentHighlighter) {
+        delete currentHighlighter;          // Qt удалит его при уничтожении
+        currentHighlighter = nullptr;
+    }
+
+    // 2️⃣ Создаём новый
     QString ext = QFileInfo(filePath).suffix();
     ext = "." + ext;
+    currentHighlighter = createHighlighter(ext);
+
     if (!langMap.contains(ext)) {
         QMessageBox::warning(this, "Error", "Unsupported file type");
         return;
@@ -112,6 +138,7 @@ void IDEWidget::parseFile(const QString &filePath) {
 
     // Update code editor text
     codeEditor->setPlainText(QString::fromStdString(sourceCode));
+    codeEditor->document()->setModified(false);   // <-- сброс
 
     // Build side outline
     astTree->clear();
@@ -242,6 +269,26 @@ void IDEWidget::onGraphOpenAt(int line, int column) {
     codeEditor->setFocus();
 }
 
+void IDEWidget::handleSaveRequest() {
+    if (currentFilePath.isEmpty())
+        return; // Можно добавить диалог «Save As…»
+
+    QFile file(currentFilePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Error", "Cannot write file");
+        return;
+    }
+    file.write(codeEditor->toPlainText().toUtf8());
+    file.close();
+
+    // Обнуляем флаг «модифицировано»
+    codeEditor->document()->setModified(false);
+    emit fileModified(false);
+
+    // После сохранения обновляем AST/Graph
+    parseFile(currentFilePath);
+}
+
 
 void IDEWidget::updateFoldsFromAst() {
     QVector<CodeEditor::FoldRange> ranges;
@@ -268,4 +315,16 @@ void IDEWidget::updateFoldsFromAst() {
     walk(astJson);
 
     codeEditor->setFoldRanges(ranges);
+}
+
+QSyntaxHighlighter *IDEWidget::createHighlighter(const QString &ext)
+{
+    if (ext == ".cpp" || ext == ".h" || ext == ".hpp")
+        return new CppHighlighter(codeEditor->document());   // parent = this → авто‑delete
+    else if (ext == ".py")
+        return new PythonHighlighter(codeEditor->document());
+    else if (ext == ".dart")
+        return new DartHighlighter(codeEditor->document());
+    else
+        return nullptr;   // для языков без подсветки
 }

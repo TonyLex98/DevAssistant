@@ -26,6 +26,19 @@
 #include <QDialogButtonBox>
 #include <QStandardPaths>
 #include <IDEWidget.h>
+#include <QToolBar>
+#include <QDockWidget>
+#include <QToolButton>
+#include <QMenu>
+#include <QAction>
+#include <QSplitter>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QInputDialog>
+#include <QDir>
+#include <QStandardPaths>
+#include <QTabWidget>
+#include <QPushButton>
 
 class ChatDialog;
 class ModelsDialog;
@@ -132,5 +145,7 @@ private:
     QString m_lastUserMessage;
     QString m_lastAssistantMessage;
     IDEWidget *ide_widget;
+
+    QSplitter *mainSplitter;
 
 };

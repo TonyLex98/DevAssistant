@@ -9,6 +9,7 @@ class CppHighlighter : public QSyntaxHighlighter {
 public:
     explicit CppHighlighter(QTextDocument *parent = nullptr);
 
+
 protected:
     void highlightBlock(const QString &text) override;
 

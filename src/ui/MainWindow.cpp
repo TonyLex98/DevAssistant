@@ -45,82 +45,40 @@ static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
     return parts;
 }
 
-MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
-    //AppConfig cfg_init; cfg_init.load();
-    //if (!cfg_init.lastProjectPath.isEmpty()) m_projectRoot = cfg_init.lastProjectPath;
+/*
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    // --------  1. Заголовок и корневой виджет ----------
     setWindowTitle("DevAssistantQt");
-    QWidget* c = new QWidget(this);
-    setCentralWidget(c);
-    auto h = new QHBoxLayout();
 
-    auto horizontalMain = new QHBoxLayout();
-    c->setLayout(horizontalMain);
-    ide_widget = new IDEWidget();
-    ide_widget->show();
+    // --------  2. IDE‑виджет (верхняя часть) ----------
+    ide_widget = new IDEWidget(this);          // <-- родитель `this`
 
+    // --------  3. Вспомогательные виджеты (нижняя часть) ----------
+    m_rootEdit  = new QLineEdit(this);
+    browseBtn   = new QPushButton("Browse...", this);
 
-
-    auto left = new QVBoxLayout();
-
-    //h->addWidget(ide_widget);
-    h->addLayout(left,1);
-
-    //ide_widget->show();
-
-    m_rootEdit = new QLineEdit(this);
-    browseBtn = new QPushButton("Browse...", this);
-    auto top = new QHBoxLayout();
-    top->addWidget(m_rootEdit,1);
+    // 3.1   Верхняя строка (путь + Browse)
+    auto top = new QHBoxLayout;
+    top->addWidget(m_rootEdit, 1);
     top->addWidget(browseBtn);
-    left->addLayout(top);
 
-
-
-
+    // 3.2   Список файлов
     m_files = new QListWidget(this);
-    left->addWidget(m_files,1);
 
-    // Заменяем обработчик двойного клика
-    connect(m_files, &QListWidget::itemDoubleClicked,
-            this, [this](QListWidgetItem* item) {
-
-        // Полный путь к файлу
-        QString filePath = QDir(m_projectRoot).filePath(item->text());
-
-        // Открываем диалог описания
-        DescriptionDialog dlg(filePath, &m_model, &m_dev_manager, this);
-        dlg.exec();          // модальный
-    });
-
-    auto btns = new QHBoxLayout();
-
-    rescanBtn = new QPushButton("Rescan", this);
+    // 3.3   Кнопки
+    auto btns = new QHBoxLayout;
+    rescanBtn   = new QPushButton("Rescan", this);
     settingsBtn = new QPushButton("Ollama Settings", this);
-    promptBtn = new QPushButton("Edit Base Prompt", this);
-    applyBtn = new QPushButton("Apply changes", this);
-    undoBtn = new QPushButton("Undo", this);
+    promptBtn   = new QPushButton("Edit Base Prompt", this);
+    applyBtn    = new QPushButton("Apply changes", this);
+    undoBtn     = new QPushButton("Undo", this);
+    descBtn     = new QPushButton("Generate Descriptions", this);
 
-    // ---------- Добавляем кнопку «Generate Descriptions» ----------
-    descBtn = new QPushButton("Generate Descriptions", this);
-
-    connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
-    // -----------------------------------------------------------------
-
-    // в MainWindow.cpp  (конструктор)
-    runSeqBtn = new QPushButton("Run sequence…", this);
-    btns->addWidget(runSeqBtn);
-    connect(runSeqBtn, &QPushButton::clicked, this, &MainWindow::runSequenceDialog);
-
-    // В конструкторе MainWindow добавить кнопку
-    editSeqBtn = new QPushButton("Edit sequences…", this);
-    btns->addWidget(editSeqBtn);
-    connect(editSeqBtn, &QPushButton::clicked, this, &MainWindow::editSequences);
-
-    newSeqBtn = new QPushButton("New sequence…", this);
-    btns->addWidget(newSeqBtn);
-    connect(newSeqBtn, &QPushButton::clicked, this, &MainWindow::createNewSequence);
-
-
+    btns->addWidget(runSeqBtn  = new QPushButton("Run sequence…", this));
+    btns->addWidget(editSeqBtn = new QPushButton("Edit sequences…", this));
+    btns->addWidget(newSeqBtn  = new QPushButton("New sequence…", this));
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
@@ -128,40 +86,169 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
     btns->addWidget(applyBtn);
     btns->addWidget(undoBtn);
     btns->addWidget(descBtn);
-    left->addLayout(btns);
 
+    // 3.4   Логи и чат
+    m_log = new QPlainTextEdit(this);
+    m_log->setReadOnly(true);
 
     m_chat = new ChatDialog(&m_model, this);
+
+    // 3.5   (Опционально) виджет распознавания голоса
+    m_voskWidget = new VoskWidget(this);
+    connect(m_voskWidget, &VoskWidget::voiceRecognized,
+            this, &MainWindow::onVoskText);
+
+    // --------  4. Верхняя часть layout (внутри rightPanel) ----------
+    QVBoxLayout *rightLayout = new QVBoxLayout;
+    rightLayout->addLayout(top);
+    //rightLayout->addWidget(m_files, 1);
+    rightLayout->addLayout(btns);
+    //rightLayout->addWidget(m_log, 1);
+    //rightLayout->addWidget(m_chat, 1);
+
+    // --------  5. Создаём вертикальный splitter ----------
+    QSplitter *mainSplitter = new QSplitter(Qt::Vertical, this);
+    QWidget *rightPanel = new QWidget(this);
+    rightPanel->setLayout(rightLayout);
+    mainSplitter->addWidget(rightPanel);
+    mainSplitter->addWidget(ide_widget);   // верхняя часть
+    // нижняя часть
+    mainSplitter->addWidget(m_files);
+    mainSplitter->addWidget(m_log);
+    mainSplitter->addWidget(m_chat);
+
+
+    // Задаём начальные размеры (опционально)
+    mainSplitter->setStretchFactor(0, 2);  // IDE
+    mainSplitter->setStretchFactor(1, 1);  // UI справа
+
+    setCentralWidget(mainSplitter);
+
+    // --------  6. Соединяем сигналы / слоты ----------
+    connect(browseBtn,   &QPushButton::clicked, this, &MainWindow::browse);
+    connect(rescanBtn,   &QPushButton::clicked, this, &MainWindow::rescan);
+    connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::openSettings);
+    connect(promptBtn,   &QPushButton::clicked, this, &MainWindow::editBasePrompt);
+    connect(applyBtn,    &QPushButton::clicked, this, &MainWindow::applyChanges);
+    connect(undoBtn,     &QPushButton::clicked, this, &MainWindow::undoLast);
+
+    // Chat + модель
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
     connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
-    connect(&m_model, &OllamaAdapter::streamError, this, [this](const QString& e){ log("Model error: "+e); });
+    connect(&m_model, &OllamaAdapter::streamError,
+            this, [this](const QString &e){ log("Model error: " + e); });
 
-    m_log = new QPlainTextEdit(this);
-    m_log->setReadOnly(true);
-    left->addWidget(m_log,1);
-
-    // *** Добавляем VoskWidget на левую панель ***
-    m_voskWidget = new VoskWidget();
-    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
-    //left->addWidget(m_voskWidget,1);
-
-    left->addWidget(m_chat,1);
-
-    connect(browseBtn,&QPushButton::clicked,this,&MainWindow::browse);
-    connect(rescanBtn,&QPushButton::clicked,this,&MainWindow::rescan);
-    connect(settingsBtn,&QPushButton::clicked,this,&MainWindow::openSettings);
-    connect(promptBtn,&QPushButton::clicked,this,&MainWindow::editBasePrompt);
-    connect(applyBtn,&QPushButton::clicked,this,&MainWindow::applyChanges);
-    connect(undoBtn,&QPushButton::clicked,this,&MainWindow::undoLast);
-
+    // Состояния
     statusBar()->showMessage(QString("Model: %1").arg(m_model.selectedModel()));
-
     m_projectRoot = QDir::homePath();
     m_rootEdit->setText(m_projectRoot);
     //rescan();
 
-    left->addWidget(m_chat);
+    // ------------ Управление последовательностями ----------------
+    // … (тот же код, что был ранее)
+}*/
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+    // --------  1. Заголовок и корневой виджет ----------
+    setWindowTitle("DevAssistantQt");
+
+    // --------  2. IDE‑виджет (верхняя часть) ----------
+    ide_widget = new IDEWidget(this);          // <-- родитель `this`
+
+    // --------  3. Вспомогательные виджеты (нижняя часть) ----------
+    m_rootEdit  = new QLineEdit(this);
+    browseBtn   = new QPushButton("Browse...", this);
+
+    // 3.1   Верхняя строка (путь + Browse)
+    auto top = new QHBoxLayout;
+    top->addWidget(m_rootEdit, 1);
+    top->addWidget(browseBtn);
+
+    // 3.2   Список файлов
+    m_files = new QListWidget(this);
+
+    // 3.3   Кнопки
+    auto btns = new QHBoxLayout;
+    rescanBtn   = new QPushButton("Rescan", this);
+    settingsBtn = new QPushButton("Ollama Settings", this);
+    promptBtn   = new QPushButton("Edit Base Prompt", this);
+    applyBtn    = new QPushButton("Apply changes", this);
+    undoBtn     = new QPushButton("Undo", this);
+    descBtn     = new QPushButton("Generate Descriptions", this);
+
+    btns->addWidget(runSeqBtn  = new QPushButton("Run sequence…", this));
+    btns->addWidget(editSeqBtn = new QPushButton("Edit sequences…", this));
+    btns->addWidget(newSeqBtn  = new QPushButton("New sequence…", this));
+
+    connect(newSeqBtn, &QPushButton::clicked, this, &MainWindow::createNewSequence);
+
+    btns->addWidget(rescanBtn);
+    btns->addWidget(settingsBtn);
+    btns->addWidget(promptBtn);
+    btns->addWidget(applyBtn);
+    btns->addWidget(undoBtn);
+    btns->addWidget(descBtn);
+
+    // 3.4   Логи и чат
+    m_log = new QPlainTextEdit(this);
+    m_log->setReadOnly(true);
+
+    m_chat = new ChatDialog(&m_model, this);
+
+    // 3.5   (Опционально) виджет распознавания голоса
+    m_voskWidget = new VoskWidget(this);
+    connect(m_voskWidget, &VoskWidget::voiceRecognized,
+            this, &MainWindow::onVoskText);
+
+    // --------  4. Верхняя часть layout (внутри rightPanel) ----------
+    QVBoxLayout *rightLayout = new QVBoxLayout;
+    rightLayout->addLayout(top);
+    rightLayout->addWidget(m_files, 1);
+    rightLayout->addLayout(btns);
+    rightLayout->addWidget(m_log, 1);
+    rightLayout->addWidget(m_chat, 1);
+
+    // --------  5. Создаём вертикальный splitter ----------
+    QSplitter *mainSplitter = new QSplitter(Qt::Vertical, this);
+    mainSplitter->addWidget(ide_widget);   // верхняя часть
+    QWidget *rightPanel = new QWidget(this);
+    rightPanel->setLayout(rightLayout);    // нижняя часть
+    mainSplitter->addWidget(rightPanel);
+
+    // Задаём начальные размеры (опционально)
+    mainSplitter->setStretchFactor(0, 2);  // IDE
+    mainSplitter->setStretchFactor(1, 1);  // UI справа
+
+    setCentralWidget(mainSplitter);
+
+    // --------  6. Соединяем сигналы / слоты ----------
+    connect(browseBtn,   &QPushButton::clicked, this, &MainWindow::browse);
+    connect(rescanBtn,   &QPushButton::clicked, this, &MainWindow::rescan);
+    connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::openSettings);
+    connect(promptBtn,   &QPushButton::clicked, this, &MainWindow::editBasePrompt);
+    connect(applyBtn,    &QPushButton::clicked, this, &MainWindow::applyChanges);
+    connect(undoBtn,     &QPushButton::clicked, this, &MainWindow::undoLast);
+
+    // Chat + модель
+    connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
+    connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
+    connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
+    connect(&m_model, &OllamaAdapter::streamError,
+            this, [this](const QString &e){ log("Model error: " + e); });
+
+    connect(runSeqBtn, &QPushButton::clicked, this, &MainWindow::runSequenceDialog);
+    connect(editSeqBtn, &QPushButton::clicked, this, &MainWindow::editSequences);
+
+    connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
+
+    // Состояния
+    statusBar()->showMessage(QString("Model: %1").arg(m_model.selectedModel()));
+    m_projectRoot = QDir::homePath();
+    m_rootEdit->setText(m_projectRoot);
+
 
     // Папка, где будем хранить наборы
     QString seqRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
@@ -178,11 +265,10 @@ MainWindow::MainWindow(QWidget* parent):QMainWindow(parent){
 
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
-    horizontalMain->addWidget(ide_widget);
-    horizontalMain->addLayout(h);
+    //rescan();
 
-
-    //c->setLayout(horizontalMain);
+    // ------------ Управление последовательностями ----------------
+    // … (тот же код, что был ранее)
 }
 
 

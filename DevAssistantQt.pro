@@ -54,7 +54,9 @@ SOURCES += \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
     src/ui/RunSequenceDialog.cpp \
+    src/uiide/DartHighlighter.cpp \
     src/uiide/IDEWidget.cpp \
+    src/uiide/PythonHighlighter.cpp \
     src/uiide/astgraphview.cpp \
     src/uiide/codeeditor.cpp \
     src/uiide/cpphighlighter.cpp \
@@ -63,7 +65,11 @@ SOURCES += \
     src/utils/PromptManager.cpp\
     src/uiide/tree-sitter/lib/src/lib.c \
     src/uiide/tree-sitter-cpp/src/parser.c \
-    src/uiide/tree-sitter-cpp/src/scanner.c
+    src/uiide/tree-sitter-cpp/src/scanner.c \
+    src/uiide/tree-sitter-python/src/parser.c \
+    src/uiide/tree-sitter-python/src/scanner.c \
+    src/uiide/tree-sitter-dart/src/parser.c \
+    src/uiide/tree-sitter-dart/src/scanner.c
 
 HEADERS += \
     src/audio/MicStreamWidget.h \
@@ -104,7 +110,9 @@ HEADERS += \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \
+    src/uiide/DartHighlighter.h \
     src/uiide/IDEWidget.h \
+    src/uiide/PythonHighlighter.h \
     src/uiide/astgraphview.h \
     src/uiide/codeeditor.h \
     src/uiide/cpphighlighter.h \
