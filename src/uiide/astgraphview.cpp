@@ -231,10 +231,14 @@ void ASTGraphView::mouseDoubleClickEvent(QMouseEvent *event) {
     QPointF p = mapToScene(event->pos());
     for (const auto &n : nodes) {
         if (n.rect.contains(p)) {
-            emit nodeDoubleClicked(nodeMap_[n.id]);   // посылаем целый JSON‑узел
+            // 1️⃣  сигнал о двойном щелчке (для открытия редактора)
+            emit nodeDoubleClicked(nodeMap_[n.id]);
+
+            // 2️⃣  перейти к строке/столбцу – как при простом щелчке
+            emit openAt(n.start_row, n.start_col);
+
             break;
         }
     }
     QGraphicsView::mouseDoubleClickEvent(event);
 }
-
