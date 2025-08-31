@@ -8,7 +8,7 @@ QMAKE_CXXFLAGS += -std=gnu++1z
 CONFIG += c++17 object_parallel_to_source
 
 
-INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio src/uiide
+INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio src/uiide src/ui/customWidgets/
 
 INCLUDEPATH += \
     $$PWD/src/uiide/tree-sitter/lib/src \
@@ -45,6 +45,7 @@ SOURCES += \
     src/core/ChangeApplier.cpp \
     src/adapters/OllamaAdapter.cpp \
     src/ui/DescriptionDialog.cpp \
+    src/ui/InputTextEdit.cpp \
     src/ui/MainWindow.cpp \
     src/ui/ChatDialog.cpp \
     src/ui/ModelsDialog.cpp \
@@ -54,8 +55,14 @@ SOURCES += \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
     src/ui/RunSequenceDialog.cpp \
+    src/ui/customWidgets/MemoryComboBox.cpp \
+    src/ui/customWidgets/MemoryLineEdit.cpp \
+    src/ui/customWidgets/MemorySplitter.cpp \
+    src/ui/customWidgets/StyleTextEdit.cpp \
+    src/ui/customWidgets/StyledButton.cpp \
     src/uiide/DartHighlighter.cpp \
     src/uiide/IDEWidget.cpp \
+    src/uiide/PathColorDelegate.cpp \
     src/uiide/PythonHighlighter.cpp \
     src/uiide/astgraphview.cpp \
     src/uiide/codeeditor.cpp \
@@ -101,6 +108,7 @@ HEADERS += \
     src/core/PromptSequenceManager.h \
     src/core/PromptStep.h \
     src/ui/DescriptionDialog.h \
+    src/ui/InputTextEdit.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
     src/ui/ModelsDialog.h \
@@ -110,8 +118,14 @@ HEADERS += \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \
+    src/ui/customWidgets/MemoryComboBox.h \
+    src/ui/customWidgets/MemoryLineEdit.h \
+    src/ui/customWidgets/MemorySplitter.h \
+    src/ui/customWidgets/StyleTextEdit.h \
+    src/ui/customWidgets/StyledButton.h \
     src/uiide/DartHighlighter.h \
     src/uiide/IDEWidget.h \
+    src/uiide/PathColorDelegate.h \
     src/uiide/PythonHighlighter.h \
     src/uiide/astgraphview.h \
     src/uiide/codeeditor.h \

@@ -3,7 +3,7 @@
 #include "PromptResolver.h"   // ← новый заголовок
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QPushButton>
+#include <StyledButton.h>
 #include <QListWidgetItem>
 
 PromptStepDialog::PromptStepDialog(QWidget *parent)
@@ -17,7 +17,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     /* ---------- Кнопка вставки резолвера ---------- */
     auto *hRes = new QHBoxLayout();
     m_resolverCombo = new QComboBox(this);
-    m_insertBtn = new QPushButton("Вставить", this);
+    m_insertBtn = new StyledButton("Вставить", this);
     hRes->addWidget(m_resolverCombo);
     hRes->addWidget(m_insertBtn);
     hRes->addStretch();
@@ -27,11 +27,11 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     for (const auto &info : PromptResolver::availableResolvers()) {
         m_resolverCombo->addItem(info.description, info.token);
     }
-    connect(m_insertBtn, &QPushButton::clicked,
+    connect(m_insertBtn, &StyledButton::clicked,
             this, &PromptStepDialog::onInsertClicked);
     /* ------------------------------------------------ */
 
-    m_templateEdit = new QTextEdit(this);
+    m_templateEdit = new StyleTextEdit(this);
     v->addWidget(m_templateEdit, 2);
 
     /* Список команд с чек‑боксами */

@@ -54,6 +54,12 @@ void PromptSequenceManager::refresh()
     }
 }
 
+const QMap<QString, PromptSequence> &PromptSequenceManager::sequences()
+{
+    refresh();
+    return m_sequences;
+}
+
 /* Сохранить/перезаписать */
 bool PromptSequenceManager::save(const PromptSequence &seq, const QString &filePath)
 {

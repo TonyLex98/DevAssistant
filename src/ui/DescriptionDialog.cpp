@@ -22,10 +22,10 @@ DescriptionDialog::DescriptionDialog(const QString& filePath,
     m_infoLabel = new QLabel(filePath, this);
     v->addWidget(m_infoLabel);
 
-    m_genBtn = new QPushButton("Сгенерировать описание", this);
+    m_genBtn = new StyledButton("Сгенерировать описание", this);
     v->addWidget(m_genBtn);
 
-    connect(m_genBtn, &QPushButton::clicked,
+    connect(m_genBtn, &StyledButton::clicked,
             this, &DescriptionDialog::onGenerate);
 }
 

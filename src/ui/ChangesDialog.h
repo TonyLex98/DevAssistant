@@ -1,7 +1,7 @@
 #pragma once
 #include <QDialog>
 #include <QListWidget>
-#include <QTextEdit>
+#include <StyleTextEdit.h>
 #include "../core/ChangeApplier.h"
 
 class ChangesDialog : public QDialog {
@@ -16,5 +16,5 @@ private slots:
 private:
     QList<Change> m_changes;
     QListWidget* m_list=nullptr;
-    QTextEdit* m_preview=nullptr;
+    StyleTextEdit* m_preview=nullptr;
 };

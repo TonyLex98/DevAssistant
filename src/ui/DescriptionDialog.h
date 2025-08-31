@@ -3,7 +3,7 @@
 
 #include <QDialog>
 #include <QLabel>
-#include <QPushButton>
+#include <StyledButton.h>
 #include "../adapters/OllamaAdapter.h"
 #include "../core/DevAssManager.h"
 #include <DescriptionGenerator.h>
@@ -27,6 +27,6 @@ private:
     OllamaAdapter*   m_model;
     DevAssManager*   m_devAss;
     QLabel*          m_infoLabel = nullptr;
-    QPushButton*     m_genBtn = nullptr;
+    StyledButton*     m_genBtn = nullptr;
 
 };

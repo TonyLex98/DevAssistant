@@ -9,7 +9,7 @@ ChangesDialog::ChangesDialog(QWidget* parent):QDialog(parent){
     auto v = new QVBoxLayout(this);
     m_list = new QListWidget(this);
     v->addWidget(m_list,1);
-    m_preview = new QTextEdit(this); m_preview->setReadOnly(true);
+    m_preview = new StyleTextEdit(this); m_preview->setReadOnly(true);
     v->addWidget(m_preview,1);
     QDialogButtonBox* bb = new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,this);
     v->addWidget(bb);

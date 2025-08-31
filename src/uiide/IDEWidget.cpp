@@ -14,13 +14,14 @@
 #include <QTabWidget>
 #include <QStatusBar>
 #include <QApplication>
-#include <methodeditdialog.h>
 
 extern "C" const TSLanguage *tree_sitter_cpp();
 extern "C" const TSLanguage *tree_sitter_python();
 extern "C" const TSLanguage *tree_sitter_dart();
 
-IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
+IDEWidget::IDEWidget(const QString &key,
+                     Qt::Orientation orientation,
+                     QWidget *parent) : MemorySplitter(key, orientation, parent) {
     // Language map
     langMap[".h"] = tree_sitter_cpp;
     langMap[".cpp"] = tree_sitter_cpp;
@@ -30,10 +31,14 @@ IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
     langMap[".dart"] = tree_sitter_dart;    // <‑‑ добавляем
 
 
-    //openProjectBtn = new QPushButton("Открыть проект");
+
+
     // Left: directory tree
     dirModel = new QFileSystemModel(this);
     dirModel->setRootPath(QDir::rootPath());
+
+
+
     dirView = new QTreeView(this);
     dirView->setModel(dirModel);
     dirView->setRootIndex(dirModel->index(QDir::homePath()));
@@ -41,10 +46,15 @@ IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
     connect(dirView, &QTreeView::clicked, this, &IDEWidget::onFileClicked);
     this->addWidget(dirView);
 
+    m_pathDelegate = new PathColorDelegate(dirModel, dirView);
+    dirView->setItemDelegate(m_pathDelegate);
+
     // Middle: Code editor
     codeEditor = new CodeEditor(this);
     new CppHighlighter(codeEditor->document());
     this->addWidget(codeEditor);
+
+    methodEdit = new MethodEditDialog();
 
     // Right: tabs with AST (tree + graph)
     rightTabs = new QTabWidget(this);
@@ -70,12 +80,25 @@ IDEWidget::IDEWidget(QWidget *parent) : QSplitter(parent) {
     connect(codeEditor->document(), &QTextDocument::modificationChanged,
             this, &IDEWidget::fileModified);
 
-    //connect(openProjectBtn, &QPushButton::clicked, this, &IDEWidget::onOpenProjectBtnClicked);
-    //statusBar()->showMessage("Ready");
 
     connect(astGraph, &ASTGraphView::nodeDoubleClicked,
             this, &IDEWidget::onGraphNodeDoubleClicked);
 
+    connect(methodEdit, &MethodEditDialog::signal_saveMethod, this, &IDEWidget::slot_saveMethod);
+
+
+    connect(methodEdit, &MethodEditDialog::signal_runSequenceDialog, this, [this](){
+        emit signal_runSequenceDialog();
+    });
+
+    connect(methodEdit, &MethodEditDialog::signal_updatelastUserMessage, this, [this](const QString& lastUserMessage){
+        QString code = methodEdit->getCode() + "\n";
+        emit signal_updatelastUserMessage(code + lastUserMessage);
+    });
+
+
+
+    this->loadState();
 
 }
 
@@ -234,37 +257,23 @@ QString IDEWidget::reconstructCode(const QJsonObject &obj) {
 
 
 void IDEWidget::onTreeItemDoubleClicked(QTreeWidgetItem *item, int) {
+    m_current_tree_item = item;
     QJsonObject *methodJson = itemToJsonMap.value(item, nullptr);
     if (!methodJson) return;
 
     const QString type = (*methodJson)["type"].toString();
     if (type.contains("function") || type.contains("method") || type.contains("class") || type.contains("struct")) {
-        MethodEditDialog dialog(this);
+        //MethodEditDialog dialog(this);
 
+        methodEdit->show();
 
         size_t start = static_cast<size_t>((*methodJson)["start_byte"].toInt());
         size_t end   = static_cast<size_t>((*methodJson)["end_byte"].toInt());
         QString original = QString::fromStdString(sourceCode.substr(start, end - start));
-        dialog.setCode(original);
+        methodEdit->setCode(original);
 
         //dialog.setCode(reconstructCode(*methodJson));
 
-
-        if (dialog.exec() == QDialog::Accepted) {
-            QString newCode = dialog.getCode();
-
-            size_t start = static_cast<size_t>((*methodJson)["start_byte"].toInt());
-            size_t end = static_cast<size_t>((*methodJson)["end_byte"].toInt());
-            std::string newSource = sourceCode.substr(0, start) + newCode.toStdString() + sourceCode.substr(end);
-
-            sourceCode = newSource;
-            QFile file(currentFilePath);
-            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                file.write(sourceCode.c_str());
-                file.close();
-            }
-            parseFile(currentFilePath);
-        }
     }
 }
 
@@ -299,29 +308,35 @@ void IDEWidget::onGraphNodeDoubleClicked(const QJsonObject &node) {
     if (type.contains("function") || type.contains("method") ||
             type.contains("class") || type.contains("struct")) {
 
-        MethodEditDialog dialog(this);
+        methodEdit->show();
 
         size_t start = static_cast<size_t>(node["start_byte"].toInt());
         size_t end   = static_cast<size_t>(node["end_byte"].toInt());
         QString original = QString::fromStdString(sourceCode.substr(start, end - start));
-        dialog.setCode(original);
+        methodEdit->setCode(original);
 
-        if (dialog.exec() == QDialog::Accepted) {
-            QString newCode = dialog.getCode();
-
-            size_t s = static_cast<size_t>(node["start_byte"].toInt());
-            size_t e = static_cast<size_t>(node["end_byte"].toInt());
-            std::string newSource = sourceCode.substr(0, s) + newCode.toStdString() + sourceCode.substr(e);
-
-            sourceCode = newSource;
-            QFile file(currentFilePath);
-            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                file.write(sourceCode.c_str());
-                file.close();
-            }
-            parseFile(currentFilePath);
-        }
     }
+}
+
+void IDEWidget::slot_saveMethod(){
+
+    QJsonObject *methodJson = itemToJsonMap.value(m_current_tree_item, nullptr);
+    if (!methodJson) return;
+
+    QString newCode = methodEdit->getCode();
+
+    size_t start = static_cast<size_t>((*methodJson)["start_byte"].toInt());
+    size_t end = static_cast<size_t>((*methodJson)["end_byte"].toInt());
+    std::string newSource = sourceCode.substr(0, start) + newCode.toStdString() + sourceCode.substr(end);
+
+    sourceCode = newSource;
+    QFile file(currentFilePath);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        file.write(sourceCode.c_str());
+        file.close();
+    }
+    parseFile(currentFilePath);
+
 }
 
 
@@ -362,4 +377,32 @@ QSyntaxHighlighter *IDEWidget::createHighlighter(const QString &ext)
         return new DartHighlighter(codeEditor->document());
     else
         return nullptr;   // для языков без подсветки
+}
+
+void IDEWidget::updateMissingFiles(const QSet<QString>& paths)
+{
+    QSet<QString> red, green;
+
+    for (const QString& p : paths) {
+        const QString ap = QDir::cleanPath(QFileInfo(p).absoluteFilePath());
+        if (QFileInfo::exists(ap)) {
+            red.insert(ap); // сам путь существует → красный
+        } else {
+            // найти ближайшего существующего родителя
+            QFileInfo fi(ap);
+            QDir d = fi.isDir() ? QDir(ap) : fi.dir();
+            QString parentPath = d.absolutePath();
+            while (!parentPath.isEmpty() && !QFileInfo::exists(parentPath)) {
+                QDir dd(parentPath);
+                if (!dd.cdUp()) break;
+                parentPath = dd.absolutePath();
+            }
+            if (!parentPath.isEmpty()) green.insert(parentPath); // зелёный на родителя
+        }
+    }
+
+    if (m_pathDelegate) {
+        m_pathDelegate->setMarkSets(red, green, /*greenAlpha*/110, /*redAlpha*/80);
+    }
+    dirView->viewport()->update();
 }

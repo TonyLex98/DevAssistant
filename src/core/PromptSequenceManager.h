@@ -20,7 +20,7 @@ public:
     void refresh();
 
     /* Доступ к уже загруженным объектам */
-    const QMap<QString, PromptSequence>& sequences() const { return m_sequences; } // key = full path
+    const QMap<QString, PromptSequence>& sequences(); // key = full path
 
     /* Сохранить/удалить отдельную последовательность */
     bool save(const PromptSequence& seq, const QString& filePath);

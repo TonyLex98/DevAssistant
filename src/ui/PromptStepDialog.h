@@ -1,14 +1,14 @@
 #pragma once
 #include <QDialog>
 #include "PromptStep.h"
-#include <QTextEdit>
+#include <StyleTextEdit.h>
 #include <QDialogButtonBox>
-#include <QPushButton>
+#include <StyledButton.h>
 #include <QComboBox>          // ← новый заголовок
 
-class QTextEdit;
+class StyleTextEdit;
 class QListWidget;
-class QPushButton;
+class StyledButton;
 class QComboBox;
 
 class PromptStepDialog : public QDialog
@@ -24,11 +24,11 @@ private slots:
     void onInsertClicked();    // слот «Вставить»
 
 private:
-    QTextEdit   *m_templateEdit = nullptr;
+    StyleTextEdit   *m_templateEdit = nullptr;
     QListWidget *m_cmdList      = nullptr;
     PromptStep   m_step;
 
     /* --- UI для резолверов --- */
     QComboBox   *m_resolverCombo = nullptr;
-    QPushButton *m_insertBtn      = nullptr;
+    StyledButton *m_insertBtn      = nullptr;
 };

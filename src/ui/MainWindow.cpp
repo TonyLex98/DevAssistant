@@ -52,44 +52,50 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("DevAssistantQt");
 
     // --------  2. IDE‑виджет (верхняя часть) ----------
-    ide_widget = new IDEWidget(this);          // <-- родитель `this`
+    ide_widget = new IDEWidget("ideSplitter", Qt::Horizontal, this);          // <-- родитель `this`
 
     // --------  3. Вспомогательные виджеты (нижняя часть) ----------
-    m_rootEdit  = new QLineEdit(this);
-    browseBtn   = new QPushButton("Browse...", this);
+    m_rootEdit  = new MemoryLineEdit("projectRoot", this);
+    browseBtn   = new StyledButton("Browse...", this);
 
     // 3.1   Верхняя строка (путь + Browse)
-    auto top = new QHBoxLayout;
+    QWidget * top_widget = new QWidget(this);
+    auto top = new QHBoxLayout(top_widget);
     top->addWidget(m_rootEdit, 1);
     top->addWidget(browseBtn);
 
     // 3.2   Список файлов
     m_files = new QListWidget(this);
 
+    QWidget *buttons_widget = new QWidget();
     // 3.3   Кнопки
-    auto btns = new QHBoxLayout;
-    rescanBtn   = new QPushButton("Rescan", this);
-    settingsBtn = new QPushButton("Ollama Settings", this);
-    promptBtn   = new QPushButton("Edit Base Prompt", this);
-    applyBtn    = new QPushButton("Apply changes", this);
-    undoBtn     = new QPushButton("Undo", this);
-    descBtn     = new QPushButton("Generate Descriptions", this);
+    auto btns = new QHBoxLayout(buttons_widget);
+    rescanBtn   = new StyledButton("Rescan", this);
+    settingsBtn = new StyledButton("Ollama Settings", this);
+    promptBtn   = new StyledButton("Edit Base Prompt", this);
+    applyBtn    = new StyledButton("Apply changes", this);
+    undoBtn     = new StyledButton("Undo", this);
+    descBtn     = new StyledButton("Generate Descriptions", this);
 
-    btns->addWidget(runSeqBtn  = new QPushButton(tr("Запустить последовательность"), this));
-    btns->addWidget(editSeqBtn = new QPushButton(tr("Edit sequences…"), this));
-    btns->addWidget(newSeqBtn  = new QPushButton("New sequence…", this));
+    btns->addWidget(runSeqBtn  = new StyledButton(tr("Запустить последовательность"), this));
+    btns->addWidget(editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this));
+    btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
 
-    connect(newSeqBtn, &QPushButton::clicked, this, &MainWindow::createNewSequence);
+    connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
-    btns->addWidget(promptBtn);
+    //btns->addWidget(promptBtn);
     //btns->addWidget(applyBtn);
-    btns->addWidget(undoBtn);
+    //btns->addWidget(undoBtn);
     btns->addWidget(descBtn);
 
+    promptBtn->hide();
+    applyBtn->hide();
+    undoBtn->hide();
+
     // 3.4   Логи и чат
-    m_log = new QPlainTextEdit(this);
+    m_log = new StyleTextEdit(this);
     m_log->setReadOnly(true);
 
     m_chat = new ChatDialog(&m_model, this);
@@ -100,19 +106,30 @@ MainWindow::MainWindow(QWidget *parent)
             this, &MainWindow::onVoskText);
 
     // --------  4. Верхняя часть layout (внутри rightPanel) ----------
-    QVBoxLayout *rightLayout = new QVBoxLayout;
+    /*QVBoxLayout *rightLayout = new QVBoxLayout;
     rightLayout->addLayout(top);
     rightLayout->addWidget(m_files, 1);
     rightLayout->addLayout(btns);
     rightLayout->addWidget(m_log, 1);
-    rightLayout->addWidget(m_chat, 1);
+    rightLayout->addWidget(m_chat, 1);*/
+
 
     // --------  5. Создаём вертикальный splitter ----------
-    QSplitter *mainSplitter = new QSplitter(Qt::Vertical, this);
+    MemorySplitter *mainSplitter = new MemorySplitter("MainWindowsMainSplitter",Qt::Vertical, this);
+    mainSplitter->addWidget(top_widget);
     mainSplitter->addWidget(ide_widget);   // верхняя часть
-    QWidget *rightPanel = new QWidget(this);
-    rightPanel->setLayout(rightLayout);    // нижняя часть
-    mainSplitter->addWidget(rightPanel);
+    //mainSplitter->addWidget(m_files);
+    mainSplitter->addWidget(m_log);
+    mainSplitter->addWidget(m_chat);
+    mainSplitter->addWidget(buttons_widget);
+
+    m_files->hide();
+
+
+
+    //QWidget *rightPanel = new QWidget(this);
+    //rightPanel->setLayout(rightLayout);    // нижняя часть
+    //mainSplitter->addWidget(rightPanel);
 
     // Задаём начальные размеры (опционально)
     mainSplitter->setStretchFactor(0, 2);  // IDE
@@ -121,12 +138,12 @@ MainWindow::MainWindow(QWidget *parent)
     setCentralWidget(mainSplitter);
 
     // --------  6. Соединяем сигналы / слоты ----------
-    connect(browseBtn,   &QPushButton::clicked, this, &MainWindow::browse);
-    connect(rescanBtn,   &QPushButton::clicked, this, &MainWindow::rescan);
-    connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::openSettings);
-    connect(promptBtn,   &QPushButton::clicked, this, &MainWindow::editBasePrompt);
-    connect(applyBtn,    &QPushButton::clicked, this, &MainWindow::applyChanges);
-    connect(undoBtn,     &QPushButton::clicked, this, &MainWindow::undoLast);
+    connect(browseBtn,   &StyledButton::clicked, this, &MainWindow::browse);
+    connect(rescanBtn,   &StyledButton::clicked, this, &MainWindow::rescan);
+    connect(settingsBtn, &StyledButton::clicked, this, &MainWindow::openSettings);
+    connect(promptBtn,   &StyledButton::clicked, this, &MainWindow::editBasePrompt);
+    connect(applyBtn,    &StyledButton::clicked, this, &MainWindow::applyChanges);
+    connect(undoBtn,     &StyledButton::clicked, this, &MainWindow::undoLast);
 
     // Chat + модель
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
@@ -135,15 +152,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&m_model, &OllamaAdapter::streamError,
             this, [this](const QString &e){ log("Model error: " + e); });
 
-    connect(runSeqBtn, &QPushButton::clicked, this, &MainWindow::runSequenceDialog);
-    connect(editSeqBtn, &QPushButton::clicked, this, &MainWindow::editSequences);
+    connect(runSeqBtn, &StyledButton::clicked, this, &MainWindow::runSequenceDialog);
+    connect(editSeqBtn, &StyledButton::clicked, this, &MainWindow::editSequences);
 
-    connect(descBtn, &QPushButton::clicked, this, &MainWindow::generateDescriptions);
+    connect(descBtn, &StyledButton::clicked, this, &MainWindow::generateDescriptions);
 
     // Состояния
     statusBar()->showMessage(QString("Model: %1").arg(m_model.selectedModel()));
-    m_projectRoot = QDir::homePath();
-    m_rootEdit->setText(m_projectRoot);
+
+    m_projectRoot = m_rootEdit->text();
+
 
 
     // Папка, где будем хранить наборы
@@ -161,6 +179,19 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
+
+    connect(ide_widget, &IDEWidget::signal_runSequenceDialog, this, &MainWindow::runSequenceDialog);
+
+    connect(ide_widget, &IDEWidget::signal_updatelastUserMessage,this, &MainWindow::slot_updatelastUserMessage);
+
+    connect(this, &MainWindow::missingFilesUpdated,
+                ide_widget, &IDEWidget::updateMissingFiles);
+
+
+    reOpenRootDir();
+
+    mainSplitter->loadState();
+
     //rescan();
 
     // ------------ Управление последовательностями ----------------
@@ -172,24 +203,8 @@ void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
     if (d.isEmpty()) return;
 
-    ide_widget->openProjectbyPath(d);
     m_projectRoot = d;
-    m_rootEdit->setText(d);
-    m_dev_manager.setProjectRoot(m_projectRoot);
-    m_promptMgr.setProjectRoot(m_projectRoot);
-
-    if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
-    {
-        qCritical() << "Не удалось подготовить DevelopersAssistant / .dapro";
-        //return -1;
-    }
-
-    if (!m_dev_manager.generateDescrFiles())
-    {
-        qCritical() << "Ошибка при создании .dadescr файлов";
-    }
-
-    rescan();
+    reOpenRootDir();
 }
 
 void MainWindow::rescan(){
@@ -206,6 +221,7 @@ void MainWindow::rescan(){
     m_index.setRoot(m_projectRoot);
     m_files->clear();
 
+    QSet<QString> needRed_set;
     /* Идем по списку файлов проекта */
     for (const QString& rel : m_index.files()) {
         /* Полный абсолютный путь к файлу */
@@ -230,14 +246,20 @@ void MainWindow::rescan(){
             needRed = true;
         }
 
-        if (needRed)
+        if (needRed){
+            needRed_set.insert(absPath);
             item->setBackgroundColor(Qt::red);
+        }
         else
             item->setBackgroundColor(Qt::green);   // можно оставить default
 
         /* Храним абсолютный путь в UserRole */
         item->setData(Qt::UserRole, absPath);
     }
+
+    emit missingFilesUpdated(needRed_set);
+
+
 
     log("Rescanned project.");
 }
@@ -347,6 +369,8 @@ void MainWindow::undoLast(){
 
 void MainWindow::sendUserMessage(const QString& text){
 
+    runSequenceDialog();
+/*
     QString capabilities = "";
     QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
 
@@ -360,7 +384,7 @@ void MainWindow::sendUserMessage(const QString& text){
     // ***  Оценка количества токенов ***
     int tokens = m_promptMgr.tokenCount(full);
     log(QString("Отправляем запрос (%1 токенов) → %2").arg(tokens).arg(text));
-
+*/
 
 }
 
@@ -392,46 +416,71 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
     }
     return QByteArray();
 }
+
 void MainWindow::editSequences()
 {
-    // Откроем отдельное окно‑диалог с PromptSequenceEditor
-    // Пользователь выбирает файл из списка, редактирует, сохраняет.
-    // Для простоты покажем только один набор (первый в списке) – можно доработать.
+    // 1. Проверяем, что есть наборы
     if (m_seqMgr.sequences().isEmpty()) {
-        QMessageBox::information(this, "Нет наборов", "В папке нет ни одного *.seq.json");
+        QMessageBox::information(this, tr("Нет наборов"),
+                                 tr("В папке нет ни одного *.seq.json"));
         return;
     }
 
-    qDebug()<< "m_seqMgr.root() = "<< m_seqMgr.root();
+    // 2. Формируем список названий файлов (без пути)
+    QStringList names;
+    QMap<QString, QString> pathByName;      // имя → путь
+    for (const QString &filePath : m_seqMgr.fileList()) {
+        QString name = QFileInfo(filePath).fileName();
+        names << name;
+        pathByName.insert(name, filePath);
+    }
 
+    // 3. Попросим пользователя выбрать файл
+    bool ok = false;
+    QString selectedName = QInputDialog::getItem(
+                this, tr("Выберите последовательность"),
+                tr("Файл:"), names, 0, false, &ok);
 
-    // Выберем первый (можно добавить отдельный QComboBox)
-    QString filePath = m_seqMgr.fileList().first();
+    if (!ok || selectedName.isEmpty())
+        return;          // пользователь отменил
+
+    QString filePath = pathByName.value(selectedName);
+
+    // 4. Загружаем выбранную последовательность
     PromptSequence seq = m_seqMgr.sequences().value(filePath);
 
-    // Окно‑редактор
+    // 5. Откроем диалог‑редактор
     QDialog dlg(this);
-    dlg.setWindowTitle("Редактор последовательности");
+    dlg.setWindowTitle(tr("Редактор последовательности") + ": " + selectedName);
     dlg.resize(720, 540);
-    auto *lay = new QVBoxLayout(&dlg);
-    auto *editor = new PromptSequenceEditor(&dlg);
+
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
     editor->setSequence(seq);
     lay->addWidget(editor);
-    auto *bb = new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel, &dlg);
+
+    QDialogButtonBox *bb = new QDialogButtonBox(
+                QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
     lay->addWidget(bb);
-    connect(bb, &QDialogButtonBox::accepted, &dlg, [&]{
-        // Сохраняем
+
+    // 6. Сохранение
+    connect(bb, &QDialogButtonBox::accepted, &dlg, [=, &dlg]{
         PromptSequence edited = editor->sequence();
-        if (m_seqMgr.save(edited, filePath))
-            QMessageBox::information(&dlg, "Сохранено", "Последовательность сохранена.");
-        else
-            QMessageBox::warning(&dlg, "Ошибка", "Не удалось сохранить файл.");
+        if (m_seqMgr.save(edited, filePath)) {
+            QMessageBox::information(&dlg, tr("Сохранено"),
+                                     tr("Последовательность сохранена."));
+        } else {
+            QMessageBox::warning(&dlg, tr("Ошибка"),
+                                 tr("Не удалось сохранить файл."));
+        }
         dlg.accept();
     });
+
     connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
     dlg.exec();
 
-    // После закрытия – обновляем кеш
+    // 7. Обновляем кеш после редактирования
     m_seqMgr.refresh();
     ensureDefaultSequence();
 }
@@ -776,7 +825,7 @@ void MainWindow::generateDescriptions()
     rescan();
 }
 
-void MainWindow::log(const QString& m){ m_log->appendPlainText(m); }
+void MainWindow::log(const QString& m){ m_log->append(m); }
 
 // <‑‑ Добавлен новый слот для обработки текста от Vosk
 void MainWindow::onVoskText(const QString& text){
@@ -805,6 +854,32 @@ void MainWindow::ensureDefaultSequence()
     // Сохраняем
     if (!m_seqMgr.save(seq, defaultFile))
         qWarning() << "Не удалось создать файл default.seq.json";
+}
+
+void MainWindow::reOpenRootDir(){
+    if(m_projectRoot.isEmpty()){
+        return;
+    }
+
+
+    ide_widget->openProjectbyPath(m_projectRoot);
+
+    m_rootEdit->setText(m_projectRoot);
+    m_dev_manager.setProjectRoot(m_projectRoot);
+    m_promptMgr.setProjectRoot(m_projectRoot);
+
+    if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
+    {
+        qCritical() << "Не удалось подготовить DevelopersAssistant / .dapro";
+        //return -1;
+    }
+
+    if (!m_dev_manager.generateDescrFiles())
+    {
+        qCritical() << "Ошибка при создании .dadescr файлов";
+    }
+
+    rescan();
 }
 
 

@@ -5,7 +5,7 @@
 #include <PromptSequence.h>
 
 class QListWidget;
-class QPushButton;
+class StyledButton;
 
 class RunSequenceDialog : public QDialog
 {
@@ -20,6 +20,6 @@ private slots:
 
 private:
     QListWidget *m_list = nullptr;
-    QPushButton *m_okBtn = nullptr;
+    StyledButton *m_okBtn = nullptr;
     QString      m_selectedPath;
 };

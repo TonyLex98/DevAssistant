@@ -1,7 +1,7 @@
 #pragma once
 #include <QMainWindow>
 #include <QListWidget>
-#include <QPlainTextEdit>
+#include <StyleTextEdit.h>
 #include <QLineEdit>
 #include <QPair>
 #include <runSequenceDialog.h>
@@ -9,7 +9,7 @@
 #include "../core/ChangeApplier.h"
 #include "../adapters/OllamaAdapter.h"
 #include "../utils/PromptManager.h"
-#include <QPushButton>
+#include <StyledButton.h>
 #include <DevAssManager.h>
 #include <QProgressDialog>
 #include "DescriptionDialog.h"      // ← новый диалог
@@ -38,7 +38,7 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QTabWidget>
-#include <QPushButton>
+#include <MemoryLineEdit.h>
 
 class ChatDialog;
 class ModelsDialog;
@@ -59,6 +59,15 @@ public:
     const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
 
 
+public slots:
+    void runSequenceDialog();
+    void slot_updatelastUserMessage(const QString& lastUserMessage);
+
+
+signals:
+
+    void missingFilesUpdated(const QSet<QString> &paths);
+
 
 private slots:
     void browse();
@@ -72,8 +81,6 @@ private slots:
 
     void generateDescriptions();      // <‑‑ новый слот
     void onVoskText(const QString&);  // <‑‑ новый слот
-
-    void slot_updatelastUserMessage(const QString& lastUserMessage);
 
 
 public:
@@ -103,8 +110,8 @@ private:
     PromptManager m_promptMgr;
 
     QListWidget* m_files=nullptr;
-    QLineEdit* m_rootEdit=nullptr;
-    QPlainTextEdit* m_log=nullptr;
+    MemoryLineEdit* m_rootEdit=nullptr;
+    StyleTextEdit* m_log=nullptr;
 
     ChatDialog* m_chat=nullptr;
     QList<Change> m_pending;
@@ -112,17 +119,17 @@ private:
     QList<QPair<QString,QString>> m_history;
     QString m_streamBuf;
 
-    QPushButton* rescanBtn;
-    QPushButton* settingsBtn;
-    QPushButton* promptBtn;
-    QPushButton* applyBtn;
-    QPushButton* undoBtn;
-    QPushButton* browseBtn;
-    QPushButton* runSeqBtn;
-    QPushButton *editSeqBtn;
-    QPushButton *newSeqBtn;
+    StyledButton* rescanBtn;
+    StyledButton* settingsBtn;
+    StyledButton* promptBtn;
+    StyledButton* applyBtn;
+    StyledButton* undoBtn;
+    StyledButton* browseBtn;
+    StyledButton* runSeqBtn;
+    StyledButton *editSeqBtn;
+    StyledButton *newSeqBtn;
     DevAssManager m_dev_manager;
-    QPushButton* descBtn = nullptr;   // <‑‑ новая кнопка
+    StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
     VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
@@ -135,17 +142,19 @@ private:
     bool                  m_sequenceMode = false;
     int                   m_currentStepIdx = -1; // -1 = не запущено
 
-    void runSequenceDialog();
+
     void runNextStep();
     /* ────── NEW ────── */
     static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
     void ensureDefaultSequence();                      // создаём, если нет
     /* ────── END ────── */
 
+    void reOpenRootDir();
+
     QString m_lastUserMessage;
     QString m_lastAssistantMessage;
     IDEWidget *ide_widget;
 
-    QSplitter *mainSplitter;
+    MemorySplitter *mainSplitter;
 
 };

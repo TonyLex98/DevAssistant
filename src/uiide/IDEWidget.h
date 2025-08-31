@@ -15,17 +15,28 @@
 #include <cpphighlighter.h>
 #include <PythonHighlighter.h>
 #include <DartHighlighter.h>
+#include <methodeditdialog.h>
+#include <MemorySplitter.h>
+#include <QPainter>
+#include <PathColorDelegate.h>
 
 class CodeEditor;
 class ASTGraphView;
 
-class IDEWidget : public QSplitter {
+
+class IDEWidget : public MemorySplitter {
     Q_OBJECT
 public:
-    IDEWidget(QWidget *parent = nullptr);
+    IDEWidget(const QString &key,
+              Qt::Orientation orientation = Qt::Horizontal,
+              QWidget *parent = nullptr);
     ~IDEWidget();
 
     void openProjectbyPath(const QString &path);
+
+
+public slots:
+    void updateMissingFiles(const QSet<QString> &paths);
 
 private slots:
     void onFileClicked(const QModelIndex &index);
@@ -37,10 +48,14 @@ private slots:
 
     void onGraphNodeDoubleClicked(const QJsonObject &node);
 
+    void slot_saveMethod();
+
 
 
 signals:
     void fileModified(bool modified);
+    void signal_runSequenceDialog();                      // Кнопка Run / Enter в InputTextEdit
+    void signal_updatelastUserMessage(const QString& lastUserMessage); // Текст последнего сообщения
 
 private:
     QTreeView *dirView;
@@ -74,7 +89,13 @@ private:
     // Language map
     QMap<QString, const TSLanguage *(*)()> langMap;
 
-    //QPushButton *openProjectBtn;    // ← новая кнопка
 
     QSyntaxHighlighter *currentHighlighter = nullptr;   // ← хранит активный подсветчик
+
+    MethodEditDialog *methodEdit;
+
+    QTreeWidgetItem *m_current_tree_item = nullptr;
+
+    PathColorDelegate* m_pathDelegate = nullptr;
+    QSet<QString> m_highlightPaths;
 };

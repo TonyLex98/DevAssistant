@@ -2,27 +2,13 @@
 #include <QDialog>
 #include <QPlainTextEdit>
 #include <QTextEdit>
-#include <QPushButton>
+#include <StyledButton.h>
 #include "../adapters/OllamaAdapter.h"
 #include <QComboBox>
 #include <QKeyEvent>
-
-class InputTextEdit : public QTextEdit {
-    Q_OBJECT
-public:
-    explicit InputTextEdit(QWidget* parent = nullptr);
-signals:
-    void sendMessage();
-    void signal_textEdited(const QString & text);
-protected:
-    void keyPressEvent(QKeyEvent* e) override {
-        if (e->key() == Qt::Key_Return && !(e->modifiers() & Qt::ShiftModifier)) {
-            emit sendMessage();
-        } else {
-            QTextEdit::keyPressEvent(e);
-        }
-    }
-};
+#include <InputTextEdit.h>
+#include <MemoryComboBox.h>
+#include <StyleTextEdit.h>
 
 class ChatDialog : public QWidget {
     Q_OBJECT
@@ -43,10 +29,10 @@ private slots:
     void pslot_updateModelsList();
 
 private:
-    QPlainTextEdit* m_chat = nullptr;
+    StyleTextEdit* m_chat = nullptr;
     InputTextEdit* m_input = nullptr;
-    QPushButton* m_send = nullptr;
-    QPushButton* m_stop = nullptr;
+    StyledButton* m_send = nullptr;
+    StyledButton* m_stop = nullptr;
     OllamaAdapter* m_model = nullptr;
-    QComboBox * m_cb_model;
+    MemoryComboBox * m_cb_model;
 };

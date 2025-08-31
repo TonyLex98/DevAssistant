@@ -3,7 +3,7 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QLabel>
-#include <QPushButton>
+#include <StyledButton.h>
 
 PromptEditorDialog::PromptEditorDialog(PromptManager* mgr, QWidget* parent):QDialog(parent),m_mgr(mgr){
     setWindowTitle("Base Prompt & History");
@@ -19,8 +19,8 @@ PromptEditorDialog::PromptEditorDialog(PromptManager* mgr, QWidget* parent):QDia
     v->addLayout(f);
     QDialogButtonBox* bb = new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Close, this);
     v->addWidget(bb);
-    connect(bb->button(QDialogButtonBox::Save), &QPushButton::clicked, this, &PromptEditorDialog::onSave);
-    connect(bb->button(QDialogButtonBox::Close), &QPushButton::clicked, this, &PromptEditorDialog::accept);
+    connect(bb->button(QDialogButtonBox::Save), &StyledButton::clicked, this, &PromptEditorDialog::onSave);
+    connect(bb->button(QDialogButtonBox::Close), &StyledButton::clicked, this, &PromptEditorDialog::accept);
 }
 
 void PromptEditorDialog::onSave(){

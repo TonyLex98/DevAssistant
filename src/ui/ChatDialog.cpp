@@ -7,20 +7,21 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     setWindowTitle(tr("Chat / Instruction"));
     resize(680,480);
     auto v = new QVBoxLayout(this);
-    m_chat = new QPlainTextEdit(this); m_chat->setReadOnly(true);
-    m_cb_model = new QComboBox(this);
+    m_chat = new StyleTextEdit(this);
+    m_chat->setReadOnly(true);
+    m_cb_model = new MemoryComboBox("modelSelector", this);
     v->addWidget(m_chat,1);
     auto h = new QHBoxLayout();
     m_input = new InputTextEdit(this);
-    m_send = new QPushButton("Send", this);
-    m_stop = new QPushButton("Stop", this);
+    m_send = new StyledButton("Отправить", this);
+    m_stop = new StyledButton("Остановить", this);
     h->addWidget(m_cb_model);
     h->addWidget(m_input,1);
     h->addWidget(m_send);
     h->addWidget(m_stop);
     v->addLayout(h);
-    connect(m_send, &QPushButton::clicked, this, &ChatDialog::onSend);
-    connect(m_stop, &QPushButton::clicked, this, &ChatDialog::onStop);
+    connect(m_send, &StyledButton::clicked, this, &ChatDialog::onSend);
+    connect(m_stop, &StyledButton::clicked, this, &ChatDialog::onStop);
     connect(m_input, &InputTextEdit::sendMessage, this, &ChatDialog::onSend);
 
     connect(m_cb_model, &QComboBox::currentTextChanged, this, [this](const QString &text){
@@ -39,7 +40,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 void ChatDialog::onSend(){
     QString t = m_input->toPlainText().trimmed();
     if (t.isEmpty()) return;
-    m_chat->appendPlainText(QString("You: %1").arg(t));
+    m_chat->append(QString("You: %1\n\n").arg(t));
     m_input->clear();
     emit sendMessage(t);
 }
@@ -49,19 +50,22 @@ void ChatDialog::onStop(){
 }
 
 void ChatDialog::pslot_updateModelsList(){
-    m_cb_model->clear();
-    m_cb_model->addItems(m_model->listModels());
+    //QString current_text = m_cb_model->currentText();
+    //qDebug()<<"current_text = "<<current_text;
+    m_cb_model->setItems(m_model->listModels());
+
+
 }
 
 void ChatDialog::appendAssistantChunk(const QString& s){
     static bool first = true;
-    if (first) { m_chat->appendPlainText("Assistant: "); first=false; }
+    if (first) { m_chat->append("Assistant: \n"); first=false; }
     m_chat->moveCursor(QTextCursor::End);
     m_chat->insertPlainText(s);
 }
 
 void ChatDialog::finishAssistantMessage(){
-    m_chat->appendPlainText("\n<< stream finished >>");
+    m_chat->append("\n<< stream finished >>");
     appendAssistantChunk("");
 }
 
@@ -70,9 +74,3 @@ void ChatDialog::sendMessageToChat(const QString &text)
     emit sendMessage(text);
 }
 
-InputTextEdit::InputTextEdit(QWidget *parent) : QTextEdit(parent)
-{
-    connect(this, &InputTextEdit::textChanged, this, [this](){
-        emit signal_textEdited(toPlainText());
-    });
-}
