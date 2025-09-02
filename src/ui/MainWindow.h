@@ -40,6 +40,7 @@
 #include <QTabWidget>
 #include <MemoryLineEdit.h>
 #include <ProjectRelationView.h>
+#include "GraphWidget.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -82,6 +83,8 @@ private slots:
 
     void generateDescriptions();      // <‑‑ новый слот
     void onVoskText(const QString&);  // <‑‑ новый слот
+
+    void openGraph();
 
 
 public:
@@ -160,5 +163,8 @@ private:
 
     QTabWidget *project_view_tabs = new QTabWidget();
     ProjectRelationView *project_view = new ProjectRelationView;
+
+    StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
+    GraphWidget  *m_graphWindow{nullptr};   // окно‑виджет графа
 
 };

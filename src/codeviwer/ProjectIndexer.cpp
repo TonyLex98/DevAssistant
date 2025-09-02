@@ -6,11 +6,15 @@
 #include <QFileInfo>
 #include <QDebug>
 
-// ВАЖНО: это — C API Tree-sitter
-#include <tree_sitter/api.h>
-
-// Объявление функции грамматики C++ (из parser.c)
-extern "C" const TSLanguage *tree_sitter_cpp();
+// ProjectIndexer.cpp
+QMap<QString, const TSLanguage*(*)()> langMap = {
+    {".cpp",  tree_sitter_cpp},
+    {".c",    tree_sitter_cpp},
+    {".h",    tree_sitter_cpp},
+    {".hpp",  tree_sitter_cpp},
+    {".py",   tree_sitter_python},
+    {".dart", tree_sitter_dart}
+};
 
 // Внутренняя структура с парсером
 struct ProjectIndexer::TSState{
@@ -37,19 +41,30 @@ QString ProjectIndexer::computeSid(NodeKind kind, const QString &canonical, cons
     return QString::fromUtf8(h);
 }
 
-SymbolGraph ProjectIndexer::buildGraphSync(){
+SymbolGraph ProjectIndexer::buildGraphSync() {
     SymbolGraph g;
     if (m_root.isEmpty()) return g;
 
     QDirIterator it(m_root, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext()){
         const QString path = it.next();
-        for (const auto &ext : m_settings.includeExt){
-            if (path.endsWith(ext, Qt::CaseInsensitive)){
-                indexFileTS(path, g);   // Tree-sitter парсинг
-                break;
-            }
-        }
+        const QString ext = QFileInfo(path).suffix().toLower();
+        const QString extWithDot = "." + ext;
+        if (!langMap.contains(extWithDot)) continue;          // только нужные языки
+
+        // Добавляем узел «файл» уровня Language
+        NodeData fileNode;
+        fileNode.kind = NodeKind::Language;                    // новый тип
+        fileNode.displayName = QFileInfo(path).fileName();
+        fileNode.canonicalName = fileNode.displayName;
+        fileNode.loc.file = path;
+        fileNode.loc.line = 1;
+        fileNode.loc.column = 1;
+        fileNode.sid.id = computeSid(NodeKind::Language, fileNode.canonicalName, path, "");
+        g.nodes.insert(fileNode.sid.id, fileNode);
+
+        // Парсим содержимое с помощью Tree‑sitter
+        indexFileTS(path, g, langMap[extWithDot]());          // <‑‑ новый параметр
     }
     return g;
 }
@@ -128,12 +143,14 @@ void ProjectIndexer::collectEdgesCalls(TSNode node, const QByteArray &src, const
     int order=0; walk(node, order);
 }
 
-void ProjectIndexer::indexFileTS(const QString &filePath, SymbolGraph &g){
+// ProjectIndexer.cpp
+void ProjectIndexer::indexFileTS(const QString &filePath, SymbolGraph &g, const TSLanguage *lang) {
     QByteArray src = readAllUtf8(filePath);
-    if(src.isEmpty()) return;
+    if (src.isEmpty()) return;
 
-    TSTree* tree = ts_parser_parse_string(m_state->parser, nullptr, src.constData(), (uint32_t)src.size());
-    if(!tree) return;
+    TSTree *tree = ts_parser_parse_string(m_state->parser, nullptr, src.constData(), (uint32_t)src.size());
+    if (!tree) return;
+
     TSNode root = ts_tree_root_node(tree);
 
     // Collect classes map name->sid

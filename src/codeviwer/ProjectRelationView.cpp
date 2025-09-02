@@ -4,6 +4,12 @@
 #include <QApplication>
 #include <QJsonArray>
 #include <QMessageBox>
+#include <tree_sitter/api.h>
+
+extern "C" const TSLanguage *tree_sitter_cpp();
+extern "C" const TSLanguage *tree_sitter_python();   // <-- добавлено
+extern "C" const TSLanguage *tree_sitter_dart();     // <-- добавлено
+
 
 ProjectRelationView::ProjectRelationView(QWidget *parent): QGraphicsView(parent){
     m_scene = new QGraphicsScene(this);

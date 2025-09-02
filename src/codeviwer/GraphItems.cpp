@@ -197,12 +197,12 @@ MethodChip::MethodChip(const NodeData &data, QGraphicsItem* parent)
 
 void MethodChip::mousePressEvent(QGraphicsSceneMouseEvent *e){
     setCursor(QCursor(Qt::ClosedHandCursor));
-    emit heldChanged(true);                         // <-- В РУКЕ
+    emit heldChanged(true);
     QGraphicsObject::mousePressEvent(e);
 }
 
 void MethodChip::mouseReleaseEvent(QGraphicsSceneMouseEvent *e){
     setCursor(QCursor(Qt::OpenHandCursor));
-    emit heldChanged(false);                        // <-- ОТПУСТИЛИ
+    emit heldChanged(false);
     QGraphicsObject::mouseReleaseEvent(e);
 }

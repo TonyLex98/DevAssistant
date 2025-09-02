@@ -6,6 +6,10 @@
 #include <tree_sitter/api.h>
 
 extern "C" const TSLanguage *tree_sitter_cpp();
+extern "C" const TSLanguage *tree_sitter_python();   // <-- добавлено
+extern "C" const TSLanguage *tree_sitter_dart();     // <-- добавлено
+
+
 
 
 class ProjectIndexer : public QObject {
@@ -32,7 +36,7 @@ private:
 
     // helpers
     QString computeSid(NodeKind kind, const QString &canonical, const QString &file, const QString &signature) const;
-    void indexFileTS(const QString &filePath, SymbolGraph &g); // Tree-sitter
+    void indexFileTS(const QString &filePath, SymbolGraph &g, const TSLanguage *lang);
     void collectEdgesCalls(TSNode node, const QByteArray &src, const QString &file, const NodeData &currentMethod, SymbolGraph &g);
 
     // small utils

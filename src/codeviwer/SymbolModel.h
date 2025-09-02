@@ -7,7 +7,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 
-enum class NodeKind { Project, Namespace, Class, Struct, Enum, Method, Field, Function, Unknown };
+// SymbolModel.h
+enum class NodeKind { Project, Namespace, Class, Struct, Enum, Method, Field, Function, Language, Unknown };
+
 enum class EdgeKind { Calls, Instantiates, Accesses, Inherits, Uses, ParameterFlow };
 
 struct SourceLoc { QString file; int line = 1; int column = 1; };

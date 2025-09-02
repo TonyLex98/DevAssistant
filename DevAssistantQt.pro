@@ -35,6 +35,7 @@ SOURCES += \
     src/codeviwer/CodePatcher.cpp \
     src/codeviwer/GraphItems.cpp \
     src/codeviwer/GraphLayout.cpp \
+    src/codeviwer/GraphWidget.cpp \
     src/codeviwer/ProjectIndexer.cpp \
     src/codeviwer/ProjectRelationView.cpp \
     src/command/Command.cpp \
@@ -103,6 +104,7 @@ HEADERS += \
     src/codeviwer/CodePatcher.h \
     src/codeviwer/GraphItems.h \
     src/codeviwer/GraphLayout.h \
+    src/codeviwer/GraphWidget.h \
     src/codeviwer/ProjectIndexer.h \
     src/codeviwer/ProjectRelationView.h \
     src/codeviwer/SymbolModel.h \

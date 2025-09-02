@@ -56,6 +56,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // --------  3. Вспомогательные виджеты (нижняя часть) ----------
     m_rootEdit  = new MemoryLineEdit("projectRoot", this);
+
+    m_graphWindow = new GraphWidget();
     browseBtn   = new StyledButton("Browse...", this);
 
     // 3.1   Верхняя строка (путь + Browse)
@@ -85,10 +87,15 @@ MainWindow::MainWindow(QWidget *parent)
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
-    //btns->addWidget(promptBtn);
-    //btns->addWidget(applyBtn);
-    //btns->addWidget(undoBtn);
     btns->addWidget(descBtn);
+
+
+    // ---------- Добавляем кнопку «Show Graph» ----------
+    graphBtn = new StyledButton("Show Graph", this);
+    btns->addWidget(graphBtn);
+    connect(graphBtn, &StyledButton::clicked, this,
+            &MainWindow::openGraph);
+    // -------------------------------------------------
 
     promptBtn->hide();
     applyBtn->hide();
@@ -198,6 +205,13 @@ MainWindow::MainWindow(QWidget *parent)
     // … (тот же код, что был ранее)
 }
 
+
+void MainWindow::openGraph()
+{
+    m_graphWindow->show();
+    m_graphWindow->raise();
+    m_graphWindow->activateWindow();
+}
 
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
