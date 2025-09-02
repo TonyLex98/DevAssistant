@@ -8,7 +8,16 @@ QMAKE_CXXFLAGS += -std=gnu++1z
 CONFIG += c++17 object_parallel_to_source
 
 
-INCLUDEPATH += src src/core src/adapters src/ui src/utils src/command  src/audio src/uiide src/ui/customWidgets/
+INCLUDEPATH += \
+    src src/core \
+    src/adapters \
+    src/ui \
+    src/utils \
+    src/command  \
+    src/audio \
+    src/uiide \
+    src/ui/customWidgets \
+    src/codeviwer
 
 INCLUDEPATH += \
     $$PWD/src/uiide/tree-sitter/lib/src \
@@ -23,6 +32,11 @@ SOURCES += \
     src/audio/VoskRunner.cpp \
     src/audio/VoskWidget.cpp \
     src/audio/WavWriter.cpp \
+    src/codeviwer/CodePatcher.cpp \
+    src/codeviwer/GraphItems.cpp \
+    src/codeviwer/GraphLayout.cpp \
+    src/codeviwer/ProjectIndexer.cpp \
+    src/codeviwer/ProjectRelationView.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandFactory.cpp \
@@ -86,6 +100,12 @@ HEADERS += \
     src/audio/VoskRunner.h \
     src/audio/VoskWidget.h \
     src/audio/WavWriter.h \
+    src/codeviwer/CodePatcher.h \
+    src/codeviwer/GraphItems.h \
+    src/codeviwer/GraphLayout.h \
+    src/codeviwer/ProjectIndexer.h \
+    src/codeviwer/ProjectRelationView.h \
+    src/codeviwer/SymbolModel.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \
     src/command/CommandFactory.h \

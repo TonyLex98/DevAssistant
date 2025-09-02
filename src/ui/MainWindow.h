@@ -39,6 +39,7 @@
 #include <QStandardPaths>
 #include <QTabWidget>
 #include <MemoryLineEdit.h>
+#include <ProjectRelationView.h>
 
 class ChatDialog;
 class ModelsDialog;
@@ -156,5 +157,8 @@ private:
     IDEWidget *ide_widget;
 
     MemorySplitter *mainSplitter;
+
+    QTabWidget *project_view_tabs = new QTabWidget();
+    ProjectRelationView *project_view = new ProjectRelationView;
 
 };
