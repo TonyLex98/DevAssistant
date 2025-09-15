@@ -49,6 +49,8 @@ SOURCES += \
     src/command/OpenFileContextCommand.cpp \
     src/command/RenameFileCommand.cpp \
     src/command/ReplaceInFileCommand.cpp \
+    src/command/RunPythonCommand.cpp \
+    src/command/RunShellCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
     src/core/DevAssManager.cpp \
     src/core/PromptResolver.cpp \
@@ -119,6 +121,8 @@ HEADERS += \
     src/command/OpenFileContextCommand.h \
     src/command/RenameFileCommand.h \
     src/command/ReplaceInFileCommand.h \
+    src/command/RunPythonCommand.h \
+    src/command/RunShellCommand.h \
     src/command/WriteDescriptionCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \

@@ -677,15 +677,12 @@ void MainWindow::handleAssistantFinished()
         //return;
     }
 
-    m_history.push_back(qMakePair(QString("assistant"), QString(fullResp)));
+    m_history.push_back(qMakePair(QString("assistant"), QString(jsonResp)));
 
-    m_lastAssistantMessage = fullResp;
+    m_lastAssistantMessage = jsonResp;
 
     // 4. Парсим команды
     QVector<Command*> cmds = CommandParser::parse(jsonResp);
-
-    // ... остальная часть функции остаётся без изменений ...
-    //m_history.push_back(qMakePair(QString("<assistant>"), QString(fullResp)));
 
     if (cmds.isEmpty()) {
         log("LLM не вернул ни одной команды");
@@ -762,12 +759,19 @@ void MainWindow::handleAssistantFinished()
     rescan();
 
 
-    // Если мы в режиме последовательности – переходим к следующему шагу
+    // Если мы в режиме последовательности, решаем, переходить к следующему
     if (m_sequenceMode) {
-        ++m_currentStepIdx;
-        QTimer::singleShot(200, this, &MainWindow::runNextStep); // небольшая пауза
+        const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
+        if (step.loop()) {
+            // Зацикливаем: очищаем контекст и сразу запускаем тот же шаг
+            //resetContextForLoop();
+            QTimer::singleShot(200, this, &MainWindow::runNextStep);
+        } else {
+            // Переходим к следующему
+            ++m_currentStepIdx;
+            QTimer::singleShot(200, this, &MainWindow::runNextStep);
+        }
     }
-
 
     qDeleteAll(toRun);
 }

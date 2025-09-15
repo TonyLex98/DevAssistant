@@ -9,6 +9,8 @@ QJsonObject PromptStep::toJson() const
     for (const QString &c : m_allowedCommands)
         arr.append(c);
     o["allowedCommands"] = arr;
+
+    o["loop"] = m_loop;
     return o;
 }
 
@@ -20,6 +22,9 @@ PromptStep PromptStep::fromJson(const QJsonObject &obj)
     QJsonArray arr = obj.value("allowedCommands").toArray();
     for (const QJsonValue &v : arr)
         step.m_allowedCommands << v.toString();
+
+    // читаем флаг зацикливания (если его нет – false)
+    step.m_loop = obj.value("loop").toBool(false);
 
     return step;
 }

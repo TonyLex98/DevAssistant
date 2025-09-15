@@ -9,6 +9,9 @@
 #include "OpenFileContextCommand.h"
 #include "OpenFileRegionCommand.h"
 #include "AskUserCommand.h"
+#include "RunPythonCommand.h"
+#include "RunShellCommand.h"
+
 
 QVector<Command*> CommandRegistry::all()
 {
@@ -21,7 +24,9 @@ QVector<Command*> CommandRegistry::all()
         new RenameFileCommand(QString(), QString()),
         new EditInRangeCommand(QString(), 0, 0, QByteArray()),
         new WriteDescriptionCommand(QString(), QString()),
-        new OpenFileContextCommand(QString())
+        new OpenFileContextCommand(QString()),
+        new RunPythonCommand(QString(), QByteArray()),
+        new RunShellCommand(QString())
     };
 }
 
@@ -104,9 +109,27 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         );
     }
 
-        if (cmd == "ASK_USER") {
+    if (cmd == "ASK_USER") {
         const QJsonObject p = obj["params"].toObject();
         return new AskUserCommand(p.value("question").toString(), obj["description"].toString());
+    }
+
+    // +++ в CommandRegistry::create()
+    if (cmd == "RUN_PYTHON") {
+        const QJsonObject p = obj["params"].toObject();
+        return new RunPythonCommand(
+            p.value("scriptPath").toString(),
+            p.value("code").toString().toUtf8(),
+            obj["description"].toString()
+        );
+    }
+
+    if (cmd == "RUN_SHELL") {
+        const QJsonObject p = obj["params"].toObject();
+        return new RunShellCommand(
+            p.value("command").toString(),
+            obj["description"].toString()
+        );
     }
 
     /* Неизвестная команда */

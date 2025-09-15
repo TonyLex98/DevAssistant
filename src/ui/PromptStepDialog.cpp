@@ -47,6 +47,10 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
         delete c; // шаблон нам больше не нужен
     }
 
+    /* ---------- чек‑бокс «Зациклить шаг» ---------- */
+    m_loopCheck = new QCheckBox("Зациклить шаг (повторять до остановки)", this);
+    v->addWidget(m_loopCheck);
+
     /* Кнопки ОК/Отмена */
     auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     v->addWidget(bb);
@@ -66,6 +70,9 @@ void PromptStepDialog::setStep(const PromptStep &step)
         it->setCheckState(step.allowedCommands().contains(name) ?
                           Qt::Checked : Qt::Unchecked);
     }
+
+    /* флаг зацикливания */
+    m_loopCheck->setChecked(step.loop());
 }
 
 void PromptStepDialog::onInsertClicked()
@@ -90,5 +97,9 @@ void PromptStepDialog::onOk()
             allowed << it->data(Qt::UserRole).toString();
     }
     m_step.setAllowedCommands(allowed);
+
+    /* сохраняем флаг зацикливания */
+    m_step.setLoop(m_loopCheck->isChecked());
+
     accept();
 }

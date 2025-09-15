@@ -24,7 +24,12 @@ public:
     const QStringList& allowedCommands() const { return m_allowedCommands; }
     void setAllowedCommands(const QStringList& lst) { m_allowedCommands = lst; }
 
+    /*--- зацикливаем ли шаг ----------------------------------------------*/
+    bool loop() const { return m_loop; }
+    void setLoop(bool v) { m_loop = v; }
+
 private:
     QString      m_template;          // шаблон промпта
     QStringList  m_allowedCommands;   // имена команд из CommandRegistry
+    bool         m_loop = false;      // ← новое поле
 };

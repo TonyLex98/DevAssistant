@@ -4,7 +4,8 @@
 #include <StyleTextEdit.h>
 #include <QDialogButtonBox>
 #include <StyledButton.h>
-#include <QComboBox>          // ← новый заголовок
+#include <QComboBox>
+#include <QCheckBox>
 
 class StyleTextEdit;
 class QListWidget;
@@ -19,6 +20,8 @@ public:
     void setStep(const PromptStep& step);
     PromptStep step() const { return m_step; }
 
+
+
 private slots:
     void onOk();
     void onInsertClicked();    // слот «Вставить»
@@ -31,4 +34,7 @@ private:
     /* --- UI для резолверов --- */
     QComboBox   *m_resolverCombo = nullptr;
     StyledButton *m_insertBtn      = nullptr;
+
+    /* --- UI для зацикливания --- */
+    QCheckBox   *m_loopCheck      = nullptr;
 };
