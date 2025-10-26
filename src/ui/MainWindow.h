@@ -195,5 +195,6 @@ private:
                               const QString& stdOut,
                               const QString& stdErr,
                               int exitCode);
+    void retryCurrentSequenceStep();
 
 };

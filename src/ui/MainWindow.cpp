@@ -701,17 +701,22 @@ void MainWindow::handleAssistantFinished()
 {
     QByteArray fullResp = m_streamBuf.toUtf8();
     QByteArray jsonResp = extractJsonPart(fullResp);
-    if (jsonResp.isEmpty()) {
-        log("Assistant ответил, но не содержит JSON-массив. Пытаемся распарсить исходный текст.");
-    }
-
     const QByteArray payload = jsonResp.isEmpty() ? fullResp : jsonResp;
     m_history.push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
     m_lastAssistantMessage = QString::fromUtf8(payload);
 
+    if (jsonResp.isEmpty()) {
+        appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
+        log("LLM ответ сохранён как контекст: не удалось извлечь JSON.");
+        retryCurrentSequenceStep();
+        return;
+    }
+
     QVector<Command*> cmds = CommandParser::parse(payload);
     if (cmds.isEmpty()) {
-        log("LLM не вернул ни одной команды");
+        appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
+        log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
+        retryCurrentSequenceStep();
         return;
     }
 
@@ -1042,6 +1047,13 @@ void MainWindow::appendConsoleContext(const QString& title,
     while (m_consoleLogs.size() > maxLogs)
         m_consoleLogs.removeFirst();
     rebuildContextCache();
+}
+
+void MainWindow::retryCurrentSequenceStep()
+{
+    if (!m_sequenceMode)
+        return;
+    QTimer::singleShot(200, this, &MainWindow::runNextStep);
 }
 
 void MainWindow::generateDescriptions()

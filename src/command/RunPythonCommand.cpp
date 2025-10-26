@@ -4,6 +4,15 @@
 #include <QFileInfo>
 #include <QDebug>
 
+static QString decodeProcessOutput(const QByteArray& data)
+{
+#ifdef Q_OS_WIN
+    return QString::fromLocal8Bit(data);
+#else
+    return QString::fromUtf8(data);
+#endif
+}
+
 RunPythonCommand::RunPythonCommand(const QString& scriptPath,
                                    const QByteArray& inlineCode,
                                    const QString& descr)
@@ -54,8 +63,8 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
         return false;
     }
     proc.waitForFinished(-1);
-    m_stdout = QString::fromUtf8(proc.readAllStandardOutput());
-    m_stderr = QString::fromUtf8(proc.readAllStandardError());
+    m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
+    m_stderr = decodeProcessOutput(proc.readAllStandardError());
     m_exitCode = proc.exitCode();
 
     if (m_exitCode != 0) {

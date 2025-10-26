@@ -25,6 +25,18 @@ QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body = buildRequestBody(userPrompt, options, false, systemPrompt);
+    QJsonArray messages;
+    if (!systemPrompt.isEmpty()) {
+        QJsonObject systemMsg;
+        systemMsg["role"] = "system";
+        systemMsg["content"] = systemPrompt;
+        messages.append(systemMsg);
+    }
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    userMsg["content"] = userPrompt;
+    messages.append(userMsg);
+    body.insert("messages", messages);
 
     QEventLoop loop;
     QNetworkReply* r = m_nam.post(req, QJsonDocument(body).toJson());
@@ -94,6 +106,18 @@ void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body = buildRequestBody(userPrompt, options, true, systemPrompt);
+    QJsonArray messages;
+    if (!systemPrompt.isEmpty()) {
+        QJsonObject systemMsg;
+        systemMsg["role"] = "system";
+        systemMsg["content"] = systemPrompt;
+        messages.append(systemMsg);
+    }
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    userMsg["content"] = userPrompt;
+    messages.append(userMsg);
+    body.insert("messages", messages);
     m_lastBody = body;
 
     m_streamReply = m_nam.post(req, QJsonDocument(body).toJson());
