@@ -49,6 +49,8 @@ SOURCES += \
     src/command/OpenFileContextCommand.cpp \
     src/command/RenameFileCommand.cpp \
     src/command/ReplaceInFileCommand.cpp \
+    src/command/SearchProjectCommand.cpp \
+    src/command/SearchWebCommand.cpp \
     src/command/RunPythonCommand.cpp \
     src/command/RunShellCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
@@ -121,6 +123,8 @@ HEADERS += \
     src/command/OpenFileContextCommand.h \
     src/command/RenameFileCommand.h \
     src/command/ReplaceInFileCommand.h \
+    src/command/SearchProjectCommand.h \
+    src/command/SearchWebCommand.h \
     src/command/RunPythonCommand.h \
     src/command/RunShellCommand.h \
     src/command/WriteDescriptionCommand.h \

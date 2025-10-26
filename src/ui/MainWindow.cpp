@@ -20,6 +20,8 @@
 #include "../command/EditInRangeCommand.h"
 #include "../command/RunShellCommand.h"
 #include "../command/RunPythonCommand.h"
+#include "../command/SearchWebCommand.h"
+#include "../command/SearchProjectCommand.h"
 
 static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
     QByteArray raw = text.toUtf8();
@@ -807,14 +809,17 @@ void MainWindow::handleAssistantFinished()
         }
         handlePostApplyContextCleanup(c);
         logConsoleResult(c);
+        handleSearchResults(c);
     }
 
     if (!applyFailed && !pendingEdits.isEmpty()) {
         if (!applyGroupedEditInRange(pendingEdits, &err)) {
             QMessageBox::warning(this, tr("Ошибка выполнения"), err);
         } else {
-            for (Command* c : pendingEdits)
+            for (Command* c : pendingEdits) {
                 handlePostApplyContextCleanup(c);
+                handleSearchResults(c);
+            }
         }
     }
 
@@ -917,6 +922,11 @@ void MainWindow::rebuildContextCache()
         if (!m_contextContent.isEmpty())
             m_contextContent += "\n\n";
         m_contextContent += m_consoleLogs.join("\n\n");
+    }
+    if (!m_externalSources.isEmpty()) {
+        if (!m_contextContent.isEmpty())
+            m_contextContent += "\n\n";
+        m_contextContent += m_externalSources.join("\n\n");
     }
 }
 
@@ -1029,6 +1039,30 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     }
 }
 
+void MainWindow::handleSearchResults(Command* cmd)
+{
+    if (auto web = dynamic_cast<SearchWebCommand*>(cmd)) {
+        if (web->results().isEmpty())
+            return;
+        QString title = QString("==== SEARCH_WEB: %1 ====").arg(cmd->params().value("query").toString());
+        QString body = web->results().join("\n\n");
+        appendExternalContext(QString("%1\n%2").arg(title, body));
+        return;
+    }
+    if (auto local = dynamic_cast<SearchProjectCommand*>(cmd)) {
+        if (local->matches().isEmpty())
+            return;
+        QString title = QString("==== SEARCH_PROJECT: %1 ====").arg(cmd->params().value("query").toString());
+        QString body = local->matches().join("\n\n");
+        appendExternalContext(QString("%1\n%2").arg(title, body));
+    }
+}
+
+QString MainWindow::searchResultsText() const
+{
+    return m_externalSources.join("\n\n");
+}
+
 void MainWindow::appendConsoleContext(const QString& title,
                                       const QString& stdOut,
                                       const QString& stdErr,
@@ -1046,6 +1080,17 @@ void MainWindow::appendConsoleContext(const QString& title,
     const int maxLogs = 5;
     while (m_consoleLogs.size() > maxLogs)
         m_consoleLogs.removeFirst();
+    rebuildContextCache();
+}
+
+void MainWindow::appendExternalContext(const QString& block)
+{
+    if (block.trimmed().isEmpty())
+        return;
+    m_externalSources << block.trimmed();
+    const int maxBlocks = 5;
+    while (m_externalSources.size() > maxBlocks)
+        m_externalSources.removeFirst();
     rebuildContextCache();
 }
 
@@ -1194,10 +1239,11 @@ PromptSequence MainWindow::defaultSequenceTemplate()
         "Вот список файлов:\n{{FILE_LIST}}\n"
         "\n{{HISTORY}}\n"
         "Если задача пользователя не до конца ясна — задай до 3 уточняющих вопросов, используя команду ASK_USER (один JSON на вопрос)."
+        "При необходимости можешь сразу вызывать SEARCH_PROJECT (поиск по проекту) или SEARCH_WEB (внешние источники), прежде чем формировать план."
         "Доступные команды: {{SUPPORTED_COMMANDS}}"
         "Затем опиши краткий план действий."
     );
-    s1.setAllowedCommands(QStringList{ "ASK_USER", "OPEN_FILE_REGION", "OPEN_FILE" });
+    s1.setAllowedCommands(QStringList{ "ASK_USER", "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
     // Step 2: Gather minimal relevant context (snippets only)
     PromptStep s2;
@@ -1205,9 +1251,11 @@ PromptSequence MainWindow::defaultSequenceTemplate()
         "На основе запроса и плана выбери минимальные необходимые участки кода."
         "Используй OPEN_FILE_REGION (желательно c startLine/endLine или регуляркой) для точечных фрагментов."
         "Если нужен целый файл (редко) — используй OPEN_FILE."
+        "Для полнотекстового поиска по проекту используй SEARCH_PROJECT (укажи maxMatches и, при необходимости, include)."
+        "Если требуются внешние сведения — вызови SEARCH_WEB и кратко перескажи найденные материалы."
         "Выведи только команды."
     );
-    s2.setAllowedCommands(QStringList{ "OPEN_FILE_REGION", "OPEN_FILE" });
+    s2.setAllowedCommands(QStringList{ "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
     // Step 3: Propose concrete edits as commands (dry‑run)
     PromptStep s3;

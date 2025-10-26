@@ -11,6 +11,8 @@
 #include "AskUserCommand.h"
 #include "RunPythonCommand.h"
 #include "RunShellCommand.h"
+#include "SearchWebCommand.h"
+#include "SearchProjectCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -61,7 +63,9 @@ QVector<Command*> CommandRegistry::all()
         new WriteDescriptionCommand(QString(), QString()),
         new OpenFileContextCommand(QString()),
         new RunPythonCommand(QString(), QByteArray()),
-        new RunShellCommand(QString())
+        new RunShellCommand(QString()),
+        new SearchWebCommand(QString()),
+        new SearchProjectCommand(QString())
     };
 }
 
@@ -181,6 +185,30 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         const QJsonObject p = paramsObject(obj.value("params"));
         return new RunShellCommand(
             p.value("command").toString(),
+            obj["description"].toString()
+        );
+    }
+
+    if (cmd == "SEARCH_WEB") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        return new SearchWebCommand(
+            p.value("query").toString(),
+            p.value("maxResults").toInt(5),
+            obj["description"].toString()
+        );
+    }
+
+    if (cmd == "SEARCH_PROJECT") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        QStringList includes;
+        QJsonArray arr = p.value("include").toArray();
+        for (const QJsonValue& v : arr)
+            includes << v.toString();
+        return new SearchProjectCommand(
+            p.value("query").toString(),
+            p.value("maxMatches").toInt(10),
+            p.value("caseSensitive").toBool(false),
+            includes,
             obj["description"].toString()
         );
     }

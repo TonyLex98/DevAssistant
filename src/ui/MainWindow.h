@@ -62,6 +62,7 @@ public:
     const QString& lastUserMessage() const { return m_lastUserMessage; }
     const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
 
+    QString searchResultsText() const;
 
 public slots:
     void runSequenceDialog();
@@ -182,6 +183,7 @@ private:
 
     QMap<QString, FileContextSlice> m_contextSlices;
     QStringList m_consoleLogs;
+    QStringList m_externalSources;
 
     void rebuildContextCache();
     QString formatNumberedLines(const QStringList& lines, int startLine) const;
@@ -195,6 +197,9 @@ private:
                               const QString& stdOut,
                               const QString& stdErr,
                               int exitCode);
+    void appendExternalContext(const QString& block);
+    void handleSearchResults(Command* cmd);
+
     void retryCurrentSequenceStep();
 
 };

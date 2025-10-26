@@ -80,6 +80,9 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // 7) {{OPEN_FILES}} – текущий запрос пользователя
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
 
+    // 7.1) {{SEARCH_RESULTS}} – результаты поисковых команд
+    result.replace("{{SEARCH_RESULTS}}", ctx->searchResultsText());
+
     
     // 6.1) {{FILE_DESCRIPTIONS}} — описания из папки DevelopersAssistant
     result.replace("{{FILE_DESCRIPTIONS}}", ctx->fileDescriptionsText());
@@ -119,6 +122,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
     vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
     vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
+    vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
 
     return vec;
 }

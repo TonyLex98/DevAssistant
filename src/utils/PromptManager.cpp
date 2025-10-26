@@ -69,6 +69,9 @@ QString PromptManager::buildPrompt(const QString& userText,
     p += buildProjectContext;
     p += "\n\n";
 
+    /* 3.1. Результаты поисковых команд */
+    p += "Под рукой есть найденные источники (если пусто — запуск НИЧЕГО не нашёл):\n{{SEARCH_RESULTS}}\n\n";
+
     /* 4. История диалога */
     p += QString("Последняя история (последние %1 сообщений):\n").arg(m_historySize);
     int start = history.size() > m_historySize ? history.size() - m_historySize : 0;
