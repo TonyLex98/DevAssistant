@@ -5,6 +5,26 @@
 #include <QMap>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QFileInfo>
+#include <QDir>
+
+static QString absoluteFileList(const QString& list, const QString& root)
+{
+    QStringList abs;
+    QDir rootDir(root);
+    const QStringList lines = list.split('\n', QString::KeepEmptyParts);
+    for (const QString& line : lines) {
+        QString trimmed = line.trimmed();
+        if (trimmed.isEmpty())
+            continue;
+        QFileInfo info(trimmed);
+        if (!info.isAbsolute()) {
+            trimmed = rootDir.absoluteFilePath(trimmed);
+        }
+        abs << QDir::toNativeSeparators(trimmed);
+    }
+    return abs.join('\n');
+}
 
 PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
                                                        const PromptStep &step,
@@ -18,7 +38,8 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     result.replace("{{PROJECT_ROOT}}", ctx->projectRootPath());
 
     // 2) {{FILE_LIST}}
-    result.replace("{{FILE_LIST}}", ctx->promptManager()->fileListText());
+    result.replace("{{FILE_LIST}}", absoluteFileList(ctx->promptManager()->fileListText(),
+                                                     ctx->projectRootPath()));
 
     // 3) {{HISTORY}} – берём последние N сообщений из MainWindow
     QString hist;

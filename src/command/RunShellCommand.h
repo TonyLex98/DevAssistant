@@ -17,7 +17,14 @@ public:
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
 
+    QString stdoutText() const { return m_stdout; }
+    QString stderrText() const { return m_stderr; }
+    int exitCode() const { return m_exitCode; }
+
 private:
     QJsonObject m_params;
     QString m_description;
+    QString m_stdout;
+    QString m_stderr;
+    int m_exitCode = 0;
 };

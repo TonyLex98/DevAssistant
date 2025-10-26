@@ -15,6 +15,11 @@
 #include <QDir>
 #include <QInputDialog>
 #include <QRegularExpression>
+#include <QFileInfo>
+#include <algorithm>
+#include "../command/EditInRangeCommand.h"
+#include "../command/RunShellCommand.h"
+#include "../command/RunPythonCommand.h"
 
 static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
     QByteArray raw = text.toUtf8();
@@ -44,6 +49,25 @@ static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
         }
     }
     return parts;
+}
+
+static QString normalizeContextPath(const QString& path, const QString& projectRoot)
+{
+    if (path.trimmed().isEmpty())
+        return QString();
+    QFileInfo info(path);
+    if (info.isAbsolute())
+        return QDir::cleanPath(info.absoluteFilePath());
+    return QDir(projectRoot).absoluteFilePath(path);
+}
+
+static QString displayContextPath(const QString& normalizedPath, const QString& projectRoot)
+{
+    QDir root(projectRoot);
+    QString rel = root.relativeFilePath(normalizedPath);
+    if (!rel.startsWith(".."))
+        return QDir::toNativeSeparators(rel);
+    return QDir::toNativeSeparators(normalizedPath);
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -411,26 +435,24 @@ void MainWindow::onModelChunk(const QString& s){
 
 QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
 {
-    /* Ищем массив … */
-    int start = txt.indexOf('[');
-    int end   = txt.lastIndexOf(']');
-
-    if (start >= 0 && end >= start) {
-        return txt.mid(start, end - start + 1);           // [ … ]
-    }
-
-    /* Ищем объект(ы) … */
     QList<QByteArray> parts = splitConcatenatedJson_fromText(QString::fromUtf8(txt));
-    if (!parts.isEmpty()){
-        QByteArray joined = "[";
-        for (int i = 0; i < parts.size(); ++i) {
-            if (i) joined += ',';
-            joined += parts[i];
-        }
-        joined += "]";
-        return joined;
+    if (parts.isEmpty())
+        return QByteArray();
+
+    if (parts.size() == 1) {
+        const QByteArray trimmed = parts.first().trimmed();
+        if (!trimmed.isEmpty() && trimmed.startsWith('['))
+            return trimmed;
     }
-    return QByteArray();
+
+    QByteArray joined = "[";
+    for (int i = 0; i < parts.size(); ++i) {
+        if (i)
+            joined += ',';
+        joined += parts.at(i);
+    }
+    joined += "]";
+    return joined;
 }
 
 void MainWindow::editSequences()
@@ -677,31 +699,22 @@ void MainWindow::handleAssistantFinished()
 
 void MainWindow::handleAssistantFinished()
 {
-    // 1. Ответ LLM – полный текст (включая «лишние» строки)
     QByteArray fullResp = m_streamBuf.toUtf8();
-
-    // 2. Выбираем только JSON‑часть
     QByteArray jsonResp = extractJsonPart(fullResp);
-
-    // 3. Проверяем, что JSON найден
     if (jsonResp.isEmpty()) {
-        log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
-        //return;
+        log("Assistant ответил, но не содержит JSON-массив. Пытаемся распарсить исходный текст.");
     }
 
-    m_history.push_back(qMakePair(QString("assistant"), QString(jsonResp)));
+    const QByteArray payload = jsonResp.isEmpty() ? fullResp : jsonResp;
+    m_history.push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
+    m_lastAssistantMessage = QString::fromUtf8(payload);
 
-    m_lastAssistantMessage = jsonResp;
-
-    // 4. Парсим команды
-    QVector<Command*> cmds = CommandParser::parse(jsonResp);
-
+    QVector<Command*> cmds = CommandParser::parse(payload);
     if (cmds.isEmpty()) {
         log("LLM не вернул ни одной команды");
-        //return;
+        return;
     }
 
-    // 5. Подтверждение пользователем
     CommandConfirmDialog dlg(cmds.toList(), this);
     if (dlg.exec() != QDialog::Accepted) {
         log("Пользователь отклонил команды");
@@ -710,82 +723,325 @@ void MainWindow::handleAssistantFinished()
     }
     QList<Command*> toRun = dlg.confirmed();
 
-    // 6. Обработка специальных команд (без изменений на диске)
     for (Command* c : toRun) {
-        if (c->name()=="ASK_USER") {
-            QString q = c->params().value("question").toString();
-            bool ok=false; QString ans = QInputDialog::getText(this, tr("Ответьте на вопрос нейросети"), q, QLineEdit::Normal, QString(), &ok);
-            if (ok) { m_history.push_back(qMakePair(QString("user"), ans)); }
-        } else if (c->name()=="OPEN_FILE_REGION" || c->name()=="OPEN_FILE") {
-            QJsonObject p = c->params(); QString path = p.value("path").toString(); QString abs = QDir(m_projectRoot).filePath(path);
-            QFile f(abs); if (f.open(QIODevice::ReadOnly)) {
-                QString txt = QString::fromUtf8(f.readAll()); f.close();
-                QString snippet;
-                if (c->name()=="OPEN_FILE_REGION") {
-                    int sLine = p.value("startLine").toInt(-1); int eLine = p.value("endLine").toInt(-1);
-                    QString region = p.value("region").toString();
-                    if (sLine>=1 && eLine>=sLine) {
-                        QStringList lines = txt.split("\n");
-                        sLine = qMax(1, sLine); eLine = qMin(eLine, lines.size());
-                        snippet = lines.mid(sLine-1, eLine-sLine+1).join("\n");
-                    } else if (!region.isEmpty()) {
-                        QRegularExpression re(region, QRegularExpression::DotMatchesEverythingOption|QRegularExpression::MultilineOption);
-                        auto m = re.match(txt);
-                        if (m.hasMatch()) snippet = m.captured(0);
-                    } else {
-                        snippet = txt;
-                    }
-                } else { snippet = txt; }
-                if (!snippet.isEmpty()) {
-                    m_contextContent += QString("\n==== %1 ====%2\n%3\n").arg(path).arg(c->name()=="OPEN_FILE_REGION"?" (region)":"").arg(snippet);
-                }
-            }
+        if (c->name() == "ASK_USER") {
+            const QString question = c->params().value("question").toString();
+            bool ok = false;
+            const QString ans = QInputDialog::getText(this,
+                                                      tr("Ответьте на вопрос нейросети"),
+                                                      question,
+                                                      QLineEdit::Normal,
+                                                      QString(),
+                                                      &ok);
+            if (ok)
+                m_history.push_back(qMakePair(QString("user"), ans));
+        } else if (c->name() == "OPEN_FILE_REGION" || c->name() == "OPEN_FILE") {
+            handleOpenCommand(c);
         }
     }
 
-    // 6. Применяем команды
-
-    // Сводка для PREVIOUS_STEPS
     QStringList appliedSummary;
     for (Command* c : toRun) {
         QString one = c->name();
         QJsonObject p = c->params();
-        if (p.contains("path")) one += QString(" path=%1").arg(p.value("path").toString());
-        if (p.contains("from") && p.contains("to")) one += QString(" %1→%2").arg(p.value("from").toString(), p.value("to").toString());
+        if (p.contains("path"))
+            one += QString(" path=%1").arg(p.value("path").toString());
+        if (p.contains("from") && p.contains("to"))
+            one += QString(" %1→%2").arg(p.value("from").toString(), p.value("to").toString());
         appliedSummary << one;
     }
     if (!appliedSummary.isEmpty()) {
-        m_prevSteps << QString("Шаг %1: %2").arg(m_currentStepIdx+1).arg(appliedSummary.join("; "));
+        m_prevSteps << QString("Шаг %1: %2").arg(m_currentStepIdx + 1).arg(appliedSummary.join("; "));
     }
 
     QString err;
-    for (Command* c : toRun) {
-        if (!c->apply(&m_dev_manager, &err)) {
-            QMessageBox::warning(this, "Ошибка выполнения", err);
-            break;
+    auto logConsoleResult = [&](Command* cmd){
+        QString title;
+        QString stdoutText;
+        QString stderrText;
+        int exitCode = 0;
+
+        if (auto py = dynamic_cast<RunPythonCommand*>(cmd)) {
+            QJsonObject p = py->params();
+            QString script = p.value("scriptPath").toString();
+            if (!script.isEmpty() && !QFileInfo(script).isAbsolute())
+                script = QDir(m_projectRoot).filePath(script);
+            if (script.isEmpty())
+                script = p.value("path").toString();
+            title = QString("RUN_PYTHON %1").arg(script.isEmpty() ? QStringLiteral("<inline>") : script);
+            stdoutText = py->stdoutText();
+            stderrText = py->stderrText();
+            exitCode = py->exitCode();
+        } else if (auto sh = dynamic_cast<RunShellCommand*>(cmd)) {
+            QString commandText = sh->params().value("command").toString();
+            title = QString("RUN_SHELL %1").arg(commandText);
+            stdoutText = sh->stdoutText();
+            stderrText = sh->stderrText();
+            exitCode = sh->exitCode();
         }
 
+        if (!title.isEmpty())
+            appendConsoleContext(title.trimmed(), stdoutText, stderrText, exitCode);
+    };
+
+    QList<Command*> pendingEdits;
+    bool applyFailed = false;
+    for (Command* c : toRun) {
+        const QString name = c->name();
+        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION")
+            continue;
+        if (name == "EDIT_IN_RANGE") {
+            pendingEdits << c;
+            continue;
+        }
+        if (!c->apply(&m_dev_manager, &err)) {
+            logConsoleResult(c);
+            QMessageBox::warning(this, tr("Ошибка выполнения"), err);
+            applyFailed = true;
+            break;
+        }
+        handlePostApplyContextCleanup(c);
+        logConsoleResult(c);
     }
 
-    // 7. После применения обновляем список
+    if (!applyFailed && !pendingEdits.isEmpty()) {
+        if (!applyGroupedEditInRange(pendingEdits, &err)) {
+            QMessageBox::warning(this, tr("Ошибка выполнения"), err);
+        } else {
+            for (Command* c : pendingEdits)
+                handlePostApplyContextCleanup(c);
+        }
+    }
+
     rescan();
 
-
-    // Если мы в режиме последовательности, решаем, переходить к следующему
     if (m_sequenceMode) {
         const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
         if (step.loop()) {
-            // Зацикливаем: очищаем контекст и сразу запускаем тот же шаг
-            //resetContextForLoop();
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
         } else {
-            // Переходим к следующему
             ++m_currentStepIdx;
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
         }
     }
 
     qDeleteAll(toRun);
+}
+
+void MainWindow::handleOpenCommand(Command* cmd)
+{
+    const QJsonObject params = cmd->params();
+    const QString rawPath = params.value("path").toString();
+    if (rawPath.isEmpty())
+        return;
+
+    const QString normalized = normalizeContextPath(rawPath, m_projectRoot);
+    QFile file(normalized);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+    const QString text = QString::fromUtf8(file.readAll());
+    file.close();
+
+    QStringList allLines = text.split('\n', QString::KeepEmptyParts);
+    if (text.endsWith('\n') && !allLines.isEmpty())
+        allLines.removeLast();
+    if (cmd->name() == "OPEN_FILE") {
+        setFullFileContext(normalized, allLines);
+        return;
+    }
+
+    int startLine = params.value("startLine").toInt(-1);
+    int endLine = params.value("endLine").toInt(-1);
+    QStringList snippet;
+
+    if (startLine >= 1 && endLine >= startLine) {
+        if (startLine > allLines.size())
+            return;
+        startLine = qMax(1, startLine);
+        endLine = qMin(endLine, allLines.size());
+        snippet = allLines.mid(startLine - 1, endLine - startLine + 1);
+    } else {
+        const QString region = params.value("region").toString();
+        if (region.isEmpty())
+            return;
+        QRegularExpression re(region, QRegularExpression::DotMatchesEverythingOption
+                                        | QRegularExpression::MultilineOption);
+        auto match = re.match(text);
+        if (!match.hasMatch())
+            return;
+        const int startIndex = match.capturedStart();
+        startLine = text.left(startIndex).count('\n') + 1;
+        const QString captured = match.captured(0);
+        snippet = captured.split('\n', QString::KeepEmptyParts);
+        if (captured.endsWith('\n') && !snippet.isEmpty())
+            snippet.removeLast();
+    }
+
+    if (!snippet.isEmpty())
+        addRegionContext(normalized, startLine, snippet);
+}
+
+void MainWindow::rebuildContextCache()
+{
+    QStringList blocks;
+    for (auto it = m_contextSlices.cbegin(); it != m_contextSlices.cend(); ++it) {
+        const FileContextSlice& slice = it.value();
+        if (slice.mode == FileContextSlice::None)
+            continue;
+
+        QString block = QString("==== %1 ====")
+                .arg(displayContextPath(it.key(), m_projectRoot));
+        if (slice.mode == FileContextSlice::Ranges)
+            block += " (selected lines)";
+        block += "\n";
+
+        if (slice.mode == FileContextSlice::FullFile) {
+            block += formatNumberedLines(slice.fullFileLines, 1);
+        } else {
+            for (const ContextRange& range : slice.regions) {
+                block += QString("[lines %1-%2]\n").arg(range.startLine).arg(range.endLine);
+                block += formatNumberedLines(range.lines, range.startLine);
+                block += "\n";
+            }
+            block = block.trimmed();
+        }
+        blocks << block.trimmed();
+    }
+    m_contextContent = blocks.join("\n\n");
+    if (!m_consoleLogs.isEmpty()) {
+        if (!m_contextContent.isEmpty())
+            m_contextContent += "\n\n";
+        m_contextContent += m_consoleLogs.join("\n\n");
+    }
+}
+
+QString MainWindow::formatNumberedLines(const QStringList& lines, int startLine) const
+{
+    if (lines.isEmpty())
+        return QString();
+    const int width = QString::number(startLine + lines.size() - 1).size();
+    QStringList numbered;
+    for (int i = 0; i < lines.size(); ++i) {
+        const int lineNo = startLine + i;
+        numbered << QString("%1| %2")
+                        .arg(lineNo, width, 10, QChar('0'))
+                        .arg(lines.at(i));
+    }
+    return numbered.join("\n");
+}
+
+void MainWindow::setFullFileContext(const QString& path, const QStringList& lines)
+{
+    const QString normalized = normalizeContextPath(path, m_projectRoot);
+    if (normalized.isEmpty())
+        return;
+    FileContextSlice& slice = m_contextSlices[normalized];
+    slice.mode = FileContextSlice::FullFile;
+    slice.fullFileLines = lines;
+    slice.regions.clear();
+    rebuildContextCache();
+}
+
+void MainWindow::addRegionContext(const QString& path, int startLine, const QStringList& lines)
+{
+    const QString normalized = normalizeContextPath(path, m_projectRoot);
+    if (normalized.isEmpty() || lines.isEmpty())
+        return;
+
+    FileContextSlice& slice = m_contextSlices[normalized];
+    slice.mode = FileContextSlice::Ranges;
+    slice.fullFileLines.clear();
+
+    ContextRange incoming;
+    incoming.startLine = startLine;
+    incoming.lines = lines;
+    incoming.endLine = startLine + lines.size() - 1;
+
+    bool replaced = false;
+    for (ContextRange& existing : slice.regions) {
+        if (existing.startLine == incoming.startLine && existing.endLine == incoming.endLine) {
+            existing.lines = lines;
+            replaced = true;
+            break;
+        }
+    }
+    if (!replaced) {
+        slice.regions.append(incoming);
+        std::sort(slice.regions.begin(), slice.regions.end(),
+                  [](const ContextRange& a, const ContextRange& b){
+                      return a.startLine < b.startLine;
+                  });
+    }
+    rebuildContextCache();
+}
+
+void MainWindow::clearContextForPath(const QString& path)
+{
+    const QString normalized = normalizeContextPath(path, m_projectRoot);
+    if (normalized.isEmpty())
+        return;
+    if (m_contextSlices.remove(normalized) > 0)
+        rebuildContextCache();
+}
+
+bool MainWindow::applyGroupedEditInRange(const QList<Command*>& commands, QString* err)
+{
+    QMap<QString, QList<EditInRangeCommand*>> grouped;
+    for (Command* c : commands) {
+        auto edit = dynamic_cast<EditInRangeCommand*>(c);
+        if (!edit)
+            continue;
+        const QString normalized = normalizeContextPath(edit->path(), m_projectRoot);
+        grouped[normalized].append(edit);
+    }
+
+    for (auto it = grouped.begin(); it != grouped.end(); ++it) {
+        if (!EditInRangeCommand::applyBatch(it.value(), &m_dev_manager, err))
+            return false;
+        clearContextForPath(it.key());
+    }
+    return true;
+}
+
+void MainWindow::handlePostApplyContextCleanup(Command* cmd)
+{
+    const QString name = cmd->name();
+    const QJsonObject p = cmd->params();
+    auto clear = [&](const QString& key) {
+        if (!key.isEmpty())
+            clearContextForPath(key);
+    };
+
+    if (name == "EDIT_IN_RANGE" || name == "REPLACE_IN_FILE"
+        || name == "DELETE_FILE" || name == "CREATE_FILE") {
+        clear(p.value("path").toString());
+        return;
+    }
+
+    if (name == "RENAME_FILE") {
+        clear(p.value("oldPath").toString());
+        clear(p.value("newPath").toString());
+    }
+}
+
+void MainWindow::appendConsoleContext(const QString& title,
+                                      const QString& stdOut,
+                                      const QString& stdErr,
+                                      int exitCode)
+{
+    QString block = QString("==== %1 ====\n").arg(title.isEmpty() ? "Console" : title);
+    if (!stdOut.trimmed().isEmpty()) {
+        block += "[stdout]\n" + stdOut.trimmed() + "\n";
+    }
+    if (!stdErr.trimmed().isEmpty()) {
+        block += "[stderr]\n" + stdErr.trimmed() + "\n";
+    }
+    block += QString("exitCode=%1").arg(exitCode);
+    m_consoleLogs << block.trimmed();
+    const int maxLogs = 5;
+    while (m_consoleLogs.size() > maxLogs)
+        m_consoleLogs.removeFirst();
+    rebuildContextCache();
 }
 
 void MainWindow::generateDescriptions()

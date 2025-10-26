@@ -41,6 +41,8 @@
 #include <MemoryLineEdit.h>
 #include <ProjectRelationView.h>
 #include "GraphWidget.h"
+#include <QMap>
+#include <QVector>
 
 class ChatDialog;
 class ModelsDialog;
@@ -165,6 +167,33 @@ private:
     ProjectRelationView *project_view = new ProjectRelationView;
 
     StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
-    GraphWidget  *m_graphWindow{nullptr};   // окно‑виджет графа
+    GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
+
+    struct ContextRange {
+        int startLine = -1;
+        int endLine = -1;
+        QStringList lines;
+    };
+    struct FileContextSlice {
+        enum Mode { None, FullFile, Ranges } mode = None;
+        QStringList fullFileLines;
+        QVector<ContextRange> regions;
+    };
+
+    QMap<QString, FileContextSlice> m_contextSlices;
+    QStringList m_consoleLogs;
+
+    void rebuildContextCache();
+    QString formatNumberedLines(const QStringList& lines, int startLine) const;
+    void setFullFileContext(const QString& path, const QStringList& lines);
+    void addRegionContext(const QString& path, int startLine, const QStringList& lines);
+    void clearContextForPath(const QString& path);
+    bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err);
+    void handleOpenCommand(Command* cmd);
+    void handlePostApplyContextCleanup(Command* cmd);
+    void appendConsoleContext(const QString& title,
+                              const QString& stdOut,
+                              const QString& stdErr,
+                              int exitCode);
 
 };

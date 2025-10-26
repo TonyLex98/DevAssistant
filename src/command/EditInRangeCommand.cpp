@@ -2,76 +2,159 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QDateTime>
+#include <algorithm>
+
+static QStringList splitPreserveEmpty(const QString& text)
+{
+    return text.split('\n', QString::KeepEmptyParts);
+}
 
 EditInRangeCommand::EditInRangeCommand(const QString& path,
                                        int startLine, int endLine,
                                        const QByteArray& content,
+                                       const QJsonArray& replacementLines,
                                        const QString& descr)
+    : m_path(path),
+      m_startLine(startLine),
+      m_endLine(endLine)
 {
     m_params["path"]      = path;
     m_params["startLine"] = startLine;
     m_params["endLine"]   = endLine;
-    m_params["content"]   = QString::fromUtf8(content);
 
     m_description = descr.isEmpty()
-        ? QString("Редактировать диапазон строк %1–%2 в файле «%3». Лучше переписывать файл полностью.")
+        ? QString("Edit lines %1-%2 in \"%3\" (line-by-line patch).")
               .arg(startLine).arg(endLine).arg(path)
         : descr;
+
+    if (!replacementLines.isEmpty()) {
+        QJsonArray normalized;
+        for (int i = 0; i < replacementLines.size(); ++i) {
+            const QJsonObject obj = replacementLines.at(i).toObject();
+            const int lineNo = obj.value("line").toInt(startLine + i);
+            const QString textLine = obj.value("text").toString();
+            m_newLines << textLine;
+            normalized.append(QJsonObject{
+                { "line", lineNo },
+                { "text", textLine }
+            });
+        }
+        m_params["replacementLines"] = normalized;
+        m_params["content"] = m_newLines.join('\n');
+    } else {
+        const QString asText = QString::fromUtf8(content);
+        m_params["content"] = asText;
+        m_newLines = splitPreserveEmpty(asText);
+
+        QJsonArray normalized;
+        for (int i = 0; i < m_newLines.size(); ++i) {
+            normalized.append(QJsonObject{
+                { "line", startLine + i },
+                { "text", m_newLines.at(i) }
+            });
+        }
+        m_params["replacementLines"] = normalized;
+    }
 }
 
 bool EditInRangeCommand::apply(DevAssManager* devAss, QString* err)
 {
-    /* ---------- Чтение исходного файла ---------- */
-    const QString path = m_params["path"].toString();
-    const int start    = m_params["startLine"].toInt();
-    const int end      = m_params["endLine"].toInt();
-    const QByteArray newCont = m_params["content"].toString().toUtf8();
+    QList<EditInRangeCommand*> single{ this };
+    return applyBatch(single, devAss, err);
+}
 
+bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
+                                    DevAssManager* devAss,
+                                    QString* err)
+{
+    if (commands.isEmpty())
+        return true;
+
+    const QString path = commands.first()->path();
+    for (const EditInRangeCommand* cmd : commands) {
+        if (cmd->path() != path) {
+            if (err) *err = "EditInRangeCommand batch must target the same file";
+            return false;
+        }
+    }
+
+    QStringList lines;
+    if (!loadFileLines(path, lines, err))
+        return false;
+
+    QList<EditInRangeCommand*> sorted = commands;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const EditInRangeCommand* a, const EditInRangeCommand* b){
+                  return a->startLine() > b->startLine();
+              });
+
+    for (EditInRangeCommand* cmd : sorted) {
+        if (!cmd->applyToLines(lines, err))
+            return false;
+    }
+
+    return saveFileLines(path, lines, devAss, err);
+}
+
+bool EditInRangeCommand::applyToLines(QStringList& lines, QString* err) const
+{
+    if (m_startLine < 1 || m_endLine < m_startLine) {
+        if (err) *err = "Invalid line range for EditInRangeCommand";
+        return false;
+    }
+
+    const int startIndex = m_startLine - 1;
+    const int endIndex = m_endLine - 1;
+    if (startIndex >= lines.size() || endIndex >= lines.size()) {
+        if (err) *err = "Line range exceeds file length";
+        return false;
+    }
+
+    const int removeCount = endIndex - startIndex + 1;
+    for (int i = 0; i < removeCount; ++i)
+        lines.removeAt(startIndex);
+    for (int i = 0; i < m_newLines.size(); ++i)
+        lines.insert(startIndex + i, m_newLines.at(i));
+    return true;
+}
+
+bool EditInRangeCommand::loadFileLines(const QString& path, QStringList& out, QString* err)
+{
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        if (err) *err = "Не удалось открыть файл для чтения";
+        if (err) *err = QString("Cannot open %1 for reading").arg(path);
         return false;
     }
     QTextStream in(&f);
-    QStringList lines;
     while (!in.atEnd())
-        lines << in.readLine();
+        out << in.readLine();
     f.close();
+    return true;
+}
 
-    if (start < 0 || end >= lines.size() || start > end) {
-        if (err) *err = "Неверные номера строк";
-        return false;
-    }
-
-    /* ---------- Формируем новые строки ---------- */
-    QStringList newLines = QString::fromUtf8(newCont).split('\n',
-                                    QString::KeepEmptyParts);
-
-    /* ---------- Создаём новый список строк ---------- */
-    QStringList merged;
-    merged.reserve(lines.size() - (end - start + 1) + newLines.size());
-    merged.append(lines.mid(0, start));
-    merged.append(newLines);
-    merged.append(lines.mid(end + 1));
-
-    /* ---------- Записываем обновлённый файл ---------- */
+bool EditInRangeCommand::saveFileLines(const QString& path,
+                                       const QStringList& lines,
+                                       DevAssManager* devAss,
+                                       QString* err)
+{
+    QFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        if (err) *err = "Не удалось открыть файл для записи";
+        if (err) *err = QString("Cannot open %1 for writing").arg(path);
         return false;
     }
+
     QTextStream out(&f);
-    for (const QString& l : qAsConst(merged))
-        out << l << '\n';
+    for (int i = 0; i < lines.size(); ++i)
+        out << lines.at(i) << '\n';
     f.close();
 
-    /* ---------- (опционально) обновляем запись в .dapro ---------- */
     if (devAss) {
         devAss->updateFileDescription(path,
                                       QDateTime::currentDateTime(),
                                       true);
         devAss->save();
     }
-
     return true;
 }
 

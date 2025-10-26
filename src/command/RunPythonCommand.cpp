@@ -1,14 +1,13 @@
 // RunPythonCommand.cpp
 #include "RunPythonCommand.h"
 #include <QFile>
+#include <QFileInfo>
 #include <QDebug>
 
 RunPythonCommand::RunPythonCommand(const QString& scriptPath,
                                    const QByteArray& inlineCode,
                                    const QString& descr)
 {
-    // Сохраняем параметры. Если scriptPath не пустой – считаем, что это файл.
-    // Иначе храним код.
     if (!scriptPath.isEmpty()) {
         m_params["scriptPath"] = scriptPath;
     }
@@ -17,40 +16,50 @@ RunPythonCommand::RunPythonCommand(const QString& scriptPath,
     }
     m_description = descr.isEmpty()
         ? (scriptPath.isEmpty()
-               ? QString("Запустить Python‑код")   // inline
+               ? QString("Запустить Python-код")
                : QString("Запустить скрипт «%1»").arg(scriptPath))
         : descr;
 }
 
-bool RunPythonCommand::apply(DevAssManager* /*devAss*/, QString* err)
+bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
 {
     QProcess proc;
     QString program = "python";
+    QStringList args;
+    const QString rawScript = m_params.value("scriptPath").toString().trimmed();
+    const QString code = m_params.value("code").toString();
+    const bool hasCode = !code.trimmed().isEmpty();
 
-    if (m_params.contains("scriptPath")) {
-        QString path = m_params["scriptPath"].toString();
+    if (!rawScript.isEmpty()) {
+        QString path = rawScript;
+        QFileInfo info(path);
+        if (!info.isAbsolute() && devAss)
+            path = devAss->projectRoot().filePath(path);
         if (!QFile::exists(path)) {
             if (err) *err = QString("Файл скрипта %1 не найден").arg(path);
             return false;
         }
-        proc.start(program, {path});
-    } else if (m_params.contains("code")) {
-        proc.start(program, {"-c", m_params["code"].toString()});
+        args << path;
+    } else if (hasCode) {
+        args << "-c" << code;
     } else {
         if (err) *err = "Ни скрипта, ни кода не указано";
         return false;
     }
 
-    // Запускаем синхронно (до завершения)
+    proc.start(program, args);
+
     if (!proc.waitForStarted()) {
         if (err) *err = "Не удалось запустить Python";
         return false;
     }
-    proc.waitForFinished(-1); // бесконечный таймаут
+    proc.waitForFinished(-1);
+    m_stdout = QString::fromUtf8(proc.readAllStandardOutput());
+    m_stderr = QString::fromUtf8(proc.readAllStandardError());
+    m_exitCode = proc.exitCode();
 
-    int exitCode = proc.exitCode();
-    if (exitCode != 0) {
-        if (err) *err = QString("Python завершился с кодом %1").arg(exitCode);
+    if (m_exitCode != 0) {
+        if (err) *err = QString("Python завершился с кодом %1").arg(m_exitCode);
         return false;
     }
     return true;

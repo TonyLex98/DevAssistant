@@ -34,10 +34,12 @@ bool RunShellCommand::apply(DevAssManager* /*devAss*/, QString* err)
         return false;
     }
     proc.waitForFinished(-1);
+    m_stdout = QString::fromUtf8(proc.readAllStandardOutput());
+    m_stderr = QString::fromUtf8(proc.readAllStandardError());
+    m_exitCode = proc.exitCode();
 
-    int exitCode = proc.exitCode();
-    if (exitCode != 0) {
-        if (err) *err = QString("Команда завершилась с кодом %1").arg(exitCode);
+    if (m_exitCode != 0) {
+        if (err) *err = QString("Команда завершилась с кодом %1").arg(m_exitCode);
         return false;
     }
     return true;
