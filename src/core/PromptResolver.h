@@ -9,8 +9,14 @@ class MainWindow;   // forward
 class PromptResolver
 {
 public:
-    /* Подставляет все {{…}} в шаблон. Возвращает готовый запрос. */
-    static QString resolve(const QString& tmpl,
+    struct ResolvedPrompt
+    {
+        QString systemPrompt;
+        QString userPrompt;
+    };
+
+    /* Fills the template placeholders and returns both the system prompt and user query. */
+    static ResolvedPrompt resolve(const QString& tmpl,
                            const PromptStep& step,
                            MainWindow* ctx);
 

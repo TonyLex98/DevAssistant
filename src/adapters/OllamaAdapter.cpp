@@ -15,16 +15,16 @@ void OllamaAdapter::configure(const QString& model, const QVariantMap& options){
 }
 
 QString OllamaAdapter::generate(const QString& prompt, const QVariantMap& options){
+    return generateWithSystem(prompt, QString(), options);
+}
+
+QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
+                                          const QString& systemPrompt,
+                                          const QVariantMap& options){
     QUrl url = m_endpoint; url.setPath("/api/generate");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QJsonObject body;
-    body.insert("model", m_model);
-    body.insert("prompt", prompt);
-    body.insert("stream", false);
-
-    for (auto it = m_params.begin(); it!=m_params.end(); ++it) body.insert(it.key(), QJsonValue::fromVariant(it.value()));
-    for (auto it = options.begin(); it!=options.end(); ++it) body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    QJsonObject body = buildRequestBody(userPrompt, options, false, systemPrompt);
 
     QEventLoop loop;
     QNetworkReply* r = m_nam.post(req, QJsonDocument(body).toJson());
@@ -81,18 +81,19 @@ QStringList OllamaAdapter::listModels(){
 }
 
 void OllamaAdapter::startStream(const QString& prompt, const QVariantMap& options) {
+    startStreamWithSystem(prompt, QString(), options);
+}
+
+void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
+                                          const QString& systemPrompt,
+                                          const QVariantMap& options) {
     if (m_streamReply) { m_streamReply->abort(); m_streamReply->deleteLater(); }
     m_buffer.clear();
 
     QUrl url = m_endpoint; url.setPath("/api/generate");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QJsonObject body;
-    body.insert("model", m_model);
-    body.insert("prompt", prompt);
-    body.insert("stream", true);
-    for (auto it = m_params.begin(); it!=m_params.end(); ++it) body.insert(it.key(), QJsonValue::fromVariant(it.value()));
-    for (auto it = options.begin(); it!=options.end(); ++it) body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    QJsonObject body = buildRequestBody(userPrompt, options, true, systemPrompt);
     m_lastBody = body;
 
     m_streamReply = m_nam.post(req, QJsonDocument(body).toJson());
@@ -120,4 +121,24 @@ void OllamaAdapter::onReadyRead(){
 void OllamaAdapter::onStreamFinished(){
     emit streamFinished();
     if (m_streamReply) { m_streamReply->deleteLater(); m_streamReply=nullptr; }
+}
+
+QJsonObject OllamaAdapter::buildRequestBody(const QString& prompt,
+                                            const QVariantMap& options,
+                                            bool stream,
+                                            const QString& systemPrompt) const
+{
+    QJsonObject body;
+    body.insert("model", m_model);
+    body.insert("prompt", prompt);
+    body.insert("stream", stream);
+    if (!systemPrompt.isEmpty())
+        body.insert("system", systemPrompt);
+
+    for (auto it = m_params.begin(); it != m_params.end(); ++it)
+        body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    for (auto it = options.begin(); it != options.end(); ++it)
+        body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+
+    return body;
 }

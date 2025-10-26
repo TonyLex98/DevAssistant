@@ -45,6 +45,6 @@ private:
                     *m_downBtn = nullptr;
 
     /* Новые виджеты */
-    QLineEdit      *m_nameEdit  = nullptr;
+    StyleTextEdit      *m_nameEdit  = nullptr;
     StyleTextEdit      *m_descEdit  = nullptr;
 };

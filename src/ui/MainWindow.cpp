@@ -5,6 +5,7 @@
 
 #include <QStatusBar>
 #include <QMessageBox>
+#include <QJsonDocument>
 #include "../ui/ChatDialog.h"
 #include "../ui/ModelsDialog.h"
 #include "../ui/OllamaSettingsDialog.h"
@@ -382,7 +383,8 @@ void MainWindow::undoLast(){
 }
 
 void MainWindow::sendUserMessage(const QString& text){
-
+    m_lastUserMessage = text;
+    qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
     runSequenceDialog();
 /*
     QString capabilities = "";
@@ -533,21 +535,25 @@ void MainWindow::runNextStep()
     }
 
     const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
-    QString resolved = PromptResolver::resolve(step.tmpl(), step, this);
+    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, this);
+    qDebug() << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt.left(200);
+    qDebug() << "[runNextStep] userPrompt:" << resolved.userPrompt;
 
-    // Оценка токенов для контекста шага
+    // РћС†РµРЅРєР° С‚РѕРєРµРЅРѕРІ РґР»СЏ РєРѕРЅС‚РµРєСЃС‚Р° С€Р°РіР°
     {
-        int tokens = m_model.estimateTokens(resolved);
-        log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_currentStepIdx+1).arg(tokens));
+        int tokens = m_model.estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
+        log(QString("[РЁР°Рі %1] РљРѕРЅС‚РµРєСЃС‚ в‰€ %2 С‚РѕРєРµРЅРѕРІ").arg(m_currentStepIdx+1).arg(tokens));
     }
-    // Логируем, показываем пользователю
-    log(QString("\n--- Шаг %1 ------------------------------------------------")
+    // Р›РѕРіРёСЂСѓРµРј, РїРѕРєР°Р·С‹РІР°РµРј РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
+    log(QString("\n--- РЁР°Рі %1 ------------------------------------------------")
         .arg(m_currentStepIdx+1));
-    log(resolved);
+    log(resolved.systemPrompt);
+    if (!resolved.userPrompt.isEmpty())
+        log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
-    // Отправляем запрос так же, как обычный ввод пользователя
+    // РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ С‚Р°Рє Р¶Рµ, РєР°Рє РѕР±С‹С‡РЅС‹Р№ РІРІРѕРґ РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
     m_streamBuf.clear();
-    m_model.startStream(resolved);
+    m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
     // В истории сохраняем только запрос (не пользовательский текст)
     //m_history.push_back(qMakePair(QString("system"), resolved));
 }
@@ -562,7 +568,13 @@ void MainWindow::handleAssistantFinished()
 
     // 3. Проверяем, что JSON найден
     if (jsonResp.isEmpty()) {
-        log("Assistant ответил, но не содержит JSON‑массив. Команды не применяются.");
+        log("Assistant ответил, но не содержит JSON-массив. Команды не применяются.");
+        log(QString("Сырой ответ модели:\n%1").arg(QString::fromUtf8(fullResp)));
+        const QJsonObject lastBody = m_model.lastRequestBody();
+        if (!lastBody.isEmpty()) {
+            log(QString("Последний запрос к Ollama:\n%1")
+                    .arg(QString::fromUtf8(QJsonDocument(lastBody).toJson(QJsonDocument::Indented))));
+        }
         //return;
     }
 
@@ -853,6 +865,8 @@ void MainWindow::onVoskText(const QString& text){
 
 void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
 {
+    if (lastUserMessage.trimmed().isEmpty())
+        return;
     m_lastUserMessage = lastUserMessage;
     qDebug()<<"m_lastUserMessage = "<<m_lastUserMessage;
 }

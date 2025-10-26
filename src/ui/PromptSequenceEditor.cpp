@@ -19,7 +19,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     QVBoxLayout *mainLay = new QVBoxLayout(this);
 
     /* 1. Поля имени/описания */
-    m_nameEdit = new QLineEdit(this);
+    m_nameEdit = new StyleTextEdit(this);
     m_descEdit = new StyleTextEdit(this);
     m_descEdit->setMinimumHeight(80);
 
@@ -58,7 +58,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     connect(m_downBtn,  &StyledButton::clicked, this, &PromptSequenceEditor::onMoveDown);
     connect(m_list,     &QListWidget::itemDoubleClicked, this, &PromptSequenceEditor::onEditStep);
 
-    connect(m_nameEdit,  &QLineEdit::textChanged,   this, &PromptSequenceEditor::onNameChanged);
+    connect(m_nameEdit,  &StyleTextEdit::textChanged,   this, &PromptSequenceEditor::onNameChanged);
     connect(m_descEdit,  &StyleTextEdit::textChanged,   this, &PromptSequenceEditor::onDescriptionChanged);
 }
 
@@ -75,7 +75,7 @@ void PromptSequenceEditor::setSequence(const PromptSequence &seq)
 PromptSequence PromptSequenceEditor::sequence() const
 {
     PromptSequence seq = m_seq;
-    seq.setName(m_nameEdit->text());
+    seq.setName(m_nameEdit->toPlainText());
     seq.setDescription(m_descEdit->toPlainText());
     return seq;
 }

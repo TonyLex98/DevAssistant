@@ -6,11 +6,13 @@
 #include <QRegularExpression>
 #include <QDebug>
 
-QString PromptResolver::resolve(const QString &tmpl,
-                               const PromptStep &step,
-                               MainWindow *ctx)
+PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
+                                                       const PromptStep &step,
+                                                       MainWindow *ctx)
 {
     QString result = tmpl;
+    QString userQuery = ctx ? ctx->lastUserMessage() : QString();
+    qDebug() << "[PromptResolver] USER_QUERY =" << userQuery;
 
     // 1) {{PROJECT_ROOT}}
     result.replace("{{PROJECT_ROOT}}", ctx->projectRootPath());
@@ -49,7 +51,7 @@ QString PromptResolver::resolve(const QString &tmpl,
     result.replace("{{SUPPORTED_COMMANDS}}", allowedList.trimmed());
 
     // 6) {{USER_QUERY}} – текущий запрос пользователя
-    result.replace("{{USER_QUERY}}", ctx->lastUserMessage());
+    result.replace("{{USER_QUERY}}", userQuery);
 
     // Последний ответ ассистента
     result.replace("{{LAST_ASSISTANTS_RESPONSE}}", ctx->lastAssistantMessage());
@@ -75,7 +77,10 @@ QString PromptResolver::resolve(const QString &tmpl,
 
 
 
-    return result;
+    ResolvedPrompt out;
+    out.systemPrompt = result;
+    out.userPrompt = userQuery;
+    return out;
 }
 
 QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
