@@ -701,20 +701,20 @@ void MainWindow::handleAssistantFinished()
 {
     QByteArray fullResp = m_streamBuf.toUtf8();
     QByteArray jsonResp = extractJsonPart(fullResp);
-    const QByteArray payload = jsonResp.isEmpty() ? fullResp : jsonResp;
+    const bool usedRaw = jsonResp.isEmpty();
+    const QByteArray payload = usedRaw ? fullResp : jsonResp;
+    if (usedRaw) {
+        appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
+        log("LLM ответ сохранён как контекст: не удалось извлечь JSON. Пытаемся распарсить сырой ответ.");
+    }
+
     m_history.push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
     m_lastAssistantMessage = QString::fromUtf8(payload);
 
-    if (jsonResp.isEmpty()) {
-        appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
-        log("LLM ответ сохранён как контекст: не удалось извлечь JSON.");
-        retryCurrentSequenceStep();
-        return;
-    }
-
     QVector<Command*> cmds = CommandParser::parse(payload);
     if (cmds.isEmpty()) {
-        appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
+        if (!usedRaw)
+            appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
         log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
         retryCurrentSequenceStep();
         return;
