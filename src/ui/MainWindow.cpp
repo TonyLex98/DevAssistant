@@ -22,6 +22,7 @@
 #include "../command/RunPythonCommand.h"
 #include "../command/SearchWebCommand.h"
 #include "../command/SearchProjectCommand.h"
+#include "../command/ShowResultCommand.h"
 
 static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
     QByteArray raw = text.toUtf8();
@@ -744,6 +745,15 @@ void MainWindow::handleAssistantFinished()
                 m_history.push_back(qMakePair(QString("user"), ans));
         } else if (c->name() == "OPEN_FILE_REGION" || c->name() == "OPEN_FILE") {
             handleOpenCommand(c);
+        } else if (c->name() == "SHOW_RESULT") {
+            QString title = c->params().value("title").toString();
+            if (title.isEmpty())
+                title = tr("Есть результат");
+            QString content = c->params().value("content").toString();
+            if (content.isEmpty())
+                content = tr("SHOW_RESULT вызван без текста.");
+            QMessageBox::information(this, title, content);
+            appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
         }
     }
 
@@ -795,7 +805,7 @@ void MainWindow::handleAssistantFinished()
     bool applyFailed = false;
     for (Command* c : toRun) {
         const QString name = c->name();
-        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION")
+        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT")
             continue;
         if (name == "EDIT_IN_RANGE") {
             pendingEdits << c;
@@ -1281,8 +1291,9 @@ PromptSequence MainWindow::defaultSequenceTemplate()
     PromptStep s5;
     s5.setTemplate(
         "Выведи окончательные команды для применения изменений (повтори весь набор без пояснений)."
+        "Если нужно показать пользователю результат или инструкцию — добавь команду SHOW_RESULT с title/content."
     );
-    s5.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE" });
+    s5.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE", "SHOW_RESULT" });
 
     PromptSequence seq("Default");
     seq.setDescription("Поэтапная последовательность правок: уточнение → сбор минимального контекста → черновик правок → уточнения → финальные команды.");

@@ -51,6 +51,7 @@ SOURCES += \
     src/command/ReplaceInFileCommand.cpp \
     src/command/SearchProjectCommand.cpp \
     src/command/SearchWebCommand.cpp \
+    src/command/ShowResultCommand.cpp \
     src/command/RunPythonCommand.cpp \
     src/command/RunShellCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
@@ -125,6 +126,7 @@ HEADERS += \
     src/command/ReplaceInFileCommand.h \
     src/command/SearchProjectCommand.h \
     src/command/SearchWebCommand.h \
+    src/command/ShowResultCommand.h \
     src/command/RunPythonCommand.h \
     src/command/RunShellCommand.h \
     src/command/WriteDescriptionCommand.h \

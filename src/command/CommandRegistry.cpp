@@ -13,6 +13,7 @@
 #include "RunShellCommand.h"
 #include "SearchWebCommand.h"
 #include "SearchProjectCommand.h"
+#include "ShowResultCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -65,7 +66,8 @@ QVector<Command*> CommandRegistry::all()
         new RunPythonCommand(QString(), QByteArray()),
         new RunShellCommand(QString()),
         new SearchWebCommand(QString()),
-        new SearchProjectCommand(QString())
+        new SearchProjectCommand(QString()),
+        new ShowResultCommand(QString())
     };
 }
 
@@ -209,6 +211,15 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             p.value("maxMatches").toInt(10),
             p.value("caseSensitive").toBool(false),
             includes,
+            obj["description"].toString()
+        );
+    }
+
+    if (cmd == "SHOW_RESULT") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        return new ShowResultCommand(
+            p.value("content").toString(),
+            p.value("title").toString(),
             obj["description"].toString()
         );
     }
