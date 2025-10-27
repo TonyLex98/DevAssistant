@@ -301,6 +301,47 @@ static QVector<SearchHit> parseDuckHtml(const QString& html,
     return hits;
 }
 
+static QString extractTextFromHtml(const QString& html)
+{
+    QString cleaned = html;
+    const QRegularExpression script(R"(<script[\s\S]*?</script>)",
+                                    QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression style(R"(<style[\s\S]*?</style>)",
+                                   QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression noscript(R"(<noscript[\s\S]*?</noscript>)",
+                                      QRegularExpression::CaseInsensitiveOption);
+    cleaned.remove(script);
+    cleaned.remove(style);
+    cleaned.remove(noscript);
+    QString text = QTextDocumentFragment::fromHtml(cleaned).toPlainText();
+    text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+    text = text.replace(QRegularExpression(QStringLiteral("[ \t]+")), QLatin1String(" "));
+    text = text.replace(QRegularExpression(QStringLiteral("\n{3,}")), QLatin1String("\n\n"));
+    return text.trimmed();
+}
+
+static QString fetchPageText(const QString& url, int maxChars)
+{
+    QUrl qurl(url);
+    if (!qurl.isValid() || qurl.scheme().isEmpty())
+        return QString();
+
+    QByteArray body;
+    int status = 0;
+    QString err;
+    if (!httpGet(qurl, &body, &status, &err, url))
+        return QString();
+    if (status < 200 || status >= 300)
+        return QString();
+
+    QString text = extractTextFromHtml(QString::fromUtf8(body));
+    if (text.isEmpty())
+        return QString();
+    if (text.size() > maxChars)
+        text = text.left(maxChars);
+    return text;
+}
+
 } // namespace
 
 SearchWebCommand::SearchWebCommand(const QString& query,
@@ -393,11 +434,17 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
 
     QStringList blocks;
     blocks.reserve(hits.size());
+    const int maxContentChars = 2000;
     for (const SearchHit& hit : hits.mid(0, maxResults)) {
         QString block = hit.title;
         block += QLatin1Char('\n') + hit.url;
         if (!hit.snippet.isEmpty())
             block += QLatin1Char('\n') + hit.snippet;
+        const QString article = fetchPageText(hit.url, maxContentChars);
+        if (!article.isEmpty()) {
+            block += QLatin1String("\n\n---\n");
+            block += article;
+        }
         blocks << block.trimmed();
     }
     m_results = blocks;
