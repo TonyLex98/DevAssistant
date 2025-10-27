@@ -18,11 +18,6 @@ public:
     const QStringList& results() const { return m_results; }
 
 private:
-    bool fetchDuckDuckGo(const QString& query,
-                         int maxResults,
-                         QStringList& out,
-                         QString* err);
-
     QJsonObject m_params;
     QString m_description;
     QStringList m_results;
