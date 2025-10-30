@@ -86,6 +86,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_rootEdit  = new MemoryLineEdit("projectRoot", this);
 
     m_graphWindow = new GraphWidget();
+    m_seqGraphWindow = nullptr;  // Will be created when needed
     browseBtn   = new StyledButton("Browse...", this);
 
     // 3.1   Верхняя строка (путь + Browse)
@@ -123,6 +124,12 @@ MainWindow::MainWindow(QWidget *parent)
     btns->addWidget(graphBtn);
     connect(graphBtn, &StyledButton::clicked, this,
             &MainWindow::openGraph);
+    
+    // ---------- Добавляем кнопку «Show Sequence Graph» ----------
+    seqGraphBtn = new StyledButton("Show Sequence Graph", this);
+    btns->addWidget(seqGraphBtn);
+    connect(seqGraphBtn, &StyledButton::clicked, this,
+            &MainWindow::openSequenceGraph);
     // -------------------------------------------------
 
     promptBtn->hide();
@@ -239,6 +246,94 @@ void MainWindow::openGraph()
     m_graphWindow->show();
     m_graphWindow->raise();
     m_graphWindow->activateWindow();
+}
+
+void MainWindow::openSequenceGraph()
+{
+    if (!m_seqGraphWindow) {
+        // Create the sequence graph window if it doesn't exist
+        m_seqGraphWindow = new SequenceGraphWidget();
+        m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+    }
+    
+    m_seqGraphWindow->show();
+    m_seqGraphWindow->raise();
+    m_seqGraphWindow->activateWindow();
+    m_seqGraphWindow->rebuildGraph();
+    
+    // Connect the signal after creating the widget
+    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, 
+            [this](const QString &sequenceName) {
+                // Open the sequence editor for the selected sequence
+                openSequenceEditorForName(sequenceName);
+            });
+}
+
+void MainWindow::updateSequenceGraphHighlight()
+{
+    if (m_seqGraphWindow && m_sequenceMode) {
+        m_seqGraphWindow->setCurrentSequence(m_currentSeq.name());
+    }
+}
+
+void MainWindow::openSequenceEditorForName(const QString &sequenceName)
+{
+    // Find the sequence by name
+    const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+    QString filePath;
+    PromptSequence seq;
+    bool found = false;
+    
+    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+        if (it.value().name() == sequenceName) {
+            seq = it.value();
+            filePath = it.key();
+            found = true;
+            break;
+        }
+    }
+    
+    if (!found) {
+        QMessageBox::warning(this, "Error", "Sequence not found: " + sequenceName);
+        return;
+    }
+
+    // Open the sequence editor for the selected sequence
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Редактор последовательности") + ": " + sequenceName);
+    dlg.resize(720, 540);
+
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
+    editor->setSequence(seq);
+    lay->addWidget(editor);
+
+    QDialogButtonBox *bb = new QDialogButtonBox(
+                QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
+    lay->addWidget(bb);
+
+    // Save changes
+    connect(bb, &QDialogButtonBox::accepted, &dlg, [=, &dlg]{
+        PromptSequence edited = editor->sequence();
+        if (m_seqMgr.save(edited, filePath)) {
+            QMessageBox::information(&dlg, tr("Сохранено"),
+                                     tr("Последовательность сохранена."));
+        } else {
+            QMessageBox::warning(&dlg, tr("Ошибка"),
+                                 tr("Не удалось сохранить файл."));
+        }
+        dlg.accept();
+    });
+
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    dlg.exec();
+
+    // Refresh after editing
+    m_seqMgr.refresh();
+    if (m_seqGraphWindow) {
+        m_seqGraphWindow->rebuildGraph(); // Update the graph if it's open
+    }
 }
 
 void MainWindow::browse(){
@@ -544,6 +639,7 @@ void MainWindow::runSequenceDialog()
     m_currentSeq = m_seqMgr.sequences().value(path);
     m_currentStepIdx = 0;
     m_sequenceMode = true;
+    updateSequenceGraphHighlight();  // Update the graph highlighting
     runNextStep();   // сразу стартуем первый шаг
 }
 
@@ -556,6 +652,7 @@ void MainWindow::runNextStep()
         QMessageBox::information(this, "Готово",
                                  "Последовательность выполнена полностью.");
         m_sequenceMode = false;
+        updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
         return;
     }
 
@@ -713,6 +810,30 @@ void MainWindow::handleAssistantFinished()
 
     m_history.push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
     m_lastAssistantMessage = QString::fromUtf8(payload);
+
+    // Check if the LLM specified to open a new sequence
+    QString nextSeqName = PromptResolver::getNextSequence();
+    if (!nextSeqName.isEmpty()) {
+        // Find the sequence by name
+        const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            if (it.value().name() == nextSeqName) {
+                m_currentSeq = it.value();
+                m_currentStepIdx = 0;
+                m_sequenceMode = true;
+                addSequenceTransitionToHistory(nextSeqName);  // Add transition to history
+                updateSequenceGraphHighlight();  // Update the graph highlighting
+                PromptResolver::clearNextSequence();  // Clear for next usage
+                QTimer::singleShot(200, this, &MainWindow::runNextStep);
+                qDeleteAll(CommandParser::parse(payload));  // Clean up parsed commands
+                return;
+            }
+        }
+        
+        // If sequence not found, log error and continue with normal flow
+        log("Указанная последовательность не найдена: " + nextSeqName);
+        PromptResolver::clearNextSequence();
+    }
 
     QVector<Command*> cmds = CommandParser::parse(payload);
     if (cmds.isEmpty()) {
@@ -1109,6 +1230,49 @@ void MainWindow::retryCurrentSequenceStep()
     if (!m_sequenceMode)
         return;
     QTimer::singleShot(200, this, &MainWindow::runNextStep);
+}
+
+void MainWindow::runNextSequence()
+{
+    // This method is called when transitioning to a new sequence
+    if (!m_sequenceMode) return;
+    if (m_currentStepIdx < 0 ||
+            m_currentStepIdx >= m_currentSeq.steps().size()) {
+        // конец последовательности
+        QMessageBox::information(this, "Готово",
+                                 "Последовательность выполнена полностью.");
+        m_sequenceMode = false;
+        updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+        return;
+    }
+
+    const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
+    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, this);
+    qDebug() << "[runNextSequence] systemPrompt snippet:" << resolved.systemPrompt.left(200);
+    qDebug() << "[runNextSequence] userPrompt:" << resolved.userPrompt;
+
+    // Оценка токенов для контекста шага
+    {
+        int tokens = m_model.estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
+        log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_currentStepIdx+1).arg(tokens));
+    }
+    // Логируем, показываем пользователю
+    log(QString("\n--- Шаг %1 ------------------------------------------------")
+        .arg(m_currentStepIdx+1));
+    log(resolved.systemPrompt);
+    if (!resolved.userPrompt.isEmpty())
+        log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
+
+    // Отправляем запрос так же, как обычный ввод пользователя
+    m_streamBuf.clear();
+    m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+}
+
+void MainWindow::addSequenceTransitionToHistory(const QString& sequenceName)
+{
+    // Add a transition message to the history when switching sequences
+    QString transitionMsg = QString("Переход к последовательности: %1").arg(sequenceName);
+    m_history.push_back(qMakePair(QString("system"), transitionMsg));
 }
 
 void MainWindow::generateDescriptions()

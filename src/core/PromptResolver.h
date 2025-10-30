@@ -31,4 +31,13 @@ public:
 
     /* Список всех доступных резолверов. */
     static QVector<ResolverInfo> availableResolvers();
+    
+    /* Set context for next sequence */
+    static void setNextSequence(const QString& sequenceName, const QString& description);
+    static QString getNextSequence();
+    static void clearNextSequence();
+
+private:
+    static QString m_nextSequenceName;
+    static QString m_nextSequenceDescription;
 };

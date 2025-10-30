@@ -38,6 +38,8 @@ SOURCES += \
     src/codeviwer/GraphWidget.cpp \
     src/codeviwer/ProjectIndexer.cpp \
     src/codeviwer/ProjectRelationView.cpp \
+    src/codeviwer/SequenceGraphWidget.cpp \
+    src/codeviwer/SequenceRelationView.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandFactory.cpp \
@@ -112,6 +114,8 @@ HEADERS += \
     src/codeviwer/GraphWidget.h \
     src/codeviwer/ProjectIndexer.h \
     src/codeviwer/ProjectRelationView.h \
+    src/codeviwer/SequenceGraphWidget.h \
+    src/codeviwer/SequenceRelationView.h \
     src/codeviwer/SymbolModel.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \

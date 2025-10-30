@@ -44,6 +44,9 @@
 #include <QMap>
 #include <QVector>
 
+// Need the complete definition for sequence graph widget
+#include "../codeviwer/SequenceGraphWidget.h"
+
 class ChatDialog;
 class ModelsDialog;
 class OllamaSettingsDialog;
@@ -88,6 +91,9 @@ private slots:
     void onVoskText(const QString&);  // <‑‑ новый слот
 
     void openGraph();
+    void openSequenceGraph();
+    void openSequenceEditorForName(const QString &sequenceName);
+    void updateSequenceGraphHighlight();  // Update the highlighted sequence in the graph
 
 
 public:
@@ -151,6 +157,8 @@ private:
 
 
     void runNextStep();
+    void runNextSequence();  // Run the next sequence specified by OPEN_SEQUENCE
+    void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
     /* ────── NEW ────── */
     static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
     void ensureDefaultSequence();                      // создаём, если нет
@@ -168,7 +176,9 @@ private:
     ProjectRelationView *project_view = new ProjectRelationView;
 
     StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
+    StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
+    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
 
     struct ContextRange {
         int startLine = -1;

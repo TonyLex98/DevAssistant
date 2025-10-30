@@ -8,6 +8,10 @@
 #include <QFileInfo>
 #include <QDir>
 
+// Static members initialization
+QString PromptResolver::m_nextSequenceName;
+QString PromptResolver::m_nextSequenceDescription;
+
 static QString absoluteFileList(const QString& list, const QString& root)
 {
     QStringList abs;
@@ -96,6 +100,22 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         int approxTokens = (result.size() / 4) + 1;
         result.replace("{{TOKEN_COUNT}}", QString::number(approxTokens));
     }
+    
+    // 7) {{OPEN_SEQUENCE:sequenceName:description}} – указывает какую последовательность открыть следующей
+    QRegularExpression openSeqRegex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
+    QRegularExpressionMatchIterator iter = openSeqRegex.globalMatch(result);
+    while (iter.hasNext()) {
+        QRegularExpressionMatch match = iter.next();
+        QString sequenceName = match.captured(1).trimmed();
+        QString description = match.captured(2).trimmed();
+        
+        // Set the next sequence for main window to process
+        setNextSequence(sequenceName, description);
+        
+        // Replace placeholder with empty string to remove it from the prompt
+        result = result.mid(0, match.capturedStart()) + result.mid(match.capturedEnd());
+    }
+    
 // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
 
@@ -117,12 +137,33 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
     vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
-    vec.append({"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистента"});
+    vec.append({"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистент"});
     vec.append({"OPEN_FILES",      "Открытые файлы"});
     vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
     vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
     vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
     vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
+    vec.append({"OPEN_SEQUENCE", "Указать, какую последовательность запустить следующей. Формат: {{OPEN_SEQUENCE:имя_последовательности,описание}}"});
 
     return vec;
+}
+
+void PromptResolver::setNextSequence(const QString& sequenceName, const QString& description)
+{
+    m_nextSequenceName = sequenceName;
+    m_nextSequenceDescription = description;
+}
+
+QString PromptResolver::getNextSequence()
+{
+    if (m_nextSequenceName.isEmpty()) {
+        return QString();
+    }
+    return m_nextSequenceName;
+}
+
+void PromptResolver::clearNextSequence()
+{
+    m_nextSequenceName.clear();
+    m_nextSequenceDescription.clear();
 }
