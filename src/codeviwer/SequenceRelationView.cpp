@@ -10,6 +10,8 @@
 #include <QAction>
 #include <QRegularExpression>
 #include <QtMath>
+#include <QSettings>
+#include <QFileInfo>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -98,6 +100,38 @@ void SequenceNodeItem::setHighlighted(bool highlighted)
     update();
 }
 
+QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
+{
+    if (change == ItemPositionHasChanged) {
+        // When this node moves, we need to update all edges connected to it
+        // Get only the edges that overlap with this item's movement to be more efficient
+        QList<QGraphicsItem*> overlappingItems = scene()->items(sceneBoundingRect(), Qt::IntersectsItemShape, Qt::AscendingOrder);
+        for (QGraphicsItem* item : overlappingItems) {
+            if (item->type() == SequenceEdgeItem::Type) {
+                SequenceEdgeItem* edge = static_cast<SequenceEdgeItem*>(item);
+                if (edge->source() == this || edge->dest() == this) {
+                    edge->updatePosition();
+                }
+            }
+        }
+        
+        // Also save the new position - find the parent SequenceRelationView to call savePositions
+        // We can access it through the scene
+        QGraphicsScene* currentScene = scene();
+        if (currentScene) {
+            QList<QGraphicsView*> views = currentScene->views();
+            if (!views.isEmpty()) {
+                // The first view should be the SequenceRelationView
+                SequenceRelationView* relationView = qobject_cast<SequenceRelationView*>(views.first());
+                if (relationView) {
+                    relationView->savePositions();
+                }
+            }
+        }
+    }
+    return QGraphicsItem::itemChange(change, value);
+}
+
 // SequenceEdgeItem Implementation
 SequenceEdgeItem::SequenceEdgeItem(SequenceNodeItem *source, SequenceNodeItem *dest, QGraphicsItem *parent)
     : QGraphicsItem(parent)
@@ -105,16 +139,18 @@ SequenceEdgeItem::SequenceEdgeItem(SequenceNodeItem *source, SequenceNodeItem *d
     , m_dest(dest)
 {
     setFlag(QGraphicsItem::ItemIsSelectable);
+    setFlag(QGraphicsItem::ItemSendsGeometryChanges);
     updatePosition();
 }
 
 QRectF SequenceEdgeItem::boundingRect() const
 {
     qreal extra = 5;
-    return QRectF(m_sourcePoint, QSizeF(m_destPoint.x() - m_sourcePoint.x(),
-                                       m_destPoint.y() - m_sourcePoint.y()))
-        .normalized()
-        .adjusted(-extra, -extra, extra, extra);
+    QRectF bounds(QPointF(std::min(m_sourcePoint.x(), m_destPoint.x()),
+                          std::min(m_sourcePoint.y(), m_destPoint.y())),
+                QPointF(std::max(m_sourcePoint.x(), m_destPoint.x()),
+                        std::max(m_sourcePoint.y(), m_destPoint.y())));
+    return bounds.adjusted(-extra, -extra, extra, extra);
 }
 
 void SequenceEdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
@@ -129,35 +165,23 @@ void SequenceEdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     if (qFuzzyCompare(line.length(), qreal(0.)))
         return;
 
-    // Draw arrow
+    // Draw arrow line
     painter->setPen(QPen(QColor(100, 100, 100), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter->drawLine(line);
 
-    // Draw arrowhead
-    double angle = std::atan2(-line.dy(), line.dx());
-    QPointF destPoint = m_dest->boundingRect().center();
+    // Calculate angle of the line for arrowhead (from source to destination)
+    double angle = std::atan2(line.dy(), line.dx()); // Direction from source to destination
     
-    // Calculate where the arrowhead should connect to the destination
-    QLineF normalLine(line);
-    qreal length = normalLine.length();
-    if (length > 0) {
-        qreal ratio = (length - m_dest->boundingRect().width()/3) / length; // Leave some margin
-        destPoint = QPointF(line.x1() + ratio * line.dx(), line.y1() + ratio * line.dy());
-    }
-
-    // Calculate the angle for the arrowhead
-    double angleToDest = std::atan2(destPoint.y() - line.y1(), destPoint.x() - line.x1());
-    
-    // Calculate arrowhead points
-    QPointF arrowP1 = destPoint + QPointF(qSin(angleToDest + M_PI / 3) * 10,
-                                          qCos(angleToDest + M_PI / 3) * 10);
-    QPointF arrowP2 = destPoint + QPointF(qSin(angleToDest + M_PI - M_PI / 3) * 10,
-                                          qCos(angleToDest + M_PI - M_PI / 3) * 10);
+    // Calculate the arrowhead points
+    // The arrowhead should point in the direction from source to destination
+    QPointF arrowTip = m_destPoint;  // Arrow tip is at the destination
+    QPointF arrowP1 = arrowTip - QPointF(10 * qCos(angle - M_PI / 6), 10 * qSin(angle - M_PI / 6));
+    QPointF arrowP2 = arrowTip - QPointF(10 * qCos(angle + M_PI / 6), 10 * qSin(angle + M_PI / 6));
 
     // Draw arrowhead
     painter->setBrush(QColor(100, 100, 100));
     QPolygonF arrowHead;
-    arrowHead << destPoint << arrowP1 << arrowP2;
+    arrowHead << arrowTip << arrowP1 << arrowP2;
     painter->drawPolygon(arrowHead);
 }
 
@@ -166,18 +190,73 @@ void SequenceEdgeItem::updatePosition()
     if (!m_source || !m_dest)
         return;
 
-    QLineF line(mapFromItem(m_source, 0, 0), mapFromItem(m_dest, 0, 0));
-    qreal length = line.length();
+    // Map the center points of source and destination nodes to this item's coordinate system
+    QPointF sourceCenter = mapFromItem(m_source, 0, 0);  
+    QPointF destCenter = mapFromItem(m_dest, 0, 0);      
 
-    if (length > qreal(20.)) {
-        QPointF edgeOffset((line.dx() * 10) / length, (line.dy() * 10) / length);
-        m_sourcePoint = line.p1() + edgeOffset;
-        m_destPoint = line.p2() - edgeOffset;
-    } else {
-        m_sourcePoint = m_destPoint = line.p1();
-    }
+    // Calculate positions for connection points at the center of the appropriate side
+    m_sourcePoint = getSideCenterPoint(m_source, destCenter);
+    m_destPoint = getSideCenterPoint(m_dest, sourceCenter);
     
     prepareGeometryChange();
+}
+
+// Calculate the point at the center of the appropriate side of the node rectangle
+QPointF SequenceEdgeItem::getSideCenterPoint(SequenceNodeItem *node, const QPointF &targetPoint) const
+{
+    if (!node) return QPointF();
+    
+    // Get the node's bounding rectangle and position in the edge's coordinate system
+    QRectF nodeRect = node->boundingRect();  // Local bounding rectangle of the node
+    QPointF nodeCenterInEdgeCoords = mapFromItem(node, 0, 0);  // Center of node in edge coordinates
+    
+    // Calculate the actual rectangle in the edge's coordinate system
+    QRectF rectInEdgeCoords(
+        nodeCenterInEdgeCoords.x() + nodeRect.left(),
+        nodeCenterInEdgeCoords.y() + nodeRect.top(),
+        nodeRect.width(),
+        nodeRect.height()
+    );
+    
+    // Calculate direction vector from node center to target
+    qreal dx = targetPoint.x() - nodeCenterInEdgeCoords.x();
+    qreal dy = targetPoint.y() - nodeCenterInEdgeCoords.y();
+    
+    // Determine which side to connect to based on the direction
+    qreal absDx = qAbs(dx);
+    qreal absDy = qAbs(dy);
+    qreal aspectRatio = rectInEdgeCoords.width() / rectInEdgeCoords.height();
+    qreal slopeRatio = (absDx > 0) ? (absDy / absDx) : 1000000.0; // Avoid division by zero
+    
+    QPointF connectionPoint;
+    
+    if (slopeRatio <= 1.0 / aspectRatio) {
+        // Connect to left or right side (slope is relatively horizontal)
+        if (dx > 0) {
+            // Connect to right side center (middle of right edge)
+            connectionPoint = QPointF(rectInEdgeCoords.right(), rectInEdgeCoords.center().y());
+        } else {
+            // Connect to left side center (middle of left edge)  
+            connectionPoint = QPointF(rectInEdgeCoords.left(), rectInEdgeCoords.center().y());
+        }
+    } else {
+        // Connect to top or bottom side (slope is relatively vertical)
+        if (dy > 0) {
+            // Connect to bottom side center (middle of bottom edge)
+            connectionPoint = QPointF(rectInEdgeCoords.center().x(), rectInEdgeCoords.bottom());
+        } else {
+            // Connect to top side center (middle of top edge)
+            connectionPoint = QPointF(rectInEdgeCoords.center().x(), rectInEdgeCoords.top());
+        }
+    }
+    
+    return connectionPoint;
+}
+
+QVariant SequenceEdgeItem::itemChange(GraphicsItemChange change, const QVariant &value)
+{
+    // The edge itself doesn't move independently - it only updates based on node positions
+    return QGraphicsItem::itemChange(change, value);
 }
 
 // SequenceRelationView Implementation
@@ -221,8 +300,18 @@ void SequenceRelationView::rebuildGraph()
     // Then find connections between sequences
     findSequenceConnections();
     
-    // Position nodes
-    positionNodes();
+    // First try to load saved positions
+    loadNodePositions();
+    
+    // If no saved positions, position nodes with default layout
+    if (m_nodePositions.isEmpty()) {
+        positionNodes();
+    }
+    
+    // Update all edges to reflect current positions
+    for (SequenceEdgeItem *edge : m_edgeItems) {
+        edge->updatePosition();
+    }
 }
 
 void SequenceRelationView::findSequenceConnections()
@@ -275,6 +364,11 @@ void SequenceRelationView::addNode(const QString &name, const QString &descripti
     SequenceNodeItem *item = new SequenceNodeItem(name, description);
     m_scene->addItem(item);
     m_nodeItems[name] = item;
+    
+    // Initialize position in our tracking map if it exists in saved positions
+    if (m_nodePositions.contains(name)) {
+        item->setPos(m_nodePositions[name]);
+    }
 }
 
 void SequenceRelationView::addEdge(const QString &from, const QString &to)
@@ -305,7 +399,8 @@ void SequenceRelationView::positionNodes()
         it.value()->setPos(pos);
     }
     
-    // Update all edges
+    // Force an update for all edges to recalculate their positions after nodes are positioned
+    // Batch update to improve performance
     for (SequenceEdgeItem *edge : m_edgeItems) {
         edge->updatePosition();
     }
@@ -382,4 +477,50 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
     if (selectedAction == refreshAction) {
         rebuildGraph();
     }
+}
+
+void SequenceRelationView::saveNodePositions()
+{
+    QSettings settings("DevAssistant", "SequenceGraphPositions");
+    
+    // Clear old settings
+    settings.beginGroup("NodePositions");
+    settings.remove("");  // Remove all entries in this group
+    settings.endGroup();
+    
+    // Save current positions
+    settings.beginGroup("NodePositions");
+    for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
+        QString nodeName = it.key();
+        QPointF pos = it.value()->pos();
+        settings.setValue(nodeName, pos);
+    }
+    settings.endGroup();
+    
+    settings.sync(); // Ensure settings are written to disk
+}
+
+void SequenceRelationView::savePositions()
+{
+    // Call the private method to save current positions
+    saveNodePositions();
+}
+
+void SequenceRelationView::loadNodePositions()
+{
+    QSettings settings("DevAssistant", "SequenceGraphPositions");
+    
+    settings.beginGroup("NodePositions");
+    QStringList sequenceNames = settings.childKeys();
+    
+    for (const QString &name : sequenceNames) {
+        if (m_nodeItems.contains(name)) {
+            QPointF pos = settings.value(name, QPointF()).toPointF();
+            if (!pos.isNull()) {
+                m_nodeItems[name]->setPos(pos);
+                m_nodePositions[name] = pos;  // Store in our internal map too
+            }
+        }
+    }
+    settings.endGroup();
 }

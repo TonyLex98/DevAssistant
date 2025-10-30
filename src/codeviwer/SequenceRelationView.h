@@ -30,6 +30,7 @@ public:
 
 public slots:
     void rebuildGraph();
+    void savePositions();  // Public slot for saving positions when nodes move
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -47,6 +48,9 @@ private:
     QMap<QString, SequenceNodeItem*> m_nodeItems;  // sequence name -> item
     QVector<SequenceEdgeItem*> m_edgeItems;
     
+    // Position storage
+    QMap<QString, QPointF> m_nodePositions;  // sequence name -> position
+    
     void clearScene();
     void buildScene();
     void findSequenceConnections();
@@ -55,6 +59,10 @@ private:
     void addNode(const QString &name, const QString &description);
     void addEdge(const QString &from, const QString &to);
     void positionNodes();
+    
+    // Position saving/loading
+    void saveNodePositions();
+    void loadNodePositions();
     
     // Context menu
     void showContextMenu(const QPoint &pos);
@@ -76,6 +84,9 @@ public:
     enum { Type = UserType + 1 };
     int type() const override { return Type; }
 
+protected:
+    QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+
 private:
     QString m_name;
     QString m_description;
@@ -92,9 +103,16 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
     
     void updatePosition();
+    QPointF getSideCenterPoint(SequenceNodeItem *node, const QPointF &targetPoint) const;
+    
+    SequenceNodeItem* source() const { return m_source; }
+    SequenceNodeItem* dest() const { return m_dest; }
     
     enum { Type = UserType + 2 };
     int type() const override { return Type; }
+
+protected:
+    QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
 
 private:
     SequenceNodeItem *m_source;
