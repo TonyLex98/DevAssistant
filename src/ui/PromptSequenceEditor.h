@@ -1,6 +1,8 @@
 #pragma once
 #include <QWidget>
 #include "PromptSequence.h"
+#include <QCheckBox>
+#include <QListWidget>
 
 class QListWidget;
 class StyledButton;
@@ -12,6 +14,7 @@ class PromptSequenceEditor : public QWidget
     Q_OBJECT
 public:
     explicit PromptSequenceEditor(QWidget *parent = nullptr);
+    void setSequenceManager(class PromptSequenceManager *seqMgr);  // Set sequence manager for reference selection
 
     /* Инициализируем редактор конкретной последовательностью */
     void setSequence(const PromptSequence &seq);
@@ -32,9 +35,11 @@ private slots:
     /* Сигналы из полей имени/описания */
     void onNameChanged();
     void onDescriptionChanged();
+    void onAddSequenceReference();  // New slot for adding sequence references
 
 private:
     void refreshList();
+    void updateSequenceReferenceList();  // Update the list of available sequence references
 
     PromptSequence m_seq;                     // объект‑заглушка
     QListWidget     *m_list   = nullptr;
@@ -47,4 +52,9 @@ private:
     /* Новые виджеты */
     StyleTextEdit      *m_nameEdit  = nullptr;
     StyleTextEdit      *m_descEdit  = nullptr;
+    
+    /* Sequence reference widgets */
+    StyledButton       *m_addRefBtn = nullptr;
+    QListWidget        *m_refList = nullptr;  // List of selected sequence references
+    PromptSequenceManager *m_seqMgr = nullptr; // To access all available sequences
 };

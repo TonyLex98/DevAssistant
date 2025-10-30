@@ -305,6 +305,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
 
     QVBoxLayout *lay = new QVBoxLayout(&dlg);
     PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
+    editor->setSequenceManager(&m_seqMgr);
     editor->setSequence(seq);
     lay->addWidget(editor);
 
@@ -592,6 +593,7 @@ void MainWindow::editSequences()
 
     QVBoxLayout *lay = new QVBoxLayout(&dlg);
     PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
+    editor->setSequenceManager(&m_seqMgr);
     editor->setSequence(seq);
     lay->addWidget(editor);
 
