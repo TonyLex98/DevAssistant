@@ -35,11 +35,9 @@ private slots:
     /* Сигналы из полей имени/описания */
     void onNameChanged();
     void onDescriptionChanged();
-    void onAddSequenceReference();  // New slot for adding sequence references
 
 private:
     void refreshList();
-    void updateSequenceReferenceList();  // Update the list of available sequence references
 
     PromptSequence m_seq;                     // объект‑заглушка
     QListWidget     *m_list   = nullptr;
@@ -53,8 +51,5 @@ private:
     StyleTextEdit      *m_nameEdit  = nullptr;
     StyleTextEdit      *m_descEdit  = nullptr;
     
-    /* Sequence reference widgets */
-    StyledButton       *m_addRefBtn = nullptr;
-    QListWidget        *m_refList = nullptr;  // List of selected sequence references
     PromptSequenceManager *m_seqMgr = nullptr; // To access all available sequences
 };

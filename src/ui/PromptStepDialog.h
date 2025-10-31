@@ -3,6 +3,7 @@
 #include "PromptStep.h"
 #include <StyleTextEdit.h>
 #include <QDialogButtonBox>
+#include "PromptSequenceManager.h"  // Include the header for sequence manager
 #include <StyledButton.h>
 #include <QComboBox>
 #include <QCheckBox>
@@ -18,6 +19,7 @@ class PromptStepDialog : public QDialog
 public:
     explicit PromptStepDialog(QWidget *parent = nullptr);
     void setStep(const PromptStep& step);
+    void setSequenceManager(PromptSequenceManager* seqMgr);  // Add sequence manager
     PromptStep step() const { return m_step; }
 
 
@@ -25,11 +27,13 @@ public:
 private slots:
     void onOk();
     void onInsertClicked();    // слот «Вставить»
+    void onAddSequenceLink();  // New slot for adding sequence links
 
 private:
     StyleTextEdit   *m_templateEdit = nullptr;
     QListWidget *m_cmdList      = nullptr;
     PromptStep   m_step;
+    PromptSequenceManager *m_seqMgr = nullptr;  // Reference to sequence manager
 
     /* --- UI для резолверов --- */
     QComboBox   *m_resolverCombo = nullptr;
@@ -37,4 +41,7 @@ private:
 
     /* --- UI для зацикливания --- */
     QCheckBox   *m_loopCheck      = nullptr;
+    
+    /* --- UI для ссылок на последовательности --- */
+    StyledButton *m_addSequenceLinkBtn = nullptr;
 };

@@ -5,6 +5,8 @@
 #include <QHBoxLayout>
 #include <StyledButton.h>
 #include <QListWidgetItem>
+#include <QMessageBox>
+
 
 PromptStepDialog::PromptStepDialog(QWidget *parent)
     : QDialog(parent)
@@ -51,6 +53,11 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     m_loopCheck = new QCheckBox("Зациклить шаг (повторять до остановки)", this);
     v->addWidget(m_loopCheck);
 
+    /* ---------- Кнопка добавления ссылки на последовательность ---------- */
+    m_addSequenceLinkBtn = new StyledButton("Добавить ссылку на последовательность", this);
+    v->addWidget(m_addSequenceLinkBtn);
+    connect(m_addSequenceLinkBtn, &StyledButton::clicked, this, &PromptStepDialog::onAddSequenceLink);
+
     /* Кнопки ОК/Отмена */
     auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     v->addWidget(bb);
@@ -86,6 +93,11 @@ void PromptStepDialog::onInsertClicked()
     m_templateEdit->setTextCursor(cur);
 }
 
+void PromptStepDialog::setSequenceManager(PromptSequenceManager* seqMgr)
+{
+    m_seqMgr = seqMgr;
+}
+
 void PromptStepDialog::onOk()
 {
     m_step.setTemplate(m_templateEdit->toPlainText());
@@ -102,4 +114,61 @@ void PromptStepDialog::onOk()
     m_step.setLoop(m_loopCheck->isChecked());
 
     accept();
+}
+
+void PromptStepDialog::onAddSequenceLink()
+{
+    if (!m_seqMgr) {
+        QMessageBox::warning(this, tr("Ошибка"), tr("Менеджер последовательностей не установлен"));
+        return;
+    }
+
+    // Create a dialog to select sequences
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Выберите последовательность для ссылки"));
+    dlg.resize(500, 400);
+
+    QVBoxLayout *dlgLayout = new QVBoxLayout(&dlg);
+
+    // Create a list with checkboxes for each sequence
+    QListWidget *seqList = new QListWidget(&dlg);
+    const QMap<QString, PromptSequence> &allSequences = m_seqMgr->sequences();
+    
+    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+        const PromptSequence &seq = it.value();
+        QString display = seq.name();
+        if (!seq.description().isEmpty())
+            display += " – " + seq.description();
+            
+        QListWidgetItem *item = new QListWidgetItem(display, seqList);
+        item->setData(Qt::UserRole, seq.name());  // Store the sequence name
+        item->setCheckState(Qt::Unchecked);       // Initially unchecked
+        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    }
+
+    dlgLayout->addWidget(seqList);
+
+    QDialogButtonBox *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    dlgLayout->addWidget(bb);
+
+    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    // Process selected sequences
+    for (int i = 0; i < seqList->count(); ++i) {
+        QListWidgetItem *item = seqList->item(i);
+        if (item->checkState() == Qt::Checked) {
+            QString seqName = item->data(Qt::UserRole).toString();
+            
+            // Add the OPEN_SEQUENCE reference to the template
+            QString currentTemplate = m_templateEdit->toPlainText();
+            if (!currentTemplate.contains(QString("{{OPEN_SEQUENCE:%1").arg(seqName))) {
+                QString newTemplate = currentTemplate + QString("\n{{OPEN_SEQUENCE:%1}}\n").arg(seqName);
+                m_templateEdit->setPlainText(newTemplate);
+            }
+        }
+    }
 }

@@ -54,18 +54,6 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     btnLay->addWidget(m_downBtn);
     mainLay->addLayout(btnLay);
 
-    // Add sequence reference section
-    mainLay->addWidget(new QLabel(tr("Ссылки на другие последовательности:")));
-    
-    QHBoxLayout *refBtnLay = new QHBoxLayout();
-    m_addRefBtn = new StyledButton(tr("Добавить ссылку на последовательность"), this);
-    refBtnLay->addWidget(m_addRefBtn);
-    refBtnLay->addStretch();
-    mainLay->addLayout(refBtnLay);
-    
-    m_refList = new QListWidget(this);
-    mainLay->addWidget(m_refList, 0);
-
     /* ────────────────────── Сигналы ──────────────────────── */
     connect(m_addBtn,   &StyledButton::clicked, this, &PromptSequenceEditor::onAddStep);
     connect(m_editBtn,  &StyledButton::clicked, this, &PromptSequenceEditor::onEditStep);
@@ -76,8 +64,6 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
 
     connect(m_nameEdit,  &StyleTextEdit::textChanged,   this, &PromptSequenceEditor::onNameChanged);
     connect(m_descEdit,  &StyleTextEdit::textChanged,   this, &PromptSequenceEditor::onDescriptionChanged);
-    
-    connect(m_addRefBtn, &StyledButton::clicked, this, &PromptSequenceEditor::onAddSequenceReference);
 }
 
 /* ────────────────────────────────────── Методы ────────────────────────────────────── */
@@ -88,7 +74,6 @@ void PromptSequenceEditor::setSequence(const PromptSequence &seq)
     m_nameEdit->setText(seq.name());
     m_descEdit->setPlainText(seq.description());
     refreshList();
-    updateSequenceReferenceList();  // Update the reference list when sequence is set
 }
 
 PromptSequence PromptSequenceEditor::sequence() const
@@ -117,6 +102,7 @@ void PromptSequenceEditor::refreshList()
 void PromptSequenceEditor::onAddStep()
 {
     PromptStepDialog dlg(this);
+    dlg.setSequenceManager(m_seqMgr);  // Pass the sequence manager
     if (dlg.exec() == QDialog::Accepted) {
         m_seq.addStep(dlg.step());
         refreshList();
@@ -132,6 +118,7 @@ void PromptSequenceEditor::onEditStep()
 
     PromptStepDialog dlg(this);
     dlg.setStep(m_seq.steps()[idx]);
+    dlg.setSequenceManager(m_seqMgr);  // Pass the sequence manager
 
     if (dlg.exec() == QDialog::Accepted) {
         // Заменяем шаг, но без пересоздания объекта PromptSequence
@@ -182,13 +169,11 @@ void PromptSequenceEditor::onMoveDown()
 void PromptSequenceEditor::onNameChanged()
 {
     emit sequenceChanged(sequence());
-    updateSequenceReferenceList();
 }
 
 void PromptSequenceEditor::onDescriptionChanged()
 {
     emit sequenceChanged(sequence());
-    updateSequenceReferenceList();
 }
 
 void PromptSequenceEditor::setSequenceManager(PromptSequenceManager *seqMgr)
@@ -196,132 +181,4 @@ void PromptSequenceEditor::setSequenceManager(PromptSequenceManager *seqMgr)
     m_seqMgr = seqMgr;
 }
 
-void PromptSequenceEditor::onAddSequenceReference()
-{
-    if (!m_seqMgr) {
-        QMessageBox::warning(this, tr("Ошибка"), tr("Менеджер последовательностей не установлен"));
-        return;
-    }
 
-    // Create a dialog to select sequences
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Выберите последовательности для ссылки"));
-    dlg.resize(500, 400);
-
-    QVBoxLayout *dlgLayout = new QVBoxLayout(&dlg);
-
-    // Create a list with checkboxes for each sequence
-    QListWidget *seqList = new QListWidget(&dlg);
-    const QMap<QString, PromptSequence> &allSequences = m_seqMgr->sequences();
-    
-    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
-        const PromptSequence &seq = it.value();
-        QString display = seq.name();
-        if (!seq.description().isEmpty())
-            display += " – " + seq.description();
-            
-        QListWidgetItem *item = new QListWidgetItem(display, seqList);
-        item->setData(Qt::UserRole, seq.name());  // Store the sequence name
-        item->setCheckState(Qt::Unchecked);       // Initially unchecked
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-    }
-
-    dlgLayout->addWidget(seqList);
-
-    QDialogButtonBox *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-    dlgLayout->addWidget(bb);
-
-    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-    if (dlg.exec() != QDialog::Accepted)
-        return;
-
-    // Process selected sequences
-    for (int i = 0; i < seqList->count(); ++i) {
-        QListWidgetItem *item = seqList->item(i);
-        if (item->checkState() == Qt::Checked) {
-            QString seqName = item->data(Qt::UserRole).toString();
-            
-            // Add the sequence reference to our reference list
-            QListWidgetItem *refItem = new QListWidgetItem(QString("→ %1").arg(seqName), m_refList);
-            refItem->setData(Qt::UserRole, seqName);
-            refItem->setFlags(refItem->flags() | Qt::ItemIsUserCheckable);
-            refItem->setCheckState(Qt::Checked); // Checked by default
-            
-            // Find an existing step that has an OPEN_SEQUENCE reference or create a new one
-            bool foundStepWithRef = false;
-            auto allCurrentSteps = m_seq.steps();
-            QVector<PromptStep> updatedSteps = allCurrentSteps;  // Create a modifiable copy
-            
-            for (int i = 0; i < updatedSteps.size(); ++i) {
-                if (updatedSteps[i].tmpl().contains("{{OPEN_SEQUENCE:")) {
-                    // Append to existing reference step
-                    QString currentTemplate = updatedSteps[i].tmpl();
-                    if (!currentTemplate.contains(QString("{{OPEN_SEQUENCE:%1").arg(seqName))) {
-                        updatedSteps[i].setTemplate(currentTemplate + QString("{{OPEN_SEQUENCE:%1}}\n").arg(seqName));
-                        foundStepWithRef = true;
-                        break;
-                    }
-                }
-            }
-            
-            // If no step with references was found, create a new step for references
-            if (!foundStepWithRef) {
-                PromptStep refStep;
-                refStep.setTemplate(QString("{{OPEN_SEQUENCE:%1}}\n").arg(seqName));
-                refStep.setAllowedCommands(QStringList{});  // No specific commands needed for this step
-                updatedSteps.append(refStep);
-            }
-            
-            // Recreate the sequence with updated steps
-            PromptSequence newSeq;
-            newSeq.setName(m_seq.name());
-            newSeq.setDescription(m_seq.description());
-            
-            for (const auto &step : updatedSteps) {
-                newSeq.addStep(step);
-            }
-            m_seq = newSeq; // Update the member variable
-        }
-    }
-    
-    refreshList(); // Refresh the main step list
-    emit sequenceChanged(sequence());
-}
-
-void PromptSequenceEditor::updateSequenceReferenceList()
-{
-    m_refList->clear();
-    const QMap<QString, PromptSequence> &allSequences = m_seqMgr->sequences();
-    
-    // Check each step for OPEN_SEQUENCE references
-    for (const PromptStep &step : m_seq.steps()) {
-        QString templateContent = step.tmpl();
-        
-        // Find all OPEN_SEQUENCE references in the template
-        QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
-        QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
-        
-        while (iter.hasNext()) {
-            QRegularExpressionMatch match = iter.next();
-            QString targetSequence = match.captured(1).trimmed();
-            
-            // Check if the target sequence exists
-            bool targetExists = false;
-            for (auto checkIt = allSequences.constBegin(); checkIt != allSequences.constEnd(); ++checkIt) {
-                if (checkIt.value().name() == targetSequence) {
-                    targetExists = true;
-                    break;
-                }
-            }
-            
-            if (targetExists) {
-                QListWidgetItem *item = new QListWidgetItem(QString("→ %1").arg(targetSequence), m_refList);
-                item->setData(Qt::UserRole, targetSequence);
-                item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-                item->setCheckState(Qt::Checked);
-            }
-        }
-    }
-}
