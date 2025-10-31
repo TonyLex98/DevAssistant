@@ -13,6 +13,7 @@
 #include <QMap>
 #include <QVector>
 #include <QPointF>
+#include <QDebug>
 #include "PromptSequence.h"
 #include "PromptSequenceManager.h"
 
@@ -31,6 +32,8 @@ public:
 public slots:
     void rebuildGraph();
     void savePositions();  // Public slot for saving positions when nodes move
+    void saveLayout();     // Public slot for saving layout when closing
+    void restoreLayout();  // Public slot for restoring layout when opening
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -50,6 +53,9 @@ private:
     
     // Position storage
     QMap<QString, QPointF> m_nodePositions;  // sequence name -> position
+    
+    // Helper method to clear the scene while preserving positions if needed
+    void clearScenePreservingPositions();
     
     void clearScene();
     void buildScene();

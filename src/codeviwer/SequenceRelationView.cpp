@@ -103,6 +103,8 @@ void SequenceNodeItem::setHighlighted(bool highlighted)
 QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 {
     if (change == ItemPositionHasChanged) {
+        qDebug() << "[SequenceNodeItem]" << m_name << "position changed to:" << value.toPointF();
+        
         // When this node moves, we need to update all edges connected to it
         // Get only the edges that overlap with this item's movement to be more efficient
         QList<QGraphicsItem*> overlappingItems = scene()->items(sceneBoundingRect(), Qt::IntersectsItemShape, Qt::AscendingOrder);
@@ -124,9 +126,16 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                 // The first view should be the SequenceRelationView
                 SequenceRelationView* relationView = qobject_cast<SequenceRelationView*>(views.first());
                 if (relationView) {
+                    qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
                     relationView->savePositions();
+                } else {
+                    qDebug() << "[SequenceNodeItem] Could not cast view to SequenceRelationView";
                 }
+            } else {
+                qDebug() << "[SequenceNodeItem] No views found for scene";
             }
+        } else {
+            qDebug() << "[SequenceNodeItem] No scene available";
         }
     }
     return QGraphicsItem::itemChange(change, value);
@@ -278,18 +287,34 @@ SequenceRelationView::SequenceRelationView(QWidget *parent)
 
 void SequenceRelationView::setSequenceManager(PromptSequenceManager *seqMgr)
 {
+    qDebug() << "[SequenceRelationView] setSequenceManager called";
     m_seqMgr = seqMgr;
     rebuildGraph();
 }
 
 void SequenceRelationView::rebuildGraph()
 {
-    clearScene();
+    qDebug() << "[SequenceRelationView] rebuildGraph() called";
     
-    if (!m_seqMgr) return;
+    // Store current positions before clearing the scene
+    QMap<QString, QPointF> savedPositions = m_nodePositions;
+    
+    qDebug() << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
+    
+    clearScenePreservingPositions();
+    
+    if (!m_seqMgr) {
+        qDebug() << "[SequenceRelationView] No sequence manager, returning";
+        return;
+    }
     
     const QMap<QString, PromptSequence>& sequences = m_seqMgr->sequences();
-    if (sequences.isEmpty()) return;
+    if (sequences.isEmpty()) {
+        qDebug() << "[SequenceRelationView] No sequences, returning";
+        return;
+    }
+    
+    qDebug() << "[SequenceRelationView] Adding nodes for sequences:" << sequences.keys();
     
     // Add all nodes first
     for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
@@ -300,18 +325,35 @@ void SequenceRelationView::rebuildGraph()
     // Then find connections between sequences
     findSequenceConnections();
     
-    // First try to load saved positions
-    loadNodePositions();
+    qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes";
     
-    // If no saved positions, position nodes with default layout
+    // Restore saved positions after nodes are added
+    for (auto it = savedPositions.constBegin(); it != savedPositions.constEnd(); ++it) {
+        QString nodeName = it.key();
+        QPointF pos = it.value();
+        if (m_nodeItems.contains(nodeName)) {
+            m_nodeItems[nodeName]->setPos(pos);
+            m_nodePositions[nodeName] = pos;  // Store in our internal map too
+            qDebug() << "[SequenceRelationView] Restored position for node:" << nodeName << "at" << pos;
+        } else {
+            qDebug() << "[SequenceRelationView] Node" << nodeName << "not found during restore";
+        }
+    }
+    
+    // If no saved positions found, use default layout
     if (m_nodePositions.isEmpty()) {
+        qDebug() << "[SequenceRelationView] No saved positions found, using default layout";
         positionNodes();
+    } else {
+        qDebug() << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
     }
     
     // Update all edges to reflect current positions
     for (SequenceEdgeItem *edge : m_edgeItems) {
         edge->updatePosition();
     }
+    
+    qDebug() << "[SequenceRelationView] rebuildGraph() completed";
 }
 
 void SequenceRelationView::findSequenceConnections()
@@ -359,7 +401,12 @@ void SequenceRelationView::findSequenceConnections()
 
 void SequenceRelationView::addNode(const QString &name, const QString &description)
 {
-    if (m_nodeItems.contains(name)) return; // Already exists
+    qDebug() << "[SequenceRelationView] addNode called for:" << name << "with current m_nodePositions size:" << m_nodePositions.size();
+    
+    if (m_nodeItems.contains(name)) {
+        qDebug() << "[SequenceRelationView] Node" << name << "already exists, skipping";
+        return; // Already exists
+    }
     
     SequenceNodeItem *item = new SequenceNodeItem(name, description);
     m_scene->addItem(item);
@@ -367,7 +414,11 @@ void SequenceRelationView::addNode(const QString &name, const QString &descripti
     
     // Initialize position in our tracking map if it exists in saved positions
     if (m_nodePositions.contains(name)) {
-        item->setPos(m_nodePositions[name]);
+        QPointF pos = m_nodePositions[name];
+        item->setPos(pos);
+        qDebug() << "[SequenceRelationView] Set position for node:" << name << "at" << pos;
+    } else {
+        qDebug() << "[SequenceRelationView] No saved position for node:" << name << ", keeping default position";
     }
 }
 
@@ -418,6 +469,15 @@ void SequenceRelationView::clearScene()
     m_scene->clear();
     m_nodeItems.clear();
     m_edgeItems.clear();
+    m_nodePositions.clear();  // Clear positions map when scene is cleared completely
+}
+
+void SequenceRelationView::clearScenePreservingPositions()
+{
+    m_scene->clear();
+    m_nodeItems.clear();
+    m_edgeItems.clear();
+    // Don't clear m_nodePositions to preserve positions for rebuild
 }
 
 void SequenceRelationView::wheelEvent(QWheelEvent *event)
@@ -481,6 +541,8 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
 
 void SequenceRelationView::saveNodePositions()
 {
+    qDebug() << "[SequenceRelationView] Saving node positions, number of nodes:" << m_nodeItems.size();
+    
     QSettings settings("DevAssistant", "SequenceGraphPositions");
     
     // Clear old settings
@@ -494,10 +556,12 @@ void SequenceRelationView::saveNodePositions()
         QString nodeName = it.key();
         QPointF pos = it.value()->pos();
         settings.setValue(nodeName, pos);
+        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
     }
     settings.endGroup();
     
     settings.sync(); // Ensure settings are written to disk
+    qDebug() << "[SequenceRelationView] Settings synced to disk";
 }
 
 void SequenceRelationView::savePositions()
@@ -506,12 +570,30 @@ void SequenceRelationView::savePositions()
     saveNodePositions();
 }
 
+void SequenceRelationView::saveLayout()
+{
+    // Save current positions to settings when closing
+    saveNodePositions();
+}
+
+void SequenceRelationView::restoreLayout()
+{
+    qDebug() << "[SequenceRelationView] restoreLayout() called";
+    // Load positions from settings when initializing
+    loadNodePositions();
+    qDebug() << "[SequenceRelationView] restoreLayout() completed, positions in m_nodePositions:" << m_nodePositions.size();
+}
+
 void SequenceRelationView::loadNodePositions()
 {
+    qDebug() << "[SequenceRelationView] Loading node positions";
+    
     QSettings settings("DevAssistant", "SequenceGraphPositions");
     
     settings.beginGroup("NodePositions");
     QStringList sequenceNames = settings.childKeys();
+    
+    qDebug() << "[SequenceRelationView] Found saved positions for:" << sequenceNames;
     
     for (const QString &name : sequenceNames) {
         if (m_nodeItems.contains(name)) {
@@ -519,8 +601,15 @@ void SequenceRelationView::loadNodePositions()
             if (!pos.isNull()) {
                 m_nodeItems[name]->setPos(pos);
                 m_nodePositions[name] = pos;  // Store in our internal map too
+                qDebug() << "[SequenceRelationView] Loaded position for node:" << name << "at" << pos;
+            } else {
+                qDebug() << "[SequenceRelationView] Position for node:" << name << "is null";
             }
+        } else {
+            qDebug() << "[SequenceRelationView] Node" << name << "not found in current items";
         }
     }
     settings.endGroup();
+    
+    qDebug() << "[SequenceRelationView] Finished loading positions, total current nodes:" << m_nodeItems.size();
 }

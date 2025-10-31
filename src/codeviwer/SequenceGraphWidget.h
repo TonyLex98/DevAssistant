@@ -14,6 +14,8 @@ public:
 
 public slots:
     void rebuildGraph();
+    void saveLayout();     // Save the current layout
+    void restoreLayout();  // Restore the saved layout
 
 signals:
     void sequenceSelected(const QString &sequenceName);

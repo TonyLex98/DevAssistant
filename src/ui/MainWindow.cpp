@@ -219,6 +219,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_seqMgr.refresh();
     ensureDefaultSequence();
 
+    // Initialize sequence graph window and restore layout on startup
+    // This ensures positions are restored even if the graph window was never opened
+    m_seqGraphWindow = new SequenceGraphWidget();
+    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+    m_seqGraphWindow->restoreLayout();
+    m_seqGraphWindow->hide(); // Hide the window, we just need it for position restoration
+    qDebug() << "[MainWindow] Initialized and restored sequence graph layout on startup";
+
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
 
@@ -250,16 +258,18 @@ void MainWindow::openGraph()
 
 void MainWindow::openSequenceGraph()
 {
-    if (!m_seqGraphWindow) {
-        // Create the sequence graph window if it doesn't exist
-        m_seqGraphWindow = new SequenceGraphWidget();
-        m_seqGraphWindow->setSequenceManager(&m_seqMgr);
-    }
+    qDebug() << "[MainWindow] openSequenceGraph called";
+    
+    // The sequence graph window is always created on startup, so just show it
+    // The layout was already restored on startup
+    
+    // Update the sequence manager in case it changed
+    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
     
     m_seqGraphWindow->show();
     m_seqGraphWindow->raise();
     m_seqGraphWindow->activateWindow();
-    m_seqGraphWindow->rebuildGraph();
+    m_seqGraphWindow->rebuildGraph(); // Rebuild to make sure everything is current
     
     // Connect the signal after creating the widget
     connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, 
@@ -1540,4 +1550,25 @@ void MainWindow::createNewSequence()
     m_seqMgr.refresh();
     ensureDefaultSequence();
     QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    qDebug() << "[MainWindow] closeEvent called";
+    
+    // Save sequence graph layout before closing if it exists and is initialized
+    if (m_seqGraphWindow) {
+        qDebug() << "[MainWindow] Saving sequence graph layout";
+        m_seqGraphWindow->saveLayout();
+    } else {
+        qDebug() << "[MainWindow] No sequence graph window to save";
+    }
+    
+    // Clean up the sequence graph window
+    if (m_seqGraphWindow) {
+        delete m_seqGraphWindow;
+        m_seqGraphWindow = nullptr;
+    }
+    
+    QMainWindow::closeEvent(event);
 }

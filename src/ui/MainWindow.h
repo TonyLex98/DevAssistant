@@ -71,6 +71,8 @@ public slots:
     void runSequenceDialog();
     void slot_updatelastUserMessage(const QString& lastUserMessage);
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 signals:
 
