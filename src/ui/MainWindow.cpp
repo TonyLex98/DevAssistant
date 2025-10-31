@@ -853,7 +853,14 @@ void MainWindow::handleAssistantFinished()
         if (!usedRaw)
             appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
         log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
-        retryCurrentSequenceStep();
+        
+        // В режиме последовательности - переходим к следующему шагу, даже если команд нет
+        if (m_sequenceMode) {
+            ++m_currentStepIdx;
+            QTimer::singleShot(200, this, &MainWindow::runNextStep);
+        } else {
+            retryCurrentSequenceStep();
+        }
         return;
     }
 
@@ -1013,11 +1020,16 @@ void MainWindow::handleAssistantFinished()
 
     rescan();
 
-    if (m_sequenceMode) {
+    if (applyFailed && !m_sequenceMode) {
+        // Повторяем в не-последовательном режиме при ошибках
+        retryCurrentSequenceStep();
+    } else if (m_sequenceMode) {
         const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
         if (step.loop()) {
+            // Если установлен флаг зацикливания, повторяем текущий шаг
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
         } else {
+            // В последовательности всегда переходим к следующему шагу (если не зацикливание)
             ++m_currentStepIdx;
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
         }
