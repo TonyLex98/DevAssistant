@@ -865,6 +865,9 @@ void MainWindow::handleAssistantFinished()
     }
     QList<Command*> toRun = dlg.confirmed();
 
+    bool hasCallSequenceCommand = false;
+    QString sequenceToCall;
+    
     for (Command* c : toRun) {
         if (c->name() == "ASK_USER") {
             const QString question = c->params().value("question").toString();
@@ -888,7 +891,48 @@ void MainWindow::handleAssistantFinished()
                 content = tr("SHOW_RESULT вызван без текста.");
             QMessageBox::information(this, title, content);
             appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+        } else if (c->name() == "CALL_SEQUENCE") {
+            // Mark that we have a sequence call command and store the name
+            sequenceToCall = c->params().value("sequenceName").toString();
+            hasCallSequenceCommand = true;
         }
+    }
+    
+    // If we have a CALL_SEQUENCE command, switch to that sequence
+    if (hasCallSequenceCommand && !sequenceToCall.isEmpty()) {
+        const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            if (it.value().name() == sequenceToCall) {
+                // Summarize what was done in the current sequence before switching
+                QStringList completedStepsSummary;
+                for (int i = 0; i < m_currentStepIdx; ++i) {
+                    if (i < m_currentSeq.steps().size()) {
+                        QString stepDesc = m_currentSeq.steps()[i].tmpl().section('\n', 0, 0).trimmed();
+                        if (stepDesc.length() > 80) stepDesc = stepDesc.left(80) + "...";
+                        completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
+                    }
+                }
+                
+                m_currentSeq = it.value();
+                m_currentStepIdx = 0;
+                m_sequenceMode = true;
+                
+                // Add context about what was done in the previous sequence
+                if (!completedStepsSummary.isEmpty()) {
+                    QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
+                    m_history.push_back(qMakePair(QString("system"), summaryText));
+                }
+                
+                addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
+                updateSequenceGraphHighlight();  // Update the graph highlighting
+                qDeleteAll(toRun);  // Clean up the commands
+                QTimer::singleShot(200, this, &MainWindow::runNextStep);
+                return;  // Exit early to switch to new sequence
+            }
+        }
+        
+        // If sequence not found, log error and continue with normal flow
+        log("Указанная последовательность не найдена: " + sequenceToCall);
     }
 
     QStringList appliedSummary;

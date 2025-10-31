@@ -14,6 +14,7 @@
 #include "SearchWebCommand.h"
 #include "SearchProjectCommand.h"
 #include "ShowResultCommand.h"
+#include "CallSequenceCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -67,7 +68,8 @@ QVector<Command*> CommandRegistry::all()
         new RunShellCommand(QString()),
         new SearchWebCommand(QString()),
         new SearchProjectCommand(QString()),
-        new ShowResultCommand(QString())
+        new ShowResultCommand(QString()),
+        new CallSequenceCommand(QString())
     };
 }
 
@@ -220,6 +222,14 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         return new ShowResultCommand(
             p.value("content").toString(),
             p.value("title").toString(),
+            obj["description"].toString()
+        );
+    }
+
+    if (cmd == "CALL_SEQUENCE") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        return new CallSequenceCommand(
+            p["sequenceName"].toString(),
             obj["description"].toString()
         );
     }
