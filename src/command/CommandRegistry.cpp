@@ -228,8 +228,13 @@ Command* CommandRegistry::create(const QJsonObject& obj)
 
     if (cmd == "CALL_SEQUENCE") {
         const QJsonObject p = paramsObject(obj.value("params"));
+        bool needSummary = true;
+        if (p.contains("summarize")) {
+            needSummary = p.value("summarize").toBool();
+        }
         return new CallSequenceCommand(
             p["sequenceName"].toString(),
+            needSummary,
             obj["description"].toString()
         );
     }

@@ -42,6 +42,9 @@ private:
     /* --- UI для зацикливания --- */
     QCheckBox   *m_loopCheck      = nullptr;
     
+    /* --- UI для саммаризации --- */
+    QCheckBox   *m_summarizeCheck = nullptr;
+    
     /* --- UI для ссылок на последовательности --- */
     StyledButton *m_addSequenceLinkBtn = nullptr;
 };

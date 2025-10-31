@@ -910,31 +910,60 @@ void MainWindow::handleAssistantFinished()
         const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == sequenceToCall) {
-                // Summarize what was done in the current sequence before switching
-                QStringList completedStepsSummary;
-                for (int i = 0; i < m_currentStepIdx; ++i) {
-                    if (i < m_currentSeq.steps().size()) {
-                        QString stepDesc = m_currentSeq.steps()[i].tmpl().section('\n', 0, 0).trimmed();
-                        if (stepDesc.length() > 80) stepDesc = stepDesc.left(80) + "...";
-                        completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
+                // Check if summary is needed (analyze the params for a summary flag)
+                Command* callSeqCommand = nullptr;
+                for (Command* c : toRun) {
+                    if (c->name() == "CALL_SEQUENCE") {
+                        callSeqCommand = c;
+                        break;
                     }
                 }
                 
-                m_currentSeq = it.value();
-                m_currentStepIdx = 0;
-                m_sequenceMode = true;
+                bool needSummary = true; // Default to true, could be controlled by a parameter
                 
-                // Add context about what was done in the previous sequence
-                if (!completedStepsSummary.isEmpty()) {
-                    QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
-                    m_history.push_back(qMakePair(QString("system"), summaryText));
+                if (callSeqCommand && callSeqCommand->params().contains("summarize") && 
+                    callSeqCommand->params().value("summarize").isBool()) {
+                    needSummary = callSeqCommand->params().value("summarize").toBool();
                 }
                 
-                addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
-                updateSequenceGraphHighlight();  // Update the graph highlighting
-                qDeleteAll(toRun);  // Clean up the commands
-                QTimer::singleShot(200, this, &MainWindow::runNextStep);
-                return;  // Exit early to switch to new sequence
+                if (needSummary) {
+                    // Summarize what was done in the current sequence before switching
+                    QStringList completedStepsSummary;
+                    for (int i = 0; i < m_currentStepIdx; ++i) {
+                        if (i < m_currentSeq.steps().size()) {
+                            QString stepDesc = m_currentSeq.steps()[i].tmpl().section('\n', 0, 0).trimmed();
+                            if (stepDesc.length() > 80) stepDesc = stepDesc.left(80) + "...";
+                            completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
+                        }
+                    }
+                    
+                    m_currentSeq = it.value();
+                    m_currentStepIdx = 0;
+                    m_sequenceMode = true;
+                    
+                    // Add context about what was done in the previous sequence
+                    if (!completedStepsSummary.isEmpty()) {
+                        QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
+                        m_history.push_back(qMakePair(QString("system"), summaryText));
+                    }
+                    
+                    addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
+                    updateSequenceGraphHighlight();  // Update the graph highlighting
+                    qDeleteAll(toRun);  // Clean up the commands
+                    QTimer::singleShot(200, this, &MainWindow::runNextStep);
+                    return;  // Exit early to switch to new sequence
+                } else {
+                    // No summary needed, directly switch to the new sequence
+                    m_currentSeq = it.value();
+                    m_currentStepIdx = 0;
+                    m_sequenceMode = true;
+                    
+                    addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
+                    updateSequenceGraphHighlight();  // Update the graph highlighting
+                    qDeleteAll(toRun);  // Clean up the commands
+                    QTimer::singleShot(200, this, &MainWindow::runNextStep);
+                    return;  // Exit early to switch to new sequence
+                }
             }
         }
         

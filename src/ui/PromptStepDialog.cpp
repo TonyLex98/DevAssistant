@@ -53,6 +53,11 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     m_loopCheck = new QCheckBox("Зациклить шаг (повторять до остановки)", this);
     v->addWidget(m_loopCheck);
 
+    /* ---------- чек‑бокс «Сделать саммаризацию» ---------- */
+    m_summarizeCheck = new QCheckBox("Сделать саммаризацию перед переходом (резюме выполненной работы)", this);
+    m_summarizeCheck->setChecked(true); // Default to checked
+    v->addWidget(m_summarizeCheck);
+
     /* ---------- Кнопка добавления ссылки на последовательность ---------- */
     m_addSequenceLinkBtn = new StyledButton("Добавить ссылку на последовательность", this);
     v->addWidget(m_addSequenceLinkBtn);
@@ -80,6 +85,10 @@ void PromptStepDialog::setStep(const PromptStep &step)
 
     /* флаг зацикливания */
     m_loopCheck->setChecked(step.loop());
+    
+    /* По умолчанию включаем саммаризацию (если не указано иное в шаблоне) */
+    m_summarizeCheck->setChecked(true);
+    // TODO: Parse template to check if summarize flag is set in CALL_SEQUENCE command
 }
 
 void PromptStepDialog::onInsertClicked()
