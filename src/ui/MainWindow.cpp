@@ -224,6 +224,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_seqGraphWindow = new SequenceGraphWidget();
     m_seqGraphWindow->setSequenceManager(&m_seqMgr);
     m_seqGraphWindow->restoreLayout();
+    m_seqGraphWindow->rebuildGraph(); // Now rebuild the graph with restored positions
     m_seqGraphWindow->hide(); // Hide the window, we just need it for position restoration
     qDebug() << "[MainWindow] Initialized and restored sequence graph layout on startup";
 

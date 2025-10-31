@@ -289,7 +289,9 @@ void SequenceRelationView::setSequenceManager(PromptSequenceManager *seqMgr)
 {
     qDebug() << "[SequenceRelationView] setSequenceManager called";
     m_seqMgr = seqMgr;
-    rebuildGraph();
+    // Don't rebuild immediately - let the caller decide when to rebuild
+    // This allows restoreLayout to happen before the graph is built
+    // rebuildGraph();  // Remove automatic rebuild
 }
 
 void SequenceRelationView::rebuildGraph()
@@ -618,16 +620,17 @@ void SequenceRelationView::loadNodePositions()
     qDebug() << "[SequenceRelationView] Found saved positions for:" << sequenceNames;
     
     for (const QString &storedKey : sequenceNames) {
-        // First, try direct match
+        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
+        if (pos.isNull()) {
+            qDebug() << "[SequenceRelationView] Position for key:" << storedKey << "is null, skipping";
+            continue;
+        }
+        
+        // First, try direct match with existing nodes
         if (m_nodeItems.contains(storedKey)) {
-            QPointF pos = settings.value(storedKey, QPointF()).toPointF();
-            if (!pos.isNull()) {
-                m_nodeItems[storedKey]->setPos(pos);
-                m_nodePositions[storedKey] = pos;  // Store in our internal map too
-                qDebug() << "[SequenceRelationView] Loaded position for node:" << storedKey << "at" << pos;
-            } else {
-                qDebug() << "[SequenceRelationView] Position for node:" << storedKey << "is null";
-            }
+            m_nodeItems[storedKey]->setPos(pos);
+            m_nodePositions[storedKey] = pos;  // Store in our internal map too
+            qDebug() << "[SequenceRelationView] Loaded position for node:" << storedKey << "at" << pos;
         } else {
             // Try various transformations for backward compatibility
             bool found = false;
@@ -642,15 +645,12 @@ void SequenceRelationView::loadNodePositions()
                 // Try to find a node with this extracted name
                 for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
                     if (it.key() == sequenceName) {
-                        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
-                        if (!pos.isNull()) {
-                            it.value()->setPos(pos);
-                            m_nodePositions[it.key()] = pos;
-                            qDebug() << "[SequenceRelationView] Loaded position for node:" << it.key() 
-                                     << "(from path-based key:" << storedKey << ") at" << pos;
-                            found = true;
-                            break;
-                        }
+                        it.value()->setPos(pos);
+                        m_nodePositions[it.key()] = pos;
+                        qDebug() << "[SequenceRelationView] Loaded position for node:" << it.key() 
+                                 << "(from path-based key:" << storedKey << ") at" << pos;
+                        found = true;
+                        break;
                     }
                 }
             }
@@ -661,25 +661,27 @@ void SequenceRelationView::loadNodePositions()
                 // Try to match with common default sequence names
                 for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
                     if (it.key().toLower() == "default" || it.key().contains("default", Qt::CaseInsensitive)) {
-                        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
-                        if (!pos.isNull()) {
-                            it.value()->setPos(pos);
-                            m_nodePositions[it.key()] = pos;
-                            qDebug() << "[SequenceRelationView] Loaded position for default node:" << it.key() 
-                                     << "(from '.' key) at" << pos;
-                            found = true;
-                            break;
-                        }
+                        it.value()->setPos(pos);
+                        m_nodePositions[it.key()] = pos;
+                        qDebug() << "[SequenceRelationView] Loaded position for default node:" << it.key() 
+                                 << "(from '.' key) at" << pos;
+                        found = true;
+                        break;
                     }
                 }
             }
             
             if (!found) {
-                qDebug() << "[SequenceRelationView] Node" << storedKey << "not found in current items";
+                // Even if we don't find a matching node right now, save the position for when the node is added later
+                // This is crucial for restoreLayout() called before nodes are created
+                m_nodePositions[storedKey] = pos;  // Store for later use when node is added
+                qDebug() << "[SequenceRelationView] Position loaded for key:" << storedKey 
+                         << "at" << pos << "(will be applied when node is added)";
             }
         }
     }
     settings.endGroup();
     
     qDebug() << "[SequenceRelationView] Finished loading positions, total current nodes:" << m_nodeItems.size();
+    qDebug() << "[SequenceRelationView] Total positions in internal map:" << m_nodePositions.size();
 }
