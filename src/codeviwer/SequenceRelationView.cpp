@@ -327,20 +327,28 @@ void SequenceRelationView::rebuildGraph()
     
     qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes";
     
-    // Restore saved positions after nodes are added
+    // First, load positions from persistent settings (most recent and authoritative)
+    loadNodePositions();
+    
+    // If there were any more recent positions in the internal map (e.g. from the current session before the last save),
+    // these might be more current than what was in settings prior to the current session
+    // However, we should only apply them if they differ from what was loaded from settings
     for (auto it = savedPositions.constBegin(); it != savedPositions.constEnd(); ++it) {
         QString nodeName = it.key();
         QPointF pos = it.value();
         if (m_nodeItems.contains(nodeName)) {
-            m_nodeItems[nodeName]->setPos(pos);
-            m_nodePositions[nodeName] = pos;  // Store in our internal map too
-            qDebug() << "[SequenceRelationView] Restored position for node:" << nodeName << "at" << pos;
-        } else {
-            qDebug() << "[SequenceRelationView] Node" << nodeName << "not found during restore";
+            // Only update if the saved position from internal map differs from what's in m_nodePositions after loading from settings
+            if (!m_nodePositions.contains(nodeName) || m_nodePositions[nodeName] != pos) {
+                m_nodeItems[nodeName]->setPos(pos);
+                m_nodePositions[nodeName] = pos;  // Update our internal map
+                qDebug() << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
+            } else {
+                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from settings";
+            }
         }
     }
     
-    // If no saved positions found, use default layout
+    // If still no positions found after both sources, use default layout
     if (m_nodePositions.isEmpty()) {
         qDebug() << "[SequenceRelationView] No saved positions found, using default layout";
         positionNodes();
@@ -550,13 +558,27 @@ void SequenceRelationView::saveNodePositions()
     settings.remove("");  // Remove all entries in this group
     settings.endGroup();
     
-    // Save current positions
+    // Clear the internal positions map and rebuild it from current node positions
+    m_nodePositions.clear();
+    
+    // Save current positions and update internal map
     settings.beginGroup("NodePositions");
     for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
         QString nodeName = it.key();
+        // Sanitize the node name to create a safe key for QSettings, but preserve original for internal use
+        QString safeNodeName = nodeName;
+        if (safeNodeName.isEmpty()) safeNodeName = "unnamed_sequence";
+        // Replace any characters that could be problematic for QSettings keys
+        safeNodeName.replace('/', '_').replace('\\', '_').replace('..', '__');
+        // Don't replace single dots in middle of names since they might be legitimate, just avoid path-like structures
+        
         QPointF pos = it.value()->pos();
-        settings.setValue(nodeName, pos);
-        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
+        settings.setValue(safeNodeName, pos);
+        
+        // Also update the internal map with current position
+        m_nodePositions[nodeName] = pos;
+        
+        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "(safe key:" << safeNodeName << ") at" << pos;
     }
     settings.endGroup();
     
@@ -595,18 +617,66 @@ void SequenceRelationView::loadNodePositions()
     
     qDebug() << "[SequenceRelationView] Found saved positions for:" << sequenceNames;
     
-    for (const QString &name : sequenceNames) {
-        if (m_nodeItems.contains(name)) {
-            QPointF pos = settings.value(name, QPointF()).toPointF();
+    for (const QString &storedKey : sequenceNames) {
+        // First, try direct match
+        if (m_nodeItems.contains(storedKey)) {
+            QPointF pos = settings.value(storedKey, QPointF()).toPointF();
             if (!pos.isNull()) {
-                m_nodeItems[name]->setPos(pos);
-                m_nodePositions[name] = pos;  // Store in our internal map too
-                qDebug() << "[SequenceRelationView] Loaded position for node:" << name << "at" << pos;
+                m_nodeItems[storedKey]->setPos(pos);
+                m_nodePositions[storedKey] = pos;  // Store in our internal map too
+                qDebug() << "[SequenceRelationView] Loaded position for node:" << storedKey << "at" << pos;
             } else {
-                qDebug() << "[SequenceRelationView] Position for node:" << name << "is null";
+                qDebug() << "[SequenceRelationView] Position for node:" << storedKey << "is null";
             }
         } else {
-            qDebug() << "[SequenceRelationView] Node" << name << "not found in current items";
+            // Try various transformations for backward compatibility
+            bool found = false;
+            
+            // Check if it looks like a file path
+            if (!storedKey.isEmpty() && 
+                (storedKey.contains('/') || storedKey.contains('\\') || storedKey.contains(".seq.json"))) {
+                // Extract name from file path
+                QFileInfo fileInfo(storedKey);
+                QString sequenceName = fileInfo.baseName(); // Gets name without extension
+                
+                // Try to find a node with this extracted name
+                for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
+                    if (it.key() == sequenceName) {
+                        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
+                        if (!pos.isNull()) {
+                            it.value()->setPos(pos);
+                            m_nodePositions[it.key()] = pos;
+                            qDebug() << "[SequenceRelationView] Loaded position for node:" << it.key() 
+                                     << "(from path-based key:" << storedKey << ") at" << pos;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // If still not found, try other variations or handle the "." case specifically
+            if (!found && storedKey == ".") {
+                // This could be an old bug where "." was saved as a key
+                // Try to match with common default sequence names
+                for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
+                    if (it.key().toLower() == "default" || it.key().contains("default", Qt::CaseInsensitive)) {
+                        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
+                        if (!pos.isNull()) {
+                            it.value()->setPos(pos);
+                            m_nodePositions[it.key()] = pos;
+                            qDebug() << "[SequenceRelationView] Loaded position for default node:" << it.key() 
+                                     << "(from '.' key) at" << pos;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!found) {
+                qDebug() << "[SequenceRelationView] Node" << storedKey << "not found in current items";
+            }
         }
     }
     settings.endGroup();
