@@ -22,9 +22,14 @@ public:
     QJsonObject params() const override { return m_params; }
     QString description() const override { return m_description; }
 
-    // apply(): no filesystem change; returns true to indicate success
     bool apply(DevAssManager* devAss, QString* err) override {
-        Q_UNUSED(devAss);
+        QString path = m_params.value("path").toString();
+        // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+        if (devAss && !QFileInfo(path).isAbsolute()) {
+            path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+            // Обновляем путь в параметрах для отображения в результатах
+            m_params["path"] = path;
+        }
         Q_UNUSED(err);
         return true;
     }

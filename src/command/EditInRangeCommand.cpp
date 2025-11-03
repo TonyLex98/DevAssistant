@@ -75,6 +75,9 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
     // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+        // Обновляем путь в параметрах команды для отображения в результатах
+        const_cast<EditInRangeCommand*>(commands.first())->m_path = path;
+        const_cast<EditInRangeCommand*>(commands.first())->m_params["path"] = path;
     }
 
     for (const EditInRangeCommand* cmd : commands) {
@@ -82,6 +85,9 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
         // Нормализуем путь команды для сравнения
         if (devAss && !QFileInfo(cmdPath).isAbsolute()) {
             cmdPath = QDir(devAss->projectRoot().absolutePath()).filePath(cmdPath);
+            // Обновляем путь в параметрах для отображения в результатах
+            const_cast<EditInRangeCommand*>(cmd)->m_path = cmdPath;
+            const_cast<EditInRangeCommand*>(cmd)->m_params["path"] = cmdPath;
         }
         if (cmdPath != path) {
             if (err) *err = "EditInRangeCommand batch must target the same file";

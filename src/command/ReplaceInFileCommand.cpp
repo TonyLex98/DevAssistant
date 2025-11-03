@@ -22,6 +22,8 @@ bool ReplaceInFileCommand::apply(DevAssManager* devAss, QString* err)
     // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+        // Обновляем путь в параметрах для отображения в результатах
+        m_params["path"] = path;
     }
 
     QByteArray cont = m_params["content"].toString().toUtf8();

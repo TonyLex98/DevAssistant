@@ -61,11 +61,11 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
             const QString line = in.readLine();
             ++lineNo;
             if (line.contains(query, cs)) {
-                QString rel = root.relativeFilePath(path);
+                QString absPath = QFileInfo(path).absoluteFilePath();  // Use absolute path
                 QString snippet = line.trimmed();
                 if (snippet.size() > 200)
                     snippet = snippet.left(197) + "...";
-                m_matches << QString("%1:%2\n%3").arg(rel).arg(lineNo).arg(snippet);
+                m_matches << QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(snippet);
             }
         }
         f.close();

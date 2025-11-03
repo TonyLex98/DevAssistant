@@ -32,6 +32,8 @@ public:
         // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
         if (devAss && !QFileInfo(path).isAbsolute()) {
             path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+            // Обновляем путь для отображения в результатах
+            m_path = path;
         }
         
         QFile f(path);

@@ -29,6 +29,9 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
         if (!QFileInfo(newPath).isAbsolute()) {
             newPath = QDir(devAss->projectRoot().absolutePath()).filePath(newPath);
         }
+        // Обновляем пути в параметрах для отображения в результатах
+        m_params["oldPath"] = oldPath;
+        m_params["newPath"] = newPath;
     }
 
     // Создаем родительские директории для нового пути, если они не существуют

@@ -42,8 +42,11 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
     if (!rawScript.isEmpty()) {
         QString path = rawScript;
         QFileInfo info(path);
-        if (!info.isAbsolute() && devAss)
+        if (!info.isAbsolute() && devAss) {
             path = devAss->projectRoot().filePath(path);
+            // Обновляем путь в параметрах для отображения в результатах
+            m_params["scriptPath"] = path;
+        }
         if (!QFile::exists(path)) {
             if (err) *err = QString("Файл скрипта %1 не найден").arg(path);
             return false;
