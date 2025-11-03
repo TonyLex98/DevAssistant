@@ -6,7 +6,8 @@
 #include <QCheckBox>
 
 CommandConfirmDialog::CommandConfirmDialog(const QList<Command*>& cmds,
-                                          QWidget* parent)
+                                          QWidget* parent,
+                                          bool defaultChecked)
     : QDialog(parent), m_commands(cmds)
 {
     setWindowTitle("Подтверждение команд");
@@ -16,7 +17,7 @@ CommandConfirmDialog::CommandConfirmDialog(const QList<Command*>& cmds,
     QListWidget* list = new QListWidget(this);
     for (Command* c : m_commands) {
         QListWidgetItem* item = new QListWidgetItem(c->description(), list);
-        item->setCheckState(Qt::Unchecked);
+        item->setCheckState(defaultChecked ? Qt::Checked : Qt::Unchecked);
         item->setData(Qt::UserRole, QVariant::fromValue<void*>(c));
     }
     v->addWidget(list);

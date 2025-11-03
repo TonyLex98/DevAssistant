@@ -9,12 +9,13 @@ class CommandConfirmDialog : public QDialog
     Q_OBJECT
 public:
     CommandConfirmDialog(const QList<Command*>& cmds,
-                        QWidget* parent = nullptr);
+                        QWidget* parent = nullptr,
+                        bool defaultChecked = false); // Added parameter to set default checked state
 
     CommandConfirmDialog(){
 
     };
-    // Возвращает список тех команд, которые пользователь подтвердил
+    // Возвращает список тех команд, которые пользователь подтвердили
     QList<Command*> confirmed() const { return m_confirmed; }
 
 private slots:

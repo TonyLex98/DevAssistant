@@ -132,6 +132,13 @@ MainWindow::MainWindow(QWidget *parent)
             &MainWindow::openSequenceGraph);
     // -------------------------------------------------
 
+    // Add confirmation mode combo box
+    confirmModeCombo = new MemoryComboBox("confirmMode", this);
+    confirmModeCombo->addItem("Auto-confirm commands", "auto");
+    confirmModeCombo->addItem("Ask for command confirmation", "ask");
+    confirmModeCombo->setCurrentIndex(0); // Default to auto-confirm
+    btns->addWidget(confirmModeCombo);
+
     promptBtn->hide();
     applyBtn->hide();
     undoBtn->hide();
@@ -864,13 +871,24 @@ void MainWindow::handleAssistantFinished()
         return;
     }
 
-    CommandConfirmDialog dlg(cmds.toList(), this);
-    if (dlg.exec() != QDialog::Accepted) {
-        log("Пользователь отклонил команды");
-        qDeleteAll(cmds);
-        return;
+    QList<Command*> toRun;
+    // Check confirmation mode
+    if (confirmModeCombo->currentData().toString() == "auto") {
+        // Auto-confirm mode: All commands are confirmed by default
+        toRun = cmds.toList();
+        
+        // Log that commands are running without confirmation
+        log(QString("Команды запускаются без подтверждения (режим: %1).").arg(confirmModeCombo->currentText()));
+    } else {
+        // Ask for confirmation mode - but check all commands by default so user doesn't need to click each
+        CommandConfirmDialog dlg(cmds.toList(), this, true); // Check all by default in "ask" mode
+        if (dlg.exec() != QDialog::Accepted) {
+            log("Пользователь отклонил команды");
+            qDeleteAll(cmds);
+            return;
+        }
+        toRun = dlg.confirmed();
     }
-    QList<Command*> toRun = dlg.confirmed();
 
     bool hasCallSequenceCommand = false;
     QString sequenceToCall;

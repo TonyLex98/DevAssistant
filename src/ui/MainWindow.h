@@ -43,6 +43,8 @@
 #include "GraphWidget.h"
 #include <QMap>
 #include <QVector>
+#include <QComboBox>
+#include "customWidgets/MemoryComboBox.h"
 
 // Need the complete definition for sequence graph widget
 #include "../codeviwer/SequenceGraphWidget.h"
@@ -143,6 +145,7 @@ private:
     StyledButton* runSeqBtn;
     StyledButton *editSeqBtn;
     StyledButton *newSeqBtn;
+    MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
     StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
     VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
