@@ -32,4 +32,20 @@ public:
 
     /* сериализовать в JSON (можно использовать для *.dadescr) */
     virtual QJsonObject toJson() const = 0;
+    
+    /* получить результат выполнения команды (для отображения пользователю и LLM) */
+    virtual QString getResult() const { return QString(); }
+    
+    /* методы для установки и получения результата выполнения */
+    void setExecutionResult(bool success, const QString& error = QString()) {
+        m_executionSuccess = success;
+        m_errorMessage = error;
+    }
+    
+    bool wasSuccessful() const { return m_executionSuccess; }
+    QString getErrorMessage() const { return m_errorMessage; }
+
+private:
+    bool m_executionSuccess = true;
+    QString m_errorMessage;
 };

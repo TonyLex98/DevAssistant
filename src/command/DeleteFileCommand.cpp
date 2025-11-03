@@ -42,3 +42,22 @@ QJsonObject DeleteFileCommand::toJson() const
     obj["description"] = description();
     return obj;
 }
+
+QString DeleteFileCommand::getResult() const
+{
+    QString result;
+    if (wasSuccessful()) {
+        result = QString("DELETE_FILE: %1\n[status]\nFile deleted successfully\nexitCode=0")
+               .arg(m_params["path"].toString());
+    } else {
+        result = QString("DELETE_FILE: %1\n[status]\nFile deletion failed\nexitCode=1")
+               .arg(m_params["path"].toString());
+    }
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

@@ -70,3 +70,26 @@ QJsonObject RunShellCommand::toJson() const
     obj["description"] = m_description;
     return obj;
 }
+
+QString RunShellCommand::getResult() const
+{
+    QString result = QString("RUN_SHELL: %1\n").arg(m_params["command"].toString());
+    if (!m_stdout.isEmpty()) {
+        result += QString("[stdout]\n%1\n").arg(m_stdout);
+    } else {
+        result += "[stdout]\nNo output\n";
+    }
+    if (!m_stderr.isEmpty()) {
+        result += QString("[stderr]\n%1\n").arg(m_stderr);
+    } else {
+        result += "[stderr]\nNo errors\n";
+    }
+    result += QString("exitCode=%1").arg(m_exitCode);
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

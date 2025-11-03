@@ -110,3 +110,22 @@ QJsonObject SearchProjectCommand::toJson() const
     obj["description"] = m_description;
     return obj;
 }
+
+QString SearchProjectCommand::getResult() const
+{
+    QString result = QString("SEARCH_PROJECT: \"%1\"\n").arg(m_params.value("query").toString());
+    if (!m_matches.isEmpty()) {
+        result += QString("[matches]\n%1\n").arg(m_matches.join("\n\n"));
+        result += "exitCode=0";
+    } else {
+        result += "[matches]\nNo matches found\n";
+        result += "exitCode=1";
+    }
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

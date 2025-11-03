@@ -16,6 +16,8 @@ public:
 
     // Путь к файлу (может быть нормализован позже)
     QString path() const { return m_params["path"].toString(); }
+    
+    QString getResult() const override;
 
 private:
     QJsonObject m_params;

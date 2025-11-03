@@ -1042,40 +1042,19 @@ void MainWindow::handleAssistantFinished()
     }
 
     QString err;
-    auto logConsoleResult = [&](Command* cmd){
-        QString title;
-        QString stdoutText;
-        QString stderrText;
-        int exitCode = 0;
-
-        if (auto py = dynamic_cast<RunPythonCommand*>(cmd)) {
-            QJsonObject p = py->params();
-            QString script = p.value("scriptPath").toString();
-            if (!script.isEmpty() && !QFileInfo(script).isAbsolute())
-                script = QDir(m_projectRoot).filePath(script);
-            if (script.isEmpty())
-                script = p.value("path").toString();
-            title = QString("RUN_PYTHON %1").arg(script.isEmpty() ? QStringLiteral("<inline>") : script);
-            stdoutText = py->stdoutText();
-            stderrText = py->stderrText();
-            exitCode = py->exitCode();
-        } else if (auto sh = dynamic_cast<RunShellCommand*>(cmd)) {
-            QString commandText = sh->params().value("command").toString();
-            title = QString("RUN_SHELL %1").arg(commandText);
-            stdoutText = sh->stdoutText();
-            stderrText = sh->stderrText();
-            exitCode = sh->exitCode();
-        }
-
-        if (!title.isEmpty()) {
-            appendConsoleContext(title.trimmed(), stdoutText, stderrText, exitCode);
+    auto logConsoleResult = [&](Command* cmd, const QString& errorMessage = QString()){
+        // Use the new getResult method to get the command result
+        QString result = cmd->getResult();
+        
+        if (!result.isEmpty()) {
+            // Extract title from the first line
+            QStringList lines = result.split('\n');
+            QString title = lines.takeFirst().split(':').first(); // Get command name part
+            
+            appendConsoleContext(title, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
+            
             // Also add to history so user can see command results in the chat
-            QString resultMessage = QString("%1\n[stdout]\n%2\n[stderr]\n%3\nexitCode=%4")
-                .arg(title.trimmed())
-                .arg(stdoutText.isEmpty() ? "No output" : stdoutText)
-                .arg(stderrText.isEmpty() ? "No errors" : stderrText)
-                .arg(exitCode);
-            m_history.push_back(qMakePair(QString("system"), resultMessage));
+            m_history.push_back(qMakePair(QString("system"), result));
         }
     };
 
@@ -1090,13 +1069,15 @@ void MainWindow::handleAssistantFinished()
             continue;
         }
         if (!c->apply(&m_dev_manager, &err)) {
-            logConsoleResult(c);
+            c->setExecutionResult(false, err);  // Set execution result before getting output
+            logConsoleResult(c, err);  // Pass the error message
             QMessageBox::warning(this, tr("Ошибка выполнения"), err);
             applyFailed = true;
             break;
         }
+        c->setExecutionResult(true);  // Set execution result for successful execution
         handlePostApplyContextCleanup(c);
-        logConsoleResult(c);
+        logConsoleResult(c, QString());  // No error for successful execution
         handleSearchResults(c);
     }
 

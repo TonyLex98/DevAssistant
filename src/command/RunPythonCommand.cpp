@@ -82,3 +82,35 @@ QJsonObject RunPythonCommand::toJson() const
     obj["description"] = m_description;
     return obj;
 }
+
+QString RunPythonCommand::getResult() const
+{
+    QString scriptOrCode;
+    if (m_params.contains("scriptPath")) {
+        scriptOrCode = m_params.value("scriptPath").toString();
+    } else if (m_params.contains("code")) {
+        scriptOrCode = "inline code";
+    } else {
+        scriptOrCode = "unknown";
+    }
+    
+    QString result = QString("RUN_PYTHON: %1\n").arg(scriptOrCode);
+    if (!m_stdout.isEmpty()) {
+        result += QString("[stdout]\n%1\n").arg(m_stdout);
+    } else {
+        result += "[stdout]\nNo output\n";
+    }
+    if (!m_stderr.isEmpty()) {
+        result += QString("[stderr]\n%1\n").arg(m_stderr);
+    } else {
+        result += "[stderr]\nNo errors\n";
+    }
+    result += QString("exitCode=%1").arg(m_exitCode);
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

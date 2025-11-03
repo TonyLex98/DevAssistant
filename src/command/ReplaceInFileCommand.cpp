@@ -59,3 +59,22 @@ QJsonObject ReplaceInFileCommand::toJson() const
     obj["description"] = description();
     return obj;
 }
+
+QString ReplaceInFileCommand::getResult() const
+{
+    QString result;
+    if (wasSuccessful()) {
+        result = QString("REPLACE_IN_FILE: %1\n[status]\nFile content replaced successfully\nexitCode=0")
+               .arg(m_params["path"].toString());
+    } else {
+        result = QString("REPLACE_IN_FILE: %1\n[status]\nFile content replacement failed\nexitCode=1")
+               .arg(m_params["path"].toString());
+    }
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

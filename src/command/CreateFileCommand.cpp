@@ -74,3 +74,22 @@ QJsonObject CreateFileCommand::toJson() const
     obj["description"] = description();
     return obj;
 }
+
+QString CreateFileCommand::getResult() const
+{
+    QString result;
+    if (wasSuccessful()) {
+        result = QString("CREATE_FILE: %1\n[status]\nFile created successfully\nexitCode=0")
+               .arg(m_params["path"].toString());
+    } else {
+        result = QString("CREATE_FILE: %1\n[status]\nFile creation failed\nexitCode=1")
+               .arg(m_params["path"].toString());
+    }
+    
+    // Add error message if command failed
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    
+    return result;
+}

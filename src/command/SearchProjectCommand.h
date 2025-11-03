@@ -18,6 +18,8 @@ public:
     QJsonObject toJson() const override;
 
     const QStringList& matches() const { return m_matches; }
+    
+    QString getResult() const override;
 
 private:
     bool shouldSkipFile(const QString& path) const;

@@ -20,6 +20,8 @@ public:
     QString stdoutText() const { return m_stdout; }
     QString stderrText() const { return m_stderr; }
     int exitCode() const { return m_exitCode; }
+    
+    QString getResult() const override;
 
 private:
     QJsonObject m_params;
