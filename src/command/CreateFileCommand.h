@@ -14,6 +14,9 @@ public:
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
 
+    // Путь к файлу (может быть нормализован позже)
+    QString path() const { return m_params["path"].toString(); }
+
 private:
     QJsonObject m_params;
     QString m_description;

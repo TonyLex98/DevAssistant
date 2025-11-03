@@ -71,9 +71,19 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
     if (commands.isEmpty())
         return true;
 
-    const QString path = commands.first()->path();
+    QString path = commands.first()->path();
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    if (devAss && !QFileInfo(path).isAbsolute()) {
+        path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+    }
+
     for (const EditInRangeCommand* cmd : commands) {
-        if (cmd->path() != path) {
+        QString cmdPath = cmd->path();
+        // Нормализуем путь команды для сравнения
+        if (devAss && !QFileInfo(cmdPath).isAbsolute()) {
+            cmdPath = QDir(devAss->projectRoot().absolutePath()).filePath(cmdPath);
+        }
+        if (cmdPath != path) {
             if (err) *err = "EditInRangeCommand batch must target the same file";
             return false;
         }
@@ -138,9 +148,22 @@ bool EditInRangeCommand::saveFileLines(const QString& path,
                                        DevAssManager* devAss,
                                        QString* err)
 {
-    QFile f(path);
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    QString normalizedPath = path;
+    if (devAss && !QFileInfo(path).isAbsolute()) {
+        normalizedPath = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+    }
+
+    // Создаем родительские директории, если они не существуют
+    QDir dir = QFileInfo(normalizedPath).absoluteDir();
+    if (!dir.exists() && !dir.mkpath(".")) {
+        if (err) *err = QString("Cannot create directory for file: %1").arg(dir.path());
+        return false;
+    }
+
+    QFile f(normalizedPath);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        if (err) *err = QString("Cannot open %1 for writing").arg(path);
+        if (err) *err = QString("Cannot open %1 for writing").arg(normalizedPath);
         return false;
     }
 
@@ -150,7 +173,7 @@ bool EditInRangeCommand::saveFileLines(const QString& path,
     f.close();
 
     if (devAss) {
-        devAss->updateFileDescription(path,
+        devAss->updateFileDescription(normalizedPath,
                                       QDateTime::currentDateTime(),
                                       true);
         devAss->save();

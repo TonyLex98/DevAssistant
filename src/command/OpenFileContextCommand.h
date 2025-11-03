@@ -26,11 +26,17 @@ public:
     }
     QString description() const override { return m_description; }
 
-    bool apply(DevAssManager*, QString* err) override
+    bool apply(DevAssManager* devAss, QString* err) override
     {
-        QFile f(m_path);
+        QString path = m_path;
+        // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+        if (devAss && !QFileInfo(path).isAbsolute()) {
+            path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+        }
+        
+        QFile f(path);
         if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            if (err) *err = QString("Не удалось открыть файл %1").arg(m_path);
+            if (err) *err = QString("Не удалось открыть файл %1").arg(path);
             return false;
         }
 

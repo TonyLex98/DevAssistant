@@ -17,7 +17,13 @@ bool WriteDescriptionCommand::apply(DevAssManager* devAss, QString* err)
 {
     if (!devAss) return false;
 
-    const QString srcPath = m_params["sourceFilePath"].toString();
+    QString srcPath = m_params["sourceFilePath"].toString();
+    
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    if (!QFileInfo(srcPath).isAbsolute()) {
+        srcPath = QDir(devAss->projectRoot().absolutePath()).filePath(srcPath);
+    }
+    
     const QString descr  = m_params["description"].toString();
 
     // Получаем относительный путь относительно корня проекта

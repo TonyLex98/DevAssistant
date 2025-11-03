@@ -15,6 +15,12 @@ DeleteFileCommand::DeleteFileCommand(const QString& path,
 bool DeleteFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
+    
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    if (devAss && !QFileInfo(path).isAbsolute()) {
+        path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+    }
+
     if (!QFile::remove(path)) {
         if (err) *err = QString("Не удалось удалить файл %1").arg(path);
         return false;

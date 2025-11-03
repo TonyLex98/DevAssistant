@@ -678,7 +678,7 @@ void MainWindow::runNextStep()
 
     const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
     PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, this);
-    qDebug() << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt.left(200);
+    qDebug() << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt;
     qDebug() << "[runNextStep] userPrompt:" << resolved.userPrompt;
 
     // РћС†РµРЅРєР° С‚РѕРєРµРЅРѕРІ РґР»СЏ РєРѕРЅС‚РµРєСЃС‚Р° С€Р°РіР°
@@ -695,6 +695,12 @@ void MainWindow::runNextStep()
 
     // РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ С‚Р°Рє Р¶Рµ, РєР°Рє РѕР±С‹С‡РЅС‹Р№ РІРІРѕРґ РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
     m_streamBuf.clear();
+    
+    // Добавляем отладочный вывод, чтобы понять, что отправляем в LLM
+    qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
+    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
+    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
+    
     m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
     // В истории сохраняем только запрос (не пользовательский текст)
     //m_history.push_back(qMakePair(QString("system"), resolved));
@@ -1381,6 +1387,12 @@ void MainWindow::runNextSequence()
 
     // Отправляем запрос так же, как обычный ввод пользователя
     m_streamBuf.clear();
+    
+    // Добавляем отладочный вывод, чтобы понять, что отправляем в LLM
+    qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
+    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
+    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
+    
     m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
 }
 

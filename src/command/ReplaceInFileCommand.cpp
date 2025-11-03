@@ -18,11 +18,24 @@ ReplaceInFileCommand::ReplaceInFileCommand(const QString& path,
 bool ReplaceInFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
+    
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    if (devAss && !QFileInfo(path).isAbsolute()) {
+        path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+    }
+
     QByteArray cont = m_params["content"].toString().toUtf8();
+
+    // Создаем родительские директории, если они не существуют
+    QDir dir = QFileInfo(path).absoluteDir();
+    if (!dir.exists() && !dir.mkpath(".")) {
+        if (err) *err = QString("Не удалось создать директорию для файла: %1").arg(dir.path());
+        return false;
+    }
 
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (err) *err = "Не удалось открыть файл для записи";
+        if (err) *err = QString("Не удалось открыть файл для записи: %1").arg(path);
         return false;
     }
     f.write(cont);

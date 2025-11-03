@@ -81,9 +81,6 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // Последний ответ ассистента
     result.replace("{{LAST_ASSISTANTS_RESPONSE}}", ctx->lastAssistantMessage());
 
-    // 7) {{OPEN_FILES}} – текущий запрос пользователя
-    result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
-
     // 7.1) {{SEARCH_RESULTS}} – результаты поисковых команд
     result.replace("{{SEARCH_RESULTS}}", ctx->searchResultsText());
 
@@ -116,11 +113,22 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         result = result.mid(0, match.capturedStart()) + result.mid(match.capturedEnd());
     }
     
-// 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
+    // Удаляем дублирующий вызов из строки 92
+    // result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
+
+    // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
+    // Но делаем это только ПОСЛЕ замены всех известных шаблонов
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
 
-
-
+    // Добавляем четкие инструкции о формате JSON-ответа
+    // Это поможет нейросети лучше понять, что нужно возвращать JSON команды
+    /*result += "\n\nВАЖНО: ";
+    result += "ВАЖНО: Отвечай только JSON-массивом команд в правильном формате. ";
+    result += "Не добавляй пояснительный текст вне JSON. ";
+    result += "Используй только команды из списка 'Доступные команды'. ";
+    result += "Каждая команда должна быть валидным JSON-объектом с полями 'command' и 'params'.\n";
+    result += "Формат: [{\"command\": \"НАЗВАНИЕ_КОМАНДЫ\", \"params\": {...}}, ...]";
+*/
     ResolvedPrompt out;
     out.systemPrompt = result;
     out.userPrompt = userQuery;

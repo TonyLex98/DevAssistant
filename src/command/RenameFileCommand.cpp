@@ -21,6 +21,23 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
     QString oldPath = m_params["oldPath"].toString();
     QString newPath = m_params["newPath"].toString();
 
+    // Нормализуем пути: если пути относительные, делаем их относительно корневой директории проекта
+    if (devAss) {
+        if (!QFileInfo(oldPath).isAbsolute()) {
+            oldPath = QDir(devAss->projectRoot().absolutePath()).filePath(oldPath);
+        }
+        if (!QFileInfo(newPath).isAbsolute()) {
+            newPath = QDir(devAss->projectRoot().absolutePath()).filePath(newPath);
+        }
+    }
+
+    // Создаем родительские директории для нового пути, если они не существуют
+    QDir newDir = QFileInfo(newPath).absoluteDir();
+    if (!newDir.exists() && !newDir.mkpath(".")) {
+        if (err) *err = QString("Не удалось создать директорию для нового файла: %1").arg(newDir.path());
+        return false;
+    }
+
     if (!QFile::rename(oldPath, newPath)) {
         if (err) *err = QString("Не удалось переименовать %1 в %2")
                         .arg(oldPath).arg(newPath);

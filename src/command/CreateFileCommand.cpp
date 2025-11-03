@@ -2,7 +2,9 @@
 #include "CreateFileCommand.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include <QDebug>
+#include <QDateTime>
 
 CreateFileCommand::CreateFileCommand(const QString& path,
                                      const QByteArray& content,
@@ -18,20 +20,41 @@ CreateFileCommand::CreateFileCommand(const QString& path,
 bool CreateFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
-    QByteArray cont = m_params["content"].toString().toUtf8();
+    
+    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    if (devAss && !QFileInfo(path).isAbsolute()) {
+        path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
+    }
 
+    // Создаем родительскую директорию, если она не существует
+    QDir dir = QFileInfo(path).absoluteDir();
+    if (!dir.exists() && !dir.mkpath(".")) {
+        if (err) *err = QString("Не удалось создать директорию для файла: %1").arg(dir.path());
+        return false;
+    }
+
+    // Проверяем, существует ли файл
     QFile f(path);
-    if (f.exists() && !f.remove()) {
-        if (err) *err = "Файл уже существует и не удалось удалить его";
+    if (f.exists()) {
+        if (err) *err = QString("Файл уже существует: %1").arg(path);
         return false;
     }
 
+    // Создаем файл
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (err) *err = "Не удалось создать файл";
+        if (err) *err = QString("Не удалось создать файл: %1").arg(path);
         return false;
     }
-    f.write(cont);
+
+    QByteArray content = m_params["content"].toString().toUtf8();
+    qint64 bytesWritten = f.write(content);
     f.close();
+
+    if (bytesWritten != content.size()) {
+        if (err) *err = QString("Ошибка записи в файл: %1 (записано %2 байт из %3)")
+                       .arg(path).arg(bytesWritten).arg(content.size());
+        return false;
+    }
 
     /* обновляем запись о файле в .dapro (если надо) */
     if (devAss) {
