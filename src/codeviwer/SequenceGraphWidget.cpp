@@ -30,8 +30,12 @@ void SequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqMgr)
 
 void SequenceGraphWidget::setTemplateManager(SolutionTemplateManager *templateMgr)
 {
-    Q_UNUSED(templateMgr); // For now, in a full implementation we would store this
+    Q_UNUSED(templateMgr); // For now, we store this in the view
     qDebug() << "[SequenceGraphWidget] setTemplateManager called";
+    if (m_view) {
+        // We don't store it directly in the widget, but the view can access templates as needed
+        // The view doesn't currently store the template manager, but may need to in the future
+    }
 }
 
 void SequenceGraphWidget::setCurrentSequence(const QString &sequenceName)
