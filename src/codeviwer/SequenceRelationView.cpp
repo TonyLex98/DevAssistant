@@ -12,6 +12,11 @@
 #include <QtMath>
 #include <QSettings>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include "SolutionTemplate.h"
+#include "SolutionTemplateManager.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -366,6 +371,154 @@ void SequenceRelationView::rebuildGraph()
     qDebug() << "[SequenceRelationView] rebuildGraph() completed";
 }
 
+void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPath)
+{
+    qDebug() << "[SequenceRelationView] rebuildGraphForTemplate called for:" << templateDirPath;
+    
+    // Store current positions before clearing the scene
+    QMap<QString, QPointF> savedPositions = m_nodePositions;
+    
+    qDebug() << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
+    
+    clearScenePreservingPositions();
+    
+    // Get all available sequence files in the template directory
+    QDir dir(templateDirPath);
+    if (!dir.exists()) {
+        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        return;
+    }
+    
+    QStringList filters = {"*.seq.json"};
+    QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    
+    // Load and add only sequences that exist in this template
+    for (const QFileInfo& fileInfo : fileInfoList) {
+        QString seqPath = fileInfo.absoluteFilePath();
+        
+        QFile seqFile(seqPath);
+        if (!seqFile.open(QIODevice::ReadOnly)) {
+            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            continue;
+        }
+        
+        QByteArray seqData = seqFile.readAll();
+        QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
+        if (!seqDoc.isObject()) {
+            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            continue;
+        }
+        
+        PromptSequence seq = PromptSequence::fromJson(seqDoc.object());
+        addNode(seq.name(), seq.description());
+    }
+    
+    // Find connections within this template
+    findSequenceConnectionsForTemplate(templateDirPath);
+    
+    qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes for template";
+    
+    // First, load positions from persistent settings (most recent and authoritative)
+    loadNodePositions();
+    
+    // If there were any more recent positions in the internal map (e.g. from the current session before the last save),
+    // these might be more current than what was in settings prior to the current session
+    // However, we should only apply them if they differ from what was loaded from settings
+    for (auto it = savedPositions.constBegin(); it != savedPositions.constEnd(); ++it) {
+        QString nodeName = it.key();
+        QPointF pos = it.value();
+        if (m_nodeItems.contains(nodeName)) {
+            // Only update if the saved position from internal map differs from what's in m_nodePositions after loading from settings
+            if (!m_nodePositions.contains(nodeName) || m_nodePositions[nodeName] != pos) {
+                m_nodeItems[nodeName]->setPos(pos);
+                m_nodePositions[nodeName] = pos;  // Update our internal map
+                qDebug() << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
+            } else {
+                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from settings";
+            }
+        }
+    }
+    
+    // If still no positions found after both sources, use default layout
+    if (m_nodePositions.isEmpty()) {
+        qDebug() << "[SequenceRelationView] No saved positions found, using default layout";
+        positionNodes();
+    } else {
+        qDebug() << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
+    }
+    
+    // Update all edges to reflect current positions
+    for (SequenceEdgeItem *edge : m_edgeItems) {
+        edge->updatePosition();
+    }
+    
+    qDebug() << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
+}
+
+void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &templateDirPath)
+{
+    // This would parse the sequences in the template to find OPEN_SEQUENCE references
+    // For now, we'll implement a simple version that looks for connections
+    // by examining the templates of each step in each sequence within the template
+    
+    // Get all available sequence files in the template directory
+    QDir dir(templateDirPath);
+    if (!dir.exists()) {
+        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        return;
+    }
+    
+    QStringList filters = {"*.seq.json"};
+    QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    
+    // First, read all sequences in the template to load them into memory
+    QMap<QString, PromptSequence> tmplSequences;  // name -> sequence
+    for (const QFileInfo& fileInfo : fileInfoList) {
+        QString seqPath = fileInfo.absoluteFilePath();
+        
+        QFile seqFile(seqPath);
+        if (!seqFile.open(QIODevice::ReadOnly)) {
+            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            continue;
+        }
+        
+        QByteArray seqData = seqFile.readAll();
+        QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
+        if (!seqDoc.isObject()) {
+            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            continue;
+        }
+        
+        PromptSequence seq = PromptSequence::fromJson(seqDoc.object());
+        tmplSequences[seq.name()] = seq;
+    }
+    
+    // Now find connections between sequences in the template
+    for (auto it = tmplSequences.constBegin(); it != tmplSequences.constEnd(); ++it) {
+        const PromptSequence &seq = it.value();
+        const QVector<PromptStep>& steps = seq.steps();
+        
+        // Look for references to other sequences in the templates
+        for (const PromptStep &step : steps) {
+            QString templateContent = step.tmpl();
+            
+            // Find all OPEN_SEQUENCE references in the template
+            QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
+            QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
+            
+            while (iter.hasNext()) {
+                QRegularExpressionMatch match = iter.next();
+                QString targetSequence = match.captured(1).trimmed();
+                
+                // Check if the target sequence exists within the template sequences
+                if (tmplSequences.contains(targetSequence)) {
+                    addEdge(seq.name(), targetSequence);
+                }
+            }
+        }
+    }
+}
+
 void SequenceRelationView::findSequenceConnections()
 {
     // This would parse the sequences to find OPEN_SEQUENCE references
@@ -571,7 +724,7 @@ void SequenceRelationView::saveNodePositions()
         QString safeNodeName = nodeName;
         if (safeNodeName.isEmpty()) safeNodeName = "unnamed_sequence";
         // Replace any characters that could be problematic for QSettings keys
-        safeNodeName.replace('/', '_').replace('\\', '_').replace('..', '__');
+        safeNodeName.replace('/', '_').replace('\\', '_').replace("..", "__");
         // Don't replace single dots in middle of names since they might be legitimate, just avoid path-like structures
         
         QPointF pos = it.value()->pos();

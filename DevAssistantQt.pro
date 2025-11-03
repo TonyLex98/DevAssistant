@@ -145,6 +145,8 @@ HEADERS += \
     src/core/PromptSequence.h \
     src/core/PromptSequenceManager.h \
     src/core/PromptStep.h \
+    src/core/SolutionTemplate.h \
+    src/core/SolutionTemplateManager.h \
     src/ui/DescriptionDialog.h \
     src/ui/InputTextEdit.h \
     src/ui/MainWindow.h \
@@ -156,6 +158,8 @@ HEADERS += \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \
+    src/ui/RunTemplateOrSequenceDialog.h \
+    src/ui/SolutionTemplateViewer.h \
     src/ui/customWidgets/MemoryComboBox.h \
     src/ui/customWidgets/MemoryLineEdit.h \
     src/ui/customWidgets/MemorySplitter.h \
@@ -180,6 +184,10 @@ HEADERS += \
 SOURCES += $$PWD/src/utils/AppConfig.cpp
 SOURCES += $$PWD/src/command/OpenFileRegionCommand.cpp
 SOURCES += $$PWD/src/command/AskUserCommand.cpp
+SOURCES += $$PWD/src/core/SolutionTemplate.cpp
+SOURCES += $$PWD/src/core/SolutionTemplateManager.cpp
+SOURCES += $$PWD/src/ui/RunTemplateOrSequenceDialog.cpp
+SOURCES += $$PWD/src/ui/SolutionTemplateViewer.cpp
 HEADERS += $$PWD/src/utils/AppConfig.h
 HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
 HEADERS += $$PWD/src/command/AskUserCommand.h

@@ -49,6 +49,9 @@
 // Need the complete definition for sequence graph widget
 #include "../codeviwer/SequenceGraphWidget.h"
 
+// Solution templates
+#include "../core/SolutionTemplateManager.h"
+
 class ChatDialog;
 class ModelsDialog;
 class OllamaSettingsDialog;
@@ -157,6 +160,7 @@ private:
 
     // ... уже есть
     PromptSequenceManager m_seqMgr;          // менеджер наборов
+    SolutionTemplateManager m_templateMgr;   // менеджер шаблонов
     PromptSequence        m_currentSeq;     // текущая выбранная последовательность
     bool                  m_sequenceMode = false;
     int                   m_currentStepIdx = -1; // -1 = не запущено

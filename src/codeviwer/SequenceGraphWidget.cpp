@@ -1,5 +1,6 @@
 #include "SequenceGraphWidget.h"
 #include <QVBoxLayout>
+#include "../core/SolutionTemplateManager.h"
 
 SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
@@ -27,15 +28,34 @@ void SequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqMgr)
     m_view->setSequenceManager(seqMgr);
 }
 
+void SequenceGraphWidget::setTemplateManager(SolutionTemplateManager *templateMgr)
+{
+    Q_UNUSED(templateMgr); // For now, in a full implementation we would store this
+    qDebug() << "[SequenceGraphWidget] setTemplateManager called";
+}
+
 void SequenceGraphWidget::setCurrentSequence(const QString &sequenceName)
 {
     m_view->setCurrentSequence(sequenceName);
+}
+
+void SequenceGraphWidget::setTemplateFilter(const QString &templateDirPath)
+{
+    qDebug() << "[SequenceGraphWidget] setTemplateFilter called with:" << templateDirPath;
+    // In a full implementation, we would use this to filter
+    m_view->rebuildGraphForTemplate(templateDirPath);
 }
 
 void SequenceGraphWidget::rebuildGraph()
 {
     qDebug() << "[SequenceGraphWidget] rebuildGraph called";
     m_view->rebuildGraph();
+}
+
+void SequenceGraphWidget::rebuildGraphForTemplate(const QString &templateDirPath)
+{
+    qDebug() << "[SequenceGraphWidget] rebuildGraphForTemplate called with:" << templateDirPath;
+    m_view->rebuildGraphForTemplate(templateDirPath);
 }
 
 void SequenceGraphWidget::saveLayout()

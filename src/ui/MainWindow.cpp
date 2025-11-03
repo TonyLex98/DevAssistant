@@ -12,6 +12,7 @@
 #include "../utils/AppConfig.h"
 #include "../ui/PromptEditorDialog.h"
 #include "../ui/ChangesDialog.h"
+#include "../ui/RunTemplateOrSequenceDialog.h"
 #include <QDir>
 #include <QInputDialog>
 #include <QRegularExpression>
@@ -23,6 +24,8 @@
 #include "../command/SearchWebCommand.h"
 #include "../command/SearchProjectCommand.h"
 #include "../command/ShowResultCommand.h"
+#include "SolutionTemplateViewer.h"
+#include "../core/SolutionTemplateManager.h"
 
 static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
     QByteArray raw = text.toUtf8();
@@ -113,6 +116,95 @@ MainWindow::MainWindow(QWidget *parent)
     btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
 
     connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
+
+    // Add button for solution templates
+    StyledButton *editTemplatesBtn = new StyledButton(tr("Edit Templates"), this);
+    btns->addWidget(editTemplatesBtn);
+    
+    connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
+        // Create and show the template viewer
+        SolutionTemplateViewer *viewer = new SolutionTemplateViewer(&m_templateMgr, this);
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Solution Templates"));
+        dialog.resize(800, 600);
+        
+        QVBoxLayout *layout = new QVBoxLayout(&dialog);
+        layout->addWidget(viewer);
+        
+        QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+        connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        layout->addWidget(buttonBox);
+        
+        dialog.exec();
+    });
+    
+    // Add button to export selected sequence as template
+    StyledButton *exportSequenceAsTemplateBtn = new StyledButton(tr("Export Sequence as Template"), this);
+    btns->addWidget(exportSequenceAsTemplateBtn);
+    
+    connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
+        // First, refresh sequence manager
+        m_seqMgr.refresh();
+        
+        // Get list of sequences
+        const QMap<QString, PromptSequence>& sequences = m_seqMgr.sequences();
+        if (sequences.isEmpty()) {
+            QMessageBox::information(this, "No Sequences", "No sequences found to export as templates.");
+            return;
+        }
+        
+        // Let user choose a sequence
+        QStringList names;
+        QMap<QString, QString> pathByName;      // name → path
+        for (const QString &filePath : m_seqMgr.fileList()) {
+            QString name = QFileInfo(filePath).fileName();
+            names << name;
+            pathByName.insert(name, filePath);
+        }
+        
+        bool ok = false;
+        QString selectedName = QInputDialog::getItem(
+                    this, tr("Export Sequence as Template"),
+                    tr("Choose sequence to export:"), names, 0, false, &ok);
+
+        if (!ok || selectedName.isEmpty())
+            return;          // пользователь отменил
+
+        QString sequencePath = pathByName.value(selectedName);
+        PromptSequence seq = sequences.value(sequencePath);
+        
+        // Ask for template name and description
+        QString templateName = QInputDialog::getText(this, "Template Name", "Enter template name:", 
+            QLineEdit::Normal, seq.name(), &ok);
+        if (!ok || templateName.trimmed().isEmpty()) {
+            return;
+        }
+        
+        QString description = QInputDialog::getMultiLineText(this, "Template Description", 
+            "Enter template description (optional):", seq.description(), &ok);
+        if (!ok) { // User cancelled, allow empty description
+            description = seq.description();
+        }
+        
+        // Create the template directory
+        QString templateDir = QDir(m_templateMgr.root()).absoluteFilePath(templateName.trimmed());
+        if (QDir().exists(templateDir)) {
+            QMessageBox::warning(this, "Import Failed", 
+                QString("Template with name '%1' already exists. Please choose a different name.").arg(templateName));
+            return;
+        }
+        
+        // Export the sequence as a template
+        if (m_templateMgr.exportSequenceAsTemplate(sequencePath, templateDir, templateName.trimmed(), description)) {
+            m_templateMgr.refresh();
+            QMessageBox::information(this, "Export Successful", 
+                QString("Sequence '%1' exported as template '%2' successfully!").arg(
+                    QFileInfo(sequencePath).fileName(), templateName));
+        } else {
+            QMessageBox::warning(this, "Export Failed", 
+                "Failed to export sequence as template. Check permissions and try again.");
+        }
+    });
 
     btns->addWidget(rescanBtn);
     btns->addWidget(settingsBtn);
@@ -226,6 +318,18 @@ MainWindow::MainWindow(QWidget *parent)
     m_seqMgr.refresh();
     ensureDefaultSequence();
 
+    // Папка, где будем хранить шаблоны решений
+    QString tmplRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                        .append("/DevelopersAssistant/SolutionTemplates");
+
+    // Создаём каталог, если его нет
+    QDir tmplDir(tmplRoot);
+    if (!tmplDir.exists())
+        tmplDir.mkpath(".");
+
+    m_templateMgr.setRoot(tmplRoot);
+    m_templateMgr.refresh();
+
     // Initialize sequence graph window and restore layout on startup
     // This ensures positions are restored even if the graph window was never opened
     m_seqGraphWindow = new SequenceGraphWidget();
@@ -273,6 +377,7 @@ void MainWindow::openSequenceGraph()
     
     // Update the sequence manager in case it changed
     m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+    m_seqGraphWindow->setTemplateManager(&m_templateMgr);  // Set template manager too
     
     m_seqGraphWindow->show();
     m_seqGraphWindow->raise();
@@ -675,24 +780,59 @@ void MainWindow::editSequences()
 
 void MainWindow::runSequenceDialog()
 {
-    // Обновляем список (на случай, если пользователь добавил файлы вручную)
+    // Обновляем списки (на случай, если пользователь добавил файлы вручную)
     m_seqMgr.refresh();
+    m_templateMgr.refresh();
     ensureDefaultSequence();
 
-    RunSequenceDialog dlg(m_seqMgr.sequences(), this);
+    RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
     if (dlg.exec() != QDialog::Accepted) return;
 
-    QString path = dlg.selectedFilePath();
-    if (!m_seqMgr.sequences().contains(path)) {
-        QMessageBox::warning(this, "Ошибка", "Файл последовательности не найден.");
-        return;
-    }
+    if (dlg.selectedMode() == RunTemplateOrSequenceDialog::RunSequence) {
+        // Run individual sequence
+        QString path = dlg.selectedSequencePath();
+        if (!m_seqMgr.sequences().contains(path)) {
+            QMessageBox::warning(this, "Ошибка", "Файл последовательности не найден.");
+            return;
+        }
 
-    m_currentSeq = m_seqMgr.sequences().value(path);
-    m_currentStepIdx = 0;
-    m_sequenceMode = true;
-    updateSequenceGraphHighlight();  // Update the graph highlighting
-    runNextStep();   // сразу стартуем первый шаг
+        m_currentSeq = m_seqMgr.sequences().value(path);
+        m_currentStepIdx = 0;
+        m_sequenceMode = true;
+        updateSequenceGraphHighlight();  // Update the graph highlighting
+        runNextStep();   // сразу стартуем первый шаг
+    } else {
+        // Run template with selected sequence
+        QString templatePath = dlg.selectedTemplatePath();
+        QString sequencePath = dlg.selectedDefaultSequencePath();
+        
+        if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
+            QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
+            return;
+        }
+        
+        // Load the selected sequence
+        PromptSequence seq;
+        QFile seqFile(sequencePath);
+        if (seqFile.open(QIODevice::ReadOnly)) {
+            QByteArray data = seqFile.readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                seq = PromptSequence::fromJson(doc.object());
+            }
+        }
+        
+        if (seq.name().isEmpty()) {
+            QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
+            return;
+        }
+        
+        m_currentSeq = seq;
+        m_currentStepIdx = 0;
+        m_sequenceMode = true;
+        updateSequenceGraphHighlight();  // Update the graph highlighting
+        runNextStep();   // сразу стартуем первый шаг
+    }
 }
 
 void MainWindow::runNextStep()

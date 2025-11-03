@@ -31,6 +31,7 @@ public:
 
 public slots:
     void rebuildGraph();
+    void rebuildGraphForTemplate(const QString &templateDirPath); // Rebuild graph for specific template
     void savePositions();  // Public slot for saving positions when nodes move
     void saveLayout();     // Public slot for saving layout when closing
     void restoreLayout();  // Public slot for restoring layout when opening
@@ -54,12 +55,17 @@ private:
     // Position storage
     QMap<QString, QPointF> m_nodePositions;  // sequence name -> position
     
+    // Template filtering
+    QString m_currentTemplateFilter;  // Currently active template filter (empty = no filter)
+    
     // Helper method to clear the scene while preserving positions if needed
     void clearScenePreservingPositions();
     
     void clearScene();
     void buildScene();
+    void buildSceneForTemplate(const QString &templateDirPath); // Build scene for specific template
     void findSequenceConnections();
+    void findSequenceConnectionsForTemplate(const QString &templateDirPath); // Find connections for template
     
     // Helper methods
     void addNode(const QString &name, const QString &description);
