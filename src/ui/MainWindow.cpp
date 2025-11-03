@@ -1067,8 +1067,16 @@ void MainWindow::handleAssistantFinished()
             exitCode = sh->exitCode();
         }
 
-        if (!title.isEmpty())
+        if (!title.isEmpty()) {
             appendConsoleContext(title.trimmed(), stdoutText, stderrText, exitCode);
+            // Also add to history so user can see command results in the chat
+            QString resultMessage = QString("%1\n[stdout]\n%2\n[stderr]\n%3\nexitCode=%4")
+                .arg(title.trimmed())
+                .arg(stdoutText.isEmpty() ? "No output" : stdoutText)
+                .arg(stderrText.isEmpty() ? "No errors" : stderrText)
+                .arg(exitCode);
+            m_history.push_back(qMakePair(QString("system"), resultMessage));
+        }
     };
 
     QList<Command*> pendingEdits;

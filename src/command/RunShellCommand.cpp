@@ -21,7 +21,7 @@ RunShellCommand::RunShellCommand(const QString& command,
         : descr;
 }
 
-bool RunShellCommand::apply(DevAssManager* /*devAss*/, QString* err)
+bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
 {
     if (!m_params.contains("command")) {
         if (err) *err = "Команда не задана";
@@ -30,6 +30,14 @@ bool RunShellCommand::apply(DevAssManager* /*devAss*/, QString* err)
 
     QProcess proc;
     QString cmd = m_params["command"].toString();
+
+    // Установить рабочую директорию из devAssManager, если возможно
+    if (devAss) {
+        QDir projectRoot = devAss->projectRoot();
+        if (!projectRoot.isEmpty() && projectRoot.exists()) {
+            proc.setWorkingDirectory(projectRoot.absolutePath());
+        }
+    }
 
     // Для *nix будем использовать /bin/sh -c
 #ifdef Q_OS_WIN
