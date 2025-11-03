@@ -3,6 +3,7 @@
 #include <QComboBox>
 #include <QSettings>
 #include <QDebug>
+#include <QTimer>
 
 class MemoryComboBox : public QComboBox
 {
@@ -28,7 +29,19 @@ public:
         connect(this, &QComboBox::editTextChanged,
                 this, &MemoryComboBox::store);
 
-        /* После конструкии не делаем load() – сделаем это в setItems() */
+        // Load the saved value after construction, but only if items exist
+        if (count() > 0) {
+            load();
+        } else {
+            // Defer loading until items are added - connect to count change
+            // Actually, we'll load at the end of the constructor after MainWindow has added items
+            // For now, just schedule a single shot timer to load after items are added
+            QTimer::singleShot(0, this, [this]() {
+                if (count() > 0) {  // Only load if we have items now
+                    load();
+                }
+            });
+        }
     }
 
     /* ---------- Вставляем список и сразу восстанавливаем состояние ---------- */
