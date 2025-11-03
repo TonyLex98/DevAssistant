@@ -44,6 +44,7 @@ private slots:
     void onSequenceInTemplateSelected();
     void onExternalSequenceSelected();
     void onGraphSequenceSelected(const QString &sequenceName);
+    void onSelectImage();
 
 private:
     void setupUI();

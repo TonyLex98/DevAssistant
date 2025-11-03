@@ -269,9 +269,23 @@ void SolutionTemplateViewer::loadTemplateInfo(const QString& templateDir)
     
     // Load image if available
     if (!tmpl.imagePath().isEmpty()) {
-        QPixmap pixmap(tmpl.imagePath());
-        if (!pixmap.isNull()) {
-            m_templateImageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        QString imagePath = tmpl.imagePath();
+        QString absoluteImagePath;
+        
+        // If the path is relative (contains "images/"), make it absolute relative to the template directory
+        if (imagePath.startsWith("images/")) {
+            absoluteImagePath = templateDir + "/" + imagePath;
+        } else {
+            absoluteImagePath = imagePath; // Already absolute path
+        }
+        
+        if (QFileInfo::exists(absoluteImagePath)) {
+            QPixmap pixmap(absoluteImagePath);
+            if (!pixmap.isNull()) {
+                m_templateImageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            } else {
+                m_templateImageLabel->setText("Image not found");
+            }
         } else {
             m_templateImageLabel->setText("Image not found");
         }

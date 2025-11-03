@@ -123,7 +123,7 @@ void TemplateSequenceGraphWidget::setupUI()
     connect(m_addSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onAddSequenceToTemplate);
     connect(m_removeSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onRemoveSequenceFromTemplate);
     connect(m_setMainSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onSetMainSequence);
-    connect(m_selectImageBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onAddSequenceToTemplate);
+    connect(m_selectImageBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onSelectImage);
     connect(m_templateSequencesList, &QListWidget::currentItemChanged, this, &TemplateSequenceGraphWidget::onSequenceInTemplateSelected);
     connect(m_availableSequencesList, &QListWidget::currentItemChanged, this, &TemplateSequenceGraphWidget::onExternalSequenceSelected);
     connect(m_refreshGraphBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::refreshGraph);
@@ -159,11 +159,22 @@ void TemplateSequenceGraphWidget::setTemplate(const SolutionTemplate &templateVa
     // Load image if exists
     if (!m_currentTemplate.imagePath().isEmpty()) {
         QString imagePath = m_currentTemplate.imagePath();
-        if (QFileInfo::exists(imagePath)) {
-            QPixmap pixmap(imagePath);
+        QString absoluteImagePath;
+        
+        // If the path is relative (contains "images/"), make it absolute relative to the template directory
+        if (imagePath.startsWith("images/")) {
+            // Get the template directory path to construct the absolute path
+            QString templateDir = m_templateManager->root() + "/" + m_currentTemplate.name();
+            absoluteImagePath = templateDir + "/" + imagePath;
+        } else {
+            absoluteImagePath = imagePath; // Already absolute path
+        }
+        
+        if (QFileInfo::exists(absoluteImagePath)) {
+            QPixmap pixmap(absoluteImagePath);
             if (!pixmap.isNull()) {
                 m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                m_imagePath = imagePath;
+                m_imagePath = absoluteImagePath; // Store absolute path for this view
             } else {
                 m_imageLabel->clear();
                 m_imageLabel->setText(tr("Image not found"));
@@ -383,4 +394,69 @@ void TemplateSequenceGraphWidget::onExternalSequenceSelected()
 void TemplateSequenceGraphWidget::onGraphSequenceSelected(const QString &sequenceName)
 {
     emit sequenceSelected(sequenceName);
+}
+
+void TemplateSequenceGraphWidget::onSelectImage()
+{
+    QString imagePath = QFileDialog::getOpenFileName(this, tr("Select Image"),
+                                                   QDir::homePath(),
+                                                   tr("Image Files (*.png *.jpg *.jpeg *.bmp *.svg *.gif)"));
+    if (imagePath.isEmpty()) return;
+
+    QPixmap pixmap(imagePath);
+    if (pixmap.isNull()) {
+        QMessageBox::warning(this, tr("Select Image"), tr("Could not load image"));
+        return;
+    }
+
+    // Get the template directory path
+    QString templateDir = m_templateManager->root() + "/" + m_currentTemplate.name();
+    if (templateDir.isEmpty() || templateDir == "/") {
+        // If we don't have a template name yet, use the current template's name
+        QString templateName = m_currentTemplate.name();
+        if (!templateName.isEmpty()) {
+            templateDir = m_templateManager->root() + "/" + templateName;
+        } else {
+            QMessageBox::warning(this, tr("Select Image"), tr("Template name is not set. Please set a template name first."));
+            return;
+        }
+    }
+    
+    QDir dir;
+    QString imagesDir = templateDir + "/images";
+    if (!dir.mkpath(imagesDir)) {
+        QMessageBox::warning(this, tr("Select Image"), 
+                           tr("Could not create images directory: %1").arg(imagesDir));
+        return;
+    }
+
+    QString imageFileName = QFileInfo(imagePath).fileName();
+    QString targetImagePath = imagesDir + "/" + imageFileName;
+
+    // If file with same name already exists, add a number to avoid overwriting
+    int counter = 1;
+    QString baseName = QFileInfo(imageFileName).baseName();
+    QString suffix = QFileInfo(imageFileName).suffix();
+    while (QFile::exists(targetImagePath)) {
+        QString newFileName = QString("%1_%2.%3").arg(baseName).arg(counter).arg(suffix);
+        targetImagePath = imagesDir + "/" + newFileName;
+        counter++;
+    }
+
+    // Copy the image to the template's images directory
+    if (!QFile::copy(imagePath, targetImagePath)) {
+        QMessageBox::warning(this, tr("Select Image"), 
+                           tr("Failed to copy image to template directory: %1").arg(targetImagePath));
+        return;
+    }
+
+    m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    m_imageLabel->setText(QFileInfo(targetImagePath).fileName());
+    
+    // Store relative path from template directory for portability
+    QString relativeImagePath = "images/" + QFileInfo(targetImagePath).fileName();
+    m_currentTemplate.setImagePath(relativeImagePath);
+    m_imagePath = targetImagePath; // Store absolute path for this view
+    
+    emit templateModified();
 }

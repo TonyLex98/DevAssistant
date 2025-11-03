@@ -160,15 +160,28 @@ void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
     if (!m_currentTemplate.imagePath().isEmpty()) {
         QString imagePath = m_currentTemplate.imagePath();
         qDebug() << "[SolutionTemplateEditor] Image path is not empty:" << imagePath;
-        if (QFileInfo::exists(imagePath)) {
+        
+        // If the path is relative (contains "images/"), make it absolute relative to the template directory
+        QString absoluteImagePath;
+        if (imagePath.startsWith("images/")) {
+            // This is a relative path, we need to construct the full path
+            // Since we don't have the template directory path here directly, we reconstruct it from the template name
+            QString templateDir = m_templateManager->root() + "/" + m_currentTemplate.name();
+            absoluteImagePath = templateDir + "/" + imagePath;
+        } else {
+            absoluteImagePath = imagePath; // Already absolute path
+        }
+        
+        qDebug() << "[SolutionTemplateEditor] Final image path to check:" << absoluteImagePath;
+        if (QFileInfo::exists(absoluteImagePath)) {
             qDebug() << "[SolutionTemplateEditor] Image file exists, loading pixmap";
-            QPixmap pixmap(imagePath);
+            QPixmap pixmap(absoluteImagePath);
             if (!pixmap.isNull()) {
                 qDebug() << "[SolutionTemplateEditor] Pixmap loaded successfully, setting to label";
                 m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
                 qDebug() << "[SolutionTemplateEditor] Pixmap set to label";
-                m_imagePathLabel->setText(QFileInfo(imagePath).fileName());
-                m_imagePath = imagePath;
+                m_imagePathLabel->setText(QFileInfo(absoluteImagePath).fileName());
+                m_imagePath = imagePath; // Keep the original relative path
             } else {
                 qDebug() << "[SolutionTemplateEditor] Failed to load pixmap, clearing image";
                 m_imageLabel->clear();
@@ -431,9 +444,54 @@ void SolutionTemplateEditor::onSelectImage()
         return;
     }
 
+    // Get the template directory path
+    QString templateDir = m_templateManager->root() + "/" + m_currentTemplate.name();
+    if (templateDir.isEmpty() || templateDir == "/") {
+        // If we don't have a template name yet, use the current template's directory path from the manager
+        // We need to get the current template path differently
+        // For new templates, we'll use the name from the edit field
+        QString templateName = m_nameEdit->lineEdit()->text().trimmed();
+        if (!templateName.isEmpty()) {
+            templateDir = m_templateManager->root() + "/" + templateName;
+        } else {
+            QMessageBox::warning(this, tr("Select Image"), tr("Template name is not set. Please set a template name first."));
+            return;
+        }
+    }
+    
+    QDir dir;
+    QString imagesDir = templateDir + "/images";
+    if (!dir.mkpath(imagesDir)) {
+        QMessageBox::warning(this, tr("Select Image"), 
+                           tr("Could not create images directory: %1").arg(imagesDir));
+        return;
+    }
+
+    QString imageFileName = QFileInfo(imagePath).fileName();
+    QString targetImagePath = imagesDir + "/" + imageFileName;
+
+    // If file with same name already exists, add a number to avoid overwriting
+    int counter = 1;
+    QString baseName = QFileInfo(imageFileName).baseName();
+    QString suffix = QFileInfo(imageFileName).suffix();
+    while (QFile::exists(targetImagePath)) {
+        QString newFileName = QString("%1_%2.%3").arg(baseName).arg(counter).arg(suffix);
+        targetImagePath = imagesDir + "/" + newFileName;
+        counter++;
+    }
+
+    // Copy the image to the template's images directory
+    if (!QFile::copy(imagePath, targetImagePath)) {
+        QMessageBox::warning(this, tr("Select Image"), 
+                           tr("Failed to copy image to template directory: %1").arg(targetImagePath));
+        return;
+    }
+
     m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    m_imagePathLabel->setText(QFileInfo(imagePath).fileName());
-    m_imagePath = imagePath;
+    m_imagePathLabel->setText(QFileInfo(targetImagePath).fileName());
+    
+    // Store relative path from template directory for portability
+    m_imagePath = "images/" + QFileInfo(targetImagePath).fileName();
     
     emit templateModified();
 }
