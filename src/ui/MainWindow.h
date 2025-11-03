@@ -108,6 +108,7 @@ public:
 private slots:
     void createNewSequence();
     //void onFileDoubleClicked(QListWidgetItem *item);
+    void setupModelWithGenerationParams(); // Configure model with generation parameters
 
 private:
     QString buildProjectContext() const;

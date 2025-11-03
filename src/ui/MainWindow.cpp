@@ -425,9 +425,41 @@ void MainWindow::openSettings(){
     if (d.exec()==QDialog::Accepted) {
         m_model.setEndpoint(QUrl(d.endpoint()));
         QVariantMap opts = d.params();
+        // Используем параметры из диалога (которые включают как базовые, так и параметры генерации)
         if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
-        // persist
-        //{ AppConfig cfg; cfg.load(); cfg.params = opts; cfg.save(); }
+        
+        // Сохраняем параметры в конфигурацию
+        AppConfig cfg;
+        cfg.load();
+        cfg.temperature = opts.value("temperature", 0.1).toDouble();
+        cfg.topP = opts.value("top_p", 0.9).toDouble();
+        cfg.topK = opts.value("top_k", 40).toInt();
+        cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();
+        cfg.presencePenalty = opts.value("presence_penalty", 0.0).toDouble();
+        cfg.frequencyPenalty = opts.value("frequency_penalty", 0.0).toDouble();
+        cfg.numPredict = opts.value("num_predict", -1).toInt();
+        cfg.numCtx = opts.value("num_ctx", 4096).toInt();
+        cfg.mirostat = opts.value("mirostat", 0).toInt();
+        cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
+        cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
+        cfg.seed = opts.value("seed", 0).toULongLong();
+        
+        // Обработка stop-слов
+        if (opts.contains("stop")) {
+            QJsonArray stopArray = opts.value("stop").toJsonArray();
+            QStringList stopWords;
+            for (const QJsonValue& val : stopArray) {
+                stopWords << val.toString();
+            }
+            cfg.stopWords = stopWords;
+        }
+        
+        cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
+        cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
+        cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
+        
+        cfg.save();
+        
         log("Settings applied.");
     }
 }
@@ -1527,6 +1559,46 @@ void MainWindow::reOpenRootDir(){
     }
 
     rescan();
+}
+
+void MainWindow::setupModelWithGenerationParams()
+{
+    // Загружаем параметры генерации
+    AppConfig cfg;
+    cfg.load();
+    
+    // Подготовим карту параметров для Ollama
+    QVariantMap genParams;
+    genParams["temperature"] = cfg.temperature;
+    genParams["top_p"] = cfg.topP;
+    genParams["top_k"] = cfg.topK;
+    genParams["repeat_penalty"] = cfg.repeatPenalty;
+    genParams["presence_penalty"] = cfg.presencePenalty;
+    genParams["frequency_penalty"] = cfg.frequencyPenalty;
+    genParams["num_predict"] = cfg.numPredict;
+    genParams["num_ctx"] = cfg.numCtx;
+    genParams["mirostat"] = cfg.mirostat;
+    genParams["mirostat_tau"] = cfg.mirostatTau;
+    genParams["mirostat_eta"] = cfg.mirostatEta;
+    genParams["seed"] = cfg.seed;
+    
+    // Если есть stop-слова, добавим их
+    if (!cfg.stopWords.isEmpty()) {
+        QJsonArray stopArray;
+        for (const QString& word : cfg.stopWords) {
+            stopArray.append(word);
+        }
+        genParams["stop"] = stopArray;
+    }
+    
+    genParams["reasoning_effort"] = cfg.reasoningEffort;
+    genParams["temperature_decay"] = cfg.temperatureDecay;
+    genParams["repeat_last_n"] = cfg.repeatLastN;
+
+    // Применяем настройки модели
+    if (!m_model.selectedModel().isEmpty()) {
+        m_model.configure(m_model.selectedModel(), genParams);
+    }
 }
 
 

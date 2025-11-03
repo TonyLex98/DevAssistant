@@ -5,7 +5,14 @@
 #include <QEventLoop>
 #include <QTimer>
 
-OllamaAdapter::OllamaAdapter(QObject* parent):QObject(parent){ m_endpoint = QUrl("http://127.0.0.1:11434"); }
+OllamaAdapter::OllamaAdapter(QObject* parent):QObject(parent){
+    m_endpoint = QUrl("http://127.0.0.1:11434");
+    // Инициализируем параметры генерации значениями по умолчанию
+    // Особенно важно для генерации JSON-ответов
+    m_genParams.temperature = 0.1;  // Низкое значение для детерминированного вывода
+    m_genParams.top_p = 0.9;
+    m_genParams.num_ctx = 4096;     // Увеличиваем размер контекста
+}
 
 void OllamaAdapter::setEndpoint(const QUrl& url){ m_endpoint = url; }
 
@@ -159,8 +166,16 @@ QJsonObject OllamaAdapter::buildRequestBody(const QString& prompt,
     if (!systemPrompt.isEmpty())
         body.insert("system", systemPrompt);
 
+    // Добавляем параметры генерации
+    QJsonObject genParamsObj = m_genParams.toJsonObject();
+    for (auto it = genParamsObj.begin(); it != genParamsObj.end(); ++it) {
+        body.insert(it.key(), it.value());
+    }
+
+    // Добавляем параметры из m_params (из configure)
     for (auto it = m_params.begin(); it != m_params.end(); ++it)
         body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    // Добавляем параметры из options (локальные overrides)
     for (auto it = options.begin(); it != options.end(); ++it)
         body.insert(it.key(), QJsonValue::fromVariant(it.value()));
 
