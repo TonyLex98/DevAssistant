@@ -39,9 +39,7 @@ struct OllamaGenerationParams {
         obj["frequency_penalty"] = frequency_penalty;
         obj["num_predict"] = num_predict;
         obj["num_ctx"] = num_ctx;
-        obj["mirostat"] = mirostat;
-        obj["mirostat_tau"] = mirostat_tau;
-        obj["mirostat_eta"] = mirostat_eta;
+        // Skip mirostat parameters as they might not be supported by all models
         if (seed != 0) obj["seed"] = qint64(seed);  // Используем qint64 для избежания проблем с типом
         if (!stop.isEmpty()) {
             QJsonArray stopArray;
@@ -49,8 +47,8 @@ struct OllamaGenerationParams {
                 stopArray.append(s);
             obj["stop"] = stopArray;
         }
-        obj["reasoning_effort"] = reasoning_effort;
-        obj["temperature_decay"] = temperature_decay;
+        // Skip reasoning_effort as it's not a standard Ollama parameter
+        // Skip temperature_decay as it's not a standard Ollama parameter
         obj["repeat_last_n"] = repeat_last_n;
         return obj;
     }

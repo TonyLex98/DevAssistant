@@ -165,18 +165,36 @@ QJsonObject OllamaAdapter::buildRequestBody(const QString& prompt,
     // Create options object for generation parameters
     QJsonObject optionsObj;
 
-    // Add generation parameters to options object
+    // Add only standard Ollama parameters to options object
     QJsonObject genParamsObj = m_genParams.toJsonObject();
     for (auto it = genParamsObj.begin(); it != genParamsObj.end(); ++it) {
-        optionsObj.insert(it.key(), it.value());
+        QString key = it.key();
+        // Filter out parameters that cause warnings in Ollama
+        if (key != "reasoning_effort" && key != "temperature_decay" && 
+            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
+            optionsObj.insert(key, it.value());
+        }
     }
 
     // Add parameters from m_params (from configure) to options object
-    for (auto it = m_params.begin(); it != m_params.end(); ++it)
-        optionsObj.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    for (auto it = m_params.begin(); it != m_params.end(); ++it) {
+        QString key = it.key(); // it.key() already returns QString in QVariantMap
+        // Filter out parameters that cause warnings in Ollama
+        if (key != "reasoning_effort" && key != "temperature_decay" && 
+            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
+            optionsObj.insert(key, QJsonValue::fromVariant(it.value()));
+        }
+    }
+    
     // Add parameters from options (local overrides) to options object
-    for (auto it = options.begin(); it != options.end(); ++it)
-        optionsObj.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    for (auto it = options.begin(); it != options.end(); ++it) {
+        QString key = it.key();
+        // Filter out parameters that cause warnings in Ollama
+        if (key != "reasoning_effort" && key != "temperature_decay" && 
+            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
+            optionsObj.insert(key, QJsonValue::fromVariant(it.value()));
+        }
+    }
 
     // Insert options object if it has values
     if (!optionsObj.isEmpty()) {
