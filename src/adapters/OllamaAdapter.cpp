@@ -9,9 +9,6 @@ OllamaAdapter::OllamaAdapter(QObject* parent):QObject(parent){
     m_endpoint = QUrl("http://127.0.0.1:11434");
     // Инициализируем параметры генерации значениями по умолчанию
     // Особенно важно для генерации JSON-ответов
-    m_genParams.temperature = 0.1;  // Низкое значение для детерминированного вывода
-    m_genParams.top_p = 0.9;
-    m_genParams.num_ctx = 4096;     // Увеличиваем размер контекста
 }
 
 void OllamaAdapter::setEndpoint(const QUrl& url){ m_endpoint = url; }
@@ -28,10 +25,11 @@ QString OllamaAdapter::generate(const QString& prompt, const QVariantMap& option
 QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
                                           const QString& systemPrompt,
                                           const QVariantMap& options){
-    QUrl url = m_endpoint; url.setPath("/api/generate");
+    QUrl url = m_endpoint; url.setPath("/api/chat");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body = buildRequestBody(userPrompt, options, false, systemPrompt);
+
     QJsonArray messages;
     if (!systemPrompt.isEmpty()) {
         QJsonObject systemMsg;
@@ -56,7 +54,7 @@ QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
     }
     QByteArray data = r->readAll(); r->deleteLater();
     QJsonObject json = QJsonDocument::fromJson(data).object();
-    return json.value("response").toString();
+    return json.value("message").toObject().value("content").toString();
 }
 
 int OllamaAdapter::estimateTokens(const QString& text) const {
@@ -109,7 +107,7 @@ void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
     if (m_streamReply) { m_streamReply->abort(); m_streamReply->deleteLater(); }
     m_buffer.clear();
 
-    QUrl url = m_endpoint; url.setPath("/api/generate");
+    QUrl url = m_endpoint; url.setPath("/api/chat");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body = buildRequestBody(userPrompt, options, true, systemPrompt);
@@ -143,8 +141,9 @@ void OllamaAdapter::onReadyRead(){
         if (nl<0) break;
         QByteArray one = m_buffer.left(nl);
         m_buffer.remove(0,nl+1);
+        if (one.trimmed().isEmpty()) continue; // Skip empty lines
         QJsonObject o = QJsonDocument::fromJson(one).object();
-        QString part = o.value("response").toString();
+        QString part = o.value("message").toObject().value("content").toString();
         if (!part.isEmpty()) emit streamChunk(part);
     }
 }
@@ -161,23 +160,28 @@ QJsonObject OllamaAdapter::buildRequestBody(const QString& prompt,
 {
     QJsonObject body;
     body.insert("model", m_model);
-    body.insert("prompt", prompt);
     body.insert("stream", stream);
-    if (!systemPrompt.isEmpty())
-        body.insert("system", systemPrompt);
 
-    // Добавляем параметры генерации
+    // Create options object for generation parameters
+    QJsonObject optionsObj;
+
+    // Add generation parameters to options object
     QJsonObject genParamsObj = m_genParams.toJsonObject();
     for (auto it = genParamsObj.begin(); it != genParamsObj.end(); ++it) {
-        body.insert(it.key(), it.value());
+        optionsObj.insert(it.key(), it.value());
     }
 
-    // Добавляем параметры из m_params (из configure)
+    // Add parameters from m_params (from configure) to options object
     for (auto it = m_params.begin(); it != m_params.end(); ++it)
-        body.insert(it.key(), QJsonValue::fromVariant(it.value()));
-    // Добавляем параметры из options (локальные overrides)
+        optionsObj.insert(it.key(), QJsonValue::fromVariant(it.value()));
+    // Add parameters from options (local overrides) to options object
     for (auto it = options.begin(); it != options.end(); ++it)
-        body.insert(it.key(), QJsonValue::fromVariant(it.value()));
+        optionsObj.insert(it.key(), QJsonValue::fromVariant(it.value()));
+
+    // Insert options object if it has values
+    if (!optionsObj.isEmpty()) {
+        body.insert("options", optionsObj);
+    }
 
     return body;
 }
