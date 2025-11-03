@@ -328,12 +328,14 @@ MainWindow::MainWindow(QWidget *parent)
         tmplDir.mkpath(".");
 
     m_templateMgr.setRoot(tmplRoot);
+    m_templateMgr.setSequenceManager(&m_seqMgr);  // Connect sequence manager to template manager
     m_templateMgr.refresh();
 
     // Initialize sequence graph window and restore layout on startup
     // This ensures positions are restored even if the graph window was never opened
     m_seqGraphWindow = new SequenceGraphWidget();
     m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+    m_seqGraphWindow->setTemplateManager(&m_templateMgr);  // Set template manager too
     m_seqGraphWindow->restoreLayout();
     m_seqGraphWindow->rebuildGraph(); // Now rebuild the graph with restored positions
     m_seqGraphWindow->hide(); // Hide the window, we just need it for position restoration

@@ -4,6 +4,7 @@
 #include <QString>
 #include "SolutionTemplate.h"
 #include <QDirIterator>
+#include "../core/PromptSequenceManager.h"  // Include the sequence manager header
 
 class SolutionTemplateManager : public QObject
 {
@@ -37,15 +38,20 @@ public:
     /* Экспорт шаблона в ZIP-архив */
     bool exportTemplate(const QString& templateDirPath, const QString& exportPath) const;
     
-    /* Импорт шаблона из ZIP-архива */
+    /* Импорт шаблона из ZIP-архив */
     bool importTemplate(const QString& importPath, const QString& targetDir) const;
     
     /* Экспорт последовательности как шаблона */
     bool exportSequenceAsTemplate(const QString& sequencePath, const QString& templateDirPath, 
                                   const QString& templateName, const QString& description = QString()) const;
 
+    /* Access to sequence manager for template editor */
+    void setSequenceManager(PromptSequenceManager* seqMgr) { m_seqMgr = seqMgr; }
+    PromptSequenceManager* sequenceManager() { return m_seqMgr; }
+
 private:
     QString m_root;                                  // директория SolutionTemplates
     QMap<QString, SolutionTemplate> m_templates;     // key = абсолютный путь к папке шаблона
     QStringList m_templateDirs;                      // список папок шаблонов
+    PromptSequenceManager* m_seqMgr = nullptr;       // pointer to sequence manager
 };

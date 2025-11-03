@@ -1,0 +1,466 @@
+#include "SolutionTemplateEditor.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QListWidgetItem>
+#include <QDialogButtonBox>
+#include <QGroupBox>
+#include <QPixmap>
+#include <QMessageBox>
+#include <QStandardPaths>
+#include <QPushButton>
+#include <QLineEdit>
+#include <QTextEdit>
+#include <QGridLayout>
+#include <QTabWidget>
+
+SolutionTemplateEditor::SolutionTemplateEditor(SolutionTemplateManager *templateManager, PromptSequenceManager *sequenceManager, QWidget *parent)
+    : QWidget(parent), m_templateManager(templateManager), m_sequenceManager(sequenceManager)
+{
+    qDebug() << "[SolutionTemplateEditor] Constructor called with templateManager:" << templateManager << "and sequenceManager:" << sequenceManager;
+    setupUI();
+    updateAvailableSequences();
+}
+
+void SolutionTemplateEditor::setupUI()
+{
+    auto *layout = new QVBoxLayout(this);
+
+    // Create tab widget to organize different sections
+    m_tabWidget = new QTabWidget(this);
+    
+    // Create the basic info widget
+    QWidget *basicInfoWidget = new QWidget(this);
+    auto *basicInfoLayout = new QVBoxLayout(basicInfoWidget);
+
+    // Основная информация о шаблоне
+    auto *infoGroupBox = new QGroupBox(tr("Template Information"));
+    auto *infoLayout = new QGridLayout(infoGroupBox);
+
+    QLabel *nameLabel = new QLabel(tr("Name:"), this);
+    qDebug() << "[SolutionTemplateEditor] Creating MemoryComboBox for solutionTemplateName";
+    m_nameEdit = new MemoryComboBox("solutionTemplateName", this);
+    qDebug() << "[SolutionTemplateEditor] Created MemoryComboBox for solutionTemplateName";
+    // Ensure the combo box is editable so lineEdit() returns a valid pointer
+    m_nameEdit->setEditable(true);
+    infoLayout->addWidget(nameLabel, 0, 0);
+    infoLayout->addWidget(m_nameEdit, 0, 1);
+
+    QLabel *descLabel = new QLabel(tr("Description:"), this);
+    m_descriptionEdit = new QLineEdit(this);
+    infoLayout->addWidget(descLabel, 1, 0);
+    infoLayout->addWidget(m_descriptionEdit, 1, 1);
+
+    QLabel *imageLabel = new QLabel(tr("Icon:"), this);
+    m_imagePathLabel = new QLabel(tr("No image selected"), this);
+    m_selectImageBtn = new QPushButton(tr("Select Image..."), this);
+    auto *imageLayout = new QHBoxLayout();
+    imageLayout->addWidget(m_imagePathLabel);
+    imageLayout->addWidget(m_selectImageBtn);
+    infoLayout->addWidget(imageLabel, 2, 0);
+    infoLayout->addLayout(imageLayout, 2, 1);
+
+    // Просмотр изображения
+    m_imageLabel = new QLabel(this);
+    m_imageLabel->setMinimumSize(200, 200);
+    m_imageLabel->setStyleSheet("border: 1px solid gray;");
+    m_imageLabel->setAlignment(Qt::AlignCenter);
+    infoLayout->addWidget(m_imageLabel, 3, 0, 1, 2);
+
+    basicInfoLayout->addWidget(infoGroupBox);
+
+    // Список последовательностей в шаблоне
+    auto *sequencesGroupBox = new QGroupBox(tr("Sequences in Template"));
+    auto *sequencesLayout = new QVBoxLayout(sequencesGroupBox);
+
+    auto *topLayout = new QHBoxLayout();
+    
+    // Список доступных последовательностей (вне шаблона)
+    m_availableSequencesList = new QListWidget(this);
+    m_availableSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
+    auto *availableGroup = new QGroupBox(tr("Available Sequences"));
+    auto *availableLayout = new QVBoxLayout(availableGroup);
+    availableLayout->addWidget(m_availableSequencesList);
+    topLayout->addWidget(availableGroup);
+
+    // Кнопки управления
+    auto *btnLayout = new QVBoxLayout();
+    m_addSequenceBtn = new QPushButton(tr("→ Add to Template"), this);
+    m_removeSequenceBtn = new QPushButton(tr("Remove from Template ←"), this);
+    m_setMainSequenceBtn = new QPushButton(tr("Set as Main"), this);
+    btnLayout->addWidget(m_addSequenceBtn);
+    btnLayout->addWidget(m_removeSequenceBtn);
+    btnLayout->addWidget(m_setMainSequenceBtn);
+    btnLayout->addStretch();
+    topLayout->addLayout(btnLayout);
+
+    // Список последовательностей в шаблоне
+    m_templateSequencesList = new QListWidget(this);
+    m_templateSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
+    auto *templateGroup = new QGroupBox(tr("Template Sequences"));
+    auto *templateLayout = new QVBoxLayout(templateGroup);
+    templateLayout->addWidget(m_templateSequencesList);
+    topLayout->addWidget(templateGroup);
+
+    sequencesLayout->addLayout(topLayout);
+
+    basicInfoLayout->addWidget(sequencesGroupBox);
+    basicInfoLayout->addStretch();
+
+    // Add basic info tab
+    m_tabWidget->addTab(basicInfoWidget, tr("Basic Info"));
+
+    // Create and configure the graph widget
+    qDebug() << "[SolutionTemplateEditor] Creating TemplateSequenceGraphWidget";
+    m_graphWidget = new TemplateSequenceGraphWidget(this);
+    qDebug() << "[SolutionTemplateEditor] Created graph widget:" << m_graphWidget;
+    m_graphWidget->setTemplateManager(m_templateManager);
+    qDebug() << "[SolutionTemplateEditor] Template manager set for graph widget";
+    if (m_sequenceManager) {
+        qDebug() << "[SolutionTemplateEditor] Setting sequence manager for graph widget";
+        m_graphWidget->setSequenceManager(m_sequenceManager);
+        qDebug() << "[SolutionTemplateEditor] Sequence manager set for graph widget";
+    } else {
+        qDebug() << "[SolutionTemplateEditor] Sequence manager is null, skipping setSequenceManager call";
+    }
+    qDebug() << "[SolutionTemplateEditor] Adding graph widget tab";
+    m_tabWidget->addTab(m_graphWidget, tr("Sequence Graph"));
+    qDebug() << "[SolutionTemplateEditor] Graph widget tab added";
+
+    layout->addWidget(m_tabWidget);
+
+    // Connect signals
+    connect(m_addSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onAddSequence);
+    connect(m_removeSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onRemoveSequence);
+    connect(m_setMainSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onSetMainSequence);
+    connect(m_selectImageBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onSelectImage);
+    connect(m_templateSequencesList, &QListWidget::currentItemChanged, this, &SolutionTemplateEditor::onSequenceSelectionChanged);
+    connect(m_availableSequencesList, &QListWidget::currentItemChanged, this, &SolutionTemplateEditor::onAvailableSequenceSelectionChanged);
+    connect(m_graphWidget, &TemplateSequenceGraphWidget::templateModified, this, &SolutionTemplateEditor::onTemplateModified);
+}
+
+void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
+{
+    qDebug() << "[SolutionTemplateEditor] setTemplate called with template name:" << templateValue.name();
+    m_currentTemplate = templateValue;
+
+    // Update UI elements
+    qDebug() << "[SolutionTemplateEditor] Updating UI elements";
+    qDebug() << "[SolutionTemplateEditor] Setting template name:" << m_currentTemplate.name();
+    // Block signals temporarily to prevent auto-saving during initial setup
+    m_nameEdit->blockSignals(true);
+    m_nameEdit->lineEdit()->setText(m_currentTemplate.name());
+    m_nameEdit->blockSignals(false);
+    qDebug() << "[SolutionTemplateEditor] Name set successfully";
+    m_descriptionEdit->setText(m_currentTemplate.description());
+    qDebug() << "[SolutionTemplateEditor] Description set successfully";
+
+    // Load image if exists
+    qDebug() << "[SolutionTemplateEditor] Checking image path:" << m_currentTemplate.imagePath();
+    if (!m_currentTemplate.imagePath().isEmpty()) {
+        QString imagePath = m_currentTemplate.imagePath();
+        qDebug() << "[SolutionTemplateEditor] Image path is not empty:" << imagePath;
+        if (QFileInfo::exists(imagePath)) {
+            qDebug() << "[SolutionTemplateEditor] Image file exists, loading pixmap";
+            QPixmap pixmap(imagePath);
+            if (!pixmap.isNull()) {
+                qDebug() << "[SolutionTemplateEditor] Pixmap loaded successfully, setting to label";
+                m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                qDebug() << "[SolutionTemplateEditor] Pixmap set to label";
+                m_imagePathLabel->setText(QFileInfo(imagePath).fileName());
+                m_imagePath = imagePath;
+            } else {
+                qDebug() << "[SolutionTemplateEditor] Failed to load pixmap, clearing image";
+                m_imageLabel->clear();
+                m_imagePathLabel->setText(tr("Image not found"));
+                m_imagePath.clear();
+            }
+        } else {
+            qDebug() << "[SolutionTemplateEditor] Image file does not exist";
+            m_imageLabel->clear();
+            m_imagePathLabel->setText(tr("Image not found"));
+            m_imagePath.clear();
+        }
+    } else {
+        qDebug() << "[SolutionTemplateEditor] No image path provided";
+        m_imageLabel->clear();
+        m_imagePathLabel->setText(tr("No image selected"));
+        m_imagePath.clear();
+    }
+
+    // Populate template sequences list
+    qDebug() << "[SolutionTemplateEditor] Populating template sequences list";
+    m_templateSequencesList->clear();
+    qDebug() << "[SolutionTemplateEditor] Cleared template sequences list";
+    for (const QString &seqPath : m_currentTemplate.sequences()) {
+        qDebug() << "[SolutionTemplateEditor] Processing sequence:" << seqPath;
+        QFileInfo info(seqPath);
+        QString displayName = info.fileName();
+        qDebug() << "[SolutionTemplateEditor] Creating list item for:" << displayName;
+        auto *item = new QListWidgetItem(displayName, m_templateSequencesList);
+        item->setData(Qt::UserRole, seqPath);
+        
+        // Mark main sequence
+        if (seqPath == m_currentTemplate.mainSequencePath()) {
+            qDebug() << "[SolutionTemplateEditor] Marking as main sequence";
+            item->setCheckState(Qt::Checked);
+        } else {
+            qDebug() << "[SolutionTemplateEditor] Marking as regular sequence";
+            item->setCheckState(Qt::Unchecked);
+        }
+    }
+    qDebug() << "[SolutionTemplateEditor] Finished populating template sequences list";
+    
+    qDebug() << "[SolutionTemplateEditor] Calling updateAvailableSequences";
+    updateAvailableSequences();
+    qDebug() << "[SolutionTemplateEditor] updateAvailableSequences completed";
+    
+    // Update the graph widget with the current template
+    qDebug() << "[SolutionTemplateEditor] Checking if graph widget exists";
+    if (m_graphWidget) {
+        qDebug() << "[SolutionTemplateEditor] Graph widget exists, setting template";
+        m_graphWidget->setTemplate(m_currentTemplate);
+        qDebug() << "[SolutionTemplateEditor] Graph widget template set";
+    } else {
+        qDebug() << "[SolutionTemplateEditor] Graph widget is null";
+    }
+    qDebug() << "[SolutionTemplateEditor] setTemplate method completed";
+}
+
+SolutionTemplate SolutionTemplateEditor::templateValue() const
+{
+    SolutionTemplate tmpl = m_currentTemplate;
+    tmpl.setName(m_nameEdit->lineEdit()->text());
+    tmpl.setDescription(m_descriptionEdit->text());
+    tmpl.setImagePath(m_imagePath);
+    
+    // Collect sequences from the list
+    QStringList seqPaths;
+    for (int i = 0; i < m_templateSequencesList->count(); ++i) {
+        QListWidgetItem *item = m_templateSequencesList->item(i);
+        QString path = item->data(Qt::UserRole).toString();
+        seqPaths << path;
+        
+        // Check if this is the main sequence
+        if (item->checkState() == Qt::Checked) {
+            tmpl.setMainSequencePath(path);
+        }
+    }
+    tmpl.clearSequences();
+    for (const QString &path : seqPaths) {
+        tmpl.addSequence(path);
+    }
+    
+    return tmpl;
+}
+
+void SolutionTemplateEditor::updateAvailableSequences()
+{
+    qDebug() << "[SolutionTemplateEditor] updateAvailableSequences called, templateManager:" << m_templateManager << "sequenceManager:" << m_sequenceManager;
+    if (!m_templateManager || !m_sequenceManager) {
+        qDebug() << "[SolutionTemplateEditor] Either templateManager or sequenceManager is null, returning early";
+        return;
+    }
+
+    m_availableSequencesList->clear();
+    
+    const QMap<QString, PromptSequence>& allSequences = m_sequenceManager->sequences();
+    
+    // Get sequences that are already in the current template
+    QStringList templateSequences;
+    for (const QString &seqPath : m_currentTemplate.sequences()) {
+        QFileInfo info(seqPath);
+        templateSequences << info.fileName().replace(".seq.json", "");
+    }
+    
+    // Add sequences that are not already in the template
+    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+        const QString &seqPath = it.key(); // Key is the file path
+        const PromptSequence &seq = it.value();
+        if (!templateSequences.contains(seq.name())) {
+            auto *item = new QListWidgetItem(seq.name(), m_availableSequencesList);
+            item->setData(Qt::UserRole, seqPath); // Store the full path
+        }
+    }
+}
+
+void SolutionTemplateEditor::onAddSequence()
+{
+    QListWidgetItem *item = m_availableSequencesList->currentItem();
+    if (!item) {
+        QMessageBox::information(this, tr("No Selection"), tr("Please select a sequence to add."));
+        return;
+    }
+
+    QString seqPath = item->data(Qt::UserRole).toString();
+    if (seqPath.isEmpty()) return;
+
+    // Get the template directory path
+    QString templateDir = m_templateManager->root() + "/" + m_currentTemplate.name();
+    QDir dir;
+    if (!dir.mkpath(templateDir)) {
+        QMessageBox::warning(this, tr("Create Directory"), 
+                           tr("Could not create template directory: %1").arg(templateDir));
+        return;
+    }
+
+    QString seqFileName = QFileInfo(seqPath).fileName();
+    QString targetPath = templateDir + "/" + seqFileName;
+
+    // Copy sequence file to template directory
+    if (QFile::exists(targetPath)) {
+        QMessageBox::warning(this, tr("Add Sequence"), 
+                           tr("Sequence already exists in template directory: %1").arg(targetPath));
+        return;
+    }
+
+    if (!QFile::copy(seqPath, targetPath)) {
+        QMessageBox::warning(this, tr("Add Sequence"), 
+                           tr("Failed to copy sequence to template directory: %1").arg(targetPath));
+        return;
+    }
+
+    // Add to template
+    m_currentTemplate.addSequence(targetPath);
+
+    // Update UI
+    auto *newItem = new QListWidgetItem(QFileInfo(targetPath).fileName(), m_templateSequencesList);
+    newItem->setData(Qt::UserRole, targetPath);
+    newItem->setCheckState(Qt::Unchecked);
+    
+    // Remove from available list
+    int row = m_availableSequencesList->row(item);
+    m_availableSequencesList->takeItem(row);
+    delete item;
+    
+    // Update the graph widget
+    if (m_graphWidget) {
+        m_graphWidget->setTemplate(m_currentTemplate);
+    }
+    
+    emit templateModified();
+}
+
+void SolutionTemplateEditor::onRemoveSequence()
+{
+    QListWidgetItem *item = m_templateSequencesList->currentItem();
+    if (!item) {
+        QMessageBox::information(this, tr("No Selection"), tr("Please select a sequence to remove."));
+        return;
+    }
+
+    QString seqPath = item->data(Qt::UserRole).toString();
+    if (seqPath.isEmpty()) return;
+
+    // If this is the main sequence, clear main sequence path
+    if (seqPath == m_currentTemplate.mainSequencePath()) {
+        m_currentTemplate.setMainSequencePath("");
+    }
+
+    // Remove from template
+    int idx = -1;
+    for (int i = 0; i < m_currentTemplate.sequences().size(); ++i) {
+        if (m_currentTemplate.sequences().at(i) == seqPath) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx >= 0) {
+        m_currentTemplate.removeSequence(idx);
+    }
+    
+    // Remove from UI
+    int row = m_templateSequencesList->row(item);
+    m_templateSequencesList->takeItem(row);
+    delete item;
+    
+    // Add back to available list
+    QFileInfo info(seqPath);
+    QString name = info.fileName();
+    auto *availableItem = new QListWidgetItem(name, m_availableSequencesList);
+    availableItem->setData(Qt::UserRole, seqPath);
+    m_seqPathByName.insert(name, seqPath);
+    
+    // Update the graph widget
+    if (m_graphWidget) {
+        m_graphWidget->setTemplate(m_currentTemplate);
+    }
+    
+    emit templateModified();
+}
+
+void SolutionTemplateEditor::onSetMainSequence()
+{
+    QListWidgetItem *item = m_templateSequencesList->currentItem();
+    if (!item) {
+        QMessageBox::information(this, tr("No Selection"), tr("Please select a sequence to set as main."));
+        return;
+    }
+
+    QString seqPath = item->data(Qt::UserRole).toString();
+    if (seqPath.isEmpty()) return;
+
+    // Uncheck all others
+    for (int i = 0; i < m_templateSequencesList->count(); ++i) {
+        QListWidgetItem *otherItem = m_templateSequencesList->item(i);
+        otherItem->setCheckState(Qt::Unchecked);
+    }
+
+    // Check this item and set as main
+    item->setCheckState(Qt::Checked);
+    m_currentTemplate.setMainSequencePath(seqPath);
+    
+    // Update the graph widget
+    if (m_graphWidget) {
+        m_graphWidget->setTemplate(m_currentTemplate);
+    }
+    
+    emit templateModified();
+}
+
+void SolutionTemplateEditor::onSelectImage()
+{
+    QString imagePath = QFileDialog::getOpenFileName(this, tr("Select Image"),
+                                                   QDir::homePath(),
+                                                   tr("Image Files (*.png *.jpg *.jpeg *.bmp *.svg *.gif)"));
+    if (imagePath.isEmpty()) return;
+
+    QPixmap pixmap(imagePath);
+    if (pixmap.isNull()) {
+        QMessageBox::warning(this, tr("Select Image"), tr("Could not load image"));
+        return;
+    }
+
+    m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    m_imagePathLabel->setText(QFileInfo(imagePath).fileName());
+    m_imagePath = imagePath;
+    
+    emit templateModified();
+}
+
+void SolutionTemplateEditor::onSequenceSelectionChanged()
+{
+    // Update the main sequence button state based on selection
+    QListWidgetItem *item = m_templateSequencesList->currentItem();
+    m_setMainSequenceBtn->setEnabled(item != nullptr);
+}
+
+void SolutionTemplateEditor::onAvailableSequenceSelectionChanged()
+{
+    // Update the add sequence button state based on selection
+    QListWidgetItem *item = m_availableSequencesList->currentItem();
+    m_addSequenceBtn->setEnabled(item != nullptr);
+}
+
+void SolutionTemplateEditor::onTemplateModified()
+{
+    // Update the template in the editor when the graph widget modifies it
+    // This method will update the internal template and ensure sync between components
+    if (m_graphWidget) {
+        // The graph widget manages its own template state, but we need to update our internal state
+        // Since the graph widget should be reflecting the same template, we can sync back if needed
+        
+        // For now, just emit that the template was modified
+        emit templateModified();
+    }
+}

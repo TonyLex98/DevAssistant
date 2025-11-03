@@ -457,9 +457,8 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
 
 void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &templateDirPath)
 {
-    // This would parse the sequences in the template to find OPEN_SEQUENCE references
-    // For now, we'll implement a simple version that looks for connections
-    // by examining the templates of each step in each sequence within the template
+    // This method finds connections only between sequences that are within the same template
+    // It ensures that no external sequence references are shown in the template graph
     
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
@@ -494,6 +493,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     }
     
     // Now find connections between sequences in the template
+    // ONLY between sequences that are part of this template
     for (auto it = tmplSequences.constBegin(); it != tmplSequences.constEnd(); ++it) {
         const PromptSequence &seq = it.value();
         const QVector<PromptStep>& steps = seq.steps();
@@ -510,9 +510,13 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
                 QRegularExpressionMatch match = iter.next();
                 QString targetSequence = match.captured(1).trimmed();
                 
-                // Check if the target sequence exists within the template sequences
+                // CRITICAL: Check if the target sequence exists within the template sequences ONLY
                 if (tmplSequences.contains(targetSequence)) {
                     addEdge(seq.name(), targetSequence);
+                    qDebug() << "[SequenceRelationView] Found internal connection in template:" << seq.name() << "->" << targetSequence;
+                } else {
+                    // This is an external reference that should not be shown in the template graph
+                    qDebug() << "[SequenceRelationView] External reference found but ignored in template graph:" << seq.name() << "->" << targetSequence;
                 }
             }
         }

@@ -40,6 +40,7 @@ SOURCES += \
     src/codeviwer/ProjectRelationView.cpp \
     src/codeviwer/SequenceGraphWidget.cpp \
     src/codeviwer/SequenceRelationView.cpp \
+    src/codeviwer/TemplateSequenceGraphWidget.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandFactory.cpp \
@@ -78,6 +79,7 @@ SOURCES += \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
     src/ui/RunSequenceDialog.cpp \
+    src/ui/SolutionTemplateEditor.cpp \
     src/ui/customWidgets/MemoryComboBox.cpp \
     src/ui/customWidgets/MemoryLineEdit.cpp \
     src/ui/customWidgets/MemorySplitter.cpp \
@@ -117,6 +119,7 @@ HEADERS += \
     src/codeviwer/ProjectRelationView.h \
     src/codeviwer/SequenceGraphWidget.h \
     src/codeviwer/SequenceRelationView.h \
+    src/codeviwer/TemplateSequenceGraphWidget.h \
     src/codeviwer/SymbolModel.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \
@@ -158,6 +161,7 @@ HEADERS += \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \
+    src/ui/SolutionTemplateEditor.h \
     src/ui/RunTemplateOrSequenceDialog.h \
     src/ui/SolutionTemplateViewer.h \
     src/ui/customWidgets/MemoryComboBox.h \
