@@ -18,19 +18,22 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_chat->setReadOnly(true);
     m_cb_model = new MemoryComboBox("modelSelector", this);
     v->addWidget(m_chat,1);
-    auto topLayout = new QHBoxLayout();
+    auto mainLayout = new QHBoxLayout();
     m_input = new InputTextEdit(this);
     m_send = new StyledButton("Отправить", this);
     m_stop = new StyledButton("Остановить", this);
-    topLayout->addWidget(m_cb_model);
-    topLayout->addWidget(m_input, 1);
     
-    // Create a vertical layout for buttons and combobox
-    auto buttonsAndComboLayout = new QVBoxLayout();
+    // Add only the input field to the main horizontal layout
+    mainLayout->addWidget(m_input, 1);
+    
+    // Create a vertical layout for ALL controls to the right of input
+    auto rightColumnLayout = new QVBoxLayout();
+    
+    // Create a horizontal layout for the send/stop buttons
     auto buttonsLayout = new QHBoxLayout();
     buttonsLayout->addWidget(m_send);
     buttonsLayout->addWidget(m_stop);
-    buttonsAndComboLayout->addLayout(buttonsLayout);
+    rightColumnLayout->addLayout(buttonsLayout);
     
     // Add the template selection combobox below the buttons
     m_templateCombo = new MemoryComboBox("defaultTemplateSelector", this);
@@ -42,11 +45,14 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     // Populate the combobox with all available templates
     populateTemplates();
     
-    buttonsAndComboLayout->addWidget(m_templateCombo);
+    rightColumnLayout->addWidget(m_templateCombo);
     
-    // Add the buttons+combobox layout to the top layout
-    topLayout->addLayout(buttonsAndComboLayout);
-    v->addLayout(topLayout);
+    // Finally add the model selection combobox at the very bottom
+    rightColumnLayout->addWidget(m_cb_model);
+    
+    // Add the right column with all controls
+    mainLayout->addLayout(rightColumnLayout);
+    v->addLayout(mainLayout);
     
     connect(m_send, &StyledButton::clicked, this, &ChatDialog::onSend);
     connect(m_stop, &StyledButton::clicked, this, &ChatDialog::onStop);
@@ -198,12 +204,31 @@ void ChatDialog::appendUserMessage(const QString &s)
 void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManager)
 {
     m_templateManager = templateManager;
+    
+    // Save the current selection before clearing
+    QString currentSelection = m_templateCombo->currentData().toString();
+    QString currentText = m_templateCombo->currentText();
+    
     // Repopulate the templates with the new manager
     m_templateCombo->clear();
     m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
     m_templateCombo->addItem("Простой чат", "simple_chat");
     m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
     populateTemplates();
+    
+    // Restore the previous selection if it still exists, otherwise keep default
+    if (!currentSelection.isEmpty()) {
+        int index = m_templateCombo->findData(currentSelection);
+        if (index != -1) {
+            m_templateCombo->setCurrentIndex(index);
+        } else {
+            // Check by text if data doesn't match but text does
+            index = m_templateCombo->findText(currentText);
+            if (index != -1) {
+                m_templateCombo->setCurrentIndex(index);
+            }
+        }
+    }
 }
 
 void ChatDialog::sendMessageToChat(const QString &text)
