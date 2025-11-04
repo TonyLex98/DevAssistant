@@ -21,9 +21,35 @@ ContextManager::~ContextManager()
     // Cleanup is handled by parent-child relationship
 }
 
+QString ContextManager::findExistingCommandId(const QString& commandName, const QJsonObject& params) const
+{
+    for (auto it = m_commandHistory.constBegin(); it != m_commandHistory.constEnd(); ++it) {
+        const CommandContextInfo& info = it.value();
+        if (info.name == commandName && info.params == params && info.isStillValid) {
+            return info.id;
+        }
+    }
+    return QString(); // Not found
+}
+
 void ContextManager::addCommand(Command* cmd, const QString& result)
 {
     if (!cmd) return;
+    
+    // Check if command with same params already exists and is valid
+    QString existingId = findExistingCommandId(cmd->name(), cmd->params());
+    if (!existingId.isEmpty()) {
+        // If command exists and is still valid, just update its timestamp and result
+        CommandContextInfo& existingInfo = m_commandHistory[existingId];
+        existingInfo.timestamp = QDateTime::currentDateTime();
+        existingInfo.result = result;
+        existingInfo.isStillValid = true; // Reset validity in case it was invalidated
+        existingInfo.invalidationReason.clear(); // Clear invalidation reason
+        
+        emit commandAdded(existingId);
+        emit contextChanged();
+        return;
+    }
     
     QString uniqueId = generateUniqueId(cmd->name());
     CommandContextInfo info;

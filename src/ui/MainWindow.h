@@ -239,5 +239,6 @@ private:
 
 private:
     void updateContextStatusDisplay(); // Update the visual display of context commands
+    void addCommandToContext(Command* cmd, const QString& result = QString()); // Wrapper to handle command addition logic
 
 };

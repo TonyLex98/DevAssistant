@@ -1292,7 +1292,7 @@ void MainWindow::handleAssistantFinished()
         
         // Add command to context manager with result
         if (m_contextManager) {
-            m_contextManager->addCommand(cmd, result);
+            addCommandToContext(cmd, result);
         }
     };
 
@@ -1378,7 +1378,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
         // Add command to context manager
         if (m_contextManager) {
             QString result = QString("OPEN_FILE: %1 (full content)").arg(rawPath);
-            m_contextManager->addCommand(cmd, result);
+            addCommandToContext(cmd, result);
         }
         return;
     }
@@ -1421,7 +1421,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
         // Add command to context manager
         if (m_contextManager) {
             QString result = QString("OPEN_FILE_REGION: %1 [lines %2-%3]").arg(rawPath).arg(startLine).arg(startLine + snippet.size() - 1);
-            m_contextManager->addCommand(cmd, result);
+            addCommandToContext(cmd, result);
         }
     }
 }
@@ -1651,7 +1651,7 @@ void MainWindow::handleSearchResults(Command* cmd)
         
         // Add to context manager
         if (m_contextManager) {
-            m_contextManager->addCommand(cmd, QString("%1\n%2").arg(title, body));
+            addCommandToContext(cmd, QString("%1\n%2").arg(title, body));
         }
         return;
     }
@@ -1664,7 +1664,7 @@ void MainWindow::handleSearchResults(Command* cmd)
         
         // Add to context manager
         if (m_contextManager) {
-            m_contextManager->addCommand(cmd, QString("%1\n%2").arg(title, body));
+            addCommandToContext(cmd, QString("%1\n%2").arg(title, body));
         }
     }
 }
@@ -2101,6 +2101,16 @@ void MainWindow::createNewSequence()
     m_seqMgr.refresh();
     ensureDefaultSequence();
     QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
+}
+
+void MainWindow::addCommandToContext(Command* cmd, const QString& result)
+{
+    if (!m_contextManager || !cmd) {
+        return;
+    }
+    
+    // The ContextManager will handle duplicate detection internally
+    m_contextManager->addCommand(cmd, result);
 }
 
 void MainWindow::updateContextStatusDisplay()

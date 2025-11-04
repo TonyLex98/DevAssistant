@@ -40,6 +40,9 @@ public:
     // Add a command to context tracking
     void addCommand(Command* cmd, const QString& result = QString());
     
+    // Check if command with same params already exists (and is valid)
+    QString findExistingCommandId(const QString& commandName, const QJsonObject& params) const;
+    
     // Mark a command as invalidated due to file changes or other reasons
     void invalidateCommand(const QString& commandId, const QString& reason);
     
