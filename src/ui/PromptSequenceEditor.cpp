@@ -103,6 +103,9 @@ void PromptSequenceEditor::onAddStep()
 {
     PromptStepDialog dlg(this);
     dlg.setSequenceManager(m_seqMgr);  // Pass the sequence manager
+    if (!m_currentSequencePath.isEmpty()) {
+        dlg.setCurrentSequencePath(m_currentSequencePath);  // Pass the current sequence path for filtering
+    }
     if (dlg.exec() == QDialog::Accepted) {
         m_seq.addStep(dlg.step());
         refreshList();
@@ -119,6 +122,9 @@ void PromptSequenceEditor::onEditStep()
     PromptStepDialog dlg(this);
     dlg.setStep(m_seq.steps()[idx]);
     dlg.setSequenceManager(m_seqMgr);  // Pass the sequence manager
+    if (!m_currentSequencePath.isEmpty()) {
+        dlg.setCurrentSequencePath(m_currentSequencePath);  // Pass the current sequence path for filtering
+    }
 
     if (dlg.exec() == QDialog::Accepted) {
         // Заменяем шаг, но без пересоздания объекта PromptSequence
@@ -179,6 +185,11 @@ void PromptSequenceEditor::onDescriptionChanged()
 void PromptSequenceEditor::setSequenceManager(PromptSequenceManager *seqMgr)
 {
     m_seqMgr = seqMgr;
+}
+
+void PromptSequenceEditor::setCurrentSequencePath(const QString& sequencePath)
+{
+    m_currentSequencePath = sequencePath;
 }
 
 

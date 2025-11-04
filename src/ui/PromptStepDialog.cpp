@@ -107,6 +107,16 @@ void PromptStepDialog::setSequenceManager(PromptSequenceManager* seqMgr)
     m_seqMgr = seqMgr;
 }
 
+void PromptStepDialog::setCurrentSequencePath(const QString& sequencePath)
+{
+    if (!sequencePath.isEmpty()) {
+        QFileInfo fileInfo(sequencePath);
+        m_templateDir = fileInfo.absolutePath(); // Use the directory of the current sequence
+    } else {
+        m_templateDir.clear();
+    }
+}
+
 void PromptStepDialog::onOk()
 {
     m_step.setTemplate(m_templateEdit->toPlainText());
@@ -141,18 +151,53 @@ void PromptStepDialog::onAddSequenceLink()
 
     // Create a list with checkboxes for each sequence
     QListWidget *seqList = new QListWidget(&dlg);
-    const QMap<QString, PromptSequence> &allSequences = m_seqMgr->sequences();
     
-    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
-        const PromptSequence &seq = it.value();
-        QString display = seq.name();
-        if (!seq.description().isEmpty())
-            display += " – " + seq.description();
+    // If we have a template directory (current sequence directory), get all .seq.json files from there
+    if (!m_templateDir.isEmpty() && QDir(m_templateDir).exists()) {
+        QDir dir(m_templateDir);
+        QStringList filters = {"*.seq.json"};
+        QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
+        
+        for (const QFileInfo& fileInfo : fileInfoList) {
+            QString seqPath = fileInfo.absoluteFilePath();
             
-        QListWidgetItem *item = new QListWidgetItem(display, seqList);
-        item->setData(Qt::UserRole, seq.name());  // Store the sequence name
-        item->setCheckState(Qt::Unchecked);       // Initially unchecked
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+            // Load the sequence from file to get its name and description
+            QFile seqFile(seqPath);
+            if (!seqFile.open(QIODevice::ReadOnly)) {
+                continue;
+            }
+            
+            QByteArray data = seqFile.readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (!doc.isObject()) {
+                continue;  // Skip invalid JSON files
+            }
+            
+            PromptSequence seq = PromptSequence::fromJson(doc.object());
+            QString display = seq.name();
+            if (!seq.description().isEmpty())
+                display += " – " + seq.description();
+                
+            QListWidgetItem *item = new QListWidgetItem(display, seqList);
+            item->setData(Qt::UserRole, seq.name());  // Store the sequence name
+            item->setCheckState(Qt::Unchecked);       // Initially unchecked
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        }
+    } else {
+        // Fallback: show all sequences if we don't have a template directory
+        const QMap<QString, PromptSequence> &allSequences = m_seqMgr->sequences();
+        
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            const PromptSequence &seq = it.value();
+            QString display = seq.name();
+            if (!seq.description().isEmpty())
+                display += " – " + seq.description();
+                
+            QListWidgetItem *item = new QListWidgetItem(display, seqList);
+            item->setData(Qt::UserRole, seq.name());  // Store the sequence name
+            item->setCheckState(Qt::Unchecked);       // Initially unchecked
+            item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+        }
     }
 
     dlgLayout->addWidget(seqList);

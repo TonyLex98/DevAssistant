@@ -146,6 +146,11 @@ void TemplateSequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqM
     } else {
         qDebug() << "[TemplateSequenceGraphWidget] Warning: m_graphView is null, cannot set sequence manager";
     }
+    
+    // Update available sequences list when sequence manager is set
+    if (m_sequenceManager) {
+        updateAvailableSequences();
+    }
 }
 
 void TemplateSequenceGraphWidget::setTemplate(const SolutionTemplate &templateValue)

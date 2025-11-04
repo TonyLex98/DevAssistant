@@ -692,6 +692,9 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
     PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
     editor->setSequenceManager(&m_seqMgr);
     editor->setSequence(seq);
+    // Set the path of the current sequence so the editor knows which directory to look in for related sequences
+    editor->setCurrentSequencePath(filePath);
+    
     lay->addWidget(editor);
 
     QDialogButtonBox *bb = new QDialogButtonBox(
@@ -1032,6 +1035,9 @@ void MainWindow::editSequences()
     PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
     editor->setSequenceManager(&m_seqMgr);
     editor->setSequence(seq);
+    // Set the path of the current sequence so the editor knows which directory to look in for related sequences
+    editor->setCurrentSequencePath(filePath);
+    
     lay->addWidget(editor);
 
     QDialogButtonBox *bb = new QDialogButtonBox(

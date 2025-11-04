@@ -20,6 +20,7 @@ public:
     explicit PromptStepDialog(QWidget *parent = nullptr);
     void setStep(const PromptStep& step);
     void setSequenceManager(PromptSequenceManager* seqMgr);  // Add sequence manager
+    void setCurrentSequencePath(const QString& sequencePath); // Add path of current sequence for filtering
     PromptStep step() const { return m_step; }
 
 
@@ -34,6 +35,7 @@ private:
     QListWidget *m_cmdList      = nullptr;
     PromptStep   m_step;
     PromptSequenceManager *m_seqMgr = nullptr;  // Reference to sequence manager
+    QString m_templateDir; // Directory of the current template for filtering
 
     /* --- UI для резолверов --- */
     QComboBox   *m_resolverCombo = nullptr;

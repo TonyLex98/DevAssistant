@@ -15,6 +15,7 @@ class PromptSequenceEditor : public QWidget
 public:
     explicit PromptSequenceEditor(QWidget *parent = nullptr);
     void setSequenceManager(class PromptSequenceManager *seqMgr);  // Set sequence manager for reference selection
+    void setCurrentSequencePath(const QString& sequencePath);  // Set path of current sequence for filtering sequences
 
     /* Инициализируем редактор конкретной последовательностью */
     void setSequence(const PromptSequence &seq);
@@ -52,4 +53,5 @@ private:
     StyleTextEdit      *m_descEdit  = nullptr;
     
     PromptSequenceManager *m_seqMgr = nullptr; // To access all available sequences
+    QString m_currentSequencePath; // Path to the currently edited sequence for filtering
 };
