@@ -31,6 +31,9 @@ public:
 
     /* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
     void addSequenceToCache(const QString& filePath, const PromptSequence& sequence);
+    
+    /* Найти последовательность по имени (возвращается путь к файлу и сама последовательность) */
+    QPair<QString, PromptSequence> findSequenceByName(const QString& name) const;
 
 private:
     QString m_root;                     // директория PromptSequences

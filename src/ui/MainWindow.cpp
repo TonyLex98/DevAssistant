@@ -524,22 +524,15 @@ void MainWindow::updateSequenceGraphHighlight()
 
 void MainWindow::openSequenceEditorForName(const QString &sequenceName)
 {
-    // Find the sequence by name
-    const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
-    QString filePath;
-    PromptSequence seq;
-    bool found = false;
+    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
+    refreshAllSequences();
     
-    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
-        if (it.value().name() == sequenceName) {
-            seq = it.value();
-            filePath = it.key();
-            found = true;
-            break;
-        }
-    }
+    // Find the sequence by name using the new method
+    QPair<QString, PromptSequence> result = m_seqMgr.findSequenceByName(sequenceName);
+    QString filePath = result.first;
+    PromptSequence seq = result.second;
     
-    if (!found) {
+    if (filePath.isEmpty()) {
         QMessageBox::warning(this, "Error", "Sequence not found: " + sequenceName);
         return;
     }
@@ -842,6 +835,9 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
 
 void MainWindow::editSequences()
 {
+    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
+    refreshAllSequences();
+    
     // 1. Проверяем, что есть наборы
     if (m_seqMgr.sequences().isEmpty()) {
         QMessageBox::information(this, tr("Нет наборов"),

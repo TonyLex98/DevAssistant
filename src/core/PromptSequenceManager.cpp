@@ -95,3 +95,14 @@ void PromptSequenceManager::addSequenceToCache(const QString& filePath, const Pr
     if (!m_fileList.contains(filePath))
         m_fileList << filePath;
 }
+
+/* Найти последовательность по имени (возвращается путь к файлу и сама последовательность) */
+QPair<QString, PromptSequence> PromptSequenceManager::findSequenceByName(const QString& name) const
+{
+    for (auto it = m_sequences.constBegin(); it != m_sequences.constEnd(); ++it) {
+        if (it.value().name() == name) {
+            return qMakePair(it.key(), it.value()); // path, sequence
+        }
+    }
+    return qMakePair(QString(), PromptSequence()); // Empty pair if not found
+}
