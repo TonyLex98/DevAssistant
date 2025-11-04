@@ -98,6 +98,7 @@ SOURCES += \
     src/ui/customWidgets/StyledTextEdit.cpp \
     src/ui/customWidgets/StyledTreeWidget.cpp \
     src/ui/customWidgets/StyledPlainTextEdit.cpp \
+    src/ui/customWidgets/CustomTextTabBar.cpp \
     src/uiide/DartHighlighter.cpp \
     src/uiide/IDEWidget.cpp \
     src/uiide/PathColorDelegate.cpp \
@@ -195,6 +196,7 @@ HEADERS += \
     src/ui/customWidgets/StyledTextEdit.h \
     src/ui/customWidgets/StyledTreeWidget.h \
     src/ui/customWidgets/StyledPlainTextEdit.h \
+    src/ui/customWidgets/CustomTextTabBar.h \
     src/uiide/DartHighlighter.h \
     src/uiide/IDEWidget.h \
     src/uiide/PathColorDelegate.h \
