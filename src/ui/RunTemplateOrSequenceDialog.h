@@ -37,6 +37,13 @@ public:
     QString selectedSequencePath() const { return m_selectedSequencePath; }
     QString selectedTemplatePath() const { return m_selectedTemplatePath; }
     QString selectedDefaultSequencePath() const { return m_selectedDefaultSequencePath; }
+    
+    // Method to set the dialog to template mode only
+    void setTemplateModeOnly() { 
+        if (m_tabWidget) {
+            m_tabWidget->setCurrentIndex(1); // Templates tab
+        }
+    }
 
 private slots:
     void onOk();

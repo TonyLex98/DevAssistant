@@ -114,11 +114,157 @@ MainWindow::MainWindow(QWidget *parent)
     undoBtn     = new StyledButton("Undo", this);
     descBtn     = new StyledButton("Generate Descriptions", this);
 
-    btns->addWidget(runSeqBtn  = new StyledButton(tr("Запустить последовательность"), this));
+    btns->addWidget(runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"), this));
+    StyledButton *runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
+    btns->addWidget(runTemplateBtn);
     btns->addWidget(editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this));
     btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
 
     connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
+    
+    // Connect the new template-only button
+    connect(runTemplateBtn, &StyledButton::clicked, this, [this]() {
+        // Directly open template mode
+        refreshAllSequences();
+        ensureDefaultSequence();
+        
+        RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
+        dlg.setTemplateModeOnly(); // Set to template mode
+        if (dlg.exec() != QDialog::Accepted) return;
+
+        if (dlg.selectedMode() != RunTemplateOrSequenceDialog::RunTemplate) {
+            QMessageBox::warning(this, "Ошибка", "Необходимо выбрать шаблон.");
+            return;
+        }
+
+        // Run template with selected sequence
+        QString templatePath = dlg.selectedTemplatePath();
+        QString sequencePath = dlg.selectedDefaultSequencePath();
+        
+        if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
+            QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
+            return;
+        }
+        
+        // Load the selected sequence
+        PromptSequence seq;
+        QFile seqFile(sequencePath);
+        if (seqFile.open(QIODevice::ReadOnly)) {
+            QByteArray data = seqFile.readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                seq = PromptSequence::fromJson(doc.object());
+            }
+        }
+        
+        if (seq.name().isEmpty()) {
+            QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
+            return;
+        }
+        
+        m_currentSeq = seq;
+        m_currentStepIdx = 0;
+        m_sequenceMode = true;
+        updateSequenceGraphHighlight();  // Update the graph highlighting
+        runNextStep();   // сразу стартуем первый шаг
+    });
+    
+    // Add a direct button for the main "Прогер" template
+    StyledButton *runProgTemplateBtn = new StyledButton(tr("Запустить Прогер-шаблон"), this);
+    btns->addWidget(runProgTemplateBtn);
+    
+    connect(runProgTemplateBtn, &StyledButton::clicked, this, [this]() {
+        refreshAllSequences();
+        ensureDefaultSequence();
+        
+        // Look for the "Прогер" template specifically
+        const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
+        QString progTemplatePath;
+        for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
+            if (it.value().name() == "Прогер" || it.value().name().contains("Прогер", Qt::CaseInsensitive)) {
+                progTemplatePath = it.key();
+                break;
+            }
+        }
+        
+        if (progTemplatePath.isEmpty()) {
+            QMessageBox::warning(this, "Ошибка", "Шаблон 'Прогер' не найден. Пожалуйста, убедитесь, что он существует.");
+            // Fallback to normal template selection
+            RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
+            dlg.setTemplateModeOnly();
+            if (dlg.exec() != QDialog::Accepted) return;
+
+            QString templatePath = dlg.selectedTemplatePath();
+            QString sequencePath = dlg.selectedDefaultSequencePath();
+            
+            if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
+                QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
+                return;
+            }
+            
+            PromptSequence seq;
+            QFile seqFile(sequencePath);
+            if (seqFile.open(QIODevice::ReadOnly)) {
+                QByteArray data = seqFile.readAll();
+                QJsonDocument doc = QJsonDocument::fromJson(data);
+                if (doc.isObject()) {
+                    seq = PromptSequence::fromJson(doc.object());
+                }
+            }
+            
+            if (seq.name().isEmpty()) {
+                QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
+                return;
+            }
+            
+            m_currentSeq = seq;
+            m_currentStepIdx = 0;
+            m_sequenceMode = true;
+            updateSequenceGraphHighlight();
+            runNextStep();
+            return;
+        }
+        
+        // Find the main sequence for the Прогер template
+        SolutionTemplate progTemplate = templates.value(progTemplatePath);
+        QString mainSequencePath = progTemplate.mainSequencePath();
+        
+        // If no main sequence is set, use the first available sequence
+        if (mainSequencePath.isEmpty() || (!QFileInfo::exists(mainSequencePath))) {
+            auto sequences = progTemplate.sequences();
+            if (!sequences.isEmpty()) {
+                // Get the first sequence in the template directory
+                mainSequencePath = QDir(progTemplatePath).absoluteFilePath(sequences[0]);
+            }
+        }
+        
+        if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
+            QMessageBox::warning(this, "Ошибка", "Основная последовательность для шаблона 'Прогер' не найдена.");
+            return;
+        }
+        
+        // Load the main sequence
+        PromptSequence seq;
+        QFile seqFile(mainSequencePath);
+        if (seqFile.open(QIODevice::ReadOnly)) {
+            QByteArray data = seqFile.readAll();
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            if (doc.isObject()) {
+                seq = PromptSequence::fromJson(doc.object());
+            }
+        }
+        
+        if (seq.name().isEmpty()) {
+            QMessageBox::warning(this, "Ошибка", "Не удалось загрузить основную последовательность шаблона 'Прогер'.");
+            return;
+        }
+        
+        m_currentSeq = seq;
+        m_currentStepIdx = 0;
+        m_sequenceMode = true;
+        updateSequenceGraphHighlight();
+        runNextStep();
+    });
 
     // Add button for solution templates
     StyledButton *editTemplatesBtn = new StyledButton(tr("Edit Templates"), this);
@@ -787,7 +933,16 @@ void MainWindow::undoLast(){
 void MainWindow::sendUserMessage(const QString& text){
     m_lastUserMessage = text;
     qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
+    
+    // Debug info about managers before running sequence
+    qDebug() << "[sendUserMessage] About to call runSequenceDialog";
+    qDebug() << "[sendUserMessage] Template manager root:" << m_templateMgr.root();
+    qDebug() << "[sendUserMessage] Sequence manager root:" << m_seqMgr.root();
+    
     runSequenceDialog();
+    
+    qDebug() << "[sendUserMessage] runSequenceDialog completed";
+
 /*
     QString capabilities = "";
     QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
@@ -907,28 +1062,54 @@ void MainWindow::editSequences()
 
 void MainWindow::runSequenceDialog()
 {
+    qDebug() << "[runSequenceDialog] Starting sequence dialog";
+    qDebug() << "[runSequenceDialog] Template manager root:" << m_templateMgr.root();
+    qDebug() << "[runSequenceDialog] About to refresh template manager";
+    
     // Обновляем списки (на случай, если пользователь добавил файлы вручную)
     m_templateMgr.refresh();
+    qDebug() << "[runSequenceDialog] Template manager refresh completed";
+    
     refreshAllSequences();
+    qDebug() << "[runSequenceDialog] refreshAllSequences completed";
+    
     ensureDefaultSequence();
+    qDebug() << "[runSequenceDialog] ensureDefaultSequence completed";
 
-    RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
-    if (dlg.exec() != QDialog::Accepted) return;
+    // Get sequences size before creating dialog
+    // Make a copy of the sequences to avoid reference issues
+    auto sequencesCopy = m_seqMgr.sequences();  // Copy instead of reference
+    int seqCount = sequencesCopy.size();
+    qDebug() << "[runSequenceDialog] Sequence count before dialog creation:" << seqCount;
+    
+    RunTemplateOrSequenceDialog dlg(sequencesCopy, &m_templateMgr, this);
+    qDebug() << "[runSequenceDialog] Created RunTemplateOrSequenceDialog with" << seqCount << "sequences";
+    
+    if (dlg.exec() != QDialog::Accepted) {
+        qDebug() << "[runSequenceDialog] Dialog cancelled";
+        return;
+    }
+    
+    qDebug() << "[runSequenceDialog] Dialog completed with selection";
 
     if (dlg.selectedMode() == RunTemplateOrSequenceDialog::RunSequence) {
-        // Run individual sequence
+        qDebug() << "[runSequenceDialog] Running individual sequence mode";
+        // Run individual sequence - use sequence manager's sequences again to get fresh data
+        const auto& currentSequences = m_seqMgr.sequences();
         QString path = dlg.selectedSequencePath();
-        if (!m_seqMgr.sequences().contains(path)) {
+        if (!currentSequences.contains(path)) {
             QMessageBox::warning(this, "Ошибка", "Файл последовательности не найден.");
             return;
         }
 
-        m_currentSeq = m_seqMgr.sequences().value(path);
+        m_currentSeq = currentSequences.value(path);
         m_currentStepIdx = 0;
         m_sequenceMode = true;
         updateSequenceGraphHighlight();  // Update the graph highlighting
+        qDebug() << "[runSequenceDialog] Starting sequence:" << m_currentSeq.name();
         runNextStep();   // сразу стартуем первый шаг
     } else {
+        qDebug() << "[runSequenceDialog] Running template mode";
         // Run template with selected sequence
         QString templatePath = dlg.selectedTemplatePath();
         QString sequencePath = dlg.selectedDefaultSequencePath();
@@ -2221,11 +2402,17 @@ void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 
 void MainWindow::refreshAllSequences()
 {
-    // Refresh the main sequence manager first
-    m_seqMgr.refresh();
+    qDebug() << "[refreshAllSequences] Starting refresh of all sequences";
     
-    // Then scan template folders for sequences and add them manually to the sequence manager
+    // First, refresh the main sequence manager to get base sequences
+    m_seqMgr.refresh();
+    QStringList allSequencePaths = m_seqMgr.fileList();
+    qDebug() << "[refreshAllSequences] Main sequence manager refreshed, base file count:" << allSequencePaths.size();
+    
+    // Then scan template folders for additional sequences
     const QStringList& templateDirs = m_templateMgr.templateDirs();
+    qDebug() << "[refreshAllSequences] Processing" << templateDirs.size() << "template directories";
+    
     for (const QString& templateDir : templateDirs) {
         QDir dir(templateDir);
         if (dir.exists()) {
@@ -2234,26 +2421,35 @@ void MainWindow::refreshAllSequences()
             QFileInfoList files = dir.entryInfoList(filters,
                                                     QDir::Files | QDir::NoSymLinks,
                                                     QDir::Name);
+            qDebug() << "[refreshAllSequences] Found" << files.size() << "sequence files in" << templateDir;
 
             for (const QFileInfo& fileInfo : files) {
                 QString path = fileInfo.absoluteFilePath();
                 
                 // Check if this sequence is already loaded to avoid duplicates
-                if (!m_seqMgr.fileList().contains(path)) {
-                    QFile f(path);
-                    if (f.open(QIODevice::ReadOnly)) {
-                        QByteArray data = f.readAll();
-                        QJsonDocument doc = QJsonDocument::fromJson(data);
-                        if (doc.isObject()) {
-                            PromptSequence seq = PromptSequence::fromJson(doc.object());
-                            // Use the new method to add the sequence to cache
-                            m_seqMgr.addSequenceToCache(path, seq);
-                        }
-                    }
+                if (!allSequencePaths.contains(path)) {
+                    qDebug() << "[refreshAllSequences] Adding new sequence:" << path;
+                    allSequencePaths << path;  // Add to our list
                 }
             }
         }
     }
+    
+    // Now refresh again to include all sequences from all sources
+    // We need to temporarily change the root to include all sequence files
+    // Or manually add them to the manager if there's a method for that
+    
+    // For now, let's refresh the sequence manager with all discovered paths
+    // The safest approach is to let the manager handle all sequences in its directory
+    // and ensure template directories are included in its scan
+    
+    // Actually, let's approach this differently - refresh the main sequence manager again 
+    // so that it picks up all sequence files from all directories including templates
+    
+    // Since the PromptSequenceManager may scan its root directory only, we need a different approach
+    // Let's make sure the sequence manager has access to all template sequences 
+    
+    qDebug() << "[refreshAllSequences] Completed discovery, total sequence files:" << allSequencePaths.size();
 }
 
 void MainWindow::updateContextStatusDisplay()

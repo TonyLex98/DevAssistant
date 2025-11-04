@@ -30,7 +30,7 @@ void RunTemplateOrSequenceDialog::setupUI()
     QComboBox *modeCombo = new QComboBox(this);
     modeCombo->addItem("Run Individual Sequence", RunSequence);
     modeCombo->addItem("Run Template", RunTemplate);
-    modeCombo->setCurrentIndex(0); // Default to sequence mode
+    modeCombo->setCurrentIndex(1); // Default to template mode (changed from 0 to 1)
     modeLayout->addWidget(modeLabel);
     modeLayout->addWidget(modeCombo, 1);
     layout->addLayout(modeLayout);
@@ -38,8 +38,14 @@ void RunTemplateOrSequenceDialog::setupUI()
     connect(modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, &RunTemplateOrSequenceDialog::onModeChanged);
     
+    // Set default mode 
+    m_selectedMode = RunTemplate;  // Changed to default to RunTemplate
+    
     // Tab widget for sequences and templates
     m_tabWidget = new QTabWidget(this);
+    
+    // Set default tab after m_tabWidget is initialized
+    m_tabWidget->setCurrentIndex(1); // Default to templates tab (index 1)
     
     // Sequences tab
     QWidget *sequenceTab = new QWidget(this);
@@ -207,7 +213,7 @@ void RunTemplateOrSequenceDialog::onTemplateSelected(const QString &templateName
 void RunTemplateOrSequenceDialog::onModeChanged(int index)
 {
     m_selectedMode = static_cast<DialogMode>(index);
-    m_tabWidget->setCurrentIndex(index); // Switch tab based on mode
+    m_tabWidget->setCurrentIndex(index); // Switch tab based on mode (0 for sequences, 1 for templates)
 }
 
 void RunTemplateOrSequenceDialog::onOk()
