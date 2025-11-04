@@ -73,7 +73,8 @@ public:
     const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
 
     QString searchResultsText() const;
-    QString getContextChainText() const; // Public access to context chain
+    QString getContextChainText() const; // Public access to context chain (only active commands)
+    QString getAllCommandsText() const;  // Public access to all commands (for full chain view)
 
 public slots:
     void runSequenceDialog();
@@ -143,7 +144,7 @@ private:
     // New context management system
     ContextManager* m_contextManager;
     QWidget* m_contextStatusWidget; // Widget to display context command status
-    QListWidget* m_contextCommandsList; // List to show which commands are in context
+    QTreeWidget* m_contextCommandsList; // Tree to show which commands are in context with expandable details
 
     QListWidget* m_files=nullptr;
     MemoryLineEdit* m_rootEdit=nullptr;

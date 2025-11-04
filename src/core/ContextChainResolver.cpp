@@ -14,7 +14,7 @@ QString ContextChainResolver::resolveContextChain(MainWindow* mainWindow)
         return QString();
     }
     
-    // Get context based on valid commands from the command chain
-    // This will be implemented in MainWindow to access the private ContextManager
-    return mainWindow->getContextChainText();
+    // Get full command chain - all commands that were applied, regardless of current validity
+    // This shows the complete history of applied commands
+    return mainWindow->getAllCommandsText();
 }

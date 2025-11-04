@@ -2,6 +2,8 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFileDialog>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 #include <QStatusBar>
 #include <QMessageBox>
@@ -249,16 +251,51 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Initialize context status widget to display command context state
     m_contextStatusWidget = new QWidget(this);
-    m_contextCommandsList = new QListWidget(m_contextStatusWidget);
+    m_contextCommandsList = new QTreeWidget(m_contextStatusWidget);
     m_contextCommandsList->setObjectName("contextCommandsList");
     
     QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
     contextLayout->setContentsMargins(5, 5, 5, 5);
-    contextLayout->addWidget(new QLabel(tr("Context Commands:"), m_contextStatusWidget));
+    
+    // Create header with toggle button
+    QHBoxLayout* headerLayout = new QHBoxLayout();
+    QLabel* titleLabel = new QLabel(tr("Context Commands:"), m_contextStatusWidget);
+    headerLayout->addWidget(titleLabel);
+    
+    // Add toggle button to show/hide the list
+    QToolButton* toggleButton = new QToolButton(m_contextStatusWidget);
+    toggleButton->setText("▼");
+    toggleButton->setCheckable(true);
+    toggleButton->setChecked(true);
+    toggleButton->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
+    headerLayout->addWidget(toggleButton);
+    headerLayout->addStretch();
+    
+    contextLayout->addLayout(headerLayout);
     contextLayout->addWidget(m_contextCommandsList);
+    
+    // Set up the tree widget
+    m_contextCommandsList->setHeaderLabels(QStringList() << "Time" << "Description");
+    m_contextCommandsList->setColumnCount(2);
+    m_contextCommandsList->setHeaderHidden(false);  // Show the header for better UX
+    m_contextCommandsList->setRootIsDecorated(true); // Show expand/collapse icons
+    m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
     
     // Set initial height for the context status widget
     m_contextStatusWidget->setMaximumHeight(150);
+    
+    // Connect toggle button to show/hide functionality
+    connect(toggleButton, &QToolButton::toggled, this, [this, toggleButton](bool checked) {
+        m_contextCommandsList->setVisible(checked);
+        toggleButton->setText(checked ? "▼" : "▲");
+        
+        // Adjust height based on visibility
+        if (checked) {
+            m_contextStatusWidget->setMaximumHeight(200); // Increased for tree view
+        } else {
+            m_contextStatusWidget->setMaximumHeight(25); // Just header height
+        }
+    });
 
     // --------  4. Верхняя часть layout (внутри rightPanel) ----------
     /*QVBoxLayout *rightLayout = new QVBoxLayout;
@@ -2072,6 +2109,41 @@ QString MainWindow::getContextChainText() const
     return QString();
 }
 
+QString MainWindow::getAllCommandsText() const
+{
+    if (m_contextManager) {
+        // Generate text from ALL commands, not just active ones
+        QStringList contextParts;
+        QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
+        
+        for (const auto& cmdInfo : allCommands) {
+            QString commandText = cmdInfo.result;
+            if (commandText.isEmpty()) {
+                // If no specific result, use description as fallback
+                commandText = cmdInfo.description;
+            }
+            
+            if (!commandText.isEmpty()) {
+                QString status = "";
+                switch (cmdInfo.state) {
+                    case CommandState::Active:
+                        status = " [ACTIVE]";
+                        break;
+                    case CommandState::Invalidated:
+                        status = QString(" [INVALIDATED: %1]").arg(cmdInfo.reason);
+                        break;
+                    case CommandState::Removed:
+                        status = " [REMOVED]";
+                        break;
+                }
+                contextParts << commandText + status;
+            }
+        }
+        return contextParts.join("\n\n");
+    }
+    return QString();
+}
+
 void MainWindow::createNewSequence()
 {
     // Ask user for name
@@ -2125,24 +2197,77 @@ void MainWindow::updateContextStatusDisplay()
     QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
     
     for (const auto& cmdInfo : allCommands) {
-        QString displayText = QString("[%1] %2").arg(cmdInfo.timestamp.toString("hh:mm:ss")).arg(cmdInfo.description);
+        // Create top-level item for the command
+        QTreeWidgetItem* commandItem = new QTreeWidgetItem(m_contextCommandsList);
         
-        QListWidgetItem* item = new QListWidgetItem(displayText);
+        // First column: timestamp
+        commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
         
-        if (cmdInfo.isStillValid) {
-            // Valid commands shown in green
-            item->setBackground(Qt::green);
-            item->setToolTip("This command is still valid in context");
-        } else {
-            // Invalid commands shown in red with reason
-            item->setBackground(Qt::red);
-            item->setToolTip(QString("Invalid: %1").arg(cmdInfo.invalidationReason));
+        // Second column: description
+        commandItem->setText(1, cmdInfo.description);
+        
+        switch (cmdInfo.state) {
+            case CommandState::Active: {
+                // Active commands in context shown in green
+                commandItem->setBackground(0, QColor(200, 255, 200)); // Light green
+                commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
+                commandItem->setForeground(0, Qt::darkGreen);
+                commandItem->setForeground(1, Qt::darkGreen);
+                commandItem->setToolTip(0, "Active in context");
+                commandItem->setToolTip(1, "Active in context");
+                break;
+            }
+            case CommandState::Invalidated: {
+                // Invalidated commands shown in red with reason
+                commandItem->setBackground(0, QColor(255, 200, 200)); // Light red
+                commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
+                commandItem->setForeground(0, Qt::red);
+                commandItem->setForeground(1, Qt::red);
+                QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
+                commandItem->setToolTip(0, tooltip);
+                commandItem->setToolTip(1, tooltip);
+                break;
+            }
+            case CommandState::Removed: {
+                // Removed commands shown in gray
+                commandItem->setBackground(0, QColor(200, 200, 200)); // Light gray
+                commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
+                commandItem->setForeground(0, Qt::gray);
+                commandItem->setForeground(1, Qt::gray);
+                commandItem->setToolTip(0, "Command was removed from context");
+                commandItem->setToolTip(1, "Command was removed from context");
+                break;
+            }
         }
         
         // Store command ID in userData for potential future use
-        item->setData(Qt::UserRole, cmdInfo.id);
-        m_contextCommandsList->addItem(item);
+        commandItem->setData(0, Qt::UserRole, cmdInfo.id);
+        
+        // Add result as child item if it exists
+        if (!cmdInfo.result.isEmpty()) {
+            QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
+            resultItem->setText(0, "Result:");
+            resultItem->setText(1, cmdInfo.result);
+            resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
+            resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
+            resultItem->setForeground(0, Qt::darkBlue);
+            resultItem->setForeground(1, Qt::darkBlue);
+            
+            // Format the result in a more readable way if it's long
+            QStringList resultLines = cmdInfo.result.split('\n');
+            if (resultLines.size() > 10) {
+                // Show first 10 lines and indicate more
+                QStringList shortResult = resultLines.mid(0, 10);
+                shortResult << "... (click to expand)";
+                resultItem->setText(1, shortResult.join('\n'));
+            } else {
+                resultItem->setText(1, cmdInfo.result);
+            }
+        }
     }
+    
+    // Collapse all items by default so that details are hidden
+    m_contextCommandsList->collapseAll();
 }
 
 void MainWindow::onFileChanged(const QString &path)

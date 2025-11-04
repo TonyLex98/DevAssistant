@@ -25,7 +25,7 @@ QString ContextManager::findExistingCommandId(const QString& commandName, const 
 {
     for (auto it = m_commandHistory.constBegin(); it != m_commandHistory.constEnd(); ++it) {
         const CommandContextInfo& info = it.value();
-        if (info.name == commandName && info.params == params && info.isStillValid) {
+        if (info.name == commandName && info.params == params && info.state == CommandState::Active) {
             return info.id;
         }
     }
@@ -36,19 +36,20 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
 {
     if (!cmd) return;
     
-    // Check if command with same params already exists and is valid
-    QString existingId = findExistingCommandId(cmd->name(), cmd->params());
-    if (!existingId.isEmpty()) {
-        // If command exists and is still valid, just update its timestamp and result
-        CommandContextInfo& existingInfo = m_commandHistory[existingId];
-        existingInfo.timestamp = QDateTime::currentDateTime();
-        existingInfo.result = result;
-        existingInfo.isStillValid = true; // Reset validity in case it was invalidated
-        existingInfo.invalidationReason.clear(); // Clear invalidation reason
-        
-        emit commandAdded(existingId);
-        emit contextChanged();
-        return;
+    // Check if command with same params already exists and is in any state
+    for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
+        CommandContextInfo& info = it.value();
+        if (info.name == cmd->name() && info.params == cmd->params()) {
+            // Update existing command
+            info.timestamp = QDateTime::currentDateTime();
+            info.result = result;
+            info.state = CommandState::Active; // Reset to active
+            info.reason.clear(); // Clear any previous reason
+            
+            emit commandAdded(it.key());
+            emit contextChanged();
+            return;
+        }
     }
     
     QString uniqueId = generateUniqueId(cmd->name());
@@ -59,6 +60,7 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
     info.description = cmd->description();
     info.timestamp = QDateTime::currentDateTime();
     info.result = result;
+    info.state = CommandState::Active;
     
     m_commandHistory.insert(uniqueId, info);
     
@@ -79,8 +81,8 @@ void ContextManager::invalidateCommand(const QString& commandId, const QString& 
 {
     if (m_commandHistory.contains(commandId)) {
         CommandContextInfo& info = m_commandHistory[commandId];
-        info.isStillValid = false;
-        info.invalidationReason = reason;
+        info.state = CommandState::Invalidated;
+        info.reason = reason;
         
         emit commandInvalidated(commandId, reason);
         emit contextChanged();
@@ -99,7 +101,7 @@ QList<CommandContextInfo> ContextManager::getValidCommands() const
 {
     QList<CommandContextInfo> validCommands;
     for (auto it = m_commandHistory.constBegin(); it != m_commandHistory.constEnd(); ++it) {
-        if (it.value().isStillValid) {
+        if (it.value().state == CommandState::Active) {
             validCommands.append(it.value());
         }
     }
@@ -128,7 +130,7 @@ QString ContextManager::generateContextText() const
 {
     QStringList contextParts;
     
-    // Add context from valid commands
+    // Add context from valid commands (Active state)
     for (const auto& cmdInfo : getValidCommands()) {
         if (!cmdInfo.result.isEmpty()) {
             contextParts << cmdInfo.result;
@@ -181,9 +183,9 @@ void ContextManager::onFileChanged(const QString &path)
                 
                 if (cmdFileInfo.absoluteFilePath() == changedFileInfo.absoluteFilePath()) {
                     // Mark command as invalid due to file change
-                    cmdInfo.isStillValid = false;
-                    cmdInfo.invalidationReason = QString("File changed externally: %1").arg(path);
-                    emit commandInvalidated(cmdInfo.id, cmdInfo.invalidationReason);
+                    cmdInfo.state = CommandState::Invalidated;
+                    cmdInfo.reason = QString("File changed externally: %1").arg(path);
+                    emit commandInvalidated(cmdInfo.id, cmdInfo.reason);
                 }
             }
         }

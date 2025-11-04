@@ -15,6 +15,13 @@ class Command;
 class DevAssManager;
 class MainWindow;
 
+// Enum for command states
+enum class CommandState {
+    Active,      // Command executed and still in context
+    Invalidated, // Command executed but invalidated due to file changes, etc.
+    Removed      // Command was removed from context
+};
+
 // Structure to track command context state
 struct CommandContextInfo {
     QString id;
@@ -22,11 +29,11 @@ struct CommandContextInfo {
     QJsonObject params;
     QString description;
     QDateTime timestamp;
-    bool isStillValid;           // Whether the command's result is still valid in context
-    QString invalidationReason;  // Why the command was invalidated
+    CommandState state;          // Current state of the command
+    QString reason;              // Reason for state (invalidation reason, etc.)
     QString result;              // Command result/output
     
-    CommandContextInfo() : isStillValid(true) {}
+    CommandContextInfo() : state(CommandState::Active) {}
 };
 
 class ContextManager : public QObject
