@@ -1,0 +1,48 @@
+{
+  "name": "Code Review & Study Assistant",
+  "description": "Template for systematic code review, understanding, and learning from existing codebase",
+  "author": "DevAssistant AI",
+  "version": "1.0",
+  "steps": [
+    {
+      "name": "Code Overview",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCode Review Task: {{USER_QUERY}}\n\nGet an overview of the code:\n1. What is the purpose of this code?\n2. What components are involved?\n3. What are the main entry points?\n4. What patterns are used?\n5. What technologies/frameworks are used?\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Code overview...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB"]
+    },
+    {
+      "name": "File Structure Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAnalyze the file structure and organization:\n1. How are files organized?\n2. What are the main modules?\n3. How do components interconnect?\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"src/main.py\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"src/core/__init__.py\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"import\", \"filePattern\": \"*.py\"}}]",
+      "allowedCommands": ["OPEN_FILE", "SEARCH_PROJECT", "SHOW_RESULT"]
+    },
+    {
+      "name": "Entry Point Discovery",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nFind and analyze entry points:\n1. Main functions\n2. Class constructors\n3. API endpoints\n4. Event handlers\n\nResponse: [{\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"def main\", \"filePattern\": \"*.py\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"if __name__ ==\", \"filePattern\": \"*.py\"}}, {\"command\": \"OPEN_FILE_REGION\", \"params\": {\"path\": \"path/to/main/file.py\", \"region\": \"/def main[^{]*{[^}]*}/\"}}]",
+      "allowedCommands": ["SEARCH_PROJECT", "OPEN_FILE", "OPEN_FILE_REGION", "SHOW_RESULT"]
+    },
+    {
+      "name": "Data Flow Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAnalyze data flow through the system:\n1. Where does input come from?\n2. How is data processed?\n3. Where does output go?\n4. What transformations happen?\n\nResponse: [{\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"input|request|data\", \"filePattern\": \"*.py\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"output|response|result\", \"filePattern\": \"*.py\"}}]",
+      "allowedCommands": ["SEARCH_PROJECT", "OPEN_FILE", "OPEN_FILE_REGION", "SHOW_RESULT"]
+    },
+    {
+      "name": "Code Quality Assessment",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAssess code quality:\n1. Identify anti-patterns\n2. Check for code duplication\n3. Analyze complexity\n4. Review error handling\n5. Check security issues\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Code quality assessment...\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"suspect/file.py\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT"]
+    },
+    {
+      "name": "Performance Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAnalyze performance aspects:\n1. Identify potential bottlenecks\n2. Check for inefficient algorithms\n3. Look for resource management issues\n\nResponse: [{\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"for.*in.*range|while|recursive\", \"filePattern\": \"*.py\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"performance/critical.py\"}}]",
+      "allowedCommands": ["SEARCH_PROJECT", "OPEN_FILE", "OPEN_FILE_REGION", "SHOW_RESULT"]
+    },
+    {
+      "name": "Security Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAnalyze security aspects:\n1. Input validation\n2. Authentication/authorization\n3. Data protection\n4. Vulnerabilities\n\nResponse: [{\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"password|token|secret|input\", \"filePattern\": \"*.py\"}}, {\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Security analysis...\"}}]",
+      "allowedCommands": ["SEARCH_PROJECT", "SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION"]
+    },
+    {
+      "name": "Documentation & Notes",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate documentation and notes about the code:\n1. Architecture understanding\n2. Key components overview\n3. Potential improvements\n4. Questions for the team\n\nResponse: [{\"command\": \"CREATE_FILE\", \"params\": {\"path\": \"docs/code-understanding.md\", \"content\": \"# Code Understanding Notes\\n\"}}, {\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"docs/code-understanding.md\", \"startLine\": 1, \"endLine\": 1, \"newText\": \"# Understanding [system/component]\\n\\n## Key Components\\n\"}}]",
+      "allowedCommands": ["CREATE_FILE", "EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    }
+  ]
+}

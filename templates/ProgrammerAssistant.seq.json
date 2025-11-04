@@ -1,0 +1,48 @@
+{
+  "name": "Programmer Assistant",
+  "description": "Enhanced template for programming tasks with scheduler, code analysis, and advanced planning",
+  "author": "DevAssistant",
+  "version": "1.0",
+  "steps": [
+    {
+      "name": "Task Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nUser query: {{USER_QUERY}}\n\nAnalyze the task, identify what files need to be examined, and create a plan.\n\nResponse format: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Analysis and plan here...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SEARCH_WEB"]
+    },
+    {
+      "name": "Code Planning",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nBased on the user query: {{USER_QUERY}}, create a detailed implementation plan.\n\nThe plan should include:\n1. Required changes to existing files\n2. New files to create (if any)\n3. Dependencies to consider\n4. Error handling requirements\n5. Testing considerations\n\nResponse format: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Detailed implementation plan here...\"}}]",
+      "allowedCommands": ["SHOW_RESULT"]
+    },
+    {
+      "name": "Code Scheduler",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nBased on the plan, now schedule the implementation in logical steps.\n\nCreate a step-by-step schedule:\n1. First, what files to examine\n2. What changes to implement in what order\n3. What to test after each step\n\nResponse format: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Implementation schedule here...\"}}]",
+      "allowedCommands": ["SHOW_RESULT"]
+    },
+    {
+      "name": "File Examination",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nNow implement the first step of the plan by examining and understanding relevant files.\n\nUser query: {{USER_QUERY}}\n\nOpen the necessary files to understand the current implementation.\n\nResponse format: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/file.ext\"}}]",
+      "allowedCommands": ["OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SHOW_RESULT"]
+    },
+    {
+      "name": "Code Implementation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nImplement the planned changes based on the files examined.\n\nUser query: {{USER_QUERY}}\n\nMake the necessary changes to the code.\n\nResponse format: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/file.ext\", \"startLine\": 1, \"endLine\": 5, \"newText\": \"updated code here...\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "CREATE_FILE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Code Review",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nReview the changes made and check for potential issues.\n\nUser query: {{USER_QUERY}}\n\nAnalyze the implemented code for correctness, style, and performance.\n\nResponse format: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Code review results here...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION"]
+    },
+    {
+      "name": "Testing Plan",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nCreate a testing plan for the changes made.\n\nUser query: {{USER_QUERY}}\n\nOutline how to test the implemented changes.\n\nResponse format: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Testing plan here...\"}}]",
+      "allowedCommands": ["SHOW_RESULT"]
+    },
+    {
+      "name": "Documentation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n\nUpdate documentation if necessary based on the changes made.\n\nUser query: {{USER_QUERY}}\n\nDocument the changes made.\n\nResponse format: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/doc.md\", \"startLine\": 10, \"endLine\": 10, \"newText\": \"documentation here...\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    }
+  ]
+}

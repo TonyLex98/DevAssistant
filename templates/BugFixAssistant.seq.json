@@ -1,0 +1,43 @@
+{
+  "name": "Bug Fix Assistant",
+  "description": "Template for systematically fixing bugs with root cause analysis and prevention",
+  "author": "DevAssistant AI",
+  "version": "1.0",
+  "steps": [
+    {
+      "name": "Bug Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nBug Report: {{USER_QUERY}}\n\nAnalyze the bug:\n1. What is the expected behavior?\n2. What is the actual behavior?\n3. How to reproduce the bug?\n4. What are the error messages?\n5. What is the impact level?\n6. What are the possible root causes?\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Bug analysis...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SEARCH_WEB"]
+    },
+    {
+      "name": "Root Cause Investigation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nInvestigate the root cause of the bug:\n1. Search for the error messages in code\n2. Examine related functions/modules\n3. Check recent changes\n4. Look for similar patterns that might have the same issue\n\nResponse: [{\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"error message or exception\", \"filePattern\": \"*.py\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/suspected/file.py\"}}, {\"command\": \"OPEN_FILE_REGION\", \"params\": {\"path\": \"path/to/suspected/file.py\", \"region\": \"/function_pattern/\"}}]",
+      "allowedCommands": ["SEARCH_PROJECT", "OPEN_FILE", "OPEN_FILE_REGION", "SHOW_RESULT"]
+    },
+    {
+      "name": "Bug Reproduction",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate a test to reproduce the bug:\n1. Write a test case that demonstrates the bug\n2. Run the test to confirm the issue\n\nResponse: [{\"command\": \"CREATE_FILE\", \"params\": {\"path\": \"tests/test_bug_reproduction.py\", \"content\": \"# Test to reproduce the bug\\n\"}}, {\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/test_bug_reproduction.py -v\"}}]",
+      "allowedCommands": ["CREATE_FILE", "RUN_SHELL", "SHOW_RESULT"]
+    },
+    {
+      "name": "Fix Implementation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nImplement the fix for the bug:\n1. Make the minimal necessary changes\n2. Preserve existing functionality\n3. Follow the project's coding standards\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/buggy/file.py\", \"startLine\": 25, \"endLine\": 30, \"newText\": \"# Bug fix implementation...\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/related/file.py\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Fix Verification",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nVerify that the fix works and doesn't break anything:\n1. Run the reproduction test\n2. Run full test suite\n3. Verify related functionality still works\n\nResponse: [{\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/test_bug_reproduction.py\"}}, {\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/ -k \\\"not slow\\\"\"}}]",
+      "allowedCommands": ["RUN_SHELL", "SHOW_RESULT", "OPEN_FILE"]
+    },
+    {
+      "name": "Regression Prevention",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nAdd tests to prevent regression:\n1. Add the reproduction test to the main test suite\n2. Consider similar edge cases\n3. Update documentation if needed\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"tests/test_main_suite.py\", \"startLine\": 100, \"endLine\": 100, \"newText\": \"    def test_bug_prevention():\\n        # Test to prevent regression\\n        pass\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Documentation Update",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nUpdate documentation about the fix:\n1. Changelog entry\n2. Known issues documentation\n3. Code comments\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"CHANGELOG.md\", \"startLine\": 1, \"endLine\": 1, \"newText\": \"- Fixed [bug description] in [component] - [date]\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    }
+  ]
+}

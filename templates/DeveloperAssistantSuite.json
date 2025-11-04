@@ -1,0 +1,82 @@
+{
+  "solutionTemplateName": "Developer Assistant Suite",
+  "version": "1.0", 
+  "description": "Complete suite of templates for all development activities with integrated workflow and scheduling",
+  "templates": [
+    {
+      "name": "Advanced Programmer Assistant",
+      "path": "AdvancedProgrammerAssistant.seq.json",
+      "category": "Development",
+      "primary": true,
+      "dependencies": [],
+      "features": ["planning", "scheduling", "implementation", "testing", "documentation"]
+    },
+    {
+      "name": "Bug Fix Assistant", 
+      "path": "BugFixAssistant.seq.json",
+      "category": "Development",
+      "primary": false,
+      "dependencies": ["Advanced Programmer Assistant"],
+      "features": ["root-cause-analysis", "reproduction", "fix-verification", "regression-prevention"]
+    },
+    {
+      "name": "Refactoring Assistant",
+      "path": "RefactoringAssistant.seq.json", 
+      "category": "Development",
+      "primary": false,
+      "dependencies": ["Advanced Programmer Assistant"],
+      "features": ["safety-net", "incremental-changes", "verification", "quality-improvements"]
+    },
+    {
+      "name": "Code Review Assistant",
+      "path": "CodeReviewAssistant.seq.json",
+      "category": "Quality",
+      "primary": false, 
+      "dependencies": [],
+      "features": ["analysis", "quality-assessment", "performance-review", "security-analysis"]
+    },
+    {
+      "name": "DevOps Assistant",
+      "path": "DevOpsAssistant.seq.json",
+      "category": "Operations",
+      "primary": false,
+      "dependencies": [],
+      "features": ["deployment", "ci-cd", "infrastructure", "configuration"]
+    },
+    {
+      "name": "Architect Assistant", 
+      "path": "ArchitectAssistant.seq.json",
+      "category": "Architecture",
+      "primary": false,
+      "dependencies": ["CodeReviewAssistant"],
+      "features": ["system-analysis", "architecture-mapping", "design-patterns", "planning"]
+    }
+  ],
+  "workflow": {
+    "default": "Advanced Programmer Assistant",
+    "autoSelection": {
+      "patterns": {
+        "bug|fix|error|issue": "Bug Fix Assistant",
+        "refactor|cleanup|improve": "Refactoring Assistant", 
+        "review|understand|learn": "Code Review Assistant",
+        "deploy|build|pipeline|config": "DevOps Assistant",
+        "arch|design|structure": "Architect Assistant"
+      }
+    },
+    "contextSharing": true,
+    "crossTemplateData": true
+  },
+  "integration": {
+    "contextChain": true,
+    "commandHistory": true,
+    "fileMonitoring": true,
+    "visualFeedback": true
+  },
+  "features": {
+    "scheduler": true,
+    "planner": true,
+    "qualityControl": true,
+    "documentation": true,
+    "testing": true
+  }
+}

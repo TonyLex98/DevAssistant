@@ -1,0 +1,48 @@
+{
+  "name": "Refactoring Assistant",
+  "description": "Template for safe and systematic code refactoring with testing and verification",
+  "author": "DevAssistant AI",
+  "version": "1.0",
+  "steps": [
+    {
+      "name": "Refactoring Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nRefactoring Task: {{USER_QUERY}}\n\nAnalyze what needs to be refactored:\n1. What is the current problematic code?\n2. Why does it need refactoring?\n3. What are the specific issues (duplication, complexity, readability, performance)?\n4. What is the target design?\n5. What are the risks of refactoring?\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Refactoring analysis...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SEARCH_WEB"]
+    },
+    {
+      "name": "Current State Documentation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nDocument the current state before refactoring:\n1. Open files that will be modified\n2. Understand dependencies\n3. Document current behavior\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/code/to/refactor.py\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"function_name\", \"filePattern\": \"*.py\"}}, {\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Current behavior documented...\"}}]",
+      "allowedCommands": ["OPEN_FILE", "SEARCH_PROJECT", "SHOW_RESULT", "OPEN_FILE_REGION"]
+    },
+    {
+      "name": "Safety Net Setup",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nSet up safety net before refactoring:\n1. Identify relevant tests\n2. Create additional tests if needed\n3. Make sure all tests pass before refactoring\n\nResponse: [{\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/ -v\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"test.*function_name\", \"filePattern\": \"test*.py\"}}, {\"command\": \"CREATE_FILE\", \"params\": {\"path\": \"tests/test_before_refactor.py\", \"content\": \"# Safety tests before refactoring\\n\"}}]",
+      "allowedCommands": ["RUN_SHELL", "SEARCH_PROJECT", "CREATE_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Refactoring Plan",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate a step-by-step refactoring plan:\n1. What changes will be made in what order?\n2. How to maintain functionality at each step?\n3. What to verify after each change?\n4. Rollback plan if something goes wrong\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Detailed refactoring plan...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION"]
+    },
+    {
+      "name": "Incremental Refactoring",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nPerform refactoring incrementally:\n1. Make small changes\n2. Run tests after each change\n3. Verify functionality is preserved\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/code.py\", \"startLine\": 10, \"endLine\": 15, \"newText\": \"# Refactored code...\"}}, {\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/ -k \\\"critical\\\"\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "RUN_SHELL", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Verification & Testing",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nComprehensive verification after refactoring:\n1. Run all tests\n2. Verify functionality\n3. Check performance\n4. Review code quality\n\nResponse: [{\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python -m pytest tests/\"}}, {\"command\": \"RUN_SHELL\", \"params\": {\"command\": \"python path/to/test_functionality.py\"}}]",
+      "allowedCommands": ["RUN_SHELL", "SHOW_RESULT", "OPEN_FILE"]
+    },
+    {
+      "name": "Quality Improvements",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nImplement additional quality improvements:\n1. Better error handling\n2. Improved documentation\n3. Enhanced performance\n4. Better maintainability\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/refactored/code.py\", \"startLine\": 5, \"endLine\": 5, \"newText\": \"/** Improved function: better description */\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Documentation & Handover",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nDocument the refactoring:\n1. Update README or design documents\n2. Add comments about the changes\n3. Update any relevant documentation\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"docs/refactoring_log.md\", \"startLine\": 1, \"endLine\": 1, \"newText\": \"- Refactored [component] for [reason] on [date]\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "SHOW_RESULT"]
+    }
+  ]
+}

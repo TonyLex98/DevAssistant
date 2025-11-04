@@ -1,0 +1,68 @@
+{
+  "name": "Advanced Programmer Assistant",
+  "description": "Complete template for complex programming tasks with advanced planning, scheduling, code analysis, testing and documentation",
+  "author": "DevAssistant AI",
+  "version": "2.0",
+  "steps": [
+    {
+      "name": "Task Understanding",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nTask: {{USER_QUERY}}\n\nAnalyze the programming task:\n1. What is the main goal?\n2. What parts of the project are involved?\n3. What constraints exist?\n4. What are the expected inputs/outputs?\n5. What are the performance requirements?\n\nProvide a brief analysis before proceeding.\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Task analysis: [your analysis here]\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SEARCH_WEB"]
+    },
+    {
+      "name": "Architecture Analysis",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nBased on your analysis, examine the project architecture to understand how to best implement the solution.\n\nOpen files that show the overall architecture and design patterns.\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/architecture-file.ext\"}}, {\"command\": \"OPEN_FILE_REGION\", \"params\": {\"path\": \"path/to/key-module.ext\", \"region\": \"/\\/\\*\\s*MAIN\\s*CLASS\\s*\\*\\/[^}]*}/\"}}]",
+      "allowedCommands": ["OPEN_FILE", "OPEN_FILE_REGION", "SEARCH_PROJECT", "SHOW_RESULT"]
+    },
+    {
+      "name": "Requirements & Dependencies",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nIdentify requirements and dependencies for the implementation.\n\nCheck configuration files, requirements, dependencies, and interfaces.\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"requirements.txt\"}}, {\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"package.json\"}}, {\"command\": \"SEARCH_PROJECT\", \"params\": {\"query\": \"interface\", \"filePattern\": \"*.ext\"}}]",
+      "allowedCommands": ["OPEN_FILE", "SEARCH_PROJECT", "SHOW_RESULT"]
+    },
+    {
+      "name": "Implementation Planning",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate a detailed implementation plan:\n1. What files need to be modified?\n2. What new files need to be created?\n3. What functions/methods need to be changed?\n4. What tests will validate the changes?\n5. What is the implementation order?\n6. What are the critical parts?\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Detailed implementation plan...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION"]
+    },
+    {
+      "name": "Task Scheduling",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate a step-by-step implementation schedule based on the plan:\n\nSchedule:\nStep 1: Setup / Preparation\nStep 2: Core Implementation\nStep 3: Integration\nStep 4: Testing\nStep 5: Documentation\nStep 6: Review\n\nFor each step, specify what needs to be done and what files are involved.\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Implementation schedule...\"}}]",
+      "allowedCommands": ["SHOW_RESULT"]
+    },
+    {
+      "name": "Implementation Step 1: Setup",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nExecute Step 1: Setup / Preparation\n\nOpen and prepare the necessary files for implementation.\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/main-file.ext\"}}, {\"command\": \"CREATE_FILE\", \"params\": {\"path\": \"path/to/new-file.ext\", \"content\": \"/* New file for implementation */\\n\"}}]",
+      "allowedCommands": ["OPEN_FILE", "CREATE_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Implementation Step 2: Core Logic",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nExecute Step 2: Core Implementation\n\nImplement the main logic of the solution.\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/implementation-file.ext\", \"startLine\": 25, \"endLine\": 30, \"newText\": \"// New implementation here...\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Implementation Step 3: Integration",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nExecute Step 3: Integration\n\nIntegrate the new code with existing functionality.\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/integration-point.ext\", \"startLine\": 45, \"endLine\": 50, \"newText\": \"// Integration code here...\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Code Quality Check",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nPerform code quality checks:\n1. Check for code style compliance\n2. Verify error handling\n3. Confirm proper resource management\n4. Validate security considerations\n5. Check performance implications\n\nResponse: [{\"command\": \"OPEN_FILE\", \"params\": {\"path\": \"path/to/modified-file.ext\"}}, {\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Quality check results...\"}}]",
+      "allowedCommands": ["OPEN_FILE", "OPEN_FILE_REGION", "SHOW_RESULT"]
+    },
+    {
+      "name": "Testing Strategy",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nCreate and implement a testing strategy:\n1. Unit tests for new functionality\n2. Integration tests for changes\n3. Edge case testing\n4. Performance tests if needed\n\nResponse: [{\"command\": \"CREATE_FILE\", \"params\": {\"path\": \"tests/test_new_feature.py\", \"content\": \"# Test file for new functionality\\n\"}}, {\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/implementation.ext\", \"startLine\": 1, \"endLine\": 1, \"newText\": \"# Added for testing: ...\"}}]",
+      "allowedCommands": ["CREATE_FILE", "EDIT_IN_RANGE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Documentation",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nUpdate documentation for the changes:\n1. Code comments\n2. API documentation\n3. Usage examples\n4. Architecture updates\n\nResponse: [{\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"path/to/implementation.ext\", \"startLine\": 5, \"endLine\": 5, \"newText\": \"/** New function: description, parameters, return value */\"}}, {\"command\": \"EDIT_IN_RANGE\", \"params\": {\"path\": \"README.md\", \"startLine\": 10, \"endLine\": 10, \"newText\": \"## New Feature: [description]\"}}]",
+      "allowedCommands": ["EDIT_IN_RANGE", "REPLACE_IN_FILE", "OPEN_FILE", "SHOW_RESULT"]
+    },
+    {
+      "name": "Final Review",
+      "tmpl": "{{PROJECT_ROOT}}\n{{FILE_LIST}}\n{{OPEN_FILES}}\n{{CONTEXT_CHAIN}}\n{{PREVIOUS_STEPS}}\n\nConduct final review of the implementation:\n1. Does it solve the original task?\n2. Are there any remaining issues?\n3. Is the code maintainable?\n4. Are all tests passing?\n5. Is documentation complete?\n\nResponse: [{\"command\": \"SHOW_RESULT\", \"params\": {\"result\": \"Final review and summary...\"}}]",
+      "allowedCommands": ["SHOW_RESULT", "OPEN_FILE", "OPEN_FILE_REGION"]
+    }
+  ]
+}
