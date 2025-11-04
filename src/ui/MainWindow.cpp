@@ -490,6 +490,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Chat + модель
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
+    connect(m_chat, &ChatDialog::runTemplateRequested, this, &MainWindow::runTemplateRequested);
+    connect(m_chat, &ChatDialog::runSimpleChat, this, &MainWindow::runSimpleChat);
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
     connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
     connect(&m_model, &OllamaAdapter::streamError,
@@ -532,6 +534,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_templateMgr.setRoot(tmplRoot);
     m_templateMgr.setSequenceManager(&m_seqMgr);  // Connect sequence manager to template manager
     m_templateMgr.refresh();
+
+    // Update templates in ChatDialog after templates have been loaded
+    m_chat->setTemplateManager(&m_templateMgr);
 
     // Initialize sequence graph window and restore layout on startup
     // This ensures positions are restored even if the graph window was never opened
@@ -2521,6 +2526,104 @@ void MainWindow::onFileChanged(const QString &path)
         }
     });
 }
+
+void MainWindow::runTemplateRequested(const QString &templatePath, const QString &text)
+{
+    // This method is called when a specific template is selected from the combobox
+    // We need to run the selected template with the provided text as the user query
+    
+    qDebug() << "[runTemplateRequested] Template path:" << templatePath;
+    qDebug() << "[runTemplateRequested] Text:" << text;
+    
+    // First, refresh to ensure we have the latest templates and sequences
+    m_templateMgr.refresh();
+    refreshAllSequences(); // Refresh sequences including those in templates
+    ensureDefaultSequence();
+    
+    // Find the template by path
+    const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
+    SolutionTemplate selectedTemplate;
+    QString foundTemplatePath;
+    
+    for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
+        if (it.key() == templatePath) {
+            selectedTemplate = it.value();
+            foundTemplatePath = it.key();
+            break;
+        }
+    }
+    
+    if (foundTemplatePath.isEmpty()) {
+        QMessageBox::warning(this, "Error", "Selected template not found: " + templatePath);
+        return;
+    }
+    
+    // Get the main sequence for this template
+    QString mainSequencePath = selectedTemplate.mainSequencePath();
+    if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
+        // If no main sequence is set, try to get the first sequence from the template
+        auto sequenceNames = selectedTemplate.sequences();
+        if (!sequenceNames.isEmpty()) {
+            // Build the path to the first sequence file in the template directory
+            mainSequencePath = QDir(foundTemplatePath).absoluteFilePath(sequenceNames[0]);
+        }
+    }
+    
+    if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
+        QMessageBox::warning(this, "Error", "No valid sequence found for template: " + selectedTemplate.name());
+        return;
+    }
+    
+    // Load the selected sequence
+    PromptSequence seq;
+    QFile seqFile(mainSequencePath);
+    if (seqFile.open(QIODevice::ReadOnly)) {
+        QByteArray data = seqFile.readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (doc.isObject()) {
+            seq = PromptSequence::fromJson(doc.object());
+        }
+        seqFile.close();
+    }
+    
+    if (seq.name().isEmpty()) {
+        QMessageBox::warning(this, "Error", "Could not load the sequence for template: " + selectedTemplate.name());
+        return;
+    }
+    
+    // Set up the sequence to run and store the user query for use in templates
+    m_currentSeq = seq;
+    m_currentStepIdx = 0;
+    m_sequenceMode = true;
+    m_lastUserMessage = text; // Save the user's query for resolution in prompts
+    
+    updateSequenceGraphHighlight();  // Update the graph highlighting
+    runNextStep();  // Start the sequence immediately
+}
+
+
+void MainWindow::runSimpleChat(const QString &text)
+{
+    // This method is called when "Простой чат" is selected - direct chat mode
+    // Send the message directly to the model in streaming mode without templates/sequences
+    
+    qDebug() << "[runSimpleChat] Text:" << text;
+    
+    // Display user message in chat
+    m_chat->appendUserMessage(text);
+    
+    // Start streaming response directly without any system context or templates
+    m_streamBuf.clear();
+    m_model.startStream(text);
+    
+    // Update history
+    m_history.push_back(qMakePair(QString("user"), text));
+    
+    // Log the request
+    int tokens = m_promptMgr.tokenCount(text);
+    log(QString("Sending simple chat request (%1 tokens) → %2").arg(tokens).arg(text));
+}
+
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {

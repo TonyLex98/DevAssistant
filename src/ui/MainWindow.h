@@ -104,6 +104,10 @@ private slots:
     void openSequenceEditorForName(const QString &sequenceName);
     void updateSequenceGraphHighlight();  // Update the highlighted sequence in the graph
 
+    // New slots for template selection combobox in ChatDialog
+    void runTemplateRequested(const QString &templatePath, const QString &text);
+    void runSimpleChat(const QString &text);
+
 
 public:
     // Accessors used by PromptResolver

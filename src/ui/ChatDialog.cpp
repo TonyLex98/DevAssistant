@@ -2,6 +2,13 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QGridLayout>
+#include <QDirIterator>
+#include <QStandardPaths>
+#include <QFileInfo>
+#include <QFile>
+#include "../core/SolutionTemplateManager.h"
+#include "../core/SolutionTemplate.h"
 
 ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_model(model){
     setWindowTitle(tr("Chat / Instruction"));
@@ -11,15 +18,36 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_chat->setReadOnly(true);
     m_cb_model = new MemoryComboBox("modelSelector", this);
     v->addWidget(m_chat,1);
-    auto h = new QHBoxLayout();
+    auto topLayout = new QHBoxLayout();
     m_input = new InputTextEdit(this);
     m_send = new StyledButton("Отправить", this);
     m_stop = new StyledButton("Остановить", this);
-    h->addWidget(m_cb_model);
-    h->addWidget(m_input,1);
-    h->addWidget(m_send);
-    h->addWidget(m_stop);
-    v->addLayout(h);
+    topLayout->addWidget(m_cb_model);
+    topLayout->addWidget(m_input, 1);
+    
+    // Create a vertical layout for buttons and combobox
+    auto buttonsAndComboLayout = new QVBoxLayout();
+    auto buttonsLayout = new QHBoxLayout();
+    buttonsLayout->addWidget(m_send);
+    buttonsLayout->addWidget(m_stop);
+    buttonsAndComboLayout->addLayout(buttonsLayout);
+    
+    // Add the template selection combobox below the buttons
+    m_templateCombo = new MemoryComboBox("defaultTemplateSelector", this);
+    m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
+    m_templateCombo->addItem("Простой чат", "simple_chat");
+    // Style the "Простой чат" item differently if possible
+    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
+    
+    // Populate the combobox with all available templates
+    populateTemplates();
+    
+    buttonsAndComboLayout->addWidget(m_templateCombo);
+    
+    // Add the buttons+combobox layout to the top layout
+    topLayout->addLayout(buttonsAndComboLayout);
+    v->addLayout(topLayout);
+    
     connect(m_send, &StyledButton::clicked, this, &ChatDialog::onSend);
     connect(m_stop, &StyledButton::clicked, this, &ChatDialog::onStop);
     connect(m_input, &InputTextEdit::sendMessage, this, &ChatDialog::onSend);
@@ -35,14 +63,6 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
         emit signal_updatelastUserMessage(str);
     });
 
-}
-
-void ChatDialog::onSend(){
-    QString t = m_input->toPlainText().trimmed();
-    if (t.isEmpty()) return;
-    m_chat->append(QString("You: %1\n\n").arg(t));
-    m_input->clear();
-    emit sendMessage(t);
 }
 
 void ChatDialog::onStop(){
@@ -67,6 +87,123 @@ void ChatDialog::appendAssistantChunk(const QString& s){
 void ChatDialog::finishAssistantMessage(){
     m_chat->append("\n<< stream finished >>");
     appendAssistantChunk("");
+}
+
+void ChatDialog::populateTemplates()
+{
+    // Refresh templates from manager to ensure we have the latest
+    if (m_templateManager) {
+        m_templateManager->refresh();
+        
+        // Use templateDirs() to get all template directory paths
+        const QStringList& templateDirs = m_templateManager->templateDirs();
+        for (const QString& templateDir : templateDirs) {
+            // Get the template name from the directory name
+            QString templateName = QFileInfo(templateDir).fileName();
+            
+            // Check if this template is already in the combobox to avoid duplicates
+            int existingIndex = m_templateCombo->findData(templateDir);
+            if (existingIndex == -1) {  // Not found
+                m_templateCombo->addItem(templateName, templateDir);
+            }
+        }
+    } else {
+        // Fallback: First, let's find where the templates are stored
+        // The templates are likely in the SolutionTemplates directory
+        QString templateRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                             .append("/DevelopersAssistant/SolutionTemplates");
+        
+        // Look for templates in a few common locations
+        QStringList possiblePaths;
+        possiblePaths << templateRoot 
+                      << "SolutionTemplates"  // relative path in project
+                      << QDir::current().absolutePath() + "/SolutionTemplates";
+        
+        for (const QString& path : possiblePaths) {
+            QDir templateDir(path);
+            if (templateDir.exists()) {
+                // Find all subdirectories (these should be the templates)
+                QFileInfoList dirList = templateDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+                for (const QFileInfo& dirInfo : dirList) {
+                    QString templatePath = dirInfo.absoluteFilePath();
+                    
+                    // Check if this is a real template directory by looking for template.templ.json
+                    QString templateJsonPath = templatePath + "/template.templ.json";
+                    if (QFile::exists(templateJsonPath)) {
+                        QString templateName = dirInfo.fileName();
+                        // Check if this template is already in the combobox to avoid duplicates
+                        int existingIndex = m_templateCombo->findData(templatePath);
+                        if (existingIndex == -1) {  // Not found
+                            m_templateCombo->addItem(templateName, templatePath);
+                        }
+                    } else {
+                        // If there's no template.templ.json, check if there are sequence files
+                        QDir dir(templatePath);
+                        QStringList sequenceFiles = dir.entryList(QStringList() << "*.seq.json", QDir::Files);
+                        if (!sequenceFiles.isEmpty()) {
+                            QString templateName = dirInfo.fileName();
+                            // Check if this template is already in the combobox to avoid duplicates
+                            int existingIndex = m_templateCombo->findData(templatePath);
+                            if (existingIndex == -1) {  // Not found
+                                m_templateCombo->addItem(templateName, templatePath);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void ChatDialog::onSend(){
+    QString t = m_input->toPlainText().trimmed();
+    if (t.isEmpty()) return;
+    
+    // Get the current selection from the template combobox
+    QString selectedTemplateData = m_templateCombo->currentData().toString();
+    QString selectedTemplateName = m_templateCombo->currentText();
+    
+    if (selectedTemplateData == "simple_chat") {
+        // Direct chat mode - send directly to model in streaming mode
+        // We'll let MainWindow handle displaying the message in the chat
+        m_input->clear();
+        
+        // Emit signal for simple chat mode
+        emit runSimpleChat(t);
+        return;
+    }
+    else if (selectedTemplateData.isEmpty()) {
+        // Default behavior - open template/sequence selection dialog
+        // We'll let MainWindow handle displaying the message in the chat
+        m_input->clear();
+        emit sendMessage(t);
+        return;
+    }
+    else {
+        // A specific template was selected - emit signal to run this template
+        // We'll let MainWindow handle displaying the message in the chat
+        m_input->clear();
+        
+        // Emit signal to run the selected template
+        emit runTemplateRequested(selectedTemplateData, t);
+        return;
+    }
+}
+
+void ChatDialog::appendUserMessage(const QString &s)
+{
+    m_chat->append(QString("You: %1\n\n").arg(s));
+}
+
+void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManager)
+{
+    m_templateManager = templateManager;
+    // Repopulate the templates with the new manager
+    m_templateCombo->clear();
+    m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
+    m_templateCombo->addItem("Простой чат", "simple_chat");
+    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
+    populateTemplates();
 }
 
 void ChatDialog::sendMessageToChat(const QString &text)
