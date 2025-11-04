@@ -5,7 +5,6 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QPushButton>
 #include <QDialog>
 #include <QDir>
 #include <QStandardPaths>
@@ -16,6 +15,7 @@
 #include <QScrollArea>
 #include "SolutionTemplateManager.h"
 #include "customWidgets/MemoryComboBox.h"
+#include "customWidgets/StyledButton.h"
 
 class SolutionTemplateViewer : public QWidget
 {
@@ -45,12 +45,12 @@ private:
     QLabel* m_templateNameLabel;
     QLabel* m_templateDescriptionLabel;
     QLabel* m_templateImageLabel;
-    QPushButton* m_editTemplateBtn;
-    QPushButton* m_deleteTemplateBtn;
-    QPushButton* m_addTemplateBtn;
-    QPushButton* m_exportTemplateBtn;
-    QPushButton* m_importSequenceBtn;
+    StyledButton* m_editTemplateBtn;
+    StyledButton* m_deleteTemplateBtn;
+    StyledButton* m_addTemplateBtn;
+    StyledButton* m_exportTemplateBtn;
+    StyledButton* m_importSequenceBtn;
     MemoryComboBox* m_defaultSequenceCombo; // Для выбора последовательности по умолчанию
-    QPushButton* m_runTemplateBtn;          // Для запуска шаблона с выбранной последовательностью
+    StyledButton* m_runTemplateBtn;          // Для запуска шаблона с выбранной последовательностью
     QString m_currentTemplateDir;
 };

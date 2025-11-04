@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QWidget>
-#include <QPushButton>
+#include "../ui/customWidgets/StyledButton.h"
 #include "ProjectRelationView.h"
 
 class GraphWidget : public QWidget
@@ -14,5 +14,5 @@ public:
 
 private:
     ProjectRelationView *m_view{nullptr};
-    QPushButton        *m_openBtn{nullptr};
+    StyledButton        *m_openBtn{nullptr};
 };

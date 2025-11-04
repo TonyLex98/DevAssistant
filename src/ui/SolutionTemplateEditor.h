@@ -8,7 +8,6 @@
 #include <QDialogButtonBox>
 #include <QTabWidget>
 #include <QComboBox>
-#include <QLineEdit>
 #include <QToolButton>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -22,13 +21,14 @@
 #include <QVector>
 #include <QDirIterator>
 #include <QGridLayout>
-#include <QPushButton>
 #include <QGroupBox>
 #include <QPixmap>
 #include <QTextEdit>
 #include "PromptSequence.h"
 #include "SolutionTemplate.h"
 #include "customWidgets/MemoryComboBox.h"
+#include "customWidgets/StyledButton.h"
+#include "customWidgets/MemoryLineEdit.h"
 #include "SolutionTemplateManager.h"
 #include "../codeviwer/TemplateSequenceGraphWidget.h"
 
@@ -63,16 +63,16 @@ private:
     SolutionTemplateManager *m_templateManager;
     PromptSequenceManager *m_sequenceManager;
     SolutionTemplate m_currentTemplate;
-    MemoryComboBox *m_nameEdit;
-    QLineEdit *m_descriptionEdit;
+    MemoryLineEdit *m_nameEdit;
+    MemoryLineEdit *m_descriptionEdit;
     QLabel *m_imageLabel;
     QLabel *m_imagePathLabel;
     QListWidget *m_templateSequencesList;
     QListWidget *m_availableSequencesList;
-    QPushButton *m_addSequenceBtn;
-    QPushButton *m_removeSequenceBtn;
-    QPushButton *m_setMainSequenceBtn;
-    QPushButton *m_selectImageBtn;
+    StyledButton *m_addSequenceBtn;
+    StyledButton *m_removeSequenceBtn;
+    StyledButton *m_setMainSequenceBtn;
+    StyledButton *m_selectImageBtn;
     
     // Для отображения всех последовательностей из проекта
     QMap<QString, QString> m_seqPathByName;  // name -> fullPath для доступных последовательностей

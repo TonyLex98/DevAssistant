@@ -1,17 +1,15 @@
 #include "VoskWidget.h"
 #include "VoskRunner.h"
-#include <QLineEdit>
 #include <QSpinBox>
 #include <QCheckBox>
-#include <QPushButton>
 #include <QTextEdit>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
 VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
-    m_dllEdit = new QLineEdit(this);
-    m_modelEdit = new QLineEdit(this);
+    m_dllEdit = new MemoryLineEdit("vosk_dll_path", this);
+    m_modelEdit = new MemoryLineEdit("vosk_model_path", this);
     m_srSpin = new QSpinBox(this);
     m_srSpin->setRange(8000, 48000);
     m_srSpin->setValue(16000);
@@ -22,8 +20,8 @@ VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
     m_dllEdit->setText(QStringLiteral("C:/vosk/libvosk.dll"));
     m_modelEdit->setText(QStringLiteral("C:/vosk/vosk-model-small-ru-0.22"));
 
-    m_startBtn = new QPushButton(tr("Start"), this);
-    m_stopBtn  = new QPushButton(tr("Stop"), this);
+    m_startBtn = new StyledButton(tr("Start"), this);
+    m_stopBtn  = new StyledButton(tr("Stop"), this);
     m_stopBtn->setEnabled(false);
 
     m_partialLbl = new QLabel(this);
@@ -59,8 +57,8 @@ VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
     connect(m_runner, &VoskRunner::finalText,   this, &VoskWidget::onFinal);
     connect(m_runner, &VoskRunner::error,       this, &VoskWidget::onError);
 
-    connect(m_startBtn, &QPushButton::clicked, this, &VoskWidget::onStart);
-    connect(m_stopBtn,  &QPushButton::clicked, this, &VoskWidget::onStop);
+    connect(m_startBtn, &StyledButton::clicked, this, &VoskWidget::onStart);
+    connect(m_stopBtn,  &StyledButton::clicked, this, &VoskWidget::onStop);
 
 }
 

@@ -8,8 +8,6 @@
 #include <QPixmap>
 #include <QMessageBox>
 #include <QStandardPaths>
-#include <QPushButton>
-#include <QLineEdit>
 #include <QTextEdit>
 #include <QGridLayout>
 #include <QTabWidget>
@@ -38,22 +36,18 @@ void SolutionTemplateEditor::setupUI()
     auto *infoLayout = new QGridLayout(infoGroupBox);
 
     QLabel *nameLabel = new QLabel(tr("Name:"), this);
-    qDebug() << "[SolutionTemplateEditor] Creating MemoryComboBox for solutionTemplateName";
-    m_nameEdit = new MemoryComboBox("solutionTemplateName", this);
-    qDebug() << "[SolutionTemplateEditor] Created MemoryComboBox for solutionTemplateName";
-    // Ensure the combo box is editable so lineEdit() returns a valid pointer
-    m_nameEdit->setEditable(true);
+    m_nameEdit = new MemoryLineEdit("solutionTemplateName", this);
     infoLayout->addWidget(nameLabel, 0, 0);
     infoLayout->addWidget(m_nameEdit, 0, 1);
 
     QLabel *descLabel = new QLabel(tr("Description:"), this);
-    m_descriptionEdit = new QLineEdit(this);
+    m_descriptionEdit = new MemoryLineEdit("solutionTemplateDescription", this);
     infoLayout->addWidget(descLabel, 1, 0);
     infoLayout->addWidget(m_descriptionEdit, 1, 1);
 
     QLabel *imageLabel = new QLabel(tr("Icon:"), this);
     m_imagePathLabel = new QLabel(tr("No image selected"), this);
-    m_selectImageBtn = new QPushButton(tr("Select Image..."), this);
+    m_selectImageBtn = new StyledButton(tr("Select Image..."), this);
     auto *imageLayout = new QHBoxLayout();
     imageLayout->addWidget(m_imagePathLabel);
     imageLayout->addWidget(m_selectImageBtn);
@@ -85,9 +79,9 @@ void SolutionTemplateEditor::setupUI()
 
     // Кнопки управления
     auto *btnLayout = new QVBoxLayout();
-    m_addSequenceBtn = new QPushButton(tr("→ Add to Template"), this);
-    m_removeSequenceBtn = new QPushButton(tr("Remove from Template ←"), this);
-    m_setMainSequenceBtn = new QPushButton(tr("Set as Main"), this);
+    m_addSequenceBtn = new StyledButton(tr("→ Add to Template"), this);
+    m_removeSequenceBtn = new StyledButton(tr("Remove from Template ←"), this);
+    m_setMainSequenceBtn = new StyledButton(tr("Set as Main"), this);
     btnLayout->addWidget(m_addSequenceBtn);
     btnLayout->addWidget(m_removeSequenceBtn);
     btnLayout->addWidget(m_setMainSequenceBtn);
@@ -130,10 +124,10 @@ void SolutionTemplateEditor::setupUI()
     layout->addWidget(m_tabWidget);
 
     // Connect signals
-    connect(m_addSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onAddSequence);
-    connect(m_removeSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onRemoveSequence);
-    connect(m_setMainSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onSetMainSequence);
-    connect(m_selectImageBtn, &QPushButton::clicked, this, &SolutionTemplateEditor::onSelectImage);
+    connect(m_addSequenceBtn, &StyledButton::clicked, this, &SolutionTemplateEditor::onAddSequence);
+    connect(m_removeSequenceBtn, &StyledButton::clicked, this, &SolutionTemplateEditor::onRemoveSequence);
+    connect(m_setMainSequenceBtn, &StyledButton::clicked, this, &SolutionTemplateEditor::onSetMainSequence);
+    connect(m_selectImageBtn, &StyledButton::clicked, this, &SolutionTemplateEditor::onSelectImage);
     connect(m_templateSequencesList, &QListWidget::currentItemChanged, this, &SolutionTemplateEditor::onSequenceSelectionChanged);
     connect(m_availableSequencesList, &QListWidget::currentItemChanged, this, &SolutionTemplateEditor::onAvailableSequenceSelectionChanged);
     connect(m_graphWidget, &TemplateSequenceGraphWidget::templateModified, this, &SolutionTemplateEditor::onTemplateModified);
@@ -149,7 +143,7 @@ void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
     qDebug() << "[SolutionTemplateEditor] Setting template name:" << m_currentTemplate.name();
     // Block signals temporarily to prevent auto-saving during initial setup
     m_nameEdit->blockSignals(true);
-    m_nameEdit->lineEdit()->setText(m_currentTemplate.name());
+    m_nameEdit->setText(m_currentTemplate.name());
     m_nameEdit->blockSignals(false);
     qDebug() << "[SolutionTemplateEditor] Name set successfully";
     m_descriptionEdit->setText(m_currentTemplate.description());
@@ -243,7 +237,7 @@ void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
 SolutionTemplate SolutionTemplateEditor::templateValue() const
 {
     SolutionTemplate tmpl = m_currentTemplate;
-    tmpl.setName(m_nameEdit->lineEdit()->text());
+    tmpl.setName(m_nameEdit->text());
     tmpl.setDescription(m_descriptionEdit->text());
     tmpl.setImagePath(m_imagePath);
     
@@ -450,7 +444,7 @@ void SolutionTemplateEditor::onSelectImage()
         // If we don't have a template name yet, use the current template's directory path from the manager
         // We need to get the current template path differently
         // For new templates, we'll use the name from the edit field
-        QString templateName = m_nameEdit->lineEdit()->text().trimmed();
+        QString templateName = m_nameEdit->text().trimmed();
         if (!templateName.isEmpty()) {
             templateDir = m_templateManager->root() + "/" + templateName;
         } else {

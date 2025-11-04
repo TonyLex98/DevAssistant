@@ -1,6 +1,5 @@
 #include "MicStreamWidget.h"
 #include "StreamRunner.h"
-#include <QLineEdit>
 #include <QSpinBox>
 #include <QPushButton>
 #include <QTextEdit>
@@ -9,9 +8,9 @@
 #include <QVBoxLayout>
 
 MicStreamWidget::MicStreamWidget(QWidget* parent) : QWidget(parent) {
-    m_exeEdit   = new QLineEdit(this);
-    m_modelEdit = new QLineEdit(this);
-    m_langEdit  = new QLineEdit(this);
+    m_exeEdit   = new MemoryLineEdit("micStreamExe", this);
+    m_modelEdit = new MemoryLineEdit("micStreamModel", this);
+    m_langEdit  = new MemoryLineEdit("micStreamLang", this);
     m_langEdit->setPlaceholderText("ru (leave empty for default/en)");
 
     // Prefill with requested folders/paths

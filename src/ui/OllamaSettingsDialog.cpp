@@ -7,7 +7,8 @@
 OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     setWindowTitle("Ollama Settings");
     auto f = new QFormLayout(this);
-    m_endpoint = new QLineEdit("http://127.0.0.1:11434", this);
+    m_endpoint = new MemoryLineEdit("ollama_endpoint", this);
+    m_endpoint->setText("http://127.0.0.1:11434");
     
     // Основные параметры генерации
     m_temperature = new QDoubleSpinBox(this); m_temperature->setRange(0.0, 2.0); m_temperature->setSingleStep(0.1); m_temperature->setValue(0.1);
@@ -23,7 +24,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     m_mirostatEta = new QDoubleSpinBox(this); m_mirostatEta->setRange(0.0, 1.0); m_mirostatEta->setSingleStep(0.01); m_mirostatEta->setValue(0.1);
     m_seed = new QSpinBox(this); m_seed->setRange(0, 1000000000); m_seed->setValue(0);
     m_stopWords = new QTextEdit(this); m_stopWords->setMaximumHeight(100); // Для ввода нескольких слов
-    m_reasoningEffort = new QLineEdit(this); m_reasoningEffort->setText("medium");
+    m_reasoningEffort = new MemoryLineEdit("ollama_reasoning_effort", this); m_reasoningEffort->setText("medium");
     m_temperatureDecay = new QDoubleSpinBox(this); m_temperatureDecay->setRange(0.0, 1.0); m_temperatureDecay->setSingleStep(0.01); m_temperatureDecay->setValue(0.0);
     m_repeatLastN = new QSpinBox(this); m_repeatLastN->setRange(0, 1000); m_repeatLastN->setValue(64);
     

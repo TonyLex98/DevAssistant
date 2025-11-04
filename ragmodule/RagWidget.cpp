@@ -2,7 +2,6 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileDialog>
-#include <QPushButton>
 #include <QStandardItemModel>
 
 namespace Rag
@@ -13,10 +12,10 @@ RagWidget::RagWidget(QWidget *parent) : QWidget(parent)
     mProcessor = new RAGProcessor(this);
     mProcessor->init();
     mTree = new QTreeView(this);
-    mRootEdit = new QLineEdit(this);
-    mIndexBtn = new QPushButton(tr("Index"), this);
-    mQueryEdit = new QLineEdit(this);
-    mAskBtn = new QPushButton(tr("Ask"), this);
+    mRootEdit = new MemoryLineEdit("rag_root_path", this);
+    mIndexBtn = new StyledButton(tr("Index"), this);
+    mQueryEdit = new MemoryLineEdit("rag_query", this);
+    mAskBtn = new StyledButton(tr("Ask"), this);
     mProgress = new QProgressBar(this);
     mResult = new QTextEdit(this);
     mResult->setReadOnly(true);
@@ -35,8 +34,8 @@ RagWidget::RagWidget(QWidget *parent) : QWidget(parent)
     rootLayout->addWidget(mResult);
     setLayout(rootLayout);
 
-    connect(mIndexBtn, &QPushButton::clicked, this, &RagWidget::onIndexButtonClicked);
-    connect(mAskBtn, &QPushButton::clicked, this, &RagWidget::onAskButtonClicked);
+    connect(mIndexBtn, &StyledButton::clicked, this, &RagWidget::onIndexButtonClicked);
+    connect(mAskBtn, &StyledButton::clicked, this, &RagWidget::onAskButtonClicked);
     connect(mProcessor, &RAGProcessor::progress, this, &RagWidget::onProgress);
     connect(mProcessor, &RAGProcessor::indexingFinished, this, &RagWidget::onIndexingFinished);
     connect(mProcessor, &RAGProcessor::answered, this, &RagWidget::onAnswered);

@@ -6,7 +6,6 @@
 
 class QListWidget;
 class StyledButton;
-class QLineEdit;
 class StyleTextEdit;
 
 class PromptSequenceEditor : public QWidget

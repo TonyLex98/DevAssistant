@@ -7,8 +7,6 @@
 #include <QListWidget>
 #include <QDialogButtonBox>
 #include <QTabWidget>
-#include <QComboBox>
-#include <QLineEdit>
 #include <QToolButton>
 #include <QFileDialog>
 #include <QMessageBox>

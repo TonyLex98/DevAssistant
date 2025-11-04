@@ -7,8 +7,9 @@
 #include <QWidget>
 #include <QTreeView>
 #include <QProgressBar>
-#include <QLineEdit>
 #include <QTextEdit>
+#include "../src/ui/customWidgets/StyledButton.h"
+#include "../src/ui/customWidgets/MemoryLineEdit.h"
 
 namespace Rag
 {
@@ -27,10 +28,10 @@ private slots:
 
 private:
     QTreeView *mTree;
-    QLineEdit *mRootEdit;
-    QPushButton *mIndexBtn;
-    QLineEdit *mQueryEdit;
-    QPushButton *mAskBtn;
+    MemoryLineEdit *mRootEdit;
+    StyledButton *mIndexBtn;
+    MemoryLineEdit *mQueryEdit;
+    StyledButton *mAskBtn;
     QProgressBar *mProgress;
     QTextEdit *mResult;
     RAGProcessor *mProcessor;

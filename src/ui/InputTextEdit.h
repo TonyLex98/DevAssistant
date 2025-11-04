@@ -4,7 +4,6 @@
 #include <QTextEdit>
 #include <QPushButton>
 #include "../adapters/OllamaAdapter.h"
-#include <QComboBox>
 #include <QKeyEvent>
 #include <StyleTextEdit.h>
 

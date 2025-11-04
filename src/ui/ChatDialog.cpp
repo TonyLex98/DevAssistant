@@ -24,7 +24,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     connect(m_stop, &StyledButton::clicked, this, &ChatDialog::onStop);
     connect(m_input, &InputTextEdit::sendMessage, this, &ChatDialog::onSend);
 
-    connect(m_cb_model, &QComboBox::currentTextChanged, this, [this](const QString &text){
+    connect(m_cb_model, &MemoryComboBox::currentTextChanged, this, [this](const QString &text){
         m_model->configure(text, QVariantMap());
     });
 

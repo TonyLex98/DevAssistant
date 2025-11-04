@@ -6,6 +6,7 @@
 #include <StyledButton.h>
 #include <QListWidgetItem>
 #include <QMessageBox>
+#include "customWidgets/MemoryComboBox.h"
 
 
 PromptStepDialog::PromptStepDialog(QWidget *parent)
@@ -18,7 +19,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 
     /* ---------- Кнопка вставки резолвера ---------- */
     auto *hRes = new QHBoxLayout();
-    m_resolverCombo = new QComboBox(this);
+    m_resolverCombo = new MemoryComboBox("promptStepResolver", this);
     m_insertBtn = new StyledButton("Вставить", this);
     hRes->addWidget(m_resolverCombo);
     hRes->addWidget(m_insertBtn);

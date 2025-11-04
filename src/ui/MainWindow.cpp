@@ -114,9 +114,12 @@ MainWindow::MainWindow(QWidget *parent)
     undoBtn     = new StyledButton("Undo", this);
     descBtn     = new StyledButton("Generate Descriptions", this);
 
-    btns->addWidget(runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"), this));
+    runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"));
+    //btns->addWidget(runSeqBtn);
+    runSeqBtn->hide();
     StyledButton *runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
-    btns->addWidget(runTemplateBtn);
+    runTemplateBtn->hide();
+    //btns->addWidget(runTemplateBtn);
     btns->addWidget(editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this));
     btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
 
@@ -171,7 +174,8 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Add a direct button for the main "Прогер" template
     StyledButton *runProgTemplateBtn = new StyledButton(tr("Запустить Прогер-шаблон"), this);
-    btns->addWidget(runProgTemplateBtn);
+    runProgTemplateBtn->hide();
+    //btns->addWidget(runProgTemplateBtn);
     
     connect(runProgTemplateBtn, &StyledButton::clicked, this, [this]() {
         refreshAllSequences();

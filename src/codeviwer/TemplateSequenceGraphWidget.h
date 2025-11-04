@@ -6,8 +6,6 @@
 #include <QTabWidget>
 #include <QSplitter>
 #include <QLabel>
-#include <QPushButton>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -18,6 +16,8 @@
 #include "SolutionTemplate.h"
 #include "SolutionTemplateManager.h"
 #include "PromptSequenceManager.h"
+#include "../ui/customWidgets/StyledButton.h"
+#include "../ui/customWidgets/MemoryLineEdit.h"
 
 class TemplateSequenceGraphWidget : public QWidget
 {
@@ -58,10 +58,10 @@ private:
     
     // Template Info Tab
     QWidget *m_templateInfoTab;
-    QLineEdit *m_nameEdit;
-    QLineEdit *m_descriptionEdit;
+    MemoryLineEdit *m_nameEdit;
+    MemoryLineEdit *m_descriptionEdit;
     QLabel *m_imageLabel;
-    QPushButton *m_selectImageBtn;
+    StyledButton *m_selectImageBtn;
     
     // Sequences Tab
     QWidget *m_sequencesTab;
@@ -71,15 +71,15 @@ private:
     QVBoxLayout *m_templateSequencesLayout;
     QListWidget *m_templateSequencesList;
     QVBoxLayout *m_buttonsLayout;
-    QPushButton *m_addSequenceBtn;
-    QPushButton *m_removeSequenceBtn;
-    QPushButton *m_setMainSequenceBtn;
+    StyledButton *m_addSequenceBtn;
+    StyledButton *m_removeSequenceBtn;
+    StyledButton *m_setMainSequenceBtn;
     
     // Graph Tab
     QWidget *m_graphTab;
     QVBoxLayout *m_graphLayout;
     SequenceRelationView *m_graphView;
-    QPushButton *m_refreshGraphBtn;
+    StyledButton *m_refreshGraphBtn;
     
     // Managers and data
     SolutionTemplateManager *m_templateManager = nullptr;

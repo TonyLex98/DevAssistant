@@ -8,7 +8,7 @@ GraphWidget::GraphWidget(QWidget *parent)
     setWindowTitle("Project Graph");
     setMinimumSize(600, 400);
 
-    m_openBtn = new QPushButton("Open Project…", this);
+    m_openBtn = new StyledButton("Open Project…", this);
     m_view    = new ProjectRelationView(this);
     //m_view->hide();
 
@@ -17,7 +17,7 @@ GraphWidget::GraphWidget(QWidget *parent)
     layout->addWidget(m_view);
     setLayout(layout);
 
-    connect(m_openBtn, &QPushButton::clicked, this, [this](){
+    connect(m_openBtn, &StyledButton::clicked, this, [this](){
         QString root = QFileDialog::getExistingDirectory(
             this, "Select project folder", QDir::homePath());
         if (root.isEmpty()) return;

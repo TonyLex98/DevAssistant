@@ -2,7 +2,6 @@
 #include <QMainWindow>
 #include <QListWidget>
 #include <StyleTextEdit.h>
-#include <QLineEdit>
 #include <QPair>
 #include <QFileSystemWatcher>
 #include <runSequenceDialog.h>
@@ -44,7 +43,6 @@
 #include "GraphWidget.h"
 #include <QMap>
 #include <QVector>
-#include <QComboBox>
 #include "customWidgets/MemoryComboBox.h"
 #include "../core/ContextManager.h"
 

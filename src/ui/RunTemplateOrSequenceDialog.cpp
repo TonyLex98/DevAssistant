@@ -27,7 +27,7 @@ void RunTemplateOrSequenceDialog::setupUI()
     // Mode selection
     auto *modeLayout = new QHBoxLayout();
     QLabel *modeLabel = new QLabel("Mode:", this);
-    QComboBox *modeCombo = new QComboBox(this);
+    MemoryComboBox *modeCombo = new MemoryComboBox("runTemplateOrSequenceMode", this);
     modeCombo->addItem("Run Individual Sequence", RunSequence);
     modeCombo->addItem("Run Template", RunTemplate);
     modeCombo->setCurrentIndex(1); // Default to template mode (changed from 0 to 1)
@@ -35,7 +35,7 @@ void RunTemplateOrSequenceDialog::setupUI()
     modeLayout->addWidget(modeCombo, 1);
     layout->addLayout(modeLayout);
     
-    connect(modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+    connect(modeCombo, QOverload<int>::of(&MemoryComboBox::currentIndexChanged), 
             this, &RunTemplateOrSequenceDialog::onModeChanged);
     
     // Set default mode 

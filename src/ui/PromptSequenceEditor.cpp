@@ -6,7 +6,6 @@
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <StyledButton.h>
-#include <QLineEdit>
 #include <StyleTextEdit.h>
 #include <QMessageBox>
 #include <QFormLayout>

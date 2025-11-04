@@ -13,12 +13,12 @@ SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* template
     
     // Connect signals
     connect(m_templateList, &QListWidget::currentRowChanged, this, &SolutionTemplateViewer::onTemplateSelected);
-    connect(m_editTemplateBtn, &QPushButton::clicked, this, &SolutionTemplateViewer::onEditTemplate);
-    connect(m_deleteTemplateBtn, &QPushButton::clicked, this, &SolutionTemplateViewer::onDeleteTemplate);
-    connect(m_addTemplateBtn, &QPushButton::clicked, this, &SolutionTemplateViewer::onAddTemplate);
-    connect(m_exportTemplateBtn, &QPushButton::clicked, this, &SolutionTemplateViewer::onExportTemplate);
-    connect(m_importSequenceBtn, &QPushButton::clicked, this, &SolutionTemplateViewer::onImportSequenceAsTemplate);
-    connect(m_runTemplateBtn, &QPushButton::clicked, this, [this]() {
+    connect(m_editTemplateBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onEditTemplate);
+    connect(m_deleteTemplateBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onDeleteTemplate);
+    connect(m_addTemplateBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onAddTemplate);
+    connect(m_exportTemplateBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onExportTemplate);
+    connect(m_importSequenceBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onImportSequenceAsTemplate);
+    connect(m_runTemplateBtn, &StyledButton::clicked, this, [this]() {
         if (!m_currentTemplateDir.isEmpty()) {
             // Emit signal to run the template with the selected sequence
             QString selectedSeq = m_defaultSequenceCombo->currentData().toString();
@@ -45,11 +45,11 @@ void SolutionTemplateViewer::setupUI()
     listLayout->addWidget(m_templateList);
     
     auto* listButtonsLayout = new QHBoxLayout();
-    m_addTemplateBtn = new QPushButton(tr("Add Template"), this);
-    m_editTemplateBtn = new QPushButton(tr("Edit Template"), this);
-    m_deleteTemplateBtn = new QPushButton(tr("Delete Template"), this);
-    m_exportTemplateBtn = new QPushButton(tr("Export Template"), this);
-    m_importSequenceBtn = new QPushButton(tr("Import Sequence as Template"), this);
+    m_addTemplateBtn = new StyledButton(tr("Add Template"), this);
+    m_editTemplateBtn = new StyledButton(tr("Edit Template"), this);
+    m_deleteTemplateBtn = new StyledButton(tr("Delete Template"), this);
+    m_exportTemplateBtn = new StyledButton(tr("Export Template"), this);
+    m_importSequenceBtn = new StyledButton(tr("Import Sequence as Template"), this);
     listButtonsLayout->addWidget(m_addTemplateBtn);
     listButtonsLayout->addWidget(m_editTemplateBtn);
     listButtonsLayout->addWidget(m_deleteTemplateBtn);
@@ -90,7 +90,7 @@ void SolutionTemplateViewer::setupUI()
     qDebug() << "[SolutionTemplateViewer] Creating MemoryComboBox for defaultTemplateSequence";
     m_defaultSequenceCombo = new MemoryComboBox("defaultTemplateSequence", this);
     qDebug() << "[SolutionTemplateViewer] Created MemoryComboBox for defaultTemplateSequence";
-    m_runTemplateBtn = new QPushButton(tr("Run Template"), this);
+    m_runTemplateBtn = new StyledButton(tr("Run Template"), this);
     seqLayout->addWidget(seqLabel);
     seqLayout->addWidget(m_defaultSequenceCombo, 1);
     seqLayout->addWidget(m_runTemplateBtn);

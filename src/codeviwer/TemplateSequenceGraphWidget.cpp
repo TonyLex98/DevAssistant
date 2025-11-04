@@ -4,8 +4,6 @@
 #include <QTabWidget>
 #include <QSplitter>
 #include <QLabel>
-#include <QPushButton>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -18,8 +16,6 @@
 #include <QJsonArray>
 #include <QGroupBox>
 #include <QGridLayout>
-#include <QJsonObject>
-#include <QJsonArray>
 
 TemplateSequenceGraphWidget::TemplateSequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
@@ -42,12 +38,12 @@ void TemplateSequenceGraphWidget::setupUI()
     auto *infoGrid = new QGridLayout(infoGroupBox);
     
     QLabel *nameLabel = new QLabel(tr("Name:"), this);
-    m_nameEdit = new QLineEdit(this);
+    m_nameEdit = new MemoryLineEdit("templateSequenceGraphWidgetName", this);
     infoGrid->addWidget(nameLabel, 0, 0);
     infoGrid->addWidget(m_nameEdit, 0, 1);
     
     QLabel *descLabel = new QLabel(tr("Description:"), this);
-    m_descriptionEdit = new QLineEdit(this);
+    m_descriptionEdit = new MemoryLineEdit("templateSequenceGraphWidgetDescription", this);
     infoGrid->addWidget(descLabel, 1, 0);
     infoGrid->addWidget(m_descriptionEdit, 1, 1);
     
@@ -56,7 +52,7 @@ void TemplateSequenceGraphWidget::setupUI()
     m_imageLabel->setMinimumSize(200, 200);
     m_imageLabel->setStyleSheet("border: 1px solid gray;");
     m_imageLabel->setAlignment(Qt::AlignCenter);
-    m_selectImageBtn = new QPushButton(tr("Select Image..."), this);
+    m_selectImageBtn = new StyledButton(tr("Select Image..."), this);
     auto *imageLayout = new QHBoxLayout();
     imageLayout->addWidget(m_imageLabel);
     imageLayout->addWidget(m_selectImageBtn);
@@ -90,9 +86,9 @@ void TemplateSequenceGraphWidget::setupUI()
     
     // Buttons in the center
     m_buttonsLayout = new QVBoxLayout();
-    m_addSequenceBtn = new QPushButton(tr("→ Add to Template"), this);
-    m_removeSequenceBtn = new QPushButton(tr("Remove from Template ←"), this);
-    m_setMainSequenceBtn = new QPushButton(tr("Set as Main"), this);
+    m_addSequenceBtn = new StyledButton(tr("→ Add to Template"), this);
+    m_removeSequenceBtn = new StyledButton(tr("Remove from Template ←"), this);
+    m_setMainSequenceBtn = new StyledButton(tr("Set as Main"), this);
     m_buttonsLayout->addWidget(m_addSequenceBtn);
     m_buttonsLayout->addWidget(m_removeSequenceBtn);
     m_buttonsLayout->addWidget(m_setMainSequenceBtn);
@@ -107,7 +103,7 @@ void TemplateSequenceGraphWidget::setupUI()
     m_graphLayout = new QVBoxLayout(m_graphTab);
     
     m_graphView = new SequenceRelationView(this);
-    m_refreshGraphBtn = new QPushButton(tr("Refresh Graph"), this);
+    m_refreshGraphBtn = new StyledButton(tr("Refresh Graph"), this);
     
     m_graphLayout->addWidget(m_graphView);
     m_graphLayout->addWidget(m_refreshGraphBtn);
@@ -120,13 +116,13 @@ void TemplateSequenceGraphWidget::setupUI()
     m_mainLayout->addWidget(m_tabs);
     
     // Connect signals
-    connect(m_addSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onAddSequenceToTemplate);
-    connect(m_removeSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onRemoveSequenceFromTemplate);
-    connect(m_setMainSequenceBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onSetMainSequence);
-    connect(m_selectImageBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::onSelectImage);
+    connect(m_addSequenceBtn, &StyledButton::clicked, this, &TemplateSequenceGraphWidget::onAddSequenceToTemplate);
+    connect(m_removeSequenceBtn, &StyledButton::clicked, this, &TemplateSequenceGraphWidget::onRemoveSequenceFromTemplate);
+    connect(m_setMainSequenceBtn, &StyledButton::clicked, this, &TemplateSequenceGraphWidget::onSetMainSequence);
+    connect(m_selectImageBtn, &StyledButton::clicked, this, &TemplateSequenceGraphWidget::onSelectImage);
     connect(m_templateSequencesList, &QListWidget::currentItemChanged, this, &TemplateSequenceGraphWidget::onSequenceInTemplateSelected);
     connect(m_availableSequencesList, &QListWidget::currentItemChanged, this, &TemplateSequenceGraphWidget::onExternalSequenceSelected);
-    connect(m_refreshGraphBtn, &QPushButton::clicked, this, &TemplateSequenceGraphWidget::refreshGraph);
+    connect(m_refreshGraphBtn, &StyledButton::clicked, this, &TemplateSequenceGraphWidget::refreshGraph);
     connect(m_graphView, &SequenceRelationView::sequenceSelected, this, &TemplateSequenceGraphWidget::onGraphSequenceSelected);
 }
 

@@ -5,13 +5,12 @@
 #include <QDialogButtonBox>
 #include "PromptSequenceManager.h"  // Include the header for sequence manager
 #include <StyledButton.h>
-#include <QComboBox>
+#include "customWidgets/MemoryComboBox.h"
 #include <QCheckBox>
 
 class StyleTextEdit;
 class QListWidget;
 class StyledButton;
-class QComboBox;
 
 class PromptStepDialog : public QDialog
 {
@@ -38,7 +37,7 @@ private:
     QString m_templateDir; // Directory of the current template for filtering
 
     /* --- UI для резолверов --- */
-    QComboBox   *m_resolverCombo = nullptr;
+    MemoryComboBox   *m_resolverCombo = nullptr;
     StyledButton *m_insertBtn      = nullptr;
 
     /* --- UI для зацикливания --- */

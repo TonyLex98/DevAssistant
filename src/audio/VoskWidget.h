@@ -1,10 +1,9 @@
 #pragma once
 #include <QWidget>
 #include <QLabel>
+#include "../ui/customWidgets/MemoryLineEdit.h"
+#include "../ui/customWidgets/StyledButton.h"
 
-class QLineEdit;
-class QPushButton;
-class QLabel;
 class QTextEdit;
 class QCheckBox;
 class QSpinBox;
@@ -23,13 +22,13 @@ private slots:
 signals:
     void voiceRecognized(const QString&);
 private:
-    QLineEdit* m_dllEdit;
-    QLineEdit* m_modelEdit;
+    MemoryLineEdit* m_dllEdit;
+    MemoryLineEdit* m_modelEdit;
     QSpinBox*  m_srSpin;
     QCheckBox* m_wordsChk;
     QCheckBox* m_partialWordsChk;
-    QPushButton* m_startBtn;
-    QPushButton* m_stopBtn;
+    StyledButton* m_startBtn;
+    StyledButton* m_stopBtn;
     QLabel*     m_partialLbl;
     QTextEdit*  m_log;
 

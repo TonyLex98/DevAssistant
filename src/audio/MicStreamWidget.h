@@ -1,8 +1,8 @@
 #pragma once
 #include <QWidget>
 #include <StreamRunner.h>
+#include "../ui/customWidgets/MemoryLineEdit.h"
 
-class QLineEdit;
 class QSpinBox;
 class QPushButton;
 class QTextEdit;
@@ -19,9 +19,9 @@ private slots:
     void onFinished(int, QProcess::ExitStatus);
     void onError(const QString& msg);
 private:
-    QLineEdit*  m_exeEdit;
-    QLineEdit*  m_modelEdit;
-    QLineEdit*  m_langEdit;
+    MemoryLineEdit*  m_exeEdit;
+    MemoryLineEdit*  m_modelEdit;
+    MemoryLineEdit*  m_langEdit;
     QSpinBox*   m_stepSpin;
     QSpinBox*   m_lenSpin;
     QSpinBox*   m_keepSpin;
