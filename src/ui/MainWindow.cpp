@@ -17,6 +17,7 @@
 #include <QInputDialog>
 #include <QRegularExpression>
 #include <QFileInfo>
+#include <QTimer>
 #include <algorithm>
 #include "../command/EditInRangeCommand.h"
 #include "../command/RunShellCommand.h"
@@ -245,6 +246,19 @@ MainWindow::MainWindow(QWidget *parent)
     m_voskWidget = new VoskWidget(this);
     connect(m_voskWidget, &VoskWidget::voiceRecognized,
             this, &MainWindow::onVoskText);
+    
+    // Initialize context status widget to display command context state
+    m_contextStatusWidget = new QWidget(this);
+    m_contextCommandsList = new QListWidget(m_contextStatusWidget);
+    m_contextCommandsList->setObjectName("contextCommandsList");
+    
+    QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
+    contextLayout->setContentsMargins(5, 5, 5, 5);
+    contextLayout->addWidget(new QLabel(tr("Context Commands:"), m_contextStatusWidget));
+    contextLayout->addWidget(m_contextCommandsList);
+    
+    // Set initial height for the context status widget
+    m_contextStatusWidget->setMaximumHeight(150);
 
     // --------  4. Верхняя часть layout (внутри rightPanel) ----------
     /*QVBoxLayout *rightLayout = new QVBoxLayout;
@@ -262,6 +276,7 @@ MainWindow::MainWindow(QWidget *parent)
     //mainSplitter->addWidget(m_files);
     mainSplitter->addWidget(m_log);
     mainSplitter->addWidget(m_chat);
+    mainSplitter->addWidget(m_contextStatusWidget); // Add context status widget
     mainSplitter->addWidget(buttons_widget);
 
     m_files->hide();
@@ -340,6 +355,19 @@ MainWindow::MainWindow(QWidget *parent)
     m_seqGraphWindow->rebuildGraph(); // Now rebuild the graph with restored positions
     m_seqGraphWindow->hide(); // Hide the window, we just need it for position restoration
     qDebug() << "[MainWindow] Initialized and restored sequence graph layout on startup";
+
+    // Initialize file system watcher to monitor external file changes
+    m_fileWatcher = new QFileSystemWatcher(this);
+    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileChanged);
+
+    // Initialize the new ContextManager
+    m_contextManager = new ContextManager(this);
+    m_contextManager->setDevAssManager(&m_dev_manager);
+    m_contextManager->setMainWindow(this);
+    connect(m_contextManager, &ContextManager::contextChanged, this, [this]() {
+        // When context changes, update the GUI display
+        updateContextStatusDisplay();
+    });
 
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
@@ -693,6 +721,14 @@ QString MainWindow::buildProjectContext() const
     // ---------- Контент файлов, открытых командой OPEN_FILE ----------
     if (!m_contextContent.isEmpty())
         s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
+    
+    // ---------- Context chain from command execution ----------
+    if (m_contextManager) {
+        QString contextChain = m_contextManager->generateContextText();
+        if (!contextChain.isEmpty()) {
+            s += "\nЦепочка контекста из выполненных команд:\n" + contextChain + "\n";
+        }
+    }
 
     return s;
 }
@@ -1245,14 +1281,18 @@ void MainWindow::handleAssistantFinished()
         QString result = cmd->getResult();
         
         if (!result.isEmpty()) {
-            // Extract title from the first line
-            QStringList lines = result.split('\n');
-            QString title = lines.takeFirst().split(':').first(); // Get command name part
+            // Extract title from the first line - include the command and its parameter for uniqueness
+            QString fullTitle = result.split('\n').first();  // Get the full first line like "RUN_SHELL: command" or "RUN_PYTHON: script"
             
-            appendConsoleContext(title, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
+            appendConsoleContext(fullTitle, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
             
             // Also add to history so user can see command results in the chat
             m_history.push_back(qMakePair(QString("system"), result));
+        }
+        
+        // Add command to context manager with result
+        if (m_contextManager) {
+            m_contextManager->addCommand(cmd, result);
         }
     };
 
@@ -1329,6 +1369,17 @@ void MainWindow::handleOpenCommand(Command* cmd)
         allLines.removeLast();
     if (cmd->name() == "OPEN_FILE") {
         setFullFileContext(normalized, allLines);
+        // Track that this file's content is in context from OPEN_FILE command
+        m_fileToContextCommands[normalized].insert("OPEN_FILE");
+        // Add file to watcher to monitor for external changes
+        if (!m_fileWatcher->files().contains(normalized) && QFileInfo::exists(normalized)) {
+            m_fileWatcher->addPath(normalized);
+        }
+        // Add command to context manager
+        if (m_contextManager) {
+            QString result = QString("OPEN_FILE: %1 (full content)").arg(rawPath);
+            m_contextManager->addCommand(cmd, result);
+        }
         return;
     }
 
@@ -1359,8 +1410,20 @@ void MainWindow::handleOpenCommand(Command* cmd)
             snippet.removeLast();
     }
 
-    if (!snippet.isEmpty())
+    if (!snippet.isEmpty()) {
         addRegionContext(normalized, startLine, snippet);
+        // Track that this file's content is in context from OPEN_FILE_REGION command
+        m_fileToContextCommands[normalized].insert("OPEN_FILE_REGION");
+        // Add file to watcher to monitor for external changes
+        if (!m_fileWatcher->files().contains(normalized) && QFileInfo::exists(normalized)) {
+            m_fileWatcher->addPath(normalized);
+        }
+        // Add command to context manager
+        if (m_contextManager) {
+            QString result = QString("OPEN_FILE_REGION: %1 [lines %2-%3]").arg(rawPath).arg(startLine).arg(startLine + snippet.size() - 1);
+            m_contextManager->addCommand(cmd, result);
+        }
+    }
 }
 
 void MainWindow::rebuildContextCache()
@@ -1399,6 +1462,17 @@ void MainWindow::rebuildContextCache()
         if (!m_contextContent.isEmpty())
             m_contextContent += "\n\n";
         m_contextContent += m_externalSources.join("\n\n");
+    }
+    
+    // If ContextManager is available, append its generated context
+    if (m_contextManager) {
+        QString contextManagerContent = m_contextManager->generateContextText();
+        if (!contextManagerContent.isEmpty()) {
+            if (!m_contextContent.isEmpty()) {
+                m_contextContent += "\n\n";
+            }
+            m_contextContent += contextManagerContent;
+        }
     }
 }
 
@@ -1467,8 +1541,15 @@ void MainWindow::clearContextForPath(const QString& path)
     const QString normalized = normalizeContextPath(path, m_projectRoot);
     if (normalized.isEmpty())
         return;
-    if (m_contextSlices.remove(normalized) > 0)
+    if (m_contextSlices.remove(normalized) > 0) {
         rebuildContextCache();
+    }
+    // Remove from file watcher if it was being monitored
+    if (m_fileWatcher->files().contains(normalized)) {
+        m_fileWatcher->removePath(normalized);
+    }
+    // Remove from file-to-context-commands mapping
+    m_fileToContextCommands.remove(normalized);
 }
 
 bool MainWindow::applyGroupedEditInRange(const QList<Command*>& commands, QString* err)
@@ -1508,6 +1589,54 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     if (name == "RENAME_FILE") {
         clear(p.value("oldPath").toString());
         clear(p.value("newPath").toString());
+        return;
+    }
+
+    // Handle RunShellCommand - remove old output when command is run again
+    if (name == "RUN_SHELL") {
+        QString command = p.value("command").toString();
+        if (!command.isEmpty()) {
+            // Remove existing output for this shell command
+            auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
+                [&command](const QString& log) {
+                    return log.startsWith("==== RUN_SHELL: " + command);
+                });
+            m_consoleLogs.erase(it, m_consoleLogs.end());
+            m_shellCommandOutputs.remove(command);
+            rebuildContextCache();
+        }
+        return;
+    }
+
+    // Handle RunPythonCommand - remove old output when same script is run again
+    if (name == "RUN_PYTHON") {
+        QString scriptPath = p.value("scriptPath").toString();
+        QString code = p.value("code").toString();
+        QString identifier = !scriptPath.isEmpty() ? scriptPath : "inline code";
+        
+        if (!identifier.isEmpty()) {
+            // Remove existing output for this Python script/command
+            auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
+                [&identifier](const QString& log) {
+                    return log.startsWith("==== RUN_PYTHON: " + identifier);
+                });
+            m_consoleLogs.erase(it, m_consoleLogs.end());
+            m_pythonScriptOutputs.remove(identifier);
+            rebuildContextCache();
+        }
+        return;
+    }
+
+    // Handle OpenFileContextCommand and OpenFileRegionCommand - add to file watcher
+    if (name == "OPEN_FILE" || name == "OPEN_FILE_REGION") {
+        QString path = p.value("path").toString();
+        if (!path.isEmpty()) {
+            const QString normalized = normalizeContextPath(path, m_projectRoot);
+            // Add file to watcher to monitor for external changes
+            if (!m_fileWatcher->files().contains(normalized) && QFileInfo::exists(normalized)) {
+                m_fileWatcher->addPath(normalized);
+            }
+        }
     }
 }
 
@@ -1519,6 +1648,11 @@ void MainWindow::handleSearchResults(Command* cmd)
         QString title = QString("==== SEARCH_WEB: %1 ====").arg(cmd->params().value("query").toString());
         QString body = web->results().join("\n\n");
         appendExternalContext(QString("%1\n%2").arg(title, body));
+        
+        // Add to context manager
+        if (m_contextManager) {
+            m_contextManager->addCommand(cmd, QString("%1\n%2").arg(title, body));
+        }
         return;
     }
     if (auto local = dynamic_cast<SearchProjectCommand*>(cmd)) {
@@ -1527,6 +1661,11 @@ void MainWindow::handleSearchResults(Command* cmd)
         QString title = QString("==== SEARCH_PROJECT: %1 ====").arg(cmd->params().value("query").toString());
         QString body = local->matches().join("\n\n");
         appendExternalContext(QString("%1\n%2").arg(title, body));
+        
+        // Add to context manager
+        if (m_contextManager) {
+            m_contextManager->addCommand(cmd, QString("%1\n%2").arg(title, body));
+        }
     }
 }
 
@@ -1548,6 +1687,30 @@ void MainWindow::appendConsoleContext(const QString& title,
         block += "[stderr]\n" + stdErr.trimmed() + "\n";
     }
     block += QString("exitCode=%1").arg(exitCode);
+    
+    // If this is a RUN_SHELL command output, replace existing output for the same command
+    if (title.startsWith("RUN_SHELL: ")) {
+        QString cmd = title.mid(11); // Extract the command part after "RUN_SHELL: "
+        // Remove existing output for this command
+        auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
+            [&cmd](const QString& log) {
+                return log.startsWith("==== RUN_SHELL: " + cmd);
+            });
+        m_consoleLogs.erase(it, m_consoleLogs.end());
+        m_shellCommandOutputs.remove(cmd);
+    }
+    // If this is a RUN_PYTHON command output, replace existing output for the same script
+    else if (title.startsWith("RUN_PYTHON: ")) {
+        QString script = title.mid(12); // Extract the script part after "RUN_PYTHON: "
+        // Remove existing output for this script
+        auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
+            [&script](const QString& log) {
+                return log.startsWith("==== RUN_PYTHON: " + script);
+            });
+        m_consoleLogs.erase(it, m_consoleLogs.end());
+        m_pythonScriptOutputs.remove(script);
+    }
+    
     m_consoleLogs << block.trimmed();
     const int maxLogs = 5;
     while (m_consoleLogs.size() > maxLogs)
@@ -1727,6 +1890,11 @@ void MainWindow::reOpenRootDir(){
         return;
     }
 
+    // Clear file watcher and context mappings when switching projects
+    m_fileWatcher->removePaths(m_fileWatcher->files());
+    m_fileToContextCommands.clear();
+    m_shellCommandOutputs.clear();
+    m_pythonScriptOutputs.clear();
 
     ide_widget->openProjectbyPath(m_projectRoot);
 
@@ -1896,6 +2064,14 @@ QString MainWindow::fileDescriptionsText() const
     return out.trimmed();
 }
 
+QString MainWindow::getContextChainText() const
+{
+    if (m_contextManager) {
+        return m_contextManager->generateContextText();
+    }
+    return QString();
+}
+
 void MainWindow::createNewSequence()
 {
     // Ask user for name
@@ -1925,6 +2101,65 @@ void MainWindow::createNewSequence()
     m_seqMgr.refresh();
     ensureDefaultSequence();
     QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
+}
+
+void MainWindow::updateContextStatusDisplay()
+{
+    if (!m_contextCommandsList) {
+        return;
+    }
+    
+    m_contextCommandsList->clear();
+    
+    // Get all commands from context manager
+    QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
+    
+    for (const auto& cmdInfo : allCommands) {
+        QString displayText = QString("[%1] %2").arg(cmdInfo.timestamp.toString("hh:mm:ss")).arg(cmdInfo.description);
+        
+        QListWidgetItem* item = new QListWidgetItem(displayText);
+        
+        if (cmdInfo.isStillValid) {
+            // Valid commands shown in green
+            item->setBackground(Qt::green);
+            item->setToolTip("This command is still valid in context");
+        } else {
+            // Invalid commands shown in red with reason
+            item->setBackground(Qt::red);
+            item->setToolTip(QString("Invalid: %1").arg(cmdInfo.invalidationReason));
+        }
+        
+        // Store command ID in userData for potential future use
+        item->setData(Qt::UserRole, cmdInfo.id);
+        m_contextCommandsList->addItem(item);
+    }
+}
+
+void MainWindow::onFileChanged(const QString &path)
+{
+    qDebug() << "[MainWindow] File changed externally:" << path;
+    
+    // Remove the file from the watcher to avoid immediate re-triggering
+    m_fileWatcher->removePath(path);
+    
+    // Add a small delay to allow file operations to complete
+    QTimer::singleShot(100, this, [this, path]() {
+        // Re-add the file to the watcher
+        if (QFileInfo::exists(path)) {
+            m_fileWatcher->addPath(path);
+        }
+        
+        // Check if this file has context in our tracking
+        if (m_fileToContextCommands.contains(path)) {
+            qDebug() << "[MainWindow] Clearing context for file due to external change:" << path;
+            
+            // Clear contexts related to this file
+            clearContextForPath(path);
+            
+            // Also remove from file-to-commands mapping
+            m_fileToContextCommands.remove(path);
+        }
+    });
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

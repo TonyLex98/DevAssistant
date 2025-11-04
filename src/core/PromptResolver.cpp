@@ -2,6 +2,7 @@
 #include "PromptResolver.h"
 #include "MainWindow.h"
 #include "PromptManager.h"
+#include "../core/ContextChainResolver.h"
 #include <QMap>
 #include <QRegularExpression>
 #include <QDebug>
@@ -84,6 +85,9 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // 7.1) {{SEARCH_RESULTS}} – результаты поисковых команд
     result.replace("{{SEARCH_RESULTS}}", ctx->searchResultsText());
 
+    // 7.2) {{CONTEXT_CHAIN}} – context chain from executed commands
+    result.replace("{{CONTEXT_CHAIN}}", ContextChainResolver::resolveContextChain(ctx));
+
     
     // 6.1) {{FILE_DESCRIPTIONS}} — описания из папки DevelopersAssistant
     result.replace("{{FILE_DESCRIPTIONS}}", ctx->fileDescriptionsText());
@@ -151,7 +155,8 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
     vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
     vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
-    vec.append({"OPEN_SEQUENCE", "Указать, какую последовательность запустить следующей. Формат: {{OPEN_SEQUENCE:имя_последовательности,описание}}"});
+    vec.append({"OPEN_SEQUENCE", "Указать, какую последовательность запустить следующей. Формат: {{OPEN_SEQUENCE:имя_последовательности,описание}"});
+    vec.append({"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
 
     return vec;
 }

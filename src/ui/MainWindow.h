@@ -4,6 +4,7 @@
 #include <StyleTextEdit.h>
 #include <QLineEdit>
 #include <QPair>
+#include <QFileSystemWatcher>
 #include <runSequenceDialog.h>
 #include "../core/ProjectIndex.h"
 #include "../core/ChangeApplier.h"
@@ -45,6 +46,7 @@
 #include <QVector>
 #include <QComboBox>
 #include "customWidgets/MemoryComboBox.h"
+#include "../core/ContextManager.h"
 
 // Need the complete definition for sequence graph widget
 #include "../codeviwer/SequenceGraphWidget.h"
@@ -71,6 +73,7 @@ public:
     const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
 
     QString searchResultsText() const;
+    QString getContextChainText() const; // Public access to context chain
 
 public slots:
     void runSequenceDialog();
@@ -112,6 +115,7 @@ private slots:
     void createNewSequence();
     //void onFileDoubleClicked(QListWidgetItem *item);
     void setupModelWithGenerationParams(); // Configure model with generation parameters
+    void onFileChanged(const QString &path); // Handle external file changes
 
 private:
     QString buildProjectContext() const;
@@ -129,6 +133,17 @@ private:
     ChangeApplier m_applier;
     OllamaAdapter m_model;
     PromptManager m_promptMgr;
+    
+    // File system monitoring to track external file changes
+    QFileSystemWatcher* m_fileWatcher;
+    QMap<QString, QSet<QString>> m_fileToContextCommands; // Maps files to commands that created context from them
+    QMap<QString, QString> m_shellCommandOutputs; // Maps shell commands to their output titles
+    QMap<QString, QString> m_pythonScriptOutputs; // Maps python scripts to their output titles
+    
+    // New context management system
+    ContextManager* m_contextManager;
+    QWidget* m_contextStatusWidget; // Widget to display context command status
+    QListWidget* m_contextCommandsList; // List to show which commands are in context
 
     QListWidget* m_files=nullptr;
     MemoryLineEdit* m_rootEdit=nullptr;
@@ -221,5 +236,8 @@ private:
     void handleSearchResults(Command* cmd);
 
     void retryCurrentSequenceStep();
+
+private:
+    void updateContextStatusDisplay(); // Update the visual display of context commands
 
 };

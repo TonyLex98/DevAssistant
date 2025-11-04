@@ -32,6 +32,8 @@ SOURCES += \
     src/audio/VoskRunner.cpp \
     src/audio/VoskWidget.cpp \
     src/audio/WavWriter.cpp \
+    src/core/ContextManager.cpp \
+    src/core/ContextChainResolver.cpp \
     src/codeviwer/CodePatcher.cpp \
     src/codeviwer/GraphItems.cpp \
     src/codeviwer/GraphLayout.cpp \
@@ -111,6 +113,8 @@ HEADERS += \
     src/audio/VoskRunner.h \
     src/audio/VoskWidget.h \
     src/audio/WavWriter.h \
+    src/core/ContextManager.h \
+    src/core/ContextChainResolver.h \
     src/codeviwer/CodePatcher.h \
     src/codeviwer/GraphItems.h \
     src/codeviwer/GraphLayout.h \
