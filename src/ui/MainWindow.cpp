@@ -2409,7 +2409,7 @@ void MainWindow::refreshAllSequences()
     QStringList allSequencePaths = m_seqMgr.fileList();
     qDebug() << "[refreshAllSequences] Main sequence manager refreshed, base file count:" << allSequencePaths.size();
     
-    // Then scan template folders for additional sequences
+    // Then scan template folders for additional sequences and load them into the sequence manager
     const QStringList& templateDirs = m_templateMgr.templateDirs();
     qDebug() << "[refreshAllSequences] Processing" << templateDirs.size() << "template directories";
     
@@ -2428,28 +2428,29 @@ void MainWindow::refreshAllSequences()
                 
                 // Check if this sequence is already loaded to avoid duplicates
                 if (!allSequencePaths.contains(path)) {
-                    qDebug() << "[refreshAllSequences] Adding new sequence:" << path;
-                    allSequencePaths << path;  // Add to our list
+                    // Load the sequence from the file and add it to the sequence manager
+                    QFile seqFile(path);
+                    if (seqFile.open(QIODevice::ReadOnly)) {
+                        QByteArray data = seqFile.readAll();
+                        QJsonDocument doc = QJsonDocument::fromJson(data);
+                        if (doc.isObject()) {
+                            PromptSequence seq = PromptSequence::fromJson(doc.object());
+                            // Add to sequence manager cache using the addSequenceToCache method
+                            m_seqMgr.addSequenceToCache(path, seq);
+                            qDebug() << "[refreshAllSequences] Loaded and added sequence from template:" << path;
+                        }
+                        seqFile.close();
+                    }
+                } else {
+                    qDebug() << "[refreshAllSequences] Sequence already in manager, skipping:" << path;
                 }
             }
         }
     }
     
-    // Now refresh again to include all sequences from all sources
-    // We need to temporarily change the root to include all sequence files
-    // Or manually add them to the manager if there's a method for that
-    
-    // For now, let's refresh the sequence manager with all discovered paths
-    // The safest approach is to let the manager handle all sequences in its directory
-    // and ensure template directories are included in its scan
-    
-    // Actually, let's approach this differently - refresh the main sequence manager again 
-    // so that it picks up all sequence files from all directories including templates
-    
-    // Since the PromptSequenceManager may scan its root directory only, we need a different approach
-    // Let's make sure the sequence manager has access to all template sequences 
-    
-    qDebug() << "[refreshAllSequences] Completed discovery, total sequence files:" << allSequencePaths.size();
+    // Update the allSequencePaths list to reflect the current state after adding template sequences
+    allSequencePaths = m_seqMgr.fileList();
+    qDebug() << "[refreshAllSequences] Completed discovery and loading, total sequence files in manager:" << allSequencePaths.size();
 }
 
 void MainWindow::updateContextStatusDisplay()
