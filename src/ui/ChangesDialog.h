@@ -1,6 +1,6 @@
 #pragma once
 #include <QDialog>
-#include <QListWidget>
+#include "../ui/customWidgets/StyledListWidget.h"
 #include <StyleTextEdit.h>
 #include "../core/ChangeApplier.h"
 
@@ -15,6 +15,6 @@ private slots:
 
 private:
     QList<Change> m_changes;
-    QListWidget* m_list=nullptr;
+    StyledListWidget* m_list=nullptr;
     StyleTextEdit* m_preview=nullptr;
 };

@@ -3,10 +3,7 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QTabWidget>
 #include <QSplitter>
-#include <QLabel>
-#include <QListWidget>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QGraphicsView>
@@ -18,6 +15,9 @@
 #include "PromptSequenceManager.h"
 #include "../ui/customWidgets/StyledButton.h"
 #include "../ui/customWidgets/MemoryLineEdit.h"
+#include "../ui/customWidgets/StyledTabWidget.h"
+#include "../ui/customWidgets/StyledLabel.h"
+#include "../ui/customWidgets/StyledListWidget.h"
 
 class TemplateSequenceGraphWidget : public QWidget
 {
@@ -54,22 +54,22 @@ private:
     
     // UI Components
     QVBoxLayout *m_mainLayout;
-    QTabWidget *m_tabs;
+    StyledTabWidget *m_tabs;
     
     // Template Info Tab
     QWidget *m_templateInfoTab;
     MemoryLineEdit *m_nameEdit;
     MemoryLineEdit *m_descriptionEdit;
-    QLabel *m_imageLabel;
+    StyledLabel *m_imageLabel;
     StyledButton *m_selectImageBtn;
     
     // Sequences Tab
     QWidget *m_sequencesTab;
     QHBoxLayout *m_sequencesLayout;
     QVBoxLayout *m_availableSequencesLayout;
-    QListWidget *m_availableSequencesList;
+    StyledListWidget *m_availableSequencesList;
     QVBoxLayout *m_templateSequencesLayout;
-    QListWidget *m_templateSequencesList;
+    StyledListWidget *m_templateSequencesList;
     QVBoxLayout *m_buttonsLayout;
     StyledButton *m_addSequenceBtn;
     StyledButton *m_removeSequenceBtn;

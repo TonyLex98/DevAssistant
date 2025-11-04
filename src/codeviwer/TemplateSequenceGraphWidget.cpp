@@ -28,7 +28,7 @@ void TemplateSequenceGraphWidget::setupUI()
     m_mainLayout = new QVBoxLayout(this);
     
     // Create tab widget
-    m_tabs = new QTabWidget(this);
+    m_tabs = new StyledTabWidget(this);
     
     // Template Info Tab
     m_templateInfoTab = new QWidget(this);
@@ -48,9 +48,8 @@ void TemplateSequenceGraphWidget::setupUI()
     infoGrid->addWidget(m_descriptionEdit, 1, 1);
     
     QLabel *imageLabel = new QLabel(tr("Icon:"), this);
-    m_imageLabel = new QLabel(tr("No image selected"), this);
+    m_imageLabel = new StyledLabel(tr("No image selected"), this);
     m_imageLabel->setMinimumSize(200, 200);
-    m_imageLabel->setStyleSheet("border: 1px solid gray;");
     m_imageLabel->setAlignment(Qt::AlignCenter);
     m_selectImageBtn = new StyledButton(tr("Select Image..."), this);
     auto *imageLayout = new QHBoxLayout();
@@ -68,7 +67,7 @@ void TemplateSequenceGraphWidget::setupUI()
     
     // Available sequences on the left
     m_availableSequencesLayout = new QVBoxLayout();
-    m_availableSequencesList = new QListWidget(this);
+    m_availableSequencesList = new StyledListWidget(this);
     m_availableSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
     auto *availableGroup = new QGroupBox(tr("Available Sequences"));
     auto *availableLayout = new QVBoxLayout(availableGroup);
@@ -77,7 +76,7 @@ void TemplateSequenceGraphWidget::setupUI()
     
     // Template sequences in the middle
     m_templateSequencesLayout = new QVBoxLayout();
-    m_templateSequencesList = new QListWidget(this);
+    m_templateSequencesList = new StyledListWidget(this);
     m_templateSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
     auto *templateGroup = new QGroupBox(tr("Template Sequences"));
     auto *templateLayout = new QVBoxLayout(templateGroup);

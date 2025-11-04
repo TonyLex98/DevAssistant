@@ -16,8 +16,8 @@ RagWidget::RagWidget(QWidget *parent) : QWidget(parent)
     mIndexBtn = new StyledButton(tr("Index"), this);
     mQueryEdit = new MemoryLineEdit("rag_query", this);
     mAskBtn = new StyledButton(tr("Ask"), this);
-    mProgress = new QProgressBar(this);
-    mResult = new QTextEdit(this);
+    mProgress = new StyledProgressBar(this);
+    mResult = new StyledTextEdit(this);
     mResult->setReadOnly(true);
 
     auto rootLayout = new QVBoxLayout(this);

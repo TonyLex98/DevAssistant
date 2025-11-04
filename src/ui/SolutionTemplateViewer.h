@@ -1,10 +1,8 @@
 #pragma once
 
 #include <QWidget>
-#include <QListWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QLabel>
 #include <QDialog>
 #include <QDir>
 #include <QStandardPaths>
@@ -16,6 +14,8 @@
 #include "SolutionTemplateManager.h"
 #include "customWidgets/MemoryComboBox.h"
 #include "customWidgets/StyledButton.h"
+#include "customWidgets/StyledListWidget.h"
+#include "customWidgets/StyledLabel.h"
 
 class SolutionTemplateViewer : public QWidget
 {
@@ -41,10 +41,10 @@ private:
     void loadTemplateInfo(const QString& templateDir);
     
     SolutionTemplateManager* m_templateManager;
-    QListWidget* m_templateList;
-    QLabel* m_templateNameLabel;
-    QLabel* m_templateDescriptionLabel;
-    QLabel* m_templateImageLabel;
+    StyledListWidget* m_templateList;
+    StyledLabel* m_templateNameLabel;
+    StyledLabel* m_templateDescriptionLabel;
+    StyledLabel* m_templateImageLabel;
     StyledButton* m_editTemplateBtn;
     StyledButton* m_deleteTemplateBtn;
     StyledButton* m_addTemplateBtn;

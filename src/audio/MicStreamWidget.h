@@ -2,10 +2,10 @@
 #include <QWidget>
 #include <StreamRunner.h>
 #include "../ui/customWidgets/MemoryLineEdit.h"
+#include "../ui/customWidgets/StyledSpinBox.h"
+#include "../ui/customWidgets/StyledButton.h"
+#include "../ui/customWidgets/StyledTextEdit.h"
 
-class QSpinBox;
-class QPushButton;
-class QTextEdit;
 class StreamRunner;
 
 class MicStreamWidget : public QWidget {
@@ -22,13 +22,13 @@ private:
     MemoryLineEdit*  m_exeEdit;
     MemoryLineEdit*  m_modelEdit;
     MemoryLineEdit*  m_langEdit;
-    QSpinBox*   m_stepSpin;
-    QSpinBox*   m_lenSpin;
-    QSpinBox*   m_keepSpin;
-    QSpinBox*   m_thrSpin;
-    QPushButton* m_startBtn;
-    QPushButton* m_stopBtn;
-    QTextEdit*  m_log;
+    StyledSpinBox*   m_stepSpin;
+    StyledSpinBox*   m_lenSpin;
+    StyledSpinBox*   m_keepSpin;
+    StyledSpinBox*   m_thrSpin;
+    StyledButton* m_startBtn;
+    StyledButton* m_stopBtn;
+    StyledTextEdit*  m_log;
 
     StreamRunner* m_runner;
 };

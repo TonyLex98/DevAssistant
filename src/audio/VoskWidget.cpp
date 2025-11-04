@@ -10,11 +10,11 @@
 VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
     m_dllEdit = new MemoryLineEdit("vosk_dll_path", this);
     m_modelEdit = new MemoryLineEdit("vosk_model_path", this);
-    m_srSpin = new QSpinBox(this);
+    m_srSpin = new StyledSpinBox(this);
     m_srSpin->setRange(8000, 48000);
     m_srSpin->setValue(16000);
-    m_wordsChk = new QCheckBox(tr("Words"), this);
-    m_partialWordsChk = new QCheckBox(tr("Partial words"), this);
+    m_wordsChk = new StyledCheckBox(tr("Words"), this);
+    m_partialWordsChk = new StyledCheckBox(tr("Partial words"), this);
 
     // Prefill example paths (edit to your own)
     m_dllEdit->setText(QStringLiteral("C:/vosk/libvosk.dll"));
@@ -24,11 +24,11 @@ VoskWidget::VoskWidget(QWidget* parent) : QWidget(parent) {
     m_stopBtn  = new StyledButton(tr("Stop"), this);
     m_stopBtn->setEnabled(false);
 
-    m_partialLbl = new QLabel(this);
+    m_partialLbl = new StyledLabel(this);
     m_partialLbl->setTextFormat(Qt::PlainText);
     m_partialLbl->setWordWrap(true);
 
-    m_log = new QTextEdit(this);
+    m_log = new StyledTextEdit(this);
     m_log->setReadOnly(true);
 
     auto form = new QFormLayout;

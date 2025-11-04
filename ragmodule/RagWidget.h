@@ -6,10 +6,10 @@
 #include "RAGProcessor.h"
 #include <QWidget>
 #include <QTreeView>
-#include <QProgressBar>
-#include <QTextEdit>
 #include "../src/ui/customWidgets/StyledButton.h"
 #include "../src/ui/customWidgets/MemoryLineEdit.h"
+#include "../src/ui/customWidgets/StyledProgressBar.h"
+#include "../src/ui/customWidgets/StyledTextEdit.h"
 
 namespace Rag
 {
@@ -32,8 +32,8 @@ private:
     StyledButton *mIndexBtn;
     MemoryLineEdit *mQueryEdit;
     StyledButton *mAskBtn;
-    QProgressBar *mProgress;
-    QTextEdit *mResult;
+    StyledProgressBar *mProgress;
+    StyledTextEdit *mResult;
     RAGProcessor *mProcessor;
 };
 

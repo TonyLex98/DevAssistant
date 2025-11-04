@@ -7,7 +7,7 @@ ChangesDialog::ChangesDialog(QWidget* parent):QDialog(parent){
     setWindowTitle("Confirm changes");
     resize(720,520);
     auto v = new QVBoxLayout(this);
-    m_list = new QListWidget(this);
+    m_list = new StyledListWidget(this);
     v->addWidget(m_list,1);
     m_preview = new StyleTextEdit(this); m_preview->setReadOnly(true);
     v->addWidget(m_preview,1);

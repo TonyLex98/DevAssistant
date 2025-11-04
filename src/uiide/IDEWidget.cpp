@@ -57,8 +57,8 @@ IDEWidget::IDEWidget(const QString &key,
     methodEdit = new MethodEditDialog();
 
     // Right: tabs with AST (tree + graph)
-    rightTabs = new QTabWidget(this);
-    astTree = new QTreeWidget(this);
+    rightTabs = new StyledTabWidget(this);
+    astTree = new StyledTreeWidget(this);
     astTree->setHeaderLabel("AST");
     connect(astTree, &QTreeWidget::itemDoubleClicked, this, &IDEWidget::onTreeItemDoubleClicked);
     rightTabs->addTab(astTree, "Outline");

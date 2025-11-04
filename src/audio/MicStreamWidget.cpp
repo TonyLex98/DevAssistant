@@ -18,30 +18,30 @@ MicStreamWidget::MicStreamWidget(QWidget* parent) : QWidget(parent) {
     m_modelEdit->setText(QStringLiteral("C:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/src/external/whisper.cpp/models/ggml-small.bin"));
     m_langEdit->setText(QString()); // auto or set "ru"
 
-    m_stepSpin = new QSpinBox(this);
+    m_stepSpin = new StyledSpinBox(this);
     m_stepSpin->setRange(100, 20000);
     m_stepSpin->setSingleStep(100);
     m_stepSpin->setValue(2000);
 
-    m_lenSpin = new QSpinBox(this);
+    m_lenSpin = new StyledSpinBox(this);
     m_lenSpin->setRange(500, 60000);
     m_lenSpin->setSingleStep(500);
     m_lenSpin->setValue(8000);
 
-    m_keepSpin = new QSpinBox(this);
+    m_keepSpin = new StyledSpinBox(this);
     m_keepSpin->setRange(0, 10000);
     m_keepSpin->setSingleStep(100);
     m_keepSpin->setValue(400);
 
-    m_thrSpin = new QSpinBox(this);
+    m_thrSpin = new StyledSpinBox(this);
     m_thrSpin->setRange(1, 32);
     m_thrSpin->setValue(4);
 
-    m_startBtn = new QPushButton(tr("Start"), this);
-    m_stopBtn  = new QPushButton(tr("Stop"), this);
+    m_startBtn = new StyledButton(tr("Start"), this);
+    m_stopBtn  = new StyledButton(tr("Stop"), this);
     m_stopBtn->setEnabled(false);
 
-    m_log = new QTextEdit(this);
+    m_log = new StyledTextEdit(this);
     m_log->setReadOnly(true);
 
     auto form = new QFormLayout;

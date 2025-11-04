@@ -1,12 +1,12 @@
 #pragma once
 #include <QWidget>
-#include <QLabel>
 #include "../ui/customWidgets/MemoryLineEdit.h"
 #include "../ui/customWidgets/StyledButton.h"
+#include "../ui/customWidgets/StyledLabel.h"
+#include "../ui/customWidgets/StyledTextEdit.h"
+#include "../ui/customWidgets/StyledCheckBox.h"
+#include "../ui/customWidgets/StyledSpinBox.h"
 
-class QTextEdit;
-class QCheckBox;
-class QSpinBox;
 class VoskRunner;
 
 class VoskWidget : public QWidget {
@@ -24,13 +24,13 @@ signals:
 private:
     MemoryLineEdit* m_dllEdit;
     MemoryLineEdit* m_modelEdit;
-    QSpinBox*  m_srSpin;
-    QCheckBox* m_wordsChk;
-    QCheckBox* m_partialWordsChk;
+    StyledSpinBox*  m_srSpin;
+    StyledCheckBox* m_wordsChk;
+    StyledCheckBox* m_partialWordsChk;
     StyledButton* m_startBtn;
     StyledButton* m_stopBtn;
-    QLabel*     m_partialLbl;
-    QTextEdit*  m_log;
+    StyledLabel*     m_partialLbl;
+    StyledTextEdit*  m_log;
 
     VoskRunner* m_runner;
 };

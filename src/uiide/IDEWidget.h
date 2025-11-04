@@ -2,11 +2,9 @@
 // Upgraded IDEWidget with CodeEditor (highlighting + folding) and AST views.
 #include <QTreeView>
 #include <QFileSystemModel>
-#include <QTreeWidget>
 #include <QSplitter>
 #include <QJsonObject>
 #include <QMap>
-#include <QTabWidget>
 #include <tree_sitter/api.h>
 #include <QPushButton>           // <‑‑ добавить
 #include <QVBoxLayout>
@@ -19,6 +17,8 @@
 #include <MemorySplitter.h>
 #include <QPainter>
 #include <PathColorDelegate.h>
+#include "../ui/customWidgets/StyledTabWidget.h"
+#include "../ui/customWidgets/StyledTreeWidget.h"
 
 class CodeEditor;
 class ASTGraphView;
@@ -61,9 +61,9 @@ private:
     QTreeView *dirView;
     QFileSystemModel *dirModel;
     CodeEditor *codeEditor;
-    QTreeWidget *astTree;
+    StyledTreeWidget *astTree;
     ASTGraphView *astGraph;
-    QTabWidget *rightTabs;
+    StyledTabWidget *rightTabs;
 
     QString currentFilePath;
     std::string sourceCode;

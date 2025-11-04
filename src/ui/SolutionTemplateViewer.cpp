@@ -41,7 +41,7 @@ void SolutionTemplateViewer::setupUI()
     auto* listGroupBox = new QGroupBox(tr("Solution Templates"));
     auto* listLayout = new QVBoxLayout(listGroupBox);
     
-    m_templateList = new QListWidget(this);
+    m_templateList = new StyledListWidget(this);
     listLayout->addWidget(m_templateList);
     
     auto* listButtonsLayout = new QHBoxLayout();
@@ -63,18 +63,17 @@ void SolutionTemplateViewer::setupUI()
     auto* detailsGroupBox = new QGroupBox(tr("Template Details"));
     auto* detailsLayout = new QVBoxLayout(detailsGroupBox);
     
-    m_templateNameLabel = new QLabel(tr("No template selected"), this);
+    m_templateNameLabel = new StyledLabel(tr("No template selected"), this);
     m_templateNameLabel->setStyleSheet("font-weight: bold; font-size: 14px;");
     
-    m_templateDescriptionLabel = new QLabel(this);
+    m_templateDescriptionLabel = new StyledLabel(this);
     m_templateDescriptionLabel->setWordWrap(true);
     m_templateDescriptionLabel->setStyleSheet("margin-top: 5px;");
     
     // Image label
-    m_templateImageLabel = new QLabel(this);
+    m_templateImageLabel = new StyledLabel(this);
     m_templateImageLabel->setMinimumSize(200, 200);
     m_templateImageLabel->setAlignment(Qt::AlignCenter);
-    m_templateImageLabel->setStyleSheet("border: 1px solid gray;");
     
     auto* infoLayout = new QHBoxLayout();
     auto* textLayout = new QVBoxLayout();

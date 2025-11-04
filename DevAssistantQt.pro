@@ -87,6 +87,17 @@ SOURCES += \
     src/ui/customWidgets/MemorySplitter.cpp \
     src/ui/customWidgets/StyleTextEdit.cpp \
     src/ui/customWidgets/StyledButton.cpp \
+    src/ui/customWidgets/StyledCheckBox.cpp \
+    src/ui/customWidgets/StyledLabel.cpp \
+    src/ui/customWidgets/StyledListWidget.cpp \
+    src/ui/customWidgets/StyledProgressBar.cpp \
+    src/ui/customWidgets/StyledRadioButton.cpp \
+    src/ui/customWidgets/StyledSpinBox.cpp \
+    src/ui/customWidgets/StyledDoubleSpinBox.cpp \
+    src/ui/customWidgets/StyledTabWidget.cpp \
+    src/ui/customWidgets/StyledTextEdit.cpp \
+    src/ui/customWidgets/StyledTreeWidget.cpp \
+    src/ui/customWidgets/StyledPlainTextEdit.cpp \
     src/uiide/DartHighlighter.cpp \
     src/uiide/IDEWidget.cpp \
     src/uiide/PathColorDelegate.cpp \
@@ -173,6 +184,17 @@ HEADERS += \
     src/ui/customWidgets/MemorySplitter.h \
     src/ui/customWidgets/StyleTextEdit.h \
     src/ui/customWidgets/StyledButton.h \
+    src/ui/customWidgets/StyledCheckBox.h \
+    src/ui/customWidgets/StyledLabel.h \
+    src/ui/customWidgets/StyledListWidget.h \
+    src/ui/customWidgets/StyledProgressBar.h \
+    src/ui/customWidgets/StyledRadioButton.h \
+    src/ui/customWidgets/StyledSpinBox.h \
+    src/ui/customWidgets/StyledDoubleSpinBox.h \
+    src/ui/customWidgets/StyledTabWidget.h \
+    src/ui/customWidgets/StyledTextEdit.h \
+    src/ui/customWidgets/StyledTreeWidget.h \
+    src/ui/customWidgets/StyledPlainTextEdit.h \
     src/uiide/DartHighlighter.h \
     src/uiide/IDEWidget.h \
     src/uiide/PathColorDelegate.h \
