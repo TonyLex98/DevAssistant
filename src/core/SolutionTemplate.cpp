@@ -34,3 +34,8 @@ SolutionTemplate SolutionTemplate::fromJson(const QJsonObject& obj)
     
     return tmpl;
 }
+
+void SolutionTemplate::removeSequenceByPath(const QString& sequencePath)
+{
+    m_sequences.removeAll(sequencePath);
+}

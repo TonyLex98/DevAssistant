@@ -188,6 +188,7 @@ private:
     /* ────── NEW ────── */
     static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
     void ensureDefaultSequence();                      // создаём, если нет
+    void refreshAllSequences();                        // Refresh sequences from both PromptSequences and template folders
     /* ────── END ────── */
 
     void reOpenRootDir();

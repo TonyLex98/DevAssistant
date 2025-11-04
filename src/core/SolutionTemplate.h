@@ -17,6 +17,7 @@ public:
     /*--- базовые операции -----------------------------------------------*/
     void addSequence(const QString& sequencePath) { m_sequences.append(sequencePath); }
     void removeSequence(int idx) { m_sequences.removeAt(idx); }
+    void removeSequenceByPath(const QString& sequencePath);
     void clearSequences() { m_sequences.clear(); }
 
     /*--- геттеры --------------------------------------------------------*/

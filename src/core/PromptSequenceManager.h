@@ -29,6 +29,9 @@ public:
     /* Получить список файлов (полные пути) – удобно для UI‑выбора */
     QStringList fileList() const { return m_fileList; }
 
+    /* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
+    void addSequenceToCache(const QString& filePath, const PromptSequence& sequence);
+
 private:
     QString m_root;                     // директория PromptSequences
     QMap<QString, PromptSequence> m_sequences; // key = абсолютный путь к файлу

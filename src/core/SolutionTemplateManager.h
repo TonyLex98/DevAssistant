@@ -44,6 +44,16 @@ public:
     /* Экспорт последовательности как шаблона */
     bool exportSequenceAsTemplate(const QString& sequencePath, const QString& templateDirPath, 
                                   const QString& templateName, const QString& description = QString()) const;
+    
+    /* Создать новую последовательность в папке шаблона */
+    bool createNewSequenceInTemplate(const QString& templateDirPath, const QString& sequenceName, 
+                                     const QString& description = QString()) const;
+    
+    /* Синхронизировать файл шаблона с содержимым папки шаблона (добавить отсутствующие файлы последовательностей) */
+    bool syncTemplateFileWithFolder(const QString& templateDirPath) const;
+    
+    /* Проверить целостность шаблона - наличие всех файлов последовательностей */
+    QStringList checkTemplateIntegrity(const QString& templateDirPath) const;
 
     /* Access to sequence manager for template editor */
     void setSequenceManager(PromptSequenceManager* seqMgr) { m_seqMgr = seqMgr; }

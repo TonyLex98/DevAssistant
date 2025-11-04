@@ -87,3 +87,11 @@ bool PromptSequenceManager::remove(const QString &filePath)
     m_fileList.removeAll(filePath);
     return true;
 }
+
+/* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
+void PromptSequenceManager::addSequenceToCache(const QString& filePath, const PromptSequence& sequence)
+{
+    m_sequences.insert(filePath, sequence);
+    if (!m_fileList.contains(filePath))
+        m_fileList << filePath;
+}

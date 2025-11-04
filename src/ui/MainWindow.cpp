@@ -147,7 +147,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
         // First, refresh sequence manager
-        m_seqMgr.refresh();
+        refreshAllSequences();
         
         // Get list of sequences
         const QMap<QString, PromptSequence>& sequences = m_seqMgr.sequences();
@@ -367,7 +367,7 @@ MainWindow::MainWindow(QWidget *parent)
         seqDir.mkpath(".");
 
     m_seqMgr.setRoot(seqRoot);
-    m_seqMgr.refresh();
+    refreshAllSequences();
     ensureDefaultSequence();
 
     // Папка, где будем хранить шаблоны решений
@@ -440,8 +440,8 @@ void MainWindow::openSequenceGraph()
     qDebug() << "[MainWindow] openSequenceGraph called";
     
     // Refresh managers to ensure we have the latest data
-    m_seqMgr.refresh();
     m_templateMgr.refresh();
+    refreshAllSequences();
     
     // Get list of templates
     const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
@@ -577,7 +577,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
     dlg.exec();
 
     // Refresh after editing
-    m_seqMgr.refresh();
+    refreshAllSequences();
     if (m_seqGraphWindow) {
         m_seqGraphWindow->rebuildGraph(); // Update the graph if it's open
     }
@@ -905,15 +905,15 @@ void MainWindow::editSequences()
     dlg.exec();
 
     // 7. Обновляем кеш после редактирования
-    m_seqMgr.refresh();
+    refreshAllSequences();
     ensureDefaultSequence();
 }
 
 void MainWindow::runSequenceDialog()
 {
     // Обновляем списки (на случай, если пользователь добавил файлы вручную)
-    m_seqMgr.refresh();
     m_templateMgr.refresh();
+    refreshAllSequences();
     ensureDefaultSequence();
 
     RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
@@ -2151,28 +2151,66 @@ void MainWindow::createNewSequence()
     QString name = QInputDialog::getText(this, "New sequence", "Name:", QLineEdit::Normal, QString(), &ok);
     if (!ok || name.trimmed().isEmpty()) return;
 
-    // Determine directory to save
-    QString dir;
-    if (!m_seqMgr.fileList().isEmpty()) {
-        dir = QFileInfo(m_seqMgr.fileList().first()).absolutePath();
-    } else {
-        dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
-                .append("/DevelopersAssistant/PromptSequences");
-        QDir().mkpath(dir);
-        m_seqMgr.setRoot(dir);
-    }
-    QString filePath = QDir(dir).filePath(name.trimmed() + ".seq.json");
+    // Ask user whether to create in PromptSequences folder or in a template folder
+    QMessageBox msgBox;
+    msgBox.setWindowTitle("Create Sequence");
+    msgBox.setText("Where would you like to create the sequence?");
+    QAbstractButton* promptSeqButton = msgBox.addButton("In PromptSequences folder", QMessageBox::ActionRole);
+    QAbstractButton* templateButton = msgBox.addButton("In Template folder", QMessageBox::ActionRole);
+    QAbstractButton* cancelButton = msgBox.addButton(QMessageBox::Cancel);
+    msgBox.exec();
 
-    // Create default template and save
-    PromptSequence seq = defaultSequenceTemplate();
-    seq.setName(name.trimmed());
-    if (!m_seqMgr.save(seq, filePath)) {
-        QMessageBox::warning(this, "Error", "Cannot save sequence to: " + filePath);
+    if (msgBox.clickedButton() == cancelButton) {
         return;
+    } else if (msgBox.clickedButton() == promptSeqButton) {
+        // Determine directory to save in PromptSequences
+        QString dir;
+        if (!m_seqMgr.fileList().isEmpty()) {
+            dir = QFileInfo(m_seqMgr.fileList().first()).absolutePath();
+        } else {
+            dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
+                    .append("/DevelopersAssistant/PromptSequences");
+            QDir().mkpath(dir);
+            m_seqMgr.setRoot(dir);
+        }
+        QString filePath = QDir(dir).filePath(name.trimmed() + ".seq.json");
+
+        // Create default template and save
+        PromptSequence seq = defaultSequenceTemplate();
+        seq.setName(name.trimmed());
+        if (!m_seqMgr.save(seq, filePath)) {
+            QMessageBox::warning(this, "Error", "Cannot save sequence to: " + filePath);
+            return;
+        }
+        refreshAllSequences();
+        ensureDefaultSequence();
+        QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
+    } else if (msgBox.clickedButton() == templateButton) {
+        // Create in template folder - user needs to select a template directory
+        QString templateDir = QFileDialog::getExistingDirectory(this, "Select Template Folder", 
+                                                              QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+        if (templateDir.isEmpty()) return;
+        
+        // Verify that the selected directory is a valid template directory by checking for template.templ.json
+        QString templateJsonPath = QDir(templateDir).filePath("template.templ.json");
+        if (!QFile::exists(templateJsonPath)) {
+            QMessageBox::warning(this, "Invalid Template Directory", 
+                               "The selected directory is not a valid template directory (missing template.templ.json).");
+            return;
+        }
+        
+        // Use the SolutionTemplateManager to create the new sequence in the template folder
+        // This will create a default sequence structure in the template directory
+        if (!m_templateMgr.createNewSequenceInTemplate(templateDir, name.trimmed())) {
+            QMessageBox::warning(this, "Error", "Cannot create sequence in template directory: " + templateDir);
+            return;
+        }
+        
+        // Now we need to refresh both sequence and template managers to recognize the new sequence
+        m_templateMgr.refresh();
+        refreshAllSequences(); // This will refresh both the main sequences and those in templates
+        QMessageBox::information(this, "OK", "Sequence created in template:\n" + templateDir + "/" + name.trimmed() + ".seq.json");
     }
-    m_seqMgr.refresh();
-    ensureDefaultSequence();
-    QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
 }
 
 void MainWindow::addCommandToContext(Command* cmd, const QString& result)
@@ -2183,6 +2221,43 @@ void MainWindow::addCommandToContext(Command* cmd, const QString& result)
     
     // The ContextManager will handle duplicate detection internally
     m_contextManager->addCommand(cmd, result);
+}
+
+void MainWindow::refreshAllSequences()
+{
+    // Refresh the main sequence manager first
+    m_seqMgr.refresh();
+    
+    // Then scan template folders for sequences and add them manually to the sequence manager
+    const QStringList& templateDirs = m_templateMgr.templateDirs();
+    for (const QString& templateDir : templateDirs) {
+        QDir dir(templateDir);
+        if (dir.exists()) {
+            // ищем *.seq.json в папке шаблона
+            QStringList filters = {"*.seq.json"};
+            QFileInfoList files = dir.entryInfoList(filters,
+                                                    QDir::Files | QDir::NoSymLinks,
+                                                    QDir::Name);
+
+            for (const QFileInfo& fileInfo : files) {
+                QString path = fileInfo.absoluteFilePath();
+                
+                // Check if this sequence is already loaded to avoid duplicates
+                if (!m_seqMgr.fileList().contains(path)) {
+                    QFile f(path);
+                    if (f.open(QIODevice::ReadOnly)) {
+                        QByteArray data = f.readAll();
+                        QJsonDocument doc = QJsonDocument::fromJson(data);
+                        if (doc.isObject()) {
+                            PromptSequence seq = PromptSequence::fromJson(doc.object());
+                            // Use the new method to add the sequence to cache
+                            m_seqMgr.addSequenceToCache(path, seq);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void MainWindow::updateContextStatusDisplay()
