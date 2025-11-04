@@ -593,53 +593,6 @@ void MainWindow::openSequenceGraph()
     m_templateMgr.refresh();
     refreshAllSequences();
     
-    // Get list of templates
-    const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
-    if (templates.isEmpty()) {
-        QMessageBox::information(this, "No Templates", "No solution templates found. Sequences from all templates will be shown.");
-        // Show all sequences if no templates exist
-        // Update the sequence manager in case it changed
-        m_seqGraphWindow->setSequenceManager(&m_seqMgr);
-        m_seqGraphWindow->setTemplateManager(&m_templateMgr);  // Set template manager too
-        
-        m_seqGraphWindow->show();
-        m_seqGraphWindow->raise();
-        m_seqGraphWindow->activateWindow();
-        m_seqGraphWindow->rebuildGraph(); // Rebuild to show all sequences
-        
-        // Connect the signal after creating the widget
-        connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, 
-                [this](const QString &sequenceName) {
-                    // Open the sequence editor for the selected sequence
-                    openSequenceEditorForName(sequenceName);
-                });
-        return;
-    }
-    
-    // Form the list of template names for user selection
-    QStringList templateNames;
-    QMap<QString, QString> pathByName;      // name → path
-    for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
-        QString path = it.key();  // Get the template directory path (the key is the path)
-        QString name = it.value().name();  // Get the template name from the SolutionTemplate object
-        templateNames << name;
-        pathByName.insert(name, path);
-    }
-    
-    // Add option to show all sequences
-    templateNames << "All Sequences";
-    
-    // Ask user to select a template
-    bool ok = false;
-    QString selectedName = QInputDialog::getItem(
-                this, tr("Select Template for Sequence Graph"),
-                tr("Choose template to show sequences from:"), templateNames, 0, false, &ok);
-
-    if (!ok || selectedName.isEmpty()) {
-        qDebug() << "[MainWindow] User cancelled template selection";
-        return;          // пользователь отменил
-    }
-    
     // Update the sequence manager and template manager
     m_seqGraphWindow->setSequenceManager(&m_seqMgr);
     m_seqGraphWindow->setTemplateManager(&m_templateMgr);
@@ -649,15 +602,9 @@ void MainWindow::openSequenceGraph()
     m_seqGraphWindow->raise();
     m_seqGraphWindow->activateWindow();
     
-    // Check if user selected "All Sequences" or a specific template
-    if (selectedName == "All Sequences") {
-        m_seqGraphWindow->rebuildGraph(); // Show all sequences
-    } else {
-        QString templatePath = pathByName.value(selectedName);
-        m_seqGraphWindow->rebuildGraphForTemplate(templatePath); // Show only sequences from selected template
-    }
-    
-    // Connect the signal after creating the widget
+    // Connect the signal after creating the widget (if not already connected)
+    // Remove any existing connections to avoid duplicates
+    disconnect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, nullptr);
     connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, 
             [this](const QString &sequenceName) {
                 // Open the sequence editor for the selected sequence
