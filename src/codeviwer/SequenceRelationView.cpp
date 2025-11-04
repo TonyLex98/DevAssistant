@@ -133,6 +133,11 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                 if (relationView) {
                     qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
                     relationView->savePositions();
+                    
+                    // If we have a current template directory set, save positions to that template as well
+                    if (!relationView->currentTemplateDirPath().isEmpty() && relationView->templateManager()) {
+                        relationView->savePositionsToTemplate(relationView->currentTemplateDirPath());
+                    }
                 } else {
                     qDebug() << "[SequenceNodeItem] Could not cast view to SequenceRelationView";
                 }
@@ -299,6 +304,12 @@ void SequenceRelationView::setSequenceManager(PromptSequenceManager *seqMgr)
     // rebuildGraph();  // Remove automatic rebuild
 }
 
+void SequenceRelationView::setTemplateManager(SolutionTemplateManager *tmplMgr)
+{
+    qDebug() << "[SequenceRelationView] setTemplateManager called";
+    m_templateMgr = tmplMgr;
+}
+
 void SequenceRelationView::rebuildGraph()
 {
     qDebug() << "[SequenceRelationView] rebuildGraph() called";
@@ -334,24 +345,17 @@ void SequenceRelationView::rebuildGraph()
     
     qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes";
     
-    // First, load positions from persistent settings (most recent and authoritative)
-    loadNodePositions();
+    // For non-template graphs, we only use the saved positions from the current session
+    // since there's no template file to load positions from
     
-    // If there were any more recent positions in the internal map (e.g. from the current session before the last save),
-    // these might be more current than what was in settings prior to the current session
-    // However, we should only apply them if they differ from what was loaded from settings
+    // Apply any saved positions from the internal map (e.g. from current session)
     for (auto it = savedPositions.constBegin(); it != savedPositions.constEnd(); ++it) {
         QString nodeName = it.key();
         QPointF pos = it.value();
         if (m_nodeItems.contains(nodeName)) {
-            // Only update if the saved position from internal map differs from what's in m_nodePositions after loading from settings
-            if (!m_nodePositions.contains(nodeName) || m_nodePositions[nodeName] != pos) {
-                m_nodeItems[nodeName]->setPos(pos);
-                m_nodePositions[nodeName] = pos;  // Update our internal map
-                qDebug() << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
-            } else {
-                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from settings";
-            }
+            m_nodeItems[nodeName]->setPos(pos);
+            m_nodePositions[nodeName] = pos;  // Update our internal map
+            qDebug() << "[SequenceRelationView] Restored position (from internal) for node:" << nodeName << "at" << pos;
         }
     }
     
@@ -381,6 +385,9 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     qDebug() << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
     
     clearScenePreservingPositions();
+    
+    // Set the current template directory so positions can be saved to this template
+    setCurrentTemplateDir(templateDirPath);
     
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
@@ -418,23 +425,34 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     
     qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes for template";
     
-    // First, load positions from persistent settings (most recent and authoritative)
-    loadNodePositions();
+    // Load positions from the template file instead of settings
+    if (m_templateMgr) {
+        QMap<QString, QPointF> templatePositions = m_templateMgr->loadPositionsFromTemplate(templateDirPath);
+        for (auto it = templatePositions.constBegin(); it != templatePositions.constEnd(); ++it) {
+            QString nodeName = it.key();
+            QPointF pos = it.value();
+            if (m_nodeItems.contains(nodeName)) {
+                m_nodeItems[nodeName]->setPos(pos);
+                m_nodePositions[nodeName] = pos;  // Update our internal map
+                qDebug() << "[SequenceRelationView] Loaded position from template for node:" << nodeName << "at" << pos;
+            }
+        }
+    }
     
     // If there were any more recent positions in the internal map (e.g. from the current session before the last save),
     // these might be more current than what was in settings prior to the current session
-    // However, we should only apply them if they differ from what was loaded from settings
+    // However, we should only apply them if they differ from what was loaded from template
     for (auto it = savedPositions.constBegin(); it != savedPositions.constEnd(); ++it) {
         QString nodeName = it.key();
         QPointF pos = it.value();
         if (m_nodeItems.contains(nodeName)) {
-            // Only update if the saved position from internal map differs from what's in m_nodePositions after loading from settings
+            // Only update if the saved position from internal map differs from what's in m_nodePositions after loading from template
             if (!m_nodePositions.contains(nodeName) || m_nodePositions[nodeName] != pos) {
                 m_nodeItems[nodeName]->setPos(pos);
                 m_nodePositions[nodeName] = pos;  // Update our internal map
                 qDebug() << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
             } else {
-                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from settings";
+                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from template";
             }
         }
     }
@@ -708,137 +726,83 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
 
 void SequenceRelationView::saveNodePositions()
 {
-    qDebug() << "[SequenceRelationView] Saving node positions, number of nodes:" << m_nodeItems.size();
-    
-    QSettings settings("DevAssistant", "SequenceGraphPositions");
-    
-    // Clear old settings
-    settings.beginGroup("NodePositions");
-    settings.remove("");  // Remove all entries in this group
-    settings.endGroup();
+    qDebug() << "[SequenceRelationView] Saving node positions to internal map, number of nodes:" << m_nodeItems.size();
     
     // Clear the internal positions map and rebuild it from current node positions
     m_nodePositions.clear();
     
-    // Save current positions and update internal map
-    settings.beginGroup("NodePositions");
+    // Update internal map with current positions
     for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
         QString nodeName = it.key();
-        // Sanitize the node name to create a safe key for QSettings, but preserve original for internal use
-        QString safeNodeName = nodeName;
-        if (safeNodeName.isEmpty()) safeNodeName = "unnamed_sequence";
-        // Replace any characters that could be problematic for QSettings keys
-        safeNodeName.replace('/', '_').replace('\\', '_').replace("..", "__");
-        // Don't replace single dots in middle of names since they might be legitimate, just avoid path-like structures
-        
         QPointF pos = it.value()->pos();
-        settings.setValue(safeNodeName, pos);
         
-        // Also update the internal map with current position
+        // Update the internal map with current position
         m_nodePositions[nodeName] = pos;
         
-        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "(safe key:" << safeNodeName << ") at" << pos;
+        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
     }
-    settings.endGroup();
+}
+
+// New method to save positions to a specific template directory
+void SequenceRelationView::savePositionsToTemplate(const QString& templateDirPath)
+{
+    qDebug() << "[SequenceRelationView] Saving positions to template directory:" << templateDirPath;
     
-    settings.sync(); // Ensure settings are written to disk
-    qDebug() << "[SequenceRelationView] Settings synced to disk";
+    // Update internal positions map
+    saveNodePositions(); // This will update m_nodePositions with current positions
+    
+    // If we have a template manager, save positions to the template file
+    if (m_templateMgr) {
+        m_templateMgr->savePositionsToTemplate(templateDirPath, m_nodePositions);
+    } else {
+        qDebug() << "[SequenceRelationView] No template manager available to save positions";
+    }
 }
 
 void SequenceRelationView::savePositions()
 {
     // Call the private method to save current positions
     saveNodePositions();
+    
+    // If we have a current template directory set, save positions to that template as well
+    if (!m_currentTemplateDirPath.isEmpty() && m_templateMgr) {
+        savePositionsToTemplate(m_currentTemplateDirPath);
+    }
 }
 
 void SequenceRelationView::saveLayout()
 {
-    // Save current positions to settings when closing
-    saveNodePositions();
+    // If we have a template directory set, save positions to the template
+    if (!m_currentTemplateDirPath.isEmpty() && m_templateMgr) {
+        savePositionsToTemplate(m_currentTemplateDirPath);
+    } else {
+        // Otherwise, just save to internal positions map
+        saveNodePositions();
+    }
 }
 
 void SequenceRelationView::restoreLayout()
 {
     qDebug() << "[SequenceRelationView] restoreLayout() called";
-    // Load positions from settings when initializing
-    loadNodePositions();
+    // For backward compatibility, we just load from internal map
+    // When building a template graph, positions will be loaded from the template file
     qDebug() << "[SequenceRelationView] restoreLayout() completed, positions in m_nodePositions:" << m_nodePositions.size();
+}
+
+// Method to set the current template directory path
+void SequenceRelationView::setCurrentTemplateDir(const QString& templateDirPath)
+{
+    m_currentTemplateDirPath = templateDirPath;
+    qDebug() << "[SequenceRelationView] Set current template directory to:" << templateDirPath;
 }
 
 void SequenceRelationView::loadNodePositions()
 {
     qDebug() << "[SequenceRelationView] Loading node positions";
     
-    QSettings settings("DevAssistant", "SequenceGraphPositions");
+    // For now, we'll clear the position map and let individual templates load their position data
+    // when they are loaded via SolutionTemplateManager
     
-    settings.beginGroup("NodePositions");
-    QStringList sequenceNames = settings.childKeys();
-    
-    qDebug() << "[SequenceRelationView] Found saved positions for:" << sequenceNames;
-    
-    for (const QString &storedKey : sequenceNames) {
-        QPointF pos = settings.value(storedKey, QPointF()).toPointF();
-        if (pos.isNull()) {
-            qDebug() << "[SequenceRelationView] Position for key:" << storedKey << "is null, skipping";
-            continue;
-        }
-        
-        // First, try direct match with existing nodes
-        if (m_nodeItems.contains(storedKey)) {
-            m_nodeItems[storedKey]->setPos(pos);
-            m_nodePositions[storedKey] = pos;  // Store in our internal map too
-            qDebug() << "[SequenceRelationView] Loaded position for node:" << storedKey << "at" << pos;
-        } else {
-            // Try various transformations for backward compatibility
-            bool found = false;
-            
-            // Check if it looks like a file path
-            if (!storedKey.isEmpty() && 
-                (storedKey.contains('/') || storedKey.contains('\\') || storedKey.contains(".seq.json"))) {
-                // Extract name from file path
-                QFileInfo fileInfo(storedKey);
-                QString sequenceName = fileInfo.baseName(); // Gets name without extension
-                
-                // Try to find a node with this extracted name
-                for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
-                    if (it.key() == sequenceName) {
-                        it.value()->setPos(pos);
-                        m_nodePositions[it.key()] = pos;
-                        qDebug() << "[SequenceRelationView] Loaded position for node:" << it.key() 
-                                 << "(from path-based key:" << storedKey << ") at" << pos;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            
-            // If still not found, try other variations or handle the "." case specifically
-            if (!found && storedKey == ".") {
-                // This could be an old bug where "." was saved as a key
-                // Try to match with common default sequence names
-                for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
-                    if (it.key().toLower() == "default" || it.key().contains("default", Qt::CaseInsensitive)) {
-                        it.value()->setPos(pos);
-                        m_nodePositions[it.key()] = pos;
-                        qDebug() << "[SequenceRelationView] Loaded position for default node:" << it.key() 
-                                 << "(from '.' key) at" << pos;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (!found) {
-                // Even if we don't find a matching node right now, save the position for when the node is added later
-                // This is crucial for restoreLayout() called before nodes are created
-                m_nodePositions[storedKey] = pos;  // Store for later use when node is added
-                qDebug() << "[SequenceRelationView] Position loaded for key:" << storedKey 
-                         << "at" << pos << "(will be applied when node is added)";
-            }
-        }
-    }
-    settings.endGroup();
-    
-    qDebug() << "[SequenceRelationView] Finished loading positions, total current nodes:" << m_nodeItems.size();
-    qDebug() << "[SequenceRelationView] Total positions in internal map:" << m_nodePositions.size();
+    // If we have positions already stored in our internal map, we'll use them
+    // In the future, this will come from template files that are loaded by SolutionTemplateManager
 }

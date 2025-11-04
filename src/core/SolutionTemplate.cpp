@@ -1,6 +1,8 @@
 // SolutionTemplate.cpp
 #include "SolutionTemplate.h"
 #include <QJsonArray>
+#include <QJsonArray>
+#include <QJsonDocument>
 
 QJsonObject SolutionTemplate::toJson() const
 {
@@ -16,6 +18,16 @@ QJsonObject SolutionTemplate::toJson() const
     }
     obj["sequences"] = seqArray;
     
+    // Serialize positions
+    QJsonObject positionsObj;
+    for (auto it = m_positions.constBegin(); it != m_positions.constEnd(); ++it) {
+        QJsonObject posObj;
+        posObj["x"] = it.value().x();
+        posObj["y"] = it.value().y();
+        positionsObj[it.key()] = posObj;
+    }
+    obj["positions"] = positionsObj;
+    
     return obj;
 }
 
@@ -30,6 +42,14 @@ SolutionTemplate SolutionTemplate::fromJson(const QJsonObject& obj)
     QJsonArray seqArray = obj.value("sequences").toArray();
     for (const QJsonValue& val : seqArray) {
         tmpl.m_sequences.append(val.toString());
+    }
+    
+    // Deserialize positions
+    QJsonObject positionsObj = obj.value("positions").toObject();
+    for (auto it = positionsObj.constBegin(); it != positionsObj.constEnd(); ++it) {
+        QJsonObject posObj = it.value().toObject();
+        QPointF pos(posObj.value("x").toDouble(), posObj.value("y").toDouble());
+        tmpl.m_positions.insert(it.key(), pos);
     }
     
     return tmpl;

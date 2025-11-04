@@ -54,6 +54,10 @@ public:
     
     /* Проверить целостность шаблона - наличие всех файлов последовательностей */
     QStringList checkTemplateIntegrity(const QString& templateDirPath) const;
+    
+    /* Работа с позициями последовательностей на холсте */
+    void savePositionsToTemplate(const QString& templateDirPath, const QMap<QString, QPointF>& positions);
+    QMap<QString, QPointF> loadPositionsFromTemplate(const QString& templateDirPath) const;
 
     /* Access to sequence manager for template editor */
     void setSequenceManager(PromptSequenceManager* seqMgr) { m_seqMgr = seqMgr; }

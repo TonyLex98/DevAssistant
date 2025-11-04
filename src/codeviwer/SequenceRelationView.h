@@ -17,6 +17,8 @@
 #include "PromptSequence.h"
 #include "PromptSequenceManager.h"
 
+class SolutionTemplateManager;  // Forward declaration
+
 class SequenceNodeItem;
 class SequenceEdgeItem;
 
@@ -27,7 +29,12 @@ class SequenceRelationView : public QGraphicsView
 public:
     explicit SequenceRelationView(QWidget *parent = nullptr);
     void setSequenceManager(PromptSequenceManager *seqMgr);
+    void setTemplateManager(class SolutionTemplateManager *tmplMgr); // Add template manager reference
     void setCurrentSequence(const QString &sequenceName);  // Highlight the current sequence
+    void setCurrentTemplateDir(const QString& templateDirPath); // Set current template directory for saving positions
+    QString currentTemplateDirPath() const { return m_currentTemplateDirPath; } // Get current template directory path
+    SolutionTemplateManager* templateManager() const { return m_templateMgr; } // Get template manager
+    void savePositionsToTemplate(const QString& templateDirPath); // Public method for saving positions to template
 
 public slots:
     void rebuildGraph();
@@ -47,6 +54,7 @@ protected:
 private:
     QGraphicsScene *m_scene = nullptr;
     PromptSequenceManager *m_seqMgr = nullptr;
+    class SolutionTemplateManager *m_templateMgr = nullptr; // reference to template manager
     
     // Node and edge tracking
     QMap<QString, SequenceNodeItem*> m_nodeItems;  // sequence name -> item
@@ -57,6 +65,7 @@ private:
     
     // Template filtering
     QString m_currentTemplateFilter;  // Currently active template filter (empty = no filter)
+    QString m_currentTemplateDirPath; // Current template directory path for saving positions
     
     // Helper method to clear the scene while preserving positions if needed
     void clearScenePreservingPositions();

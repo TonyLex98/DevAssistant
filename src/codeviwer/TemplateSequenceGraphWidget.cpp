@@ -133,6 +133,10 @@ void TemplateSequenceGraphWidget::setupUI()
 void TemplateSequenceGraphWidget::setTemplateManager(SolutionTemplateManager *templateManager)
 {
     m_templateManager = templateManager;
+    if (m_graphView && m_templateManager) {
+        m_graphView->setTemplateManager(m_templateManager);
+        qDebug() << "[TemplateSequenceGraphWidget] Template manager set on graph view";
+    }
 }
 
 void TemplateSequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqManager)
@@ -143,6 +147,12 @@ void TemplateSequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqM
         qDebug() << "[TemplateSequenceGraphWidget] Setting sequence manager on graph view";
         m_graphView->setSequenceManager(seqManager);
         qDebug() << "[TemplateSequenceGraphWidget] Sequence manager set on graph view";
+        
+        // Also set the template manager if it's available
+        if (m_templateManager) {
+            m_graphView->setTemplateManager(m_templateManager);
+            qDebug() << "[TemplateSequenceGraphWidget] Template manager set on graph view";
+        }
     } else {
         qDebug() << "[TemplateSequenceGraphWidget] Warning: m_graphView is null, cannot set sequence manager";
     }
@@ -198,6 +208,12 @@ void TemplateSequenceGraphWidget::setTemplate(const SolutionTemplate &templateVa
     
     updateTemplateSequencesList();
     updateAvailableSequences();
+    
+    // Connect template manager to graph view if not already done
+    if (m_graphView && m_templateManager) {
+        m_graphView->setTemplateManager(m_templateManager);
+    }
+    
     buildGraphForTemplate();
 }
 

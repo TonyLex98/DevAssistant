@@ -506,3 +506,91 @@ QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templ
 
     return missingFiles;
 }
+
+/* Сохранить позиции последовательностей в шаблон */
+void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDirPath, const QMap<QString, QPointF>& positions)
+{
+    qDebug() << "[SolutionTemplateManager] Saving positions to template:" << templateDirPath;
+    qDebug() << "[SolutionTemplateManager] Number of positions to save:" << positions.size();
+    
+    QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
+    
+    // Load the existing template
+    QFile tmplFile(templateJsonPath);
+    if (!tmplFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "[SolutionTemplateManager] Could not open template file for position update:" << templateJsonPath;
+        return;
+    }
+    
+    QByteArray data = tmplFile.readAll();
+    QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
+    if (!tmplDoc.isObject()) {
+        qDebug() << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
+        tmplFile.close();
+        return;
+    }
+    
+    tmplFile.close();
+    
+    // Deserialize the template
+    SolutionTemplate tmpl = SolutionTemplate::fromJson(tmplDoc.object());
+    
+    // Update positions in the template
+    for (auto it = positions.constBegin(); it != positions.constEnd(); ++it) {
+        tmpl.setPositionForSequence(it.key(), it.value());
+        qDebug() << "[SolutionTemplateManager] Set position for sequence:" << it.key() << "at" << it.value();
+    }
+    
+    // Save the updated template back to file
+    QJsonObject updatedTmplObj = tmpl.toJson();
+    QJsonDocument updatedTmplDoc(updatedTmplObj);
+    
+    QFile updatedTmplFile(templateJsonPath);
+    if (!updatedTmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qDebug() << "[SolutionTemplateManager] Could not update template file for positions:" << templateJsonPath;
+        return;
+    }
+    
+    updatedTmplFile.write(updatedTmplDoc.toJson(QJsonDocument::Indented));
+    updatedTmplFile.close();
+    
+    // Also update the cached template in memory
+    m_templates.insert(templateDirPath, tmpl);
+    
+    qDebug() << "[SolutionTemplateManager] Successfully saved positions to template file:" << templateJsonPath;
+}
+
+/* Загрузить позиции последовательностей из шаблона */
+QMap<QString, QPointF> SolutionTemplateManager::loadPositionsFromTemplate(const QString& templateDirPath) const
+{
+    qDebug() << "[SolutionTemplateManager] Loading positions from template:" << templateDirPath;
+    
+    QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
+    
+    // Load the template file
+    QFile tmplFile(templateJsonPath);
+    if (!tmplFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "[SolutionTemplateManager] Could not open template file for position loading:" << templateJsonPath;
+        return QMap<QString, QPointF>(); // Return empty map
+    }
+    
+    QByteArray data = tmplFile.readAll();
+    QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
+    if (!tmplDoc.isObject()) {
+        qDebug() << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
+        tmplFile.close();
+        return QMap<QString, QPointF>(); // Return empty map
+    }
+    
+    tmplFile.close();
+    
+    // Deserialize the template
+    SolutionTemplate tmpl = SolutionTemplate::fromJson(tmplDoc.object());
+    
+    // Get positions from the template
+    QMap<QString, QPointF> positions = tmpl.positions();
+    
+    qDebug() << "[SolutionTemplateManager] Loaded" << positions.size() << "positions from template";
+    
+    return positions;
+}

@@ -1,6 +1,8 @@
 #pragma once
 #include <QString>
 #include <QVector>
+#include <QMap>
+#include <QPointF>
 #include <QJsonObject>
 #include <QPixmap>
 
@@ -19,6 +21,12 @@ public:
     void removeSequence(int idx) { m_sequences.removeAt(idx); }
     void removeSequenceByPath(const QString& sequencePath);
     void clearSequences() { m_sequences.clear(); }
+    
+    // Position operations
+    void setPositionForSequence(const QString& sequenceName, const QPointF& position) { m_positions[sequenceName] = position; }
+    QPointF getPositionForSequence(const QString& sequenceName) const { return m_positions.value(sequenceName, QPointF()); }
+    void clearPositions() { m_positions.clear(); }
+    const QMap<QString, QPointF>& positions() const { return m_positions; }
 
     /*--- геттеры --------------------------------------------------------*/
     const QString&               name() const { return m_name; }
@@ -38,4 +46,5 @@ private:
     QString          m_imagePath;
     QString          m_mainSequencePath;
     QVector<QString> m_sequences; // Пути к файлам последовательностей
+    QMap<QString, QPointF> m_positions; // Позиции последовательностей на холсте
 };
