@@ -14,7 +14,7 @@ public:
             "QTreeWidget {"
             "  border: 2px solid #5A9;"              // светло-синий контур
             "  border-radius: 12px;"                 // округлые углы
-            "  font: 18px \"Segoe UI\", sans-serif;" // крупный шрифт
+            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
             "  color: #000000;"                      // черный текст
             "  background-color: #ffffff;"           // белый фон
             "  padding: 4px;"                        // внутренние отступы

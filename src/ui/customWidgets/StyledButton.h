@@ -16,7 +16,7 @@ public:
             "  border: 2px solid #5A9;"            // светло‑синий контур
             "  border-radius: 12px;"              // округлые углы
             "  padding: 6px 12px;"                // внутренние отступы
-            "  font: 18px \"Segoe UI\", sans-serif;" // крупный шрифт
+            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
             "  background-color: #e8f0ff;"        // мягкий голубой фон
             "}"
             "QPushButton:hover { background-color: #c8def8; }"  // подсветка при наведении

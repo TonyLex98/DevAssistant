@@ -13,7 +13,7 @@
  *   - 2‑пиксельный серо‑синий бордер (#5A9)
  *   - 12‑пиксельное скругление углов
  *   - padding: 6px 12px
- *   - font: 18px "Segoe UI", sans-serif
+ *   - font: 18px "Arial", sans-serif
  *
  * При необходимости можно переопределить keyPressEvent
  * (например, чтобы посылать сообщение по Enter).
@@ -31,7 +31,7 @@ public:
             "  border: 2px solid #5A9;"        // 2px бордер, цвет #5A9
             "  border-radius: 12px;"          // скругление 12px
             "  padding: 6px 12px;"            // внутренние отступы
-            "  font: 18px \"Segoe UI\", sans-serif;"  // шрифт
+            "  font: 18px \"Arial\", sans-serif;"  // шрифт
             "}"
         );
         qDebug() << "[StyleTextEdit] ctor, parent =" << parent;

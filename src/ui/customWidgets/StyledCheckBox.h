@@ -12,7 +12,7 @@ public:
         // Consistent styling with other custom widgets
         setStyleSheet(
             "QCheckBox {"
-            "  font: 18px \"Segoe UI\", sans-serif;" // крупный шрифт
+            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
             "  spacing: 8px;"                        // расстояние между чекбоксом и текстом
             "  color: #000000;"                      // черный текст
             "}"

@@ -21,7 +21,7 @@ public:
             "  border: 2px solid #5A9;"
             "  border-radius: 12px;"
             "  padding: 6px 12px;"
-            "  font: 18px \"Segoe UI\", sans-serif;"
+            "  font: 18px \"Arial\", sans-serif;"
             "}"
         );
 
