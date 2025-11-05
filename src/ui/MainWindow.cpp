@@ -1860,8 +1860,29 @@ void MainWindow::handleOpenCommand(Command* cmd)
     QStringList snippet;
 
     if (startLine >= 1 && endLine >= startLine) {
-        if (startLine > allLines.size())
+        // Validate that the requested line numbers don't exceed the total number of lines in the file
+        if (startLine > allLines.size()) {
+            // Error: requested start line is beyond the end of the file
+            QString errorMsg = QString("ERROR: Cannot OPEN_FILE_REGION %1: requested start line %2 is beyond file length of %3 lines. Remember: line numbering starts from 1, not 0.")
+                    .arg(rawPath).arg(startLine).arg(allLines.size());
+            log(errorMsg);
+            if (m_contextManager) {
+                addCommandToContext(cmd, errorMsg);
+            }
             return;
+        }
+        
+        if (endLine > allLines.size()) {
+            // Error: requested end line is beyond the end of the file
+            QString errorMsg = QString("ERROR: Cannot OPEN_FILE_REGION %1: requested end line %2 is beyond file length of %3 lines. Remember: line numbering starts from 1, not 0.")
+                    .arg(rawPath).arg(endLine).arg(allLines.size());
+            log(errorMsg);
+            if (m_contextManager) {
+                addCommandToContext(cmd, errorMsg);
+            }
+            return;
+        }
+        
         startLine = qMax(1, startLine);
         endLine = qMin(endLine, allLines.size());
         snippet = allLines.mid(startLine - 1, endLine - startLine + 1);

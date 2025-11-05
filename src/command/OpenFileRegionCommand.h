@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QDir>
 
 class OpenFileRegionCommand : public Command
 {
@@ -15,7 +16,19 @@ public:
         m_params["path"] = path;
         if (!regionExpr.isEmpty()) m_params["region"] = regionExpr;
         if (startLine>=1 && endLine>=startLine){ m_params["startLine"]=startLine; m_params["endLine"]=endLine; }
-        m_description = descr.isEmpty() ? QString("Открыть участок файла «%1»").arg(path) : descr;
+        
+        // Создаем более информативное описание, которое четко подскажет модели, какие параметры используются
+        if (descr.isEmpty()) {
+            if (startLine >= 1 && endLine >= startLine) {
+                m_description = QString("Открыть участок файла «%1» СТРОГИЙ ФОРМАТ: строки с %2 по %3 (startLine=%2, endLine=%3) - КЛЮЧЕВОЕ: используй именно эти параметры!").arg(path).arg(startLine).arg(endLine);
+            } else if (!regionExpr.isEmpty()) {
+                m_description = QString("Открыть участок файла «%1» по регулярному выражению «%2»").arg(path).arg(regionExpr);
+            } else {
+                m_description = QString("Открыть участок файла «%1» - ВАЖНО: используй startLine и endLine параметры для указания конкретных строк!").arg(path);
+            }
+        } else {
+            m_description = descr;
+        }
     }
 
     QString name() const override { return "OPEN_FILE_REGION"; }

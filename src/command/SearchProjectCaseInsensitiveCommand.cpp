@@ -52,13 +52,22 @@ bool SearchProjectCaseInsensitiveCommand::apply(DevAssManager* devAss, QString* 
         if (shouldSkipFile(path))
             continue;
         QFile f(path);
-        if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        if (!f.open(QIODevice::ReadOnly))
             continue;
-        QTextStream in(&f);
-        int lineNo = 0;
-        while (!in.atEnd() && m_matches.size() < maxMatches) {
-            const QString line = in.readLine();
-            ++lineNo;
+        QByteArray content = f.readAll();
+        f.close();
+        
+        // Try to decode with UTF-8 first, fallback to system encoding if needed
+        QString text = QString::fromUtf8(content);
+        if (text.isNull() || (content.size() > 0 && text.toUtf8() != content)) {
+            // Fallback to system locale encoding if UTF-8 doesn't work
+            text = QString::fromLocal8Bit(content);
+        }
+        
+        QStringList lines = text.split('\n', QString::KeepEmptyParts);
+        for (int i = 0; i < lines.size() && m_matches.size() < maxMatches; ++i) {
+            const QString& line = lines[i];
+            int lineNo = i + 1; // Line numbers start from 1
             if (line.contains(query, cs)) {
                 QString absPath = QFileInfo(path).absoluteFilePath();  // Use absolute path
                 QString snippet = line.trimmed();
@@ -67,7 +76,6 @@ bool SearchProjectCaseInsensitiveCommand::apply(DevAssManager* devAss, QString* 
                 m_matches << QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(snippet);
             }
         }
-        f.close();
     }
 
     if (m_matches.isEmpty() && err) {
@@ -78,8 +86,15 @@ bool SearchProjectCaseInsensitiveCommand::apply(DevAssManager* devAss, QString* 
 
 bool SearchProjectCaseInsensitiveCommand::shouldSkipFile(const QString& path) const
 {
-    if (path.contains("DevelopersAssistant"))
-        return true;
+    // Пропускаем файлы в подкаталоге DevelopersAssistant проекта
+    QString normalizedPath = QDir::cleanPath(path);
+    QStringList pathParts = normalizedPath.split('/');
+    for (const QString& part : pathParts) {
+        if (part == "DevelopersAssistant") {
+            return true;
+        }
+    }
+    
     QFileInfo info(path);
     if (!m_includeGlobs.isEmpty()) {
         bool match = false;
