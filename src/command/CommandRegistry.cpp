@@ -15,6 +15,7 @@
 #include "SearchProjectCommand.h"
 #include "ShowResultCommand.h"
 #include "CallSequenceCommand.h"
+#include "OpenSequenceCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -69,7 +70,8 @@ QVector<Command*> CommandRegistry::all()
         new SearchWebCommand(QString()),
         new SearchProjectCommand(QString()),
         new ShowResultCommand(QString()),
-        new CallSequenceCommand(QString())
+        new CallSequenceCommand(QString()),
+        new OpenSequenceCommand(QString())
     };
 }
 
@@ -429,6 +431,22 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
         
         return new CallSequenceCommand(sequenceName, needSummary, description);
+    }
+
+    if (cmd == "OPEN_SEQUENCE") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        QString sequenceName = p["sequenceName"].toString();
+        QString description = obj["description"].toString();
+        
+        // Поддержка альтернативного формата
+        if (sequenceName.isEmpty()) {
+            sequenceName = obj["sequence_name"].toString();
+        }
+        if (sequenceName.isEmpty()) {
+            sequenceName = p["sequence_name"].toString();
+        }
+        
+        return new OpenSequenceCommand(sequenceName, description);
     }
 
     /* Неизвестная команда */

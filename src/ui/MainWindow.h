@@ -197,6 +197,7 @@ private:
 
     QString m_lastUserMessage;
     QString m_lastAssistantMessage;
+    QString m_currentSeqPath; // Path of the currently running sequence (for finding related sequences)
     IDEWidget *ide_widget;
 
     MemorySplitter *mainSplitter;

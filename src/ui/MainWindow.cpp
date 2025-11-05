@@ -224,6 +224,7 @@ MainWindow::MainWindow(QWidget *parent)
             m_currentSeq = seq;
             m_currentStepIdx = 0;
             m_sequenceMode = true;
+            m_currentSeqPath = sequencePath; // Track the sequence path for related sequence lookup
             updateSequenceGraphHighlight();
             runNextStep();
             return;
@@ -282,6 +283,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_currentSeq = seq;
         m_currentStepIdx = 0;
         m_sequenceMode = true;
+        m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
         updateSequenceGraphHighlight();
         runNextStep();
     });
@@ -1083,6 +1085,7 @@ void MainWindow::runSequenceDialog()
         m_currentSeq = currentSequences.value(path);
         m_currentStepIdx = 0;
         m_sequenceMode = true;
+        m_currentSeqPath = path; // Track the sequence path for related sequence lookup
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] Starting sequence:" << m_currentSeq.name();
         runNextStep();   // сразу стартуем первый шаг
@@ -1298,41 +1301,127 @@ void MainWindow::handleAssistantFinished()
     // Check if the LLM specified to open a new sequence
     QString nextSeqName = PromptResolver::getNextSequence();
     if (!nextSeqName.isEmpty()) {
-        // Find the sequence by name - first try by internal sequence name
+        // Refresh all sequences to ensure latest templates are loaded
+        refreshAllSequences();
+        
         const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
         PromptSequence foundSeq;
         QString foundPath;
         
-        // First try to find by sequence name (original behavior)
+        // First try to find by internal sequence name
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == nextSeqName) {
                 foundSeq = it.value();
                 foundPath = it.key();
+                log("Found sequence by name: " + nextSeqName + " at " + foundPath); // Debug log
                 break;
             }
         }
         
-        // If not found by name, try to find by filename (for OPEN_SEQUENCE:filename.json format)
+        // If not found by name, try by filename
         if (foundPath.isEmpty()) {
             for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
                 QFileInfo fileInfo(it.key());
                 if (fileInfo.fileName() == nextSeqName) {
                     foundSeq = it.value();
                     foundPath = it.key();
+                    log("Found sequence by filename: " + nextSeqName + " at " + foundPath); // Debug log
                     break;
                 }
             }
         }
         
-        // If still not found, try partial match in case only the base name was provided
+        // Try with expected extension if not already present
+        if (foundPath.isEmpty()) {
+            QString expectedFileName = nextSeqName;
+            if (!expectedFileName.endsWith(".seq.json")) {
+                expectedFileName += ".seq.json";
+            }
+            for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+                QFileInfo fileInfo(it.key());
+                if (fileInfo.fileName() == expectedFileName) {
+                    foundSeq = it.value();
+                    foundPath = it.key();
+                    log("Found sequence by expected filename: " + expectedFileName + " at " + foundPath); // Debug log
+                    break;
+                }
+            }
+        }
+        
+        // Try base name match (without extension)
         if (foundPath.isEmpty()) {
             for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
                 QFileInfo fileInfo(it.key());
-                if (fileInfo.baseName() == nextSeqName) { // Compare without extension
+                if (fileInfo.baseName() == nextSeqName) {
                     foundSeq = it.value();
                     foundPath = it.key();
+                    log("Found sequence by basename match: " + nextSeqName + " at " + foundPath); // Debug log
                     break;
                 }
+            }
+        }
+        
+        // Try base name matching for .seq extension case
+        if (foundPath.isEmpty()) {
+            for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+                QFileInfo fileInfo(it.key());
+                if (fileInfo.baseName() == nextSeqName + ".seq") {
+                    foundSeq = it.value();
+                    foundPath = it.key();
+                    log("Found sequence by basename + .seq match: " + nextSeqName + ".seq" + " at " + foundPath); // Debug log
+                    break;
+                }
+            }
+        }
+        
+        // If still not found and we're currently in a sequence from a template,
+        // try to find the sequence file in the same directory as the current sequence
+        if (foundPath.isEmpty() && !m_currentSeqPath.isEmpty()) {
+            QFileInfo currentSeqInfo(m_currentSeqPath);
+            QDir templateDir = currentSeqInfo.absoluteDir();
+            
+            // Try multiple possible formats for the sequence filename
+            QStringList possibleFilenames;
+            
+            // Add the exact name as provided
+            possibleFilenames << nextSeqName;
+            
+            // Add with .seq.json extension if not already present
+            if (!nextSeqName.endsWith(".seq.json")) {
+                possibleFilenames << (nextSeqName + ".seq.json");
+            }
+            
+            // Add with just .json extension if not already present
+            if (!nextSeqName.endsWith(".json")) {
+                possibleFilenames << (nextSeqName + ".json");
+            }
+            
+            // Add with just .seq extension if not already present  
+            if (!nextSeqName.endsWith(".seq")) {
+                possibleFilenames << (nextSeqName + ".seq");
+            }
+            
+            // Try each possible filename in the template directory
+            for (const QString& filename : possibleFilenames) {
+                QString sequenceFilePath = templateDir.filePath(filename);
+                
+                if (QFile::exists(sequenceFilePath)) {
+                    // Load the sequence from this file
+                    QFile seqFile(sequenceFilePath);
+                    if (seqFile.open(QIODevice::ReadOnly)) {
+                        QByteArray data = seqFile.readAll();
+                        QJsonDocument doc = QJsonDocument::fromJson(data);
+                        if (doc.isObject()) {
+                            foundSeq = PromptSequence::fromJson(doc.object());
+                            foundPath = sequenceFilePath;
+                            log(QString("Found sequence in template directory: %1").arg(sequenceFilePath)); // Debug log
+                            break;
+                        }
+                        seqFile.close();
+                    }
+                }
+                
+                if (!foundPath.isEmpty()) break; // Found, exit the loop
             }
         }
         
@@ -1340,6 +1429,7 @@ void MainWindow::handleAssistantFinished()
             m_currentSeq = foundSeq;
             m_currentStepIdx = 0;
             m_sequenceMode = true;
+            m_currentSeqPath = foundPath; // Update the sequence path when transitioning via template-based OPEN_SEQUENCE
             addSequenceTransitionToHistory(nextSeqName);  // Add transition to history
             updateSequenceGraphHighlight();  // Update the graph highlighting
             PromptResolver::clearNextSequence();  // Clear for next usage
@@ -1350,6 +1440,10 @@ void MainWindow::handleAssistantFinished()
         
         // If sequence not found, log error and continue with normal flow
         log("Указанная последовательность не найдена: " + nextSeqName);
+        log("Available sequences in manager: " + QString::number(allSequences.size()));
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            log("  - Sequence name: '" + it.value().name() + "' at path: " + it.key());
+        }
         PromptResolver::clearNextSequence();
     }
 
@@ -1389,7 +1483,9 @@ void MainWindow::handleAssistantFinished()
     }
 
     bool hasCallSequenceCommand = false;
+    bool hasOpenSequenceCommand = false;
     QString sequenceToCall;
+    QString openSequenceName;
     
     for (Command* c : toRun) {
         if (c->name() == "ASK_USER") {
@@ -1418,6 +1514,10 @@ void MainWindow::handleAssistantFinished()
             // Mark that we have a sequence call command and store the name
             sequenceToCall = c->params().value("sequenceName").toString();
             hasCallSequenceCommand = true;
+        } else if (c->name() == "OPEN_SEQUENCE") {
+            // Mark that we have an open sequence command and store the name
+            openSequenceName = c->params().value("sequenceName").toString();
+            hasOpenSequenceCommand = true;
         }
     }
     
@@ -1457,6 +1557,17 @@ void MainWindow::handleAssistantFinished()
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
                     
+                    // Update current sequence path to match the sequence we're switching to (find the path)
+                    QString foundPath;
+                    const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+                    for (auto itPath = allSequences.constBegin(); itPath != allSequences.constEnd(); ++itPath) {
+                        if (itPath.value().name() == sequenceToCall) {
+                            foundPath = itPath.key();
+                            break;
+                        }
+                    }
+                    m_currentSeqPath = foundPath; // Update the sequence path
+                    
                     // Add context about what was done in the previous sequence
                     if (!completedStepsSummary.isEmpty()) {
                         QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
@@ -1474,6 +1585,17 @@ void MainWindow::handleAssistantFinished()
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
                     
+                    // Update current sequence path to match the sequence we're switching to (find the path)
+                    QString foundPath;
+                    const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+                    for (auto itPath = allSequences.constBegin(); itPath != allSequences.constEnd(); ++itPath) {
+                        if (itPath.value().name() == sequenceToCall) {
+                            foundPath = itPath.key();
+                            break;
+                        }
+                    }
+                    m_currentSeqPath = foundPath; // Update the sequence path
+                    
                     addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
                     updateSequenceGraphHighlight();  // Update the graph highlighting
                     qDeleteAll(toRun);  // Clean up the commands
@@ -1485,6 +1607,38 @@ void MainWindow::handleAssistantFinished()
         
         // If sequence not found, log error and continue with normal flow
         log("Указанная последовательность не найдена: " + sequenceToCall);
+    }
+    
+    // If we have an OPEN_SEQUENCE command, switch to that sequence
+    if (hasOpenSequenceCommand && !openSequenceName.isEmpty()) {
+        const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            if (it.value().name() == openSequenceName) {
+                m_currentSeq = it.value();
+                m_currentStepIdx = 0;
+                m_sequenceMode = true;
+                
+                // Update current sequence path to match the sequence we're switching to (find the path)
+                QString foundPath;
+                const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+                for (auto itPath = allSequences.constBegin(); itPath != allSequences.constEnd(); ++itPath) {
+                    if (itPath.value().name() == openSequenceName) {
+                        foundPath = itPath.key();
+                        break;
+                    }
+                }
+                m_currentSeqPath = foundPath; // Update the sequence path
+                
+                addSequenceTransitionToHistory(openSequenceName);  // Add transition to history
+                updateSequenceGraphHighlight();  // Update the graph highlighting
+                qDeleteAll(toRun);  // Clean up the commands
+                QTimer::singleShot(200, this, &MainWindow::runNextStep);
+                return;  // Exit early to switch to new sequence
+            }
+        }
+        
+        // If sequence not found, log error and continue with normal flow
+        log("Указанная последовательность не найдена: " + openSequenceName);
     }
 
     QStringList appliedSummary;
@@ -2662,6 +2816,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_currentSeq = seq;
     m_currentStepIdx = 0;
     m_sequenceMode = true;
+    m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
     m_lastUserMessage = text; // Save the user's query for resolution in prompts
     
     updateSequenceGraphHighlight();  // Update the graph highlighting
