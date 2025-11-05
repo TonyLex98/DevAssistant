@@ -1911,9 +1911,10 @@ void MainWindow::handleOpenCommand(Command* cmd)
         if (!m_fileWatcher->files().contains(normalized) && QFileInfo::exists(normalized)) {
             m_fileWatcher->addPath(normalized);
         }
-        // Add command to context manager
+        // Add command to context manager - include the actual numbered content
         if (m_contextManager) {
-            QString result = QString("OPEN_FILE_REGION: %1 [lines %2-%3]").arg(rawPath).arg(startLine).arg(startLine + snippet.size() - 1);
+            QString numberedContent = formatNumberedLines(snippet, startLine);
+            QString result = QString("OPEN_FILE_REGION: %1\n%2").arg(rawPath, numberedContent);
             addCommandToContext(cmd, result);
         }
     }
@@ -1937,7 +1938,7 @@ void MainWindow::rebuildContextCache()
             block += formatNumberedLines(slice.fullFileLines, 1);
         } else {
             for (const ContextRange& range : slice.regions) {
-                block += QString("[lines %1-%2]\n").arg(range.startLine).arg(range.endLine);
+                // Include only the numbered lines without the range header for cleaner output
                 block += formatNumberedLines(range.lines, range.startLine);
                 block += "\n";
             }
