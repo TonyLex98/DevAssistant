@@ -2944,8 +2944,19 @@ void MainWindow::updateContextStatusDisplay()
         }
     }
     
-    // Expand all items by default so that sequence structure is visible
-    m_contextCommandsList->expandAll();
+    // Expand only the top-level sequence/command items, keeping result items collapsed by default
+    // This shows the structure but keeps the display compact
+    for (int i = 0; i < m_contextCommandsList->topLevelItemCount(); ++i) {
+        QTreeWidgetItem* topLevelItem = m_contextCommandsList->topLevelItem(i);
+        topLevelItem->setExpanded(true);
+        
+        // Collapse any child items (results) by default, so they can be expanded when needed
+        for (int j = 0; j < topLevelItem->childCount(); ++j) {
+            QTreeWidgetItem* childItem = topLevelItem->child(j);
+            // Keep child items (like results) collapsed by default
+            childItem->setExpanded(false);
+        }
+    }
 }
 
 void MainWindow::onFileChanged(const QString &path)
