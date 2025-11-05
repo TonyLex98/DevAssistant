@@ -233,8 +233,24 @@ MainWindow::MainWindow(QWidget *parent)
         SolutionTemplate progTemplate = templates.value(progTemplatePath);
         QString mainSequencePath = progTemplate.mainSequencePath();
         
-        // If no main sequence is set, use the first available sequence
-        if (mainSequencePath.isEmpty() || (!QFileInfo::exists(mainSequencePath))) {
+        // First, try to use the main sequence path as specified in the template file,
+        // resolved relative to the template directory
+        if (!mainSequencePath.isEmpty()) {
+            QString resolvedMainSeqPath = QDir(progTemplatePath).absoluteFilePath(mainSequencePath);
+            if (QFile::exists(resolvedMainSeqPath)) {
+                mainSequencePath = resolvedMainSeqPath;
+            } else {
+                // If the main sequence specified in template doesn't exist, fall back to first sequence
+                auto sequences = progTemplate.sequences();
+                if (!sequences.isEmpty()) {
+                    // Get the first sequence in the template directory
+                    mainSequencePath = QDir(progTemplatePath).absoluteFilePath(sequences[0]);
+                } else {
+                    mainSequencePath = ""; // No sequences available
+                }
+            }
+        } else {
+            // If no main sequence is set in template, use the first available sequence
             auto sequences = progTemplate.sequences();
             if (!sequences.isEmpty()) {
                 // Get the first sequence in the template directory
@@ -2560,8 +2576,25 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     
     // Get the main sequence for this template
     QString mainSequencePath = selectedTemplate.mainSequencePath();
-    if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
-        // If no main sequence is set, try to get the first sequence from the template
+    
+    // First, try to use the main sequence path as specified in the template file,
+    // resolved relative to the template directory
+    if (!mainSequencePath.isEmpty()) {
+        QString resolvedMainSeqPath = QDir(foundTemplatePath).absoluteFilePath(mainSequencePath);
+        if (QFile::exists(resolvedMainSeqPath)) {
+            mainSequencePath = resolvedMainSeqPath;
+        } else {
+            // If the main sequence specified in template doesn't exist, fall back to first sequence
+            auto sequenceNames = selectedTemplate.sequences();
+            if (!sequenceNames.isEmpty()) {
+                // Build the path to the first sequence file in the template directory
+                mainSequencePath = QDir(foundTemplatePath).absoluteFilePath(sequenceNames[0]);
+            } else {
+                mainSequencePath = ""; // No sequences available
+            }
+        }
+    } else {
+        // If no main sequence is set in template, use the first available sequence
         auto sequenceNames = selectedTemplate.sequences();
         if (!sequenceNames.isEmpty()) {
             // Build the path to the first sequence file in the template directory

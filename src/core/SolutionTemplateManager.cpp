@@ -160,10 +160,19 @@ QString SolutionTemplateManager::getMainSequencePath(const QString &templateDirP
         QString mainSeqPath = tmpl.mainSequencePath();
         
         // Р•СЃР»Рё СѓРєР°Р·Р°РЅ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ Рє РіР»Р°РІРЅРѕР№ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё, РґРµР»Р°РµРј РµРіРѕ Р°Р±СЃРѕР»СЋС‚РЅС‹Рј
-        if (!mainSeqPath.isEmpty() && !QFileInfo::exists(mainSeqPath)) {
-            // Р•СЃР»Рё РїСѓС‚СЊ РЅРµ Р°Р±СЃРѕР»СЋС‚РЅС‹Р№, РґРµР»Р°РµРј РµРіРѕ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РїР°РїРєРё С€Р°Р±Р»РѕРЅР°
-            if (!mainSeqPath.startsWith("/")) {
-                return QDir(templateDirPath).absoluteFilePath(mainSeqPath);
+        if (!mainSeqPath.isEmpty()) {
+            // Check if the main sequence path exists as an absolute path
+            if (QFileInfo::exists(mainSeqPath)) {
+                return mainSeqPath;
+            } else {
+                // If it doesn't exist, try resolving it relative to the template directory
+                QString resolvedPath = QDir(templateDirPath).absoluteFilePath(mainSeqPath);
+                if (QFile::exists(resolvedPath)) {
+                    return resolvedPath;
+                } else {
+                    // If still not found, return empty string to indicate it doesn't exist
+                    return QString();
+                }
             }
         }
         return mainSeqPath;
