@@ -12,6 +12,7 @@ ContextManager::ContextManager(QObject *parent)
     , m_devAssManager(nullptr)
     , m_mainWindow(nullptr)
     , m_commandCounter(0)
+    , m_sequenceCounter(0)
 {
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &ContextManager::onFileChanged);
 }
@@ -130,10 +131,37 @@ QString ContextManager::generateContextText() const
 {
     QStringList contextParts;
     
-    // Add context from valid commands (Active state)
-    for (const auto& cmdInfo : getValidCommands()) {
-        if (!cmdInfo.result.isEmpty()) {
-            contextParts << cmdInfo.result;
+    // Get all sequences to organize commands by sequence
+    QList<CommandSequenceInfo> allSequences = getCommandSequences();
+    
+    if (allSequences.isEmpty()) {
+        // If no sequences, fall back to showing individual commands as before
+        for (const auto& cmdInfo : getValidCommands()) {
+            if (!cmdInfo.result.isEmpty()) {
+                contextParts << cmdInfo.result;
+            }
+        }
+    } else {
+        // Organize commands by sequences
+        for (const auto& seqInfo : allSequences) {
+            // Add sequence header
+            QStringList seqContent;
+            seqContent << QString("=== SEQUENCE: %1 ===").arg(seqInfo.name);
+            if (!seqInfo.description.isEmpty()) {
+                seqContent << seqInfo.description;
+            }
+            
+            // Add commands in this sequence
+            QList<CommandContextInfo> commandsInSequence = getCommandsInSequence(seqInfo.id);
+            for (const auto& cmdInfo : commandsInSequence) {
+                if (!cmdInfo.result.isEmpty() && cmdInfo.state == CommandState::Active) {
+                    seqContent << cmdInfo.result;
+                }
+            }
+            
+            if (seqContent.size() > 2) { // If there are commands beyond the header
+                contextParts << seqContent.join("\n");
+            }
         }
     }
     
@@ -201,4 +229,99 @@ QDateTime ContextManager::getFileModificationTime(const QString& path) const
         return fileInfo.lastModified();
     }
     return QDateTime(); // Invalid datetime
+}
+
+QString ContextManager::startCommandSequence(const QString& name, const QString& description)
+{
+    QString sequenceId = QString("SEQ_%1").arg(++m_sequenceCounter);
+    
+    CommandSequenceInfo seqInfo;
+    seqInfo.id = sequenceId;
+    seqInfo.name = name.isEmpty() ? QString("Sequence %1").arg(m_sequenceCounter) : name;
+    seqInfo.description = description;
+    seqInfo.timestamp = QDateTime::currentDateTime();
+    
+    m_sequenceHistory.insert(sequenceId, seqInfo);
+    
+    emit sequenceStarted(sequenceId);
+    emit contextChanged();
+    
+    return sequenceId;
+}
+
+void ContextManager::endCommandSequence(const QString& sequenceId)
+{
+    if (m_sequenceHistory.contains(sequenceId)) {
+        CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
+        // Optionally update timestamp or add end time here
+        emit sequenceEnded(sequenceId);
+        emit contextChanged();
+    }
+}
+
+void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceId, const QString& result)
+{
+    if (!cmd || !m_sequenceHistory.contains(sequenceId)) return;
+    
+    // First add the command to the main command history with sequence info
+    QString commandId = generateUniqueId(cmd->name());
+    CommandContextInfo info;
+    info.id = commandId;
+    info.name = cmd->name();
+    info.params = cmd->params();
+    info.description = cmd->description();
+    info.timestamp = QDateTime::currentDateTime();
+    info.result = result;
+    info.state = CommandState::Active;
+    info.sequenceId = sequenceId; // Link to the sequence
+    
+    m_commandHistory.insert(commandId, info);
+    
+    // Add command ID to the sequence
+    CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
+    seqInfo.commandIds.append(commandId);
+    
+    // If command involves file operations, add those files to watcher
+    QString filePath = info.params.value("path").toString();
+    if (!filePath.isEmpty()) {
+        QFileInfo fileInfo(filePath);
+        if (fileInfo.exists()) {
+            m_fileWatcher->addPath(fileInfo.absoluteFilePath());
+        }
+    }
+    
+    emit commandAddedToSequence(commandId, sequenceId);
+    emit commandAdded(commandId);
+    emit contextChanged();
+}
+
+QList<CommandSequenceInfo> ContextManager::getCommandSequences() const
+{
+    QList<CommandSequenceInfo> sequences;
+    for (auto it = m_sequenceHistory.constBegin(); it != m_sequenceHistory.constEnd(); ++it) {
+        sequences.append(it.value());
+    }
+    return sequences;
+}
+
+QList<CommandContextInfo> ContextManager::getCommandsInSequence(const QString& sequenceId) const
+{
+    QList<CommandContextInfo> commands;
+    if (m_sequenceHistory.contains(sequenceId)) {
+        const CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
+        for (const QString& commandId : seqInfo.commandIds) {
+            if (m_commandHistory.contains(commandId)) {
+                commands.append(m_commandHistory[commandId]);
+            }
+        }
+    }
+    return commands;
+}
+
+CommandSequenceInfo ContextManager::getSequenceInfo(const QString& sequenceId) const
+{
+    if (m_sequenceHistory.contains(sequenceId)) {
+        return m_sequenceHistory[sequenceId];
+    }
+    return CommandSequenceInfo(); // Return empty sequence info if not found
 }

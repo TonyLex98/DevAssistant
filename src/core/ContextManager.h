@@ -32,8 +32,20 @@ struct CommandContextInfo {
     CommandState state;          // Current state of the command
     QString reason;              // Reason for state (invalidation reason, etc.)
     QString result;              // Command result/output
+    QString sequenceId;          // ID of the command sequence this command belongs to
     
     CommandContextInfo() : state(CommandState::Active) {}
+};
+
+// Structure to track command sequences
+struct CommandSequenceInfo {
+    QString id;
+    QString name;
+    QDateTime timestamp;
+    QString description;
+    QList<QString> commandIds;   // IDs of commands in this sequence
+    
+    CommandSequenceInfo() {}
 };
 
 class ContextManager : public QObject
@@ -77,22 +89,35 @@ public:
     // Set MainWindow reference to connect signals
     void setMainWindow(MainWindow* mainWindow);
 
+    // Methods to manage command sequences
+    QString startCommandSequence(const QString& name = QString(), const QString& description = QString());
+    void endCommandSequence(const QString& sequenceId);
+    void addCommandToSequence(Command* cmd, const QString& sequenceId, const QString& result = QString());
+    QList<CommandSequenceInfo> getCommandSequences() const;
+    QList<CommandContextInfo> getCommandsInSequence(const QString& sequenceId) const;
+    CommandSequenceInfo getSequenceInfo(const QString& sequenceId) const;
+
 signals:
     // Signal emitted when command context changes
     void contextChanged();
     void commandAdded(const QString& commandId);
     void commandInvalidated(const QString& commandId, const QString& reason);
     void commandRemoved(const QString& commandId);
+    void sequenceStarted(const QString& sequenceId);
+    void sequenceEnded(const QString& sequenceId);
+    void commandAddedToSequence(const QString& commandId, const QString& sequenceId);
 
 public slots:
     void onFileChanged(const QString &path);
     
 private:
     QMap<QString, CommandContextInfo> m_commandHistory;
+    QMap<QString, CommandSequenceInfo> m_sequenceHistory;
     QFileSystemWatcher* m_fileWatcher;
     DevAssManager* m_devAssManager;
     MainWindow* m_mainWindow;
     int m_commandCounter; // To generate unique IDs
+    int m_sequenceCounter; // To generate unique sequence IDs
     
     QString generateUniqueId(const QString& commandName);
     void setupFileWatcher();

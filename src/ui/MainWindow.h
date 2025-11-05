@@ -198,6 +198,7 @@ private:
     QString m_lastUserMessage;
     QString m_lastAssistantMessage;
     QString m_currentSeqPath; // Path of the currently running sequence (for finding related sequences)
+    QString m_currentSeqId;   // ID of the current command sequence being tracked
     IDEWidget *ide_widget;
 
     MemorySplitter *mainSplitter;

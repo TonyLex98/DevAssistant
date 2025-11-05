@@ -225,6 +225,7 @@ MainWindow::MainWindow(QWidget *parent)
             m_currentStepIdx = 0;
             m_sequenceMode = true;
             m_currentSeqPath = sequencePath; // Track the sequence path for related sequence lookup
+            m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
             updateSequenceGraphHighlight();
             runNextStep();
             return;
@@ -284,6 +285,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_currentStepIdx = 0;
         m_sequenceMode = true;
         m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
+        m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
         updateSequenceGraphHighlight();
         runNextStep();
     });
@@ -1086,6 +1088,7 @@ void MainWindow::runSequenceDialog()
         m_currentStepIdx = 0;
         m_sequenceMode = true;
         m_currentSeqPath = path; // Track the sequence path for related sequence lookup
+        m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] Starting sequence:" << m_currentSeq.name();
         runNextStep();   // сразу стартуем первый шаг
@@ -1132,7 +1135,12 @@ void MainWindow::runNextStep()
         // конец последовательности
         QMessageBox::information(this, "Готово",
                                  "Последовательность выполнена полностью.");
+        // End the command sequence if we were tracking one
+        if (!m_currentSeqId.isEmpty() && m_contextManager) {
+            m_contextManager->endCommandSequence(m_currentSeqId);
+        }
         m_sequenceMode = false;
+        m_currentSeqId.clear(); // Clear the current sequence ID
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
         return;
     }
@@ -1553,9 +1561,17 @@ void MainWindow::handleAssistantFinished()
                         }
                     }
                     
+                    // End the current command sequence before starting the new one
+                    if (!m_currentSeqId.isEmpty() && m_contextManager) {
+                        m_contextManager->endCommandSequence(m_currentSeqId);
+                    }
+                    
                     m_currentSeq = it.value();
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
+                    
+                    // Start a new command sequence for the new sequence
+                    m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
                     
                     // Update current sequence path to match the sequence we're switching to (find the path)
                     QString foundPath;
@@ -1581,9 +1597,17 @@ void MainWindow::handleAssistantFinished()
                     return;  // Exit early to switch to new sequence
                 } else {
                     // No summary needed, directly switch to the new sequence
+                    // End the current command sequence before starting the new one
+                    if (!m_currentSeqId.isEmpty() && m_contextManager) {
+                        m_contextManager->endCommandSequence(m_currentSeqId);
+                    }
+                    
                     m_currentSeq = it.value();
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
+                    
+                    // Start a new command sequence for the new sequence
+                    m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
                     
                     // Update current sequence path to match the sequence we're switching to (find the path)
                     QString foundPath;
@@ -1614,9 +1638,17 @@ void MainWindow::handleAssistantFinished()
         const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == openSequenceName) {
+                // End the current command sequence before starting the new one
+                if (!m_currentSeqId.isEmpty() && m_contextManager) {
+                    m_contextManager->endCommandSequence(m_currentSeqId);
+                }
+                
                 m_currentSeq = it.value();
                 m_currentStepIdx = 0;
                 m_sequenceMode = true;
+                
+                // Start a new command sequence for the new sequence
+                m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
                 
                 // Update current sequence path to match the sequence we're switching to (find the path)
                 QString foundPath;
@@ -2125,7 +2157,12 @@ void MainWindow::runNextSequence()
         // конец последовательности
         QMessageBox::information(this, "Готово",
                                  "Последовательность выполнена полностью.");
+        // End the command sequence if we were tracking one
+        if (!m_currentSeqId.isEmpty() && m_contextManager) {
+            m_contextManager->endCommandSequence(m_currentSeqId);
+        }
         m_sequenceMode = false;
+        m_currentSeqId.clear(); // Clear the current sequence ID
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
         return;
     }
@@ -2562,8 +2599,13 @@ void MainWindow::addCommandToContext(Command* cmd, const QString& result)
         return;
     }
     
-    // The ContextManager will handle duplicate detection internally
-    m_contextManager->addCommand(cmd, result);
+    // If we're in a sequence mode, add to the current sequence, otherwise add directly
+    if (m_sequenceMode && !m_currentSeqId.isEmpty()) {
+        m_contextManager->addCommandToSequence(cmd, m_currentSeqId, result);
+    } else {
+        // The ContextManager will handle duplicate detection internally
+        m_contextManager->addCommand(cmd, result);
+    }
 }
 
 void MainWindow::refreshAllSequences()
@@ -2627,81 +2669,187 @@ void MainWindow::updateContextStatusDisplay()
     
     m_contextCommandsList->clear();
     
-    // Get all commands from context manager
-    QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
+    // Get all sequences from context manager
+    QList<CommandSequenceInfo> allSequences = m_contextManager->getCommandSequences();
     
-    for (const auto& cmdInfo : allCommands) {
-        // Create top-level item for the command
-        QTreeWidgetItem* commandItem = new QTreeWidgetItem(m_contextCommandsList);
+    if (allSequences.isEmpty()) {
+        // If no sequences, fall back to showing individual commands as before
+        QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
         
-        // First column: timestamp
-        commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
-        
-        // Second column: description
-        commandItem->setText(1, cmdInfo.description);
-        
-        switch (cmdInfo.state) {
-            case CommandState::Active: {
-                // Active commands in context shown in green
-                commandItem->setBackground(0, QColor(200, 255, 200)); // Light green
-                commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
-                commandItem->setForeground(0, Qt::darkGreen);
-                commandItem->setForeground(1, Qt::darkGreen);
-                commandItem->setToolTip(0, "Active in context");
-                commandItem->setToolTip(1, "Active in context");
-                break;
+        for (const auto& cmdInfo : allCommands) {
+            // Create top-level item for the command
+            QTreeWidgetItem* commandItem = new QTreeWidgetItem(m_contextCommandsList);
+            
+            // First column: timestamp
+            commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
+            
+            // Second column: description
+            commandItem->setText(1, cmdInfo.description);
+            
+            // If this command belongs to a sequence, indicate that
+            if (!cmdInfo.sequenceId.isEmpty()) {
+                CommandSequenceInfo seqInfo = m_contextManager->getSequenceInfo(cmdInfo.sequenceId);
+                commandItem->setText(1, QString("[%1] %2").arg(seqInfo.name).arg(cmdInfo.description));
             }
-            case CommandState::Invalidated: {
-                // Invalidated commands shown in red with reason
-                commandItem->setBackground(0, QColor(255, 200, 200)); // Light red
-                commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
-                commandItem->setForeground(0, Qt::red);
-                commandItem->setForeground(1, Qt::red);
-                QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
-                commandItem->setToolTip(0, tooltip);
-                commandItem->setToolTip(1, tooltip);
-                break;
+            
+            switch (cmdInfo.state) {
+                case CommandState::Active: {
+                    // Active commands in context shown in green
+                    commandItem->setBackground(0, QColor(200, 255, 200)); // Light green
+                    commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
+                    commandItem->setForeground(0, Qt::darkGreen);
+                    commandItem->setForeground(1, Qt::darkGreen);
+                    commandItem->setToolTip(0, "Active in context");
+                    commandItem->setToolTip(1, "Active in context");
+                    break;
+                }
+                case CommandState::Invalidated: {
+                    // Invalidated commands shown in red with reason
+                    commandItem->setBackground(0, QColor(255, 200, 200)); // Light red
+                    commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
+                    commandItem->setForeground(0, Qt::red);
+                    commandItem->setForeground(1, Qt::red);
+                    QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
+                    commandItem->setToolTip(0, tooltip);
+                    commandItem->setToolTip(1, tooltip);
+                    break;
+                }
+                case CommandState::Removed: {
+                    // Removed commands shown in gray
+                    commandItem->setBackground(0, QColor(200, 200, 200)); // Light gray
+                    commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
+                    commandItem->setForeground(0, Qt::gray);
+                    commandItem->setForeground(1, Qt::gray);
+                    commandItem->setToolTip(0, "Command was removed from context");
+                    commandItem->setToolTip(1, "Command was removed from context");
+                    break;
+                }
             }
-            case CommandState::Removed: {
-                // Removed commands shown in gray
-                commandItem->setBackground(0, QColor(200, 200, 200)); // Light gray
-                commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
-                commandItem->setForeground(0, Qt::gray);
-                commandItem->setForeground(1, Qt::gray);
-                commandItem->setToolTip(0, "Command was removed from context");
-                commandItem->setToolTip(1, "Command was removed from context");
-                break;
+            
+            // Store command ID in userData for potential future use
+            commandItem->setData(0, Qt::UserRole, cmdInfo.id);
+            
+            // Add result as child item if it exists
+            if (!cmdInfo.result.isEmpty()) {
+                QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
+                resultItem->setText(0, "Result:");
+                resultItem->setText(1, cmdInfo.result);
+                resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
+                resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
+                resultItem->setForeground(0, Qt::darkBlue);
+                resultItem->setForeground(1, Qt::darkBlue);
+                
+                // Format the result in a more readable way if it's long
+                QStringList resultLines = cmdInfo.result.split('\n');
+                if (resultLines.size() > 10) {
+                    // Show first 10 lines and indicate more
+                    QStringList shortResult = resultLines.mid(0, 10);
+                    shortResult << "... (click to expand)";
+                    resultItem->setText(1, shortResult.join('\n'));
+                } else {
+                    resultItem->setText(1, cmdInfo.result);
+                }
             }
         }
-        
-        // Store command ID in userData for potential future use
-        commandItem->setData(0, Qt::UserRole, cmdInfo.id);
-        
-        // Add result as child item if it exists
-        if (!cmdInfo.result.isEmpty()) {
-            QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
-            resultItem->setText(0, "Result:");
-            resultItem->setText(1, cmdInfo.result);
-            resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
-            resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
-            resultItem->setForeground(0, Qt::darkBlue);
-            resultItem->setForeground(1, Qt::darkBlue);
+    } else {
+        // Show commands organized by sequences
+        for (const auto& seqInfo : allSequences) {
+            // Create top-level item for the sequence
+            QTreeWidgetItem* seqItem = new QTreeWidgetItem(m_contextCommandsList);
             
-            // Format the result in a more readable way if it's long
-            QStringList resultLines = cmdInfo.result.split('\n');
-            if (resultLines.size() > 10) {
-                // Show first 10 lines and indicate more
-                QStringList shortResult = resultLines.mid(0, 10);
-                shortResult << "... (click to expand)";
-                resultItem->setText(1, shortResult.join('\n'));
-            } else {
-                resultItem->setText(1, cmdInfo.result);
+            // First column: timestamp
+            seqItem->setText(0, seqInfo.timestamp.toString("hh:mm:ss"));
+            
+            // Second column: sequence name with description
+            seqItem->setText(1, QString("SEQUENCE: %1").arg(seqInfo.name));
+            if (!seqInfo.description.isEmpty()) {
+                seqItem->setToolTip(1, seqInfo.description);
+            }
+            
+            // Set different color for sequence items (to distinguish from commands)
+            seqItem->setBackground(0, QColor(255, 235, 205)); // Light orange background for sequences
+            seqItem->setBackground(1, QColor(255, 235, 205)); // Light orange background
+            seqItem->setForeground(0, Qt::darkBlue);
+            seqItem->setForeground(1, Qt::darkBlue);
+            
+            // Store sequence ID in userData for potential future use
+            seqItem->setData(0, Qt::UserRole, seqInfo.id);
+            
+            // Get commands in this sequence and add them as child items
+            QList<CommandContextInfo> commandsInSequence = m_contextManager->getCommandsInSequence(seqInfo.id);
+            for (const auto& cmdInfo : commandsInSequence) {
+                QTreeWidgetItem* commandItem = new QTreeWidgetItem(seqItem);
+                
+                // First column: timestamp
+                commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
+                
+                // Second column: command description
+                commandItem->setText(1, cmdInfo.description);
+                
+                switch (cmdInfo.state) {
+                    case CommandState::Active: {
+                        // Active commands in context shown in green
+                        commandItem->setBackground(0, QColor(200, 255, 200)); // Light green
+                        commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
+                        commandItem->setForeground(0, Qt::darkGreen);
+                        commandItem->setForeground(1, Qt::darkGreen);
+                        commandItem->setToolTip(0, "Active in context");
+                        commandItem->setToolTip(1, "Active in context");
+                        break;
+                    }
+                    case CommandState::Invalidated: {
+                        // Invalidated commands shown in red with reason
+                        commandItem->setBackground(0, QColor(255, 200, 200)); // Light red
+                        commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
+                        commandItem->setForeground(0, Qt::red);
+                        commandItem->setForeground(1, Qt::red);
+                        QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
+                        commandItem->setToolTip(0, tooltip);
+                        commandItem->setToolTip(1, tooltip);
+                        break;
+                    }
+                    case CommandState::Removed: {
+                        // Removed commands shown in gray
+                        commandItem->setBackground(0, QColor(200, 200, 200)); // Light gray
+                        commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
+                        commandItem->setForeground(0, Qt::gray);
+                        commandItem->setForeground(1, Qt::gray);
+                        commandItem->setToolTip(0, "Command was removed from context");
+                        commandItem->setToolTip(1, "Command was removed from context");
+                        break;
+                    }
+                }
+                
+                // Store command ID in userData for potential future use
+                commandItem->setData(0, Qt::UserRole, cmdInfo.id);
+                
+                // Add result as child item if it exists
+                if (!cmdInfo.result.isEmpty()) {
+                    QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
+                    resultItem->setText(0, "Result:");
+                    resultItem->setText(1, cmdInfo.result);
+                    resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
+                    resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
+                    resultItem->setForeground(0, Qt::darkBlue);
+                    resultItem->setForeground(1, Qt::darkBlue);
+                    
+                    // Format the result in a more readable way if it's long
+                    QStringList resultLines = cmdInfo.result.split('\n');
+                    if (resultLines.size() > 10) {
+                        // Show first 10 lines and indicate more
+                        QStringList shortResult = resultLines.mid(0, 10);
+                        shortResult << "... (click to expand)";
+                        resultItem->setText(1, shortResult.join('\n'));
+                    } else {
+                        resultItem->setText(1, cmdInfo.result);
+                    }
+                }
             }
         }
     }
     
-    // Collapse all items by default so that details are hidden
-    m_contextCommandsList->collapseAll();
+    // Expand all items by default so that sequence structure is visible
+    m_contextCommandsList->expandAll();
 }
 
 void MainWindow::onFileChanged(const QString &path)
@@ -2817,6 +2965,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_currentStepIdx = 0;
     m_sequenceMode = true;
     m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
+    m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
     m_lastUserMessage = text; // Save the user's query for resolution in prompts
     
     updateSequenceGraphHighlight();  // Update the graph highlighting
