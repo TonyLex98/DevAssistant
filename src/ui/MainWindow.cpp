@@ -413,6 +413,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_log->setReadOnly(true);
 
     m_chat = new ChatDialog(&m_model, this);
+    // Set the MainWindow reference in the ChatDialog so it can signal template stops
+    m_chat->setMainWindow(this);
 
     // 3.5   (Опционально) виджет распознавания голоса
     m_voskWidget = new VoskWidget(this);
@@ -466,6 +468,9 @@ MainWindow::MainWindow(QWidget *parent)
             m_contextStatusWidget->setMaximumHeight(25); // Just header height
         }
     });
+
+    // Set the MainWindow reference in the ChatDialog so it can signal template stops
+    m_chat->setMainWindow(this);
 
     // --------  4. Верхняя часть layout (внутри rightPanel) ----------
     /*QVBoxLayout *rightLayout = new QVBoxLayout;
@@ -1130,6 +1135,21 @@ void MainWindow::runSequenceDialog()
 void MainWindow::runNextStep()
 {
     if (!m_sequenceMode) return;
+    
+    // Check if stop was requested
+    if (m_stopRequested) {
+        // Reset the stop flag and exit sequence mode
+        m_stopRequested = false;
+        m_sequenceMode = false;
+        m_currentSeqId.clear(); // Clear the current sequence ID
+        updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+        
+        // Show message that execution was stopped
+        QMessageBox::information(this, "Остановлено",
+                                 "Выполнение шаблона остановлено пользователем.");
+        return;
+    }
+    
     if (m_currentStepIdx < 0 ||
             m_currentStepIdx >= m_currentSeq.steps().size()) {
         // конец последовательности
@@ -1294,6 +1314,20 @@ void MainWindow::handleAssistantFinished()
 
 void MainWindow::handleAssistantFinished()
 {
+    // Check if stop was requested - if so, don't continue with any processing
+    if (m_stopRequested) {
+        m_stopRequested = false;
+        m_sequenceMode = false;
+        m_currentSeqId.clear(); // Clear the current sequence ID
+        updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+        
+        // Show message that execution was stopped
+        QMessageBox::information(this, "Остановлено",
+                                 "Выполнение шаблона остановлено пользователем.");
+        qDeleteAll(CommandParser::parse(m_streamBuf.toUtf8()));
+        return;
+    }
+
     QByteArray fullResp = m_streamBuf.toUtf8();
     QByteArray jsonResp = extractJsonPart(fullResp);
     const bool usedRaw = jsonResp.isEmpty();
@@ -1463,6 +1497,18 @@ void MainWindow::handleAssistantFinished()
         
         // В режиме последовательности - переходим к следующему шагу, даже если команд нет
         if (m_sequenceMode) {
+            // Check if stop was requested before advancing to next step
+            if (m_stopRequested) {
+                m_stopRequested = false;
+                m_sequenceMode = false;
+                m_currentSeqId.clear(); // Clear the current sequence ID
+                updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+                
+                // Show message that execution was stopped
+                QMessageBox::information(this, "Остановлено",
+                                         "Выполнение шаблона остановлено пользователем.");
+                return;
+            }
             ++m_currentStepIdx;
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
         } else {
@@ -1748,6 +1794,20 @@ void MainWindow::handleAssistantFinished()
         // Повторяем в не-последовательном режиме при ошибках
         retryCurrentSequenceStep();
     } else if (m_sequenceMode) {
+        // Check if stop was requested before advancing to next step
+        if (m_stopRequested) {
+            m_stopRequested = false;
+            m_sequenceMode = false;
+            m_currentSeqId.clear(); // Clear the current sequence ID
+            updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+            
+            // Show message that execution was stopped
+            QMessageBox::information(this, "Остановлено",
+                                     "Выполнение шаблона остановлено пользователем.");
+            qDeleteAll(toRun);
+            return;
+        }
+        
         const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
         if (step.loop()) {
             // Если установлен флаг зацикливания, повторяем текущий шаг
@@ -2145,6 +2205,20 @@ void MainWindow::retryCurrentSequenceStep()
 {
     if (!m_sequenceMode)
         return;
+    
+    // Check if stop was requested
+    if (m_stopRequested) {
+        m_stopRequested = false;
+        m_sequenceMode = false;
+        m_currentSeqId.clear(); // Clear the current sequence ID
+        updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
+        
+        // Show message that execution was stopped
+        QMessageBox::information(this, "Остановлено",
+                                 "Выполнение шаблона остановлено пользователем.");
+        return;
+    }
+    
     QTimer::singleShot(200, this, &MainWindow::runNextStep);
 }
 
@@ -2995,6 +3069,17 @@ void MainWindow::runSimpleChat(const QString &text)
     log(QString("Sending simple chat request (%1 tokens) → %2").arg(tokens).arg(text));
 }
 
+
+void MainWindow::stopTemplateExecution()
+{
+    // Set the stop flag to true to indicate that template execution should be stopped
+    m_stopRequested = true;
+    
+    // If we're in sequence mode, the next runNextStep call will check the flag and stop
+    if (m_sequenceMode) {
+        log("Шаблонное выполнение остановлено пользователем.");
+    }
+}
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {

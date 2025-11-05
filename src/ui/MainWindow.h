@@ -77,6 +77,7 @@ public:
 public slots:
     void runSequenceDialog();
     void slot_updatelastUserMessage(const QString& lastUserMessage);
+    void stopTemplateExecution();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -181,6 +182,7 @@ private:
     SolutionTemplateManager m_templateMgr;   // менеджер шаблонов
     PromptSequence        m_currentSeq;     // текущая выбранная последовательность
     bool                  m_sequenceMode = false;
+    bool                  m_stopRequested = false; // Flag to indicate that the sequence execution should be stopped
     int                   m_currentStepIdx = -1; // -1 = не запущено
 
 

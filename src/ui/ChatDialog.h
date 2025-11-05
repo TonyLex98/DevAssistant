@@ -21,6 +21,7 @@ public:
     void finishAssistantMessage();
     void sendMessageToChat(const QString& text);
     void setTemplateManager(class SolutionTemplateManager* templateManager);
+    void setMainWindow(class MainWindow* mainWnd);
 
 signals:
     void sendMessage(const QString& text);
@@ -43,4 +44,5 @@ private:
     MemoryComboBox * m_cb_model;
     MemoryComboBox * m_templateCombo;
     class SolutionTemplateManager* m_templateManager = nullptr;
+    class MainWindow* m_mainWnd = nullptr;
 };

@@ -9,6 +9,7 @@
 #include <QFile>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/SolutionTemplate.h"
+#include "MainWindow.h"
 
 ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_model(model){
     setWindowTitle(tr("Chat / Instruction"));
@@ -73,6 +74,10 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 
 void ChatDialog::onStop(){
     if (m_model) m_model->stopStream();
+    // Also signal the MainWindow to stop template execution if running
+    if (m_mainWnd) {
+        m_mainWnd->stopTemplateExecution();
+    }
 }
 
 void ChatDialog::pslot_updateModelsList(){
@@ -234,5 +239,10 @@ void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManag
 void ChatDialog::sendMessageToChat(const QString &text)
 {
     emit sendMessage(text);
+}
+
+void ChatDialog::setMainWindow(class MainWindow* mainWnd)
+{
+    m_mainWnd = mainWnd;
 }
 
