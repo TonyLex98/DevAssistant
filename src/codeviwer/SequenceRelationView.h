@@ -75,6 +75,8 @@ private:
     void buildSceneForTemplate(const QString &templateDirPath); // Build scene for specific template
     void findSequenceConnections();
     void findSequenceConnectionsForTemplate(const QString &templateDirPath); // Find connections for template
+    void findSequenceConnectionsLegacy();
+    void findSequenceConnectionsForTemplateLegacy(const QString &templateDirPath);
     
     // Helper methods
     void addNode(const QString &name, const QString &description);

@@ -478,6 +478,116 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     // This method finds connections only between sequences that are within the same template
     // It ensures that no external sequence references are shown in the template graph
     
+    // Look for template.templ.json in the same directory
+    QString mainTemplatePath = QDir(templateDirPath).filePath("template.templ.json");
+    if (!QFile::exists(mainTemplatePath)) {
+        qDebug() << "[SequenceRelationView] Main template file does not exist in directory:" << templateDirPath;
+        // Fallback to old behavior if no template file exists
+        findSequenceConnectionsForTemplateLegacy(templateDirPath);
+        return;
+    }
+    
+    // Load the main template to get sequence targets
+    QFile templateFile(mainTemplatePath);
+    if (!templateFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
+        findSequenceConnectionsForTemplateLegacy(templateDirPath);
+        return;
+    }
+    
+    QByteArray templateData = templateFile.readAll();
+    QJsonDocument templateDoc = QJsonDocument::fromJson(templateData);
+    templateFile.close();
+    
+    if (!templateDoc.isObject()) {
+        qDebug() << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
+        findSequenceConnectionsForTemplateLegacy(templateDirPath);
+        return;
+    }
+    
+    QJsonObject templateObj = templateDoc.object();
+    
+    // Get sequence targets from the template
+    if (!templateObj.contains("sequenceTargets")) {
+        qDebug() << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
+        findSequenceConnectionsForTemplateLegacy(templateDirPath);
+        return;
+    }
+    
+    // Get all available sequence files in the template directory
+    QDir dir(templateDirPath);
+    if (!dir.exists()) {
+        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        return;
+    }
+    
+    QStringList filters = {"*.seq.json"};
+    QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+    
+    // Read all sequences in the template to map base names to sequence names
+    QMap<QString, QString> baseNameToSequenceNameMap;  // base filename -> sequence name
+    for (const QFileInfo& fileInfo : fileInfoList) {
+        QString seqPath = fileInfo.absoluteFilePath();
+        
+        QFile seqFile(seqPath);
+        if (!seqFile.open(QIODevice::ReadOnly)) {
+            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            continue;
+        }
+        
+        QByteArray seqData = seqFile.readAll();
+        QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
+        if (!seqDoc.isObject()) {
+            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            continue;
+        }
+        
+        PromptSequence seq = PromptSequence::fromJson(seqDoc.object());
+        
+        // Map base filename (without extension) to sequence name for lookup
+        QString baseName = fileInfo.baseName();
+        baseNameToSequenceNameMap[baseName] = seq.name();
+        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
+    }
+    
+    QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
+    
+    // Process each source sequence and its targets from the template
+    for (auto it = sequenceTargets.constBegin(); it != sequenceTargets.constEnd(); ++it) {
+        QString sourceBaseName = it.key();  // This is the base filename of the source sequence
+        QJsonArray targetArray = it.value().toArray();
+        
+        // Get the actual sequence name for the source
+        QString sourceSequenceName = baseNameToSequenceNameMap.value(sourceBaseName, sourceBaseName);
+        
+        // Process each target sequence
+        for (const QJsonValue& targetValue : targetArray) {
+            QString targetBaseName = targetValue.toString();
+            
+            // Get the actual sequence name for the target
+            QString targetSequenceName = baseNameToSequenceNameMap.value(targetBaseName, targetBaseName);
+            
+            // Verify both sequences exist in this template
+            if (baseNameToSequenceNameMap.contains(sourceBaseName) && 
+                baseNameToSequenceNameMap.contains(targetBaseName)) {
+                
+                addEdge(sourceSequenceName, targetSequenceName);
+                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
+            } else {
+                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
+            }
+        }
+    }
+}
+
+void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QString &templateDirPath)
+{
+    // Legacy method to maintain compatibility with older behavior
+    // This handles the old OPEN_SEQUENCE:... format (though it's deprecated)
+    
+    // This method finds connections only between sequences that are within the same template
+    // It ensures that no external sequence references are shown in the template graph
+    
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
     if (!dir.exists()) {
@@ -527,8 +637,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
             QString templateContent = step.tmpl();
             
             // Find all OPEN_SEQUENCE references in the template
-            // Note: OPEN_SEQUENCE syntax is deprecated in favor of OPEN_SEQUENCE_INFO resolver
-            // But we keep this for backward compatibility to show connections in graph
+            // Note: This is legacy support; new approach uses sequenceTargets
             QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
             QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
             
@@ -561,9 +670,104 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
 
 void SequenceRelationView::findSequenceConnections()
 {
-    // This would parse the sequences to find OPEN_SEQUENCE references
-    // For now, we'll implement a version that looks for connections
-    // by examining the templates of each step in each sequence
+    // New approach: read connections from sequenceTargets in template.templ.json
+    // This will show directed links as defined in the template file
+    
+    if (!m_seqMgr) return;
+    
+    const QMap<QString, PromptSequence>& sequences = m_seqMgr->sequences();
+    
+    // Extract template directory from one of the sequence paths
+    // We expect sequences to come from the same template directory
+    if (sequences.isEmpty()) return;
+    
+    QString firstSeqPath = sequences.firstKey(); // Get the first sequence file path
+    if (firstSeqPath.isEmpty()) return;
+    
+    QFileInfo seqFileInfo(firstSeqPath);
+    QString templateDir = seqFileInfo.absolutePath();
+    
+    // Look for template.templ.json in the template directory
+    QString mainTemplatePath = QDir(templateDir).filePath("template.templ.json");
+    if (!QFile::exists(mainTemplatePath)) {
+        qDebug() << "[SequenceRelationView] Main template file does not exist:" << mainTemplatePath;
+        // Fallback to old behavior if no template file exists
+        findSequenceConnectionsLegacy();
+        return;
+    }
+    
+    // Load the main template to get sequence targets
+    QFile templateFile(mainTemplatePath);
+    if (!templateFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
+        findSequenceConnectionsLegacy();
+        return;
+    }
+    
+    QByteArray templateData = templateFile.readAll();
+    QJsonDocument templateDoc = QJsonDocument::fromJson(templateData);
+    templateFile.close();
+    
+    if (!templateDoc.isObject()) {
+        qDebug() << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
+        findSequenceConnectionsLegacy();
+        return;
+    }
+    
+    QJsonObject templateObj = templateDoc.object();
+    
+    // Get sequence targets from the template
+    if (!templateObj.contains("sequenceTargets")) {
+        qDebug() << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
+        findSequenceConnectionsLegacy();
+        return;
+    }
+    
+    QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
+    
+    // Create a mapping from sequence file base name to full sequence information
+    QMap<QString, QString> baseNameToSequenceNameMap;  // base filename -> sequence name
+    QMap<QString, QString> baseNameToSequencePathMap;  // base filename -> sequence file path
+    for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
+        QString filePath = it.key();
+        QFileInfo fileInfo(filePath);
+        QString baseName = fileInfo.baseName();
+        baseNameToSequenceNameMap[baseName] = it.value().name();
+        baseNameToSequencePathMap[baseName] = filePath;
+    }
+    
+    // Process each source sequence and its targets
+    for (auto it = sequenceTargets.constBegin(); it != sequenceTargets.constEnd(); ++it) {
+        QString sourceBaseName = it.key();  // This is the base filename of the source sequence
+        QJsonArray targetArray = it.value().toArray();
+        
+        // Get the actual sequence name for the source
+        QString sourceSequenceName = baseNameToSequenceNameMap.value(sourceBaseName, sourceBaseName);
+        
+        // Process each target sequence
+        for (const QJsonValue& targetValue : targetArray) {
+            QString targetBaseName = targetValue.toString();
+            
+            // Get the actual sequence name for the target
+            QString targetSequenceName = baseNameToSequenceNameMap.value(targetBaseName, targetBaseName);
+            
+            // Verify both sequences exist in our manager
+            if (baseNameToSequenceNameMap.contains(sourceBaseName) && 
+                baseNameToSequenceNameMap.contains(targetBaseName)) {
+                
+                addEdge(sourceSequenceName, targetSequenceName);
+                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
+            } else {
+                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
+            }
+        }
+    }
+}
+
+void SequenceRelationView::findSequenceConnectionsLegacy()
+{
+    // Legacy method to maintain compatibility with older behavior
+    // This handles the old OPEN_SEQUENCE:... format (though it's deprecated)
     
     if (!m_seqMgr) return;
     
@@ -588,8 +792,7 @@ void SequenceRelationView::findSequenceConnections()
             QString templateContent = step.tmpl();
             
             // Find all OPEN_SEQUENCE references in the template
-            // Note: OPEN_SEQUENCE syntax is deprecated in favor of OPEN_SEQUENCE_INFO resolver
-            // But we keep this for backward compatibility to show connections in graph
+            // Note: This is legacy support; new approach uses sequenceTargets
             QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
             QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
             
@@ -626,7 +829,7 @@ void SequenceRelationView::findSequenceConnections()
                 
                 if (targetExists) {
                     addEdge(seq.name(), actualTargetSeqName);
-                    qDebug() << "[SequenceRelationView] Found connection:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
+                    qDebug() << "[SequenceRelationView] Found legacy connection:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
                 } else {
                     qDebug() << "[SequenceRelationView] Target sequence not found:" << targetSequence << "referenced from:" << seq.name();
                 }
