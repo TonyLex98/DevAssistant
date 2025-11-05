@@ -108,17 +108,17 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     QStringList openSequenceCommands;
     while (iter.hasNext()) {
         QRegularExpressionMatch match = iter.next();
-        QString sequenceName = match.captured(1).trimmed();
-        QString description = match.captured(2).trimmed();
+        QString sequenceName = match.captured(1).trimmed();  // This is the filename part
+        QString description = match.captured(2).trimmed();   // This is the optional description
         
-        // Store the sequence name and description for logging/debugging
+        // Store the sequence name (filename) and description for logging/debugging
         QString commandInfo = QString("OPEN_SEQUENCE: %1").arg(sequenceName);
         if (!description.isEmpty()) {
             commandInfo += QString(" (%1)").arg(description);
         }
         openSequenceCommands.append(commandInfo);
         
-        // Set the next sequence for main window to process
+        // Set the next sequence for main window to process - use only the filename part
         setNextSequence(sequenceName, description);
         
         // Replace placeholder with empty string to remove it from the prompt
