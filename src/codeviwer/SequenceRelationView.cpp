@@ -489,7 +489,8 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     
     // First, read all sequences in the template to load them into memory
-    QMap<QString, PromptSequence> tmplSequences;  // name -> sequence
+    QMap<QString, PromptSequence> tmplSequences;  // name -> sequence  
+    QMap<QString, QString> fileToNameMap;         // base filename without extension -> sequence name
     for (const QFileInfo& fileInfo : fileInfoList) {
         QString seqPath = fileInfo.absoluteFilePath();
         
@@ -508,6 +509,11 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
         
         PromptSequence seq = PromptSequence::fromJson(seqDoc.object());
         tmplSequences[seq.name()] = seq;
+        
+        // Map base filename (without extension) to sequence name for lookup
+        QString baseName = fileInfo.baseName();
+        fileToNameMap[baseName] = seq.name();
+        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
     }
     
     // Now find connections between sequences in the template
@@ -528,10 +534,20 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
                 QRegularExpressionMatch match = iter.next();
                 QString targetSequence = match.captured(1).trimmed();
                 
+                // First check if target sequence exists by its sequence name
+                // If not, check if it exists by its base filename (for UI-generated references)
+                QString actualTargetSeqName = targetSequence;
+                if (!tmplSequences.contains(targetSequence)) {
+                    // Try to find using base filename to sequence name mapping
+                    if (fileToNameMap.contains(targetSequence)) {
+                        actualTargetSeqName = fileToNameMap[targetSequence];
+                    }
+                }
+                
                 // CRITICAL: Check if the target sequence exists within the template sequences ONLY
-                if (tmplSequences.contains(targetSequence)) {
-                    addEdge(seq.name(), targetSequence);
-                    qDebug() << "[SequenceRelationView] Found internal connection in template:" << seq.name() << "->" << targetSequence;
+                if (tmplSequences.contains(actualTargetSeqName)) {
+                    addEdge(seq.name(), actualTargetSeqName);
+                    qDebug() << "[SequenceRelationView] Found internal connection in template:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
                 } else {
                     // This is an external reference that should not be shown in the template graph
                     qDebug() << "[SequenceRelationView] External reference found but ignored in template graph:" << seq.name() << "->" << targetSequence;
@@ -544,12 +560,22 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
 void SequenceRelationView::findSequenceConnections()
 {
     // This would parse the sequences to find OPEN_SEQUENCE references
-    // For now, we'll implement a simple version that looks for connections
+    // For now, we'll implement a version that looks for connections
     // by examining the templates of each step in each sequence
     
     if (!m_seqMgr) return;
     
     const QMap<QString, PromptSequence>& sequences = m_seqMgr->sequences();
+    
+    // Create a mapping from base filename (without extension) to sequence name
+    QMap<QString, QString> fileToNameMap;  // base filename without extension -> sequence name
+    for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
+        QString filePath = it.key();  // This is the file path
+        QFileInfo fileInfo(filePath);
+        QString baseName = fileInfo.baseName();  // Get the filename without extension
+        fileToNameMap[baseName] = it.value().name();  // Map base name to sequence name
+        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << it.value().name();
+    }
     
     for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
         const PromptSequence &seq = it.value();
@@ -567,17 +593,38 @@ void SequenceRelationView::findSequenceConnections()
                 QRegularExpressionMatch match = iter.next();
                 QString targetSequence = match.captured(1).trimmed();
                 
-                // Check if the target sequence exists
-                bool targetExists = false;
+                // First check if target sequence exists by its sequence name
+                // If not, check if it exists by its base filename (for UI-generated references)
+                QString actualTargetSeqName = targetSequence;
+                bool targetSeqExistsByName = false;
                 for (auto checkIt = sequences.constBegin(); checkIt != sequences.constEnd(); ++checkIt) {
                     if (checkIt.value().name() == targetSequence) {
+                        targetSeqExistsByName = true;
+                        break;
+                    }
+                }
+                
+                if (!targetSeqExistsByName) {
+                    // Try to find using base filename to sequence name mapping
+                    if (fileToNameMap.contains(targetSequence)) {
+                        actualTargetSeqName = fileToNameMap[targetSequence];
+                    }
+                }
+                
+                // Check if the actual target sequence exists
+                bool targetExists = false;
+                for (auto checkIt = sequences.constBegin(); checkIt != sequences.constEnd(); ++checkIt) {
+                    if (checkIt.value().name() == actualTargetSeqName) {
                         targetExists = true;
                         break;
                     }
                 }
                 
                 if (targetExists) {
-                    addEdge(seq.name(), targetSequence);
+                    addEdge(seq.name(), actualTargetSeqName);
+                    qDebug() << "[SequenceRelationView] Found connection:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
+                } else {
+                    qDebug() << "[SequenceRelationView] Target sequence not found:" << targetSequence << "referenced from:" << seq.name();
                 }
             }
         }

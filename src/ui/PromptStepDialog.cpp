@@ -180,8 +180,8 @@ void PromptStepDialog::onAddSequenceLink()
                 display += " – " + seq.description();
                 
             QListWidgetItem *item = new QListWidgetItem(display, seqList);
-            item->setData(Qt::UserRole, seq.name());  // Store the sequence name
-            item->setCheckState(Qt::Unchecked);       // Initially unchecked
+            item->setData(Qt::UserRole, fileInfo.baseName());  // Store the filename without extension as requested
+            item->setCheckState(Qt::Unchecked);                // Initially unchecked
             item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         }
     } else {
@@ -195,8 +195,9 @@ void PromptStepDialog::onAddSequenceLink()
                 display += " – " + seq.description();
                 
             QListWidgetItem *item = new QListWidgetItem(display, seqList);
-            item->setData(Qt::UserRole, seq.name());  // Store the sequence name
-            item->setCheckState(Qt::Unchecked);       // Initially unchecked
+            QFileInfo fileInfo(it.key());  // it.key() is the file path
+            item->setData(Qt::UserRole, fileInfo.baseName());  // Store the filename without extension
+            item->setCheckState(Qt::Unchecked);                // Initially unchecked
             item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         }
     }
@@ -216,12 +217,13 @@ void PromptStepDialog::onAddSequenceLink()
     for (int i = 0; i < seqList->count(); ++i) {
         QListWidgetItem *item = seqList->item(i);
         if (item->checkState() == Qt::Checked) {
-            QString seqName = item->data(Qt::UserRole).toString();
+            QString seqBaseName = item->data(Qt::UserRole).toString();  // This is already without extension
+            QString seqDescription = seqBaseName;                       // Use the same name as description
             
-            // Add the OPEN_SEQUENCE reference to the template
+            // Add the OPEN_SEQUENCE reference to the template with both name (without extension) and description
             QString currentTemplate = m_templateEdit->toPlainText();
-            if (!currentTemplate.contains(QString("{{OPEN_SEQUENCE:%1").arg(seqName))) {
-                QString newTemplate = currentTemplate + QString("\n{{OPEN_SEQUENCE:%1}}\n").arg(seqName);
+            if (!currentTemplate.contains(QString("{{OPEN_SEQUENCE:%1").arg(seqBaseName))) {
+                QString newTemplate = currentTemplate + QString("\n{{OPEN_SEQUENCE:%1,%2}}\n").arg(seqBaseName, seqDescription);
                 m_templateEdit->setPlainText(newTemplate);
             }
         }
