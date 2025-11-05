@@ -2,12 +2,44 @@
 #pragma once
 
 #include <QTextEdit>
+#include <QSyntaxHighlighter>
+#include <QRegularExpression>
 #include <QKeyEvent>
 #include <QDebug>
 
+// Syntax highlighter for special commands in templates
+class TemplateSyntaxHighlighter : public QSyntaxHighlighter
+{
+    Q_OBJECT
+
+public:
+    TemplateSyntaxHighlighter(QTextDocument *parent = nullptr) : QSyntaxHighlighter(parent)
+    {
+        // Format for OPEN_SEQUENCE commands
+        m_openSequenceFormat.setForeground(QColor(255, 105, 180)); // Hot pink color
+        m_openSequenceFormat.setFontWeight(QFont::Bold);
+    }
+
+protected:
+    void highlightBlock(const QString &text) override
+    {
+        // Highlight OPEN_SEQUENCE commands: {{OPEN_SEQUENCE:...}}
+        QRegularExpression openSeqRegex(R"(\{\{OPEN_SEQUENCE:[^}]*\}\})");
+        QRegularExpressionMatchIterator iter = openSeqRegex.globalMatch(text);
+        while (iter.hasNext()) {
+            QRegularExpressionMatch match = iter.next();
+            setFormat(match.capturedStart(), match.capturedLength(), m_openSequenceFormat);
+        }
+    }
+
+private:
+    QTextCharFormat m_openSequenceFormat;
+};
+
+
 /**
  * @brief StyleTextEdit
- *        QTextEdit, стилизованный как MemoryComboBox.
+ *        QTextEdit, стилизованный как MemoryComboBox, с подсветкой синтаксиса.
  *
  * В конструкторе задаётся:
  *   - 2‑пиксельный серо‑синий бордер (#5A9)
@@ -25,6 +57,9 @@ public:
     explicit StyleTextEdit(QWidget *parent = nullptr)
         : QTextEdit(parent)
     {
+        // Initialize syntax highlighter
+        m_syntaxHighlighter = new TemplateSyntaxHighlighter(this->document());
+        
         // --------- Стили, как у MemoryComboBox ----------
         setStyleSheet(
             "QTextEdit {"
@@ -38,5 +73,6 @@ public:
     }
 
 protected:
+    TemplateSyntaxHighlighter* m_syntaxHighlighter = nullptr;
 
 };

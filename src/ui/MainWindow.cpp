@@ -1298,20 +1298,54 @@ void MainWindow::handleAssistantFinished()
     // Check if the LLM specified to open a new sequence
     QString nextSeqName = PromptResolver::getNextSequence();
     if (!nextSeqName.isEmpty()) {
-        // Find the sequence by name
+        // Find the sequence by name - first try by internal sequence name
         const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
+        PromptSequence foundSeq;
+        QString foundPath;
+        
+        // First try to find by sequence name (original behavior)
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == nextSeqName) {
-                m_currentSeq = it.value();
-                m_currentStepIdx = 0;
-                m_sequenceMode = true;
-                addSequenceTransitionToHistory(nextSeqName);  // Add transition to history
-                updateSequenceGraphHighlight();  // Update the graph highlighting
-                PromptResolver::clearNextSequence();  // Clear for next usage
-                QTimer::singleShot(200, this, &MainWindow::runNextStep);
-                qDeleteAll(CommandParser::parse(payload));  // Clean up parsed commands
-                return;
+                foundSeq = it.value();
+                foundPath = it.key();
+                break;
             }
+        }
+        
+        // If not found by name, try to find by filename (for OPEN_SEQUENCE:filename.json format)
+        if (foundPath.isEmpty()) {
+            for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+                QFileInfo fileInfo(it.key());
+                if (fileInfo.fileName() == nextSeqName) {
+                    foundSeq = it.value();
+                    foundPath = it.key();
+                    break;
+                }
+            }
+        }
+        
+        // If still not found, try partial match in case only the base name was provided
+        if (foundPath.isEmpty()) {
+            for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+                QFileInfo fileInfo(it.key());
+                if (fileInfo.baseName() == nextSeqName) { // Compare without extension
+                    foundSeq = it.value();
+                    foundPath = it.key();
+                    break;
+                }
+            }
+        }
+        
+        if (!foundPath.isEmpty()) {
+            m_currentSeq = foundSeq;
+            m_currentStepIdx = 0;
+            m_sequenceMode = true;
+            addSequenceTransitionToHistory(nextSeqName);  // Add transition to history
+            updateSequenceGraphHighlight();  // Update the graph highlighting
+            PromptResolver::clearNextSequence();  // Clear for next usage
+            QTimer::singleShot(200, this, &MainWindow::runNextStep);
+            qDeleteAll(CommandParser::parse(payload));  // Clean up parsed commands
+            return;
         }
         
         // If sequence not found, log error and continue with normal flow

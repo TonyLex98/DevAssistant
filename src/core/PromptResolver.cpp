@@ -105,16 +105,30 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // 7) {{OPEN_SEQUENCE:sequenceName:description}} – указывает какую последовательность открыть следующей
     QRegularExpression openSeqRegex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
     QRegularExpressionMatchIterator iter = openSeqRegex.globalMatch(result);
+    QStringList openSequenceCommands;
     while (iter.hasNext()) {
         QRegularExpressionMatch match = iter.next();
         QString sequenceName = match.captured(1).trimmed();
         QString description = match.captured(2).trimmed();
+        
+        // Store the sequence name and description for logging/debugging
+        QString commandInfo = QString("OPEN_SEQUENCE: %1").arg(sequenceName);
+        if (!description.isEmpty()) {
+            commandInfo += QString(" (%1)").arg(description);
+        }
+        openSequenceCommands.append(commandInfo);
         
         // Set the next sequence for main window to process
         setNextSequence(sequenceName, description);
         
         // Replace placeholder with empty string to remove it from the prompt
         result = result.mid(0, match.capturedStart()) + result.mid(match.capturedEnd());
+    }
+    
+    // Add information about OPEN_SEQUENCE commands that will be processed (for debugging/logging)
+    if (!openSequenceCommands.isEmpty()) {
+        QString openSeqInfo = openSequenceCommands.join("\n");
+        result += openSeqInfo;
     }
     
     // Удаляем дублирующий вызов из строки 92
