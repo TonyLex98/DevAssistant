@@ -102,34 +102,13 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         result.replace("{{TOKEN_COUNT}}", QString::number(approxTokens));
     }
     
-    // 7) {{OPEN_SEQUENCE:sequenceName:description}} – указывает какую последовательность открыть следующей
-    QRegularExpression openSeqRegex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
-    QRegularExpressionMatchIterator iter = openSeqRegex.globalMatch(result);
-    QStringList openSequenceCommands;
-    while (iter.hasNext()) {
-        QRegularExpressionMatch match = iter.next();
-        QString sequenceName = match.captured(1).trimmed();  // This is the filename part
-        QString description = match.captured(2).trimmed();   // This is the optional description
-        
-        // Store the sequence name (filename) and description for logging/debugging
-        QString commandInfo = QString("OPEN_SEQUENCE: %1").arg(sequenceName);
-        if (!description.isEmpty()) {
-            commandInfo += QString(" (%1)").arg(description);
-        }
-        openSequenceCommands.append(commandInfo);
-        
-        // Set the next sequence for main window to process - use only the filename part
-        setNextSequence(sequenceName, description);
-        
-        // Replace placeholder with empty string to remove it from the prompt
-        result = result.mid(0, match.capturedStart()) + result.mid(match.capturedEnd());
+    // 7) {{OPEN_SEQUENCE_INFO}} – список доступных последовательностей в шаблоне
+    if (result.contains("{{OPEN_SEQUENCE_INFO}}")) {
+        QString sequenceInfoList = generateSequenceInfoList(ctx);
+        result.replace("{{OPEN_SEQUENCE_INFO}}", sequenceInfoList);
     }
     
-    // Add information about OPEN_SEQUENCE commands that will be processed (for debugging/logging)
-    if (!openSequenceCommands.isEmpty()) {
-        QString openSeqInfo = openSequenceCommands.join("\n");
-        result += openSeqInfo;
-    }
+
     
     // Удаляем дублирующий вызов из строки 92
     // result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
@@ -169,7 +148,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
     vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
     vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
-    vec.append({"OPEN_SEQUENCE", "Указать, какую последовательность запустить следующей. Формат: {{OPEN_SEQUENCE:имя_последовательности,описание}"});
+    vec.append({"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
     vec.append({"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
 
     return vec;
@@ -193,4 +172,165 @@ void PromptResolver::clearNextSequence()
 {
     m_nextSequenceName.clear();
     m_nextSequenceDescription.clear();
+}
+
+QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
+{
+    if (!ctx) {
+        return QString("Нет доступных последовательностей: контекст отсутствует");
+    }
+    
+    // Get the current template directory based on the current sequence path
+    QString templateDir = ctx->currentSequencePath();
+    QString currentSequenceName;
+    
+    if (!templateDir.isEmpty()) {
+        QFileInfo seqPathInfo(templateDir);
+        templateDir = seqPathInfo.absolutePath();
+        
+        // Extract current sequence base name from the file path (this is what we use as identifier)
+        QFileInfo fileInfo(templateDir);
+        currentSequenceName = fileInfo.baseName();  // Use the file base name as the sequence identifier
+    } else {
+        // If no current sequence path, we might be in a general context
+        templateDir.clear();
+    }
+    
+    QStringList sequenceInfoList;
+    int index = 1;
+    
+    // Look for the main template file to read sequence targets (directed links)
+    if (!templateDir.isEmpty() && QDir(templateDir).exists()) {
+        // Look for template.templ.json in the same directory
+        QString mainTemplatePath = QDir(templateDir).filePath("template.templ.json");
+        
+        if (QFile::exists(mainTemplatePath)) {
+            // Load the main template to get sequence targets
+            QFile templateFile(mainTemplatePath);
+            if (templateFile.open(QIODevice::ReadOnly)) {
+                QByteArray templateData = templateFile.readAll();
+                QJsonDocument templateDoc = QJsonDocument::fromJson(templateData);
+                
+                if (templateDoc.isObject()) {
+                    QJsonObject templateObj = templateDoc.object();
+                    
+                    // Look for sequence targets object in the template
+                    if (templateObj.contains("sequenceTargets")) {
+                        QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
+                        
+                        // Get the targets for the current sequence specifically
+                        QJsonArray currentTargets;
+                        if (!currentSequenceName.isEmpty() && sequenceTargets.contains(currentSequenceName)) {
+                            currentTargets = sequenceTargets.value(currentSequenceName).toArray();
+                            
+                            // Process each target sequence
+                            for (const QJsonValue& targetValue : currentTargets) {
+                                QString seqBaseName = targetValue.toString();
+                                
+                                // Find the sequence file and get its details
+                                QString seqPath = QDir(templateDir).filePath(seqBaseName + ".seq.json");
+                                QString seqName = seqBaseName;  // Default to filename
+                                QString seqDescription = "";
+                                
+                                QFile seqFile(seqPath);
+                                if (seqFile.open(QIODevice::ReadOnly)) {
+                                    QByteArray data = seqFile.readAll();
+                                    QJsonDocument doc = QJsonDocument::fromJson(data);
+                                    if (doc.isObject()) {
+                                        PromptSequence seq = PromptSequence::fromJson(doc.object());
+                                        seqName = seq.name();
+                                        seqDescription = seq.description();
+                                    }
+                                    seqFile.close();
+                                }
+                                
+                                // Use the sequence name as description if no specific description provided
+                                if (seqDescription.isEmpty()) {
+                                    seqDescription = seqName;
+                                }
+                                
+                                QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = true;")
+                                    .arg(index)
+                                    .arg(seqDescription.isEmpty() ? seqBaseName : seqDescription)
+                                    .arg(seqBaseName);
+                                    
+                                sequenceInfoList << sequenceInfo;
+                                index++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // If no directed links were found for current sequence, fallback to all sequences in the directory
+        if (sequenceInfoList.isEmpty()) {
+            QDir dir(templateDir);
+            QStringList filters = {"*.seq.json"};
+            QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
+            
+            for (const QFileInfo& fileInfo : fileInfoList) {
+                QString seqPath = fileInfo.absoluteFilePath();
+                
+                // Load the sequence from file to get its name and description
+                QFile seqFile(seqPath);
+                if (!seqFile.open(QIODevice::ReadOnly)) {
+                    continue;
+                }
+                
+                QByteArray data = seqFile.readAll();
+                QJsonDocument doc = QJsonDocument::fromJson(data);
+                if (!doc.isObject()) {
+                    continue;  // Skip invalid JSON files
+                }
+                
+                PromptSequence seq = PromptSequence::fromJson(doc.object());
+                
+                QString seqName = seq.name();
+                QString seqDescription = seq.description();
+                if (seqDescription.isEmpty()) {
+                    seqDescription = seqName;  // Use name as description if no description is available
+                }
+                
+                QString seqBaseName = fileInfo.baseName();  // Get filename without extension
+                
+                QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = true;")
+                    .arg(index)
+                    .arg(seqDescription)
+                    .arg(seqBaseName);
+                    
+                sequenceInfoList << sequenceInfo;
+                index++;
+            }
+        }
+    } else {
+        // Fallback: use sequence manager if no template directory
+        PromptSequenceManager& seqMgr = ctx->sequenceManager();
+        const QMap<QString, PromptSequence>& allSequences = seqMgr.sequences();
+        
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
+            const PromptSequence& seq = it.value();
+            QString seqDescription = seq.description();
+            if (seqDescription.isEmpty()) {
+                seqDescription = seq.name();  // Use name as description if no description is available
+            }
+            
+            QFileInfo seqFileInfo(it.key());  // it.key() is the file path
+            QString seqBaseName = seqFileInfo.baseName();  // Get filename without extension
+            
+            QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = true;")
+                .arg(index)
+                .arg(seqDescription)
+                .arg(seqBaseName);
+                
+            sequenceInfoList << sequenceInfo;
+            index++;
+        }
+    }
+    
+    if (sequenceInfoList.isEmpty()) {
+        return QString("Нет доступных последовательностей");
+    }
+    
+    return sequenceInfoList.join("\n");
 }

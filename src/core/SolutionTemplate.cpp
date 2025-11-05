@@ -18,6 +18,11 @@ QJsonObject SolutionTemplate::toJson() const
     }
     obj["sequences"] = seqArray;
     
+    // Serialize sequence targets (directed links)
+    if (!m_sequenceTargets.isEmpty()) {
+        obj["sequenceTargets"] = m_sequenceTargets;
+    }
+    
     // Serialize positions
     QJsonObject positionsObj;
     for (auto it = m_positions.constBegin(); it != m_positions.constEnd(); ++it) {
@@ -44,6 +49,11 @@ SolutionTemplate SolutionTemplate::fromJson(const QJsonObject& obj)
         tmpl.m_sequences.append(val.toString());
     }
     
+    // Deserialize sequence targets (directed links)
+    if (obj.contains("sequenceTargets")) {
+        tmpl.m_sequenceTargets = obj.value("sequenceTargets").toObject();
+    }
+    
     // Deserialize positions
     QJsonObject positionsObj = obj.value("positions").toObject();
     for (auto it = positionsObj.constBegin(); it != positionsObj.constEnd(); ++it) {
@@ -53,6 +63,19 @@ SolutionTemplate SolutionTemplate::fromJson(const QJsonObject& obj)
     }
     
     return tmpl;
+}
+
+void SolutionTemplate::setTargetsForSequence(const QString& seqName, const QJsonArray& targets) 
+{
+    m_sequenceTargets[seqName] = targets;
+}
+
+QJsonArray SolutionTemplate::getTargetsForSequence(const QString& seqName) const 
+{
+    if (m_sequenceTargets.contains(seqName)) {
+        return m_sequenceTargets.value(seqName).toArray();
+    }
+    return QJsonArray();  // Return empty array if sequence has no targets
 }
 
 void SolutionTemplate::removeSequenceByPath(const QString& sequencePath)

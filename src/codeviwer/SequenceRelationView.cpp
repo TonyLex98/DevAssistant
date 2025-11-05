@@ -527,6 +527,8 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
             QString templateContent = step.tmpl();
             
             // Find all OPEN_SEQUENCE references in the template
+            // Note: OPEN_SEQUENCE syntax is deprecated in favor of OPEN_SEQUENCE_INFO resolver
+            // But we keep this for backward compatibility to show connections in graph
             QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
             QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
             
@@ -586,6 +588,8 @@ void SequenceRelationView::findSequenceConnections()
             QString templateContent = step.tmpl();
             
             // Find all OPEN_SEQUENCE references in the template
+            // Note: OPEN_SEQUENCE syntax is deprecated in favor of OPEN_SEQUENCE_INFO resolver
+            // But we keep this for backward compatibility to show connections in graph
             QRegularExpression regex(R"(\{\{OPEN_SEQUENCE:([^,}]+),?([^}]*)\}\})");
             QRegularExpressionMatchIterator iter = regex.globalMatch(templateContent);
             

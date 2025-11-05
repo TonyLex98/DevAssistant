@@ -4,6 +4,7 @@
 #include <QMap>
 #include <QPointF>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QPixmap>
 
 class SolutionTemplate
@@ -21,6 +22,12 @@ public:
     void removeSequence(int idx) { m_sequences.removeAt(idx); }
     void removeSequenceByPath(const QString& sequencePath);
     void clearSequences() { m_sequences.clear(); }
+    
+    // Sequence target operations (for OPEN_SEQUENCE_INFO) - directed links
+    void setSequenceTargets(const QJsonObject& targets) { m_sequenceTargets = targets; }
+    QJsonObject getSequenceTargets() const { return m_sequenceTargets; }
+    void setTargetsForSequence(const QString& seqName, const QJsonArray& targets);
+    QJsonArray getTargetsForSequence(const QString& seqName) const;
     
     // Position operations
     void setPositionForSequence(const QString& sequenceName, const QPointF& position) { m_positions[sequenceName] = position; }
@@ -46,5 +53,6 @@ private:
     QString          m_imagePath;
     QString          m_mainSequencePath;
     QVector<QString> m_sequences; // Пути к файлам последовательностей
+    QJsonObject      m_sequenceTargets; // Directed links: sequence -> [target sequences] for OPEN_SEQUENCE_INFO
     QMap<QString, QPointF> m_positions; // Позиции последовательностей на холсте
 };

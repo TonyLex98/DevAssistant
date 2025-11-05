@@ -15,25 +15,25 @@ class TemplateSyntaxHighlighter : public QSyntaxHighlighter
 public:
     TemplateSyntaxHighlighter(QTextDocument *parent = nullptr) : QSyntaxHighlighter(parent)
     {
-        // Format for OPEN_SEQUENCE commands
-        m_openSequenceFormat.setForeground(QColor(255, 105, 180)); // Hot pink color
-        m_openSequenceFormat.setFontWeight(QFont::Bold);
+        // Format for OPEN_SEQUENCE_INFO
+        m_openSequenceInfoFormat.setForeground(QColor(255, 105, 180)); // Hot pink color
+        m_openSequenceInfoFormat.setFontWeight(QFont::Bold);
     }
 
 protected:
     void highlightBlock(const QString &text) override
     {
-        // Highlight OPEN_SEQUENCE commands: {{OPEN_SEQUENCE:...}}
-        QRegularExpression openSeqRegex(R"(\{\{OPEN_SEQUENCE:[^}]*\}\})");
-        QRegularExpressionMatchIterator iter = openSeqRegex.globalMatch(text);
+        // Highlight OPEN_SEQUENCE_INFO: {{OPEN_SEQUENCE_INFO}}
+        QRegularExpression openSeqInfoRegex(R"(\{\{OPEN_SEQUENCE_INFO\}\})");
+        QRegularExpressionMatchIterator iter = openSeqInfoRegex.globalMatch(text);
         while (iter.hasNext()) {
             QRegularExpressionMatch match = iter.next();
-            setFormat(match.capturedStart(), match.capturedLength(), m_openSequenceFormat);
+            setFormat(match.capturedStart(), match.capturedLength(), m_openSequenceInfoFormat);
         }
     }
 
 private:
-    QTextCharFormat m_openSequenceFormat;
+    QTextCharFormat m_openSequenceInfoFormat;
 };
 
 

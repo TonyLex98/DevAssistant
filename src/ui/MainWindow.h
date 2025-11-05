@@ -114,6 +114,8 @@ public:
     // Accessors used by PromptResolver
     QString previousStepsText() const;
     QString fileDescriptionsText() const;
+    PromptSequenceManager& sequenceManager() { return m_seqMgr; }  // Access to sequence manager
+    QString currentSequencePath() const { return m_currentSeqPath; }  // Access to current sequence path
 
 private slots:
     void createNewSequence();
