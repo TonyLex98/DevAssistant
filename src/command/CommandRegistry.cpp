@@ -16,6 +16,7 @@
 #include "ShowResultCommand.h"
 #include "CallSequenceCommand.h"
 #include "OpenSequenceCommand.h"
+#include "SearchProjectCaseInsensitiveCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -69,6 +70,7 @@ QVector<Command*> CommandRegistry::all()
         new RunShellCommand(QString()),
         new SearchWebCommand(QString()),
         new SearchProjectCommand(QString()),
+        new SearchProjectCaseInsensitiveCommand(QString()),
         new ShowResultCommand(QString()),
         new CallSequenceCommand(QString()),
         new OpenSequenceCommand(QString())
@@ -385,6 +387,32 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
         
         return new SearchProjectCommand(query, maxMatches, caseSensitive, includes, description);
+    }
+
+    if (cmd == "SEARCH_PROJECT_CASE_INSENSITIVE") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        QString query = p.value("query").toString();
+        int maxMatches = p.value("maxMatches").toInt(10);
+        QString description = obj["description"].toString();
+        
+        QStringList includes;
+        QJsonArray arr = p.value("include").toArray();
+        if (arr.isEmpty()) {
+            // Поддержка альтернативного формата для include
+            arr = obj.value("include").toArray();
+        }
+        for (const QJsonValue& v : arr)
+            includes << v.toString();
+        
+        // Поддержка альтернативного формата для query
+        if (query.isEmpty()) {
+            query = obj["query"].toString();
+        }
+        if (query.isEmpty()) {
+            query = p["search_query"].toString();
+        }
+        
+        return new SearchProjectCaseInsensitiveCommand(query, maxMatches, includes, description);
     }
 
     if (cmd == "SHOW_RESULT") {

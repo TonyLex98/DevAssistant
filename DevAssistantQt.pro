@@ -55,6 +55,7 @@ SOURCES += \
     src/command/RenameFileCommand.cpp \
     src/command/ReplaceInFileCommand.cpp \
     src/command/SearchProjectCommand.cpp \
+    src/command/SearchProjectCaseInsensitiveCommand.cpp \
     src/command/SearchWebCommand.cpp \
     src/command/ShowResultCommand.cpp \
     src/command/CallSequenceCommand.cpp \
@@ -149,6 +150,7 @@ HEADERS += \
     src/command/RenameFileCommand.h \
     src/command/ReplaceInFileCommand.h \
     src/command/SearchProjectCommand.h \
+    src/command/SearchProjectCaseInsensitiveCommand.h \
     src/command/SearchWebCommand.h \
     src/command/ShowResultCommand.h \
     src/command/CallSequenceCommand.h \
