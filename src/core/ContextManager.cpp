@@ -37,22 +37,45 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
 {
     if (!cmd) return;
     
-    // Check if command with same params already exists and is in any state
-    for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
-        CommandContextInfo& info = it.value();
-        if (info.name == cmd->name() && info.params == cmd->params()) {
-            // Update existing command
-            info.timestamp = QDateTime::currentDateTime();
-            info.result = result;
-            info.state = CommandState::Active; // Reset to active
-            info.reason.clear(); // Clear any previous reason
-            
-            emit commandAdded(it.key());
-            emit contextChanged();
-            return;
+    // Check if command with same params already exists and is in Active state
+    // Only update if there's an existing active command with same params
+    QString existingActiveId = findExistingCommandId(cmd->name(), cmd->params());
+    if (!existingActiveId.isEmpty()) {
+        // Update existing active command
+        CommandContextInfo& info = m_commandHistory[existingActiveId];
+        info.timestamp = QDateTime::currentDateTime();
+        info.result = result;
+        info.state = CommandState::Active; // Reset to active
+        info.reason.clear(); // Clear any previous reason
+        
+        emit commandAdded(existingActiveId);
+        emit contextChanged();
+        return;
+    } else {
+        // Look for any command with same name and params regardless of state
+        // If found, we might want to check if we should create a new one based on its state
+        for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
+            CommandContextInfo& info = it.value();
+            if (info.name == cmd->name() && info.params == cmd->params()) {
+                // If the existing command is invalidated or removed, we should create a new one
+                if (info.state != CommandState::Active) {
+                    break; // Will create a new command below
+                } else {
+                    // This shouldn't happen due to findExistingCommandId check above, but just in case
+                    info.timestamp = QDateTime::currentDateTime();
+                    info.result = result;
+                    info.state = CommandState::Active; // Reset to active
+                    info.reason.clear(); // Clear any previous reason
+                    
+                    emit commandAdded(it.key());
+                    emit contextChanged();
+                    return;
+                }
+            }
         }
     }
     
+    // Create new command
     QString uniqueId = generateUniqueId(cmd->name());
     CommandContextInfo info;
     info.id = uniqueId;
@@ -262,6 +285,59 @@ void ContextManager::endCommandSequence(const QString& sequenceId)
 void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceId, const QString& result)
 {
     if (!cmd || !m_sequenceHistory.contains(sequenceId)) return;
+    
+    // Check if command with same params already exists and is in Active state
+    QString existingActiveId = findExistingCommandId(cmd->name(), cmd->params());
+    if (!existingActiveId.isEmpty()) {
+        // Update existing active command with sequence info
+        CommandContextInfo& info = m_commandHistory[existingActiveId];
+        info.timestamp = QDateTime::currentDateTime();
+        info.result = result;
+        info.sequenceId = sequenceId; // Link to the sequence
+        info.state = CommandState::Active; // Reset to active
+        info.reason.clear(); // Clear any previous reason
+        
+        // Also add to the sequence if not already there
+        CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
+        if (!seqInfo.commandIds.contains(existingActiveId)) {
+            seqInfo.commandIds.append(existingActiveId);
+        }
+        
+        emit commandAddedToSequence(existingActiveId, sequenceId);
+        emit commandAdded(existingActiveId);
+        emit contextChanged();
+        return;
+    } else {
+        // Look for any command with same name and params regardless of state
+        // If found, we might want to check if we should create a new one based on its state
+        for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
+            CommandContextInfo& info = it.value();
+            if (info.name == cmd->name() && info.params == cmd->params()) {
+                // If the existing command is invalidated or removed, we should create a new one
+                if (info.state != CommandState::Active) {
+                    break; // Will create a new command below
+                } else {
+                    // This shouldn't happen due to findExistingCommandId check above, but just in case
+                    info.timestamp = QDateTime::currentDateTime();
+                    info.result = result;
+                    info.sequenceId = sequenceId; // Link to the sequence
+                    info.state = CommandState::Active; // Reset to active
+                    info.reason.clear(); // Clear any previous reason
+                    
+                    // Also add to the sequence if not already there
+                    CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
+                    if (!seqInfo.commandIds.contains(it.key())) {
+                        seqInfo.commandIds.append(it.key());
+                    }
+                    
+                    emit commandAddedToSequence(it.key(), sequenceId);
+                    emit commandAdded(it.key());
+                    emit contextChanged();
+                    return;
+                }
+            }
+        }
+    }
     
     // First add the command to the main command history with sequence info
     QString commandId = generateUniqueId(cmd->name());
