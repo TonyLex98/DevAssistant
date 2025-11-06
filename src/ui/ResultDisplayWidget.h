@@ -16,4 +16,5 @@ public:
 private:
     QTextEdit *m_textEdit;
     void convertMarkdownToHtml(QString &htmlContent);
+    QString processTable(const QStringList &tableRows);
 };

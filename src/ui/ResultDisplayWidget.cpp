@@ -58,9 +58,91 @@ void ResultDisplayWidget::appendResult(const QString &title, const QString &cont
     m_textEdit->ensureCursorVisible();
 }
 
+QString ResultDisplayWidget::processTable(const QStringList &tableRows)
+{
+    if (tableRows.isEmpty()) return QString();
+    
+    QStringList rowsHtml;
+    
+    // Find the header row (typically the first row before the separator)
+    int headerRowIndex = -1;
+    int separatorRowIndex = -1;
+    
+    for (int i = 0; i < tableRows.size(); i++) {
+        QString line = tableRows[i].trimmed();
+        if (line.startsWith("|") && line.contains("--") && line.contains("|")) {
+            separatorRowIndex = i;
+            break;
+        }
+    }
+    
+    if (separatorRowIndex > 0) {
+        headerRowIndex = separatorRowIndex - 1;
+    }
+    
+    // Process each row
+    for (int i = 0; i < tableRows.size(); i++) {
+        QString line = tableRows[i].trimmed();
+        
+        // Skip separator line
+        if (line.startsWith("|") && line.contains("--") && line.contains("|")) {
+            continue;
+        }
+        
+        if (line.startsWith("|") && line.endsWith("|")) {
+            // This is a table row
+            QString content = line.mid(1, line.length() - 2); // Remove leading and trailing |
+            
+            // Split by | but avoid splitting inside code blocks
+            QStringList cells;
+            int lastPos = 0;
+            int pos = 0;
+            
+            while (pos < content.length()) {
+                if (content[pos] == '|' && 
+                    (pos == 0 || content[pos-1] != '\\')) { // Not escaped
+                    cells << content.mid(lastPos, pos - lastPos).trimmed();
+                    lastPos = pos + 1;
+                }
+                pos++;
+            }
+            cells << content.mid(lastPos).trimmed(); // Add last cell
+            
+            // Determine if this is header row
+            bool isHeaderRow = (i == headerRowIndex);
+            QString rowTag = isHeaderRow ? "th" : "td";
+            QString rowStyle = isHeaderRow ? "style='background-color: #f2f2f2; font-weight: bold'" : "";
+            
+            QString rowHtml = QString("<tr>");
+            for (const QString &cell : cells) {
+                QString escapedCell = cell.toHtmlEscaped();
+                rowHtml += QString("<%1 %2 style='border: 1px solid #ddd; padding: 8px; text-align: left'>%3</%1>")
+                           .arg(rowTag, rowStyle, escapedCell);
+            }
+            rowHtml += QString("</tr>");
+            
+            rowsHtml << rowHtml;
+        }
+    }
+    
+    if (rowsHtml.isEmpty()) return QString();
+    
+    return QString("<table style='border-collapse: collapse; width: 100%%; margin: 10px 0; border: 1px solid #ddd; font-family: Arial, sans-serif; font-size: 14px'>%1</table>")
+             .arg(rowsHtml.join(""));
+}
+
 void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
 {
-    // Process code blocks first to avoid them being processed by other patterns
+    // Create a temporary storage for already processed HTML blocks to avoid double processing
+    struct Placeholder {
+        QString original;
+        QString placeholder;
+    };
+    
+    QVector<Placeholder> placeholders;
+    int placeholderCounter = 0;
+    
+    // Step 1: Process code blocks first and temporarily replace them with placeholders
     QRegularExpression codeBlockRegex(R"(```(\w+)?\s*\n(.*?)```)", 
                                      QRegularExpression::DotMatchesEverythingOption | 
                                      QRegularExpression::MultilineOption);
@@ -88,14 +170,17 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
             "<div style='font-weight:bold; color:#ffcc00; margin-bottom:5px; font-size:0.9em'>%1 Code:</div>"
             "<code style='color:#dcdcdc; font-family:monospace; line-height:1.4'>%2</code>"
             "</div>")
-            .arg(language.isEmpty() ? "Code" : language.toUpper())
-            .arg(code);
+            .arg(language.isEmpty() ? "Code" : language.toUpper()).arg(code);
         
-        htmlContent.replace(match.capturedStart() + offset, match.capturedLength(), htmlCodeBlock);
-        offset += htmlCodeBlock.length() - match.capturedLength();
+        QString placeholder = QString("MARKDOWN_CODEBLOCK_%1_TEMP_PLACEHOLDER").arg(placeholderCounter);
+        placeholders.append({htmlCodeBlock, placeholder});
+        
+        htmlContent.replace(match.capturedStart() + offset, match.capturedLength(), placeholder);
+        offset += placeholder.length() - match.capturedLength();
+        placeholderCounter++;
     }
     
-    // Process inline code blocks
+    // Step 2: Process inline code blocks and temporarily replace them with placeholders
     QRegularExpression inlineCodeRegex(R"(`(.*?)`)");
     QRegularExpressionMatchIterator inlineCodeIter = inlineCodeRegex.globalMatch(htmlContent);
     offset = 0;
@@ -108,11 +193,15 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
             "border-radius:3px; font-family:monospace; font-weight:bold'>%1</code>")
             .arg(escapedCode);
         
-        htmlContent.replace(match.capturedStart() + offset, match.capturedLength(), htmlInlineCode);
-        offset += htmlInlineCode.length() - match.capturedLength();
+        QString placeholder = QString("MARKDOWN_INLINE_CODE_%1_TEMP_PLACEHOLDER").arg(placeholderCounter);
+        placeholders.append({htmlInlineCode, placeholder});
+        
+        htmlContent.replace(match.capturedStart() + offset, match.capturedLength(), placeholder);
+        offset += placeholder.length() - match.capturedLength();
+        placeholderCounter++;
     }
     
-    // Process headers: # Header, ## Header, etc.
+    // Step 3: Process headers: # Header, ## Header, etc.
     QRegularExpression headerRegex(R"(^(#+)\s+(.*)$)", QRegularExpression::MultilineOption);
     QRegularExpressionMatchIterator headerIter = headerRegex.globalMatch(htmlContent);
     offset = 0;
@@ -134,13 +223,13 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
         offset += htmlHeader.length() - match.capturedLength();
     }
     
-    // Process bold: **text** or __text__
-    QRegularExpression boldRegex(R"(\*{2}([^*]+?)\*{2}|_{2}([^_]+?)_{2})");
+    // Step 4: Process bold: **text** (only asterisks, not underscores to avoid conflicts with code)
+    QRegularExpression boldRegex(R"(\*{2}([^*]+?)\*{2})");
     QRegularExpressionMatchIterator boldIter = boldRegex.globalMatch(htmlContent);
     offset = 0;
     while (boldIter.hasNext()) {
         QRegularExpressionMatch match = boldIter.next();
-        QString boldText = match.captured(1).isEmpty() ? match.captured(2) : match.captured(1);
+        QString boldText = match.captured(1);
         QString escapedBoldText = boldText.toHtmlEscaped();
         QString htmlBold = QString("<strong style='font-weight:bold'>%1</strong>")
                            .arg(escapedBoldText);
@@ -149,13 +238,13 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
         offset += htmlBold.length() - match.capturedLength();
     }
     
-    // Process italic: *text* or _text_
-    QRegularExpression italicRegex(R"((?<![\*_])\*([^*]+?)\*(?![\*_]|\s\*)|(?<![_\*])_([^_]+?)_(?![_\*]|\s_))");
+    // Step 5: Process italic: *text* (only asterisks, not underscores to avoid conflicts with code)
+    QRegularExpression italicRegex(R"((?<!\*)\*([^*]+?)\*(?!\*))");
     QRegularExpressionMatchIterator italicIter = italicRegex.globalMatch(htmlContent);
     offset = 0;
     while (italicIter.hasNext()) {
         QRegularExpressionMatch match = italicIter.next();
-        QString italicText = match.captured(1).isEmpty() ? match.captured(2) : match.captured(1);
+        QString italicText = match.captured(1);
         QString escapedItalicText = italicText.toHtmlEscaped();
         QString htmlItalic = QString("<em style='font-style:italic'>%1</em>")
                              .arg(escapedItalicText);
@@ -164,7 +253,7 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
         offset += htmlItalic.length() - match.capturedLength();
     }
     
-    // Process bullet lists: - item
+    // Step 6: Process bullet lists: - item
     QRegularExpression listRegex(R"((?:^|\n)\s*-\s+(.*?)(?=\n\s*-\s+|\n\s*\S|\n*$))");
     QRegularExpressionMatchIterator listIter = listRegex.globalMatch(htmlContent);
     offset = 0;
@@ -183,7 +272,7 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
     htmlContent.replace(QRegularExpression(R"((\n\s*<li style='margin:5px 0; line-height:1.4'>.*?</li>)+)"), 
                         "<ul style='margin:5px 0 10px 20px; padding-left:20px; line-height:1.4'>\\1</ul>");
     
-    // Process numbered lists: 1. item, 2. item, etc.
+    // Step 7: Process numbered lists: 1. item, 2. item, etc.
     QRegularExpression numListRegex(R"((?:^|\n)\s*(\d+)\.\s+(.*?)(?=\n\s*\d+\.|\n\s*\S|\n*$))");
     QRegularExpressionMatchIterator numListIter = numListRegex.globalMatch(htmlContent);
     offset = 0;
@@ -203,6 +292,77 @@ void ResultDisplayWidget::convertMarkdownToHtml(QString &htmlContent)
     htmlContent.replace(QRegularExpression(R"((\n\s*<li style='margin:5px 0; line-height:1.4'>.*?</li>)+)"), 
                         "<ol style='margin:5px 0 10px 20px; padding-left:20px; line-height:1.4'>\\1</ol>");
     
-    // Convert remaining line breaks to HTML, but be careful not to break already formatted blocks
+    // Step 8: Process tables: | header1 | header2 | header3 |
+    // First, let's find and process any markdown tables
+    // Find table blocks - they start with |, have separator line with dashes, and continue with rows
+    QStringList allLines = htmlContent.split('\n');
+    QStringList resultLines;
+    bool inTable = false;
+    QStringList tableRows;
+    
+    for (int i = 0; i < allLines.size(); i++) {
+        QString line = allLines[i];
+        
+        if (line.trimmed().startsWith("|") && line.trimmed().contains("--") && line.trimmed().contains("|")) {
+            // This is a separator line, the line before it is the header
+            if (i > 0 && allLines[i-1].trimmed().startsWith("|")) {
+                // This confirms it's a table - process the table
+                tableRows << line; // Add the separator line
+                inTable = true;
+            } else {
+                resultLines << line; // Not part of a table, just add to results
+            }
+        } else if (line.trimmed().startsWith("|") && inTable) {
+            // Continue adding table rows
+            tableRows << line;
+        } else if (line.trimmed().startsWith("|") && !inTable) {
+            // Potential start of a table - check if next line is separator
+            if (i + 1 < allLines.size()) {
+                QString nextLine = allLines[i + 1];
+                if (nextLine.trimmed().startsWith("|") && nextLine.contains("--") && nextLine.contains(":")) {
+                    // Confirmed: this is a table
+                    tableRows << line << nextLine; // Add current line and separator
+                    inTable = true;
+                    i++; // Skip the next line (separator) since we added it
+                    continue;
+                } else {
+                    resultLines << line; // Not a table, just add to results
+                }
+            } else {
+                resultLines << line; // Last line, add as normal
+            }
+        } else if (inTable && (!line.trimmed().startsWith("|") || line.trimmed().isEmpty())) {
+            // End of table, process it and add to result
+            QString tableHtml = processTable(tableRows);
+            resultLines << tableHtml;
+            tableRows.clear();
+            inTable = false;
+            resultLines << line; // Add current non-table line
+        } else {
+            if (inTable) {
+                tableRows << line; // Add to table if we're still in table mode
+            } else {
+                resultLines << line; // Regular line
+            }
+        }
+    }
+    
+    // If we ended with a table, process it
+    if (inTable && !tableRows.isEmpty()) {
+        QString tableHtml = processTable(tableRows);
+        resultLines << tableHtml;
+        tableRows.clear();
+    }
+    
+    htmlContent = resultLines.join('\n');
+    
+    // Step 9: Convert remaining line breaks to HTML, but be careful not to break already formatted blocks
     htmlContent.replace(QRegularExpression(R"((?<!<br>)(?<!<br />)\n(?!\s*</))"), "<br>");
+    
+    // Step 10: Restore the temporarily replaced HTML blocks
+    // Process in reverse order to avoid issues with offset changes during replacement
+    for (int i = placeholders.size() - 1; i >= 0; --i) {
+        const auto& placeholder = placeholders[i];
+        htmlContent.replace(placeholder.placeholder, placeholder.original);
+    }
 }
