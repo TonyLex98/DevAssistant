@@ -62,6 +62,7 @@ SOURCES += \
     src/command/RunPythonCommand.cpp \
     src/command/RunShellCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
+    src/command/ListFilesInFolderCommand.cpp \
     src/core/DevAssManager.cpp \
     src/core/PromptResolver.cpp \
     src/core/PromptSequence.cpp \
@@ -162,6 +163,7 @@ HEADERS += \
     src/command/RunPythonCommand.h \
     src/command/RunShellCommand.h \
     src/command/WriteDescriptionCommand.h \
+    src/command/ListFilesInFolderCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \
     src/core/ProjectStructureResolver.h \

@@ -17,6 +17,7 @@
 #include "CallSequenceCommand.h"
 #include "OpenSequenceCommand.h"
 #include "SearchProjectCaseInsensitiveCommand.h"
+#include "ListFilesInFolderCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -73,7 +74,8 @@ QVector<Command*> CommandRegistry::all()
         new SearchProjectCaseInsensitiveCommand(QString()),
         new ShowResultCommand(QString()),
         new CallSequenceCommand(QString()),
-        new OpenSequenceCommand(QString())
+        new OpenSequenceCommand(QString()),
+        new ListFilesInFolderCommand(QString())
     };
 }
 
@@ -475,6 +477,22 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
         
         return new OpenSequenceCommand(sequenceName, description);
+    }
+
+    if (cmd == "LIST_FILES_IN_FOLDER") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        QString folderPath = p["folderPath"].toString();
+        QString description = obj["description"].toString();
+        
+        // Поддержка альтернативного формата
+        if (folderPath.isEmpty()) {
+            folderPath = obj["folder_path"].toString();
+        }
+        if (folderPath.isEmpty()) {
+            folderPath = p["folder_path"].toString();
+        }
+        
+        return new ListFilesInFolderCommand(folderPath, description);
     }
 
     /* Неизвестная команда */

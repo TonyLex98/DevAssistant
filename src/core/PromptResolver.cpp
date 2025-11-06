@@ -154,7 +154,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
     vec.append({"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
     vec.append({"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
-    vec.append({"PROJECT_STRUCTURE", "Древовидное представление структуры проекта"});
+    vec.append({"PROJECT_STRUCTURE", "Древовидное представление структуры папок проекта"});
 
     return vec;
 }

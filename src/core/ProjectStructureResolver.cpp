@@ -27,61 +27,62 @@ QString ProjectStructureResolver::resolveProjectStructure(MainWindow* ctx)
 QString ProjectStructureResolver::generateProjectTree(const QString& projectRoot, const QStringList& files)
 {
     // Создаем структуру дерева папок
-    QMap<QString, QStringList> directoryMap;
+    QSet<QString> directorySet;
     
     for (const QString& file : files) {
         QFileInfo fileInfo(file);
         QString dirPath = fileInfo.path();
-        if (dirPath == ".") {
-            dirPath = ""; // Корневой уровень
+        
+        // Добавляем все промежуточные папки
+        QStringList pathParts = dirPath.split('/');
+        QString currentPath = "";
+        for (int i = 0; i < pathParts.size(); ++i) {
+            if (!currentPath.isEmpty()) {
+                currentPath += "/";
+            }
+            currentPath += pathParts[i];
+            directorySet.insert(currentPath);
         }
-        directoryMap[dirPath].append(fileInfo.fileName());
     }
     
-    // Сортируем содержимое каждой директории для упорядоченного вывода
-    QMap<QString, QStringList> sortedDirectoryMap;
-    for (auto it = directoryMap.begin(); it != directoryMap.end(); ++it) {
-        QStringList items = it.value();
-        items.sort(Qt::CaseSensitive);
-        sortedDirectoryMap[it.key()] = items;
+    // Преобразуем в QMap для сортировки по уровням вложенности
+    QMap<int, QStringList> directoriesByLevel;
+    for (const QString& dir : directorySet) {
+        int level = dir.count('/') + 1;
+        if (dir.isEmpty()) level = 0; // Корневая директория
+        directoriesByLevel[level].append(dir);
+    }
+    
+    // Сортируем имена папок на каждом уровне
+    for (auto& dirs : directoriesByLevel) {
+        dirs.sort();
     }
     
     // Строим дерево
     QStringList result;
-    result << "Структура проекта:";
+    result << "Структура проекта (только папки):";
     result << "";
     
-    // Сначала выводим корневую директорию
-    if (sortedDirectoryMap.contains("")) {
-        const QStringList& rootFiles = sortedDirectoryMap[""];
-        for (const QString& fileName : rootFiles) {
-            result << fileName;
-        }
-    }
-    
-    // Затем выводим остальные директории
-    for (auto it = sortedDirectoryMap.begin(); it != sortedDirectoryMap.end(); ++it) {
-        QString dirPath = it.key();
-        if (dirPath.isEmpty()) continue; // Пропускаем корневой уровень, он уже обработан
+    // Выводим директории по уровням
+    for (auto it = directoriesByLevel.begin(); it != directoriesByLevel.end(); ++it) {
+        int level = it.key();
+        const QStringList& dirs = it.value();
         
-        // Подсчитываем уровень вложенности
-        QStringList pathParts = dirPath.split('/');
-        int level = pathParts.size();
-        
-        // Создаем отступы для визуального представления вложенности
-        QString indent = "";
-        for (int i = 0; i < level - 1; ++i) {
-            indent += "  "; // 2 пробела на каждый уровень
-        }
-        
-        // Добавляем папку с отступом
-        QString folderName = pathParts.last(); // Имя последней папки в пути
-        result << QString("%1%2/").arg(indent).arg(folderName);
-        
-        // Добавляем файлы в этой папке с дополнительным отступом
-        const QStringList& dirFiles = it.value();
-        for (const QString& fileName : dirFiles) {
-            result << QString("%1  %2").arg(indent).arg(fileName);
+        for (const QString& dirPath : dirs) {
+            // Создаем отступы для визуального представления вложенности
+            QString indent = "";
+            for (int i = 0; i < level; ++i) {
+                indent += "  "; // 2 пробела на каждый уровень
+            }
+            
+            // Получаем имя папки
+            QStringList pathParts = dirPath.split('/');
+            QString folderName = pathParts.isEmpty() ? "" : pathParts.last();
+            if (folderName.isEmpty() && level == 0) {
+                folderName = QFileInfo(projectRoot).fileName(); // Имя корневой папки проекта
+            }
+            
+            result << QString("%1%2/").arg(indent).arg(folderName);
         }
     }
     
