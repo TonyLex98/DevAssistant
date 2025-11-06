@@ -186,11 +186,9 @@ QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
     
     if (!templateDir.isEmpty()) {
         QFileInfo seqPathInfo(templateDir);
-        templateDir = seqPathInfo.absolutePath();
+        currentSequenceName = seqPathInfo.baseName();  // Get the base name (without extension) of the current sequence file
+        templateDir = seqPathInfo.absolutePath();      // Get the directory containing the sequence file
         
-        // Extract current sequence base name from the file path (this is what we use as identifier)
-        QFileInfo fileInfo(templateDir);
-        currentSequenceName = fileInfo.baseName();  // Use the file base name as the sequence identifier
     } else {
         // If no current sequence path, we might be in a general context
         templateDir.clear();
