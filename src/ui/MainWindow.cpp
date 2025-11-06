@@ -415,6 +415,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_chat = new ChatDialog(&m_model, this);
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
     m_chat->setMainWindow(this);
+    
+    // 3.5 Result display widget
+    m_resultDisplayWidget = new ResultDisplayWidget(this);
 
     // 3.5   (Опционально) виджет распознавания голоса
     m_voskWidget = new VoskWidget(this);
@@ -482,11 +485,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     // --------  5. Создаём вертикальный splitter ----------
-    MemorySplitter *mainSplitter = new MemorySplitter("MainWindowsMainSplitter",Qt::Vertical, this);
+    mainSplitter = new MemorySplitter("MainWindowsMainSplitter",Qt::Vertical, this);
     mainSplitter->addWidget(top_widget);
     mainSplitter->addWidget(ide_widget);   // верхняя часть
     //mainSplitter->addWidget(m_files);
     mainSplitter->addWidget(m_log);
+    mainSplitter->addWidget(m_resultDisplayWidget);
     mainSplitter->addWidget(m_chat);
     mainSplitter->addWidget(m_contextStatusWidget); // Add context status widget
     mainSplitter->addWidget(buttons_widget);
@@ -1662,8 +1666,14 @@ void MainWindow::handleAssistantFinished()
             QString content = c->params().value("content").toString();
             if (content.isEmpty())
                 content = tr("SHOW_RESULT вызван без текста.");
-            QMessageBox::information(this, title, content);
-            appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+            
+            // Add the result to the new result display widget
+            if (m_resultDisplayWidget) {
+                m_resultDisplayWidget->appendResult(title, content);
+            } else {
+                // Fallback: show in external context as before
+                appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+            }
         } else if (c->name() == "CALL_SEQUENCE") {
             // Mark that we have a sequence call command and store the name
             sequenceToCall = c->params().value("sequenceName").toString();

@@ -75,6 +75,7 @@ SOURCES += \
     src/ui/InputTextEdit.cpp \
     src/ui/MainWindow.cpp \
     src/ui/ChatDialog.cpp \
+    src/ui/ResultDisplayWidget.cpp \
     src/ui/ModelsDialog.cpp \
     src/ui/OllamaSettingsDialog.cpp \
     src/ui/PromptEditorDialog.cpp \
@@ -172,6 +173,7 @@ HEADERS += \
     src/ui/InputTextEdit.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
+    src/ui/ResultDisplayWidget.h \
     src/ui/ModelsDialog.h \
     src/ui/OllamaSettingsDialog.h \
     src/ui/PromptEditorDialog.h \

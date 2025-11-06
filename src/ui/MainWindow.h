@@ -26,6 +26,7 @@
 #include <QDialogButtonBox>
 #include <QStandardPaths>
 #include <IDEWidget.h>
+#include "../ui/ResultDisplayWidget.h"
 #include <QToolBar>
 #include <QDockWidget>
 #include <QToolButton>
@@ -229,6 +230,7 @@ private:
     QMap<QString, FileContextSlice> m_contextSlices;
     QStringList m_consoleLogs;
     QStringList m_externalSources;
+    ResultDisplayWidget* m_resultDisplayWidget = nullptr;
 
     void rebuildContextCache();
     QString formatNumberedLines(const QStringList& lines, int startLine) const;
