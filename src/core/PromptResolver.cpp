@@ -3,6 +3,7 @@
 #include "MainWindow.h"
 #include "PromptManager.h"
 #include "../core/ContextChainResolver.h"
+#include "../core/ProjectStructureResolver.h"
 #include <QMap>
 #include <QRegularExpression>
 #include <QDebug>
@@ -108,6 +109,9 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         result.replace("{{OPEN_SEQUENCE_INFO}}", sequenceInfoList);
     }
     
+    // 8) {{PROJECT_STRUCTURE}} – древовидное представление структуры проекта
+    result.replace("{{PROJECT_STRUCTURE}}", ProjectStructureResolver::resolveProjectStructure(ctx));
+    
 
     
     // Удаляем дублирующий вызов из строки 92
@@ -150,6 +154,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
     vec.append({"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
     vec.append({"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
+    vec.append({"PROJECT_STRUCTURE", "Древовидное представление структуры проекта"});
 
     return vec;
 }

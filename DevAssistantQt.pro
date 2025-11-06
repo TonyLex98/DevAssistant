@@ -69,6 +69,7 @@ SOURCES += \
     src/core/PromptStep.cpp \
     src/main.cpp \
     src/core/ProjectIndex.cpp \
+    src/core/ProjectStructureResolver.cpp \
     src/core/ChangeApplier.cpp \
     src/adapters/OllamaAdapter.cpp \
     src/ui/DescriptionDialog.cpp \
@@ -163,6 +164,7 @@ HEADERS += \
     src/command/WriteDescriptionCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \
+    src/core/ProjectStructureResolver.h \
     src/core/ChangeApplier.h \
     src/core/ModelAdapter.h \
     src/adapters/OllamaAdapter.h \

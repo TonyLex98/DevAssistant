@@ -117,6 +117,7 @@ public:
     QString fileDescriptionsText() const;
     PromptSequenceManager& sequenceManager() { return m_seqMgr; }  // Access to sequence manager
     QString currentSequencePath() const { return m_currentSeqPath; }  // Access to current sequence path
+    ProjectIndex& projectIndex() { return m_index; }  // Access to project index for structure resolver
 
 private slots:
     void createNewSequence();
