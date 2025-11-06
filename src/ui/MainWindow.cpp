@@ -1662,7 +1662,7 @@ void MainWindow::handleAssistantFinished()
         } else if (c->name() == "SHOW_RESULT") {
             QString title = c->params().value("title").toString();
             if (title.isEmpty())
-                title = tr("Есть результат");
+                title = tr("Есть результат:\n");
             QString content = c->params().value("content").toString();
             if (content.isEmpty())
                 content = tr("SHOW_RESULT вызван без текста.");

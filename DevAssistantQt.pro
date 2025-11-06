@@ -117,7 +117,10 @@ SOURCES += \
     src/uiide/tree-sitter-python/src/parser.c \
     src/uiide/tree-sitter-python/src/scanner.c \
     src/uiide/tree-sitter-dart/src/parser.c \
-    src/uiide/tree-sitter-dart/src/scanner.c
+    src/uiide/tree-sitter-dart/src/scanner.c \
+    src/md4c/src/entity.c \
+    src/md4c/src/md4c.c \
+    src/md4c/src/md4c-html.c
 
 HEADERS += \
     src/audio/MicStreamWidget.h \
