@@ -6,7 +6,7 @@ class CallSequenceCommand : public Command
 public:
     CallSequenceCommand(const QString& sequenceName = QString(), bool needSummary = true, const QString& description = QString()) {
         m_params["sequenceName"] = sequenceName;
-        m_params["summarize"] = needSummary;
+        m_params["summarize"] = false;//needSummary;
         m_description = description.isEmpty() ? QString("Вызвать другую последовательность: %1").arg(sequenceName) : description;
     }
     
@@ -35,7 +35,7 @@ public:
     
     bool needSummary() const {
         if (m_params.contains("summarize")) {
-            return m_params.value("summarize").toBool();
+            return false;//m_params.value("summarize").toBool();
         }
         return true; // Default to true
     }

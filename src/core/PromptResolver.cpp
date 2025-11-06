@@ -294,7 +294,7 @@ QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
                 
                 QString seqBaseName = fileInfo.baseName();  // Get filename without extension
                 
-                QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = true;")
+                QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = false;")
                     .arg(index)
                     .arg(seqDescription)
                     .arg(seqBaseName);
@@ -318,7 +318,7 @@ QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
             QFileInfo seqFileInfo(it.key());  // it.key() is the file path
             QString seqBaseName = seqFileInfo.baseName();  // Get filename without extension
             
-            QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = true;")
+            QString sequenceInfo = QString("%1. %2; sequenceName = \"%3\"; summarize = false;")
                 .arg(index)
                 .arg(seqDescription)
                 .arg(seqBaseName);
