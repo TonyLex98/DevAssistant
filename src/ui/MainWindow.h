@@ -193,6 +193,9 @@ private:
     void runNextStep();
     void runNextSequence();  // Run the next sequence specified by OPEN_SEQUENCE
     void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
+    
+    // Вспомогательная функция для суммаризации результатов поиска
+    QString summarizeSearchResults(const QString& content, const QString& query);
     /* ────── NEW ────── */
     static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
     void ensureDefaultSequence();                      // создаём, если нет

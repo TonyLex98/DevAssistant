@@ -1662,8 +1662,8 @@ void MainWindow::handleAssistantFinished()
         } else if (c->name() == "SHOW_RESULT") {
             QString title = c->params().value("title").toString();
             if (title.isEmpty())
-                title = tr("Есть результат:\n");
-            QString content = c->params().value("content").toString();
+                title = tr("Есть результат:");
+            QString content = "\n" + c->params().value("content").toString() + "\n";
             if (content.isEmpty())
                 content = tr("SHOW_RESULT вызван без текста.");
             
@@ -2489,13 +2489,34 @@ void MainWindow::handleSearchResults(Command* cmd)
     if (auto web = dynamic_cast<SearchWebCommand*>(cmd)) {
         if (web->results().isEmpty())
             return;
-        QString title = QString("==== SEARCH_WEB: %1 ====").arg(cmd->params().value("query").toString());
+        QString query = cmd->params().value("query").toString();
+        QString title = QString("==== SEARCH_WEB: %1 ====").arg(query);
         QString body = web->results().join("\n\n");
-        appendExternalContext(QString("%1\n%2").arg(title, body));
+        qDebug() << "[MainWindow] SEARCH_WEB results count:" << web->results().size();
+        qDebug() << "[MainWindow] SEARCH_WEB result body length:" << body.length();
+        if (!body.isEmpty()) {
+            qDebug() << "[MainWindow] SEARCH_WEB first 200 chars of result:" << body.left(200);
+        } else {
+            qDebug() << "[MainWindow] SEARCH_WEB result body is empty";
+        }
+        
+        // Проверяем, содержит ли результат пометку о необходимости суммаризации
+        bool needsSummarization = body.contains("Контент для суммаризации", Qt::CaseInsensitive);
+        
+        QString resultBody = body;
+        if (needsSummarization) {
+            // Помечаем, что результат требует суммаризации (в реальной реализации вызовем LLM асинхронно)
+            resultBody = summarizeSearchResults(body, query);
+        }
+        
+        appendExternalContext(QString("%1\n%2").arg(title, resultBody));
         
         // Add to context manager
         if (m_contextManager) {
-            addCommandToContext(cmd, QString("%1\n%2").arg(title, body));
+            qDebug() << "[MainWindow] Adding SEARCH_WEB command to context manager";
+            addCommandToContext(cmd, QString("%1\n%2").arg(title, resultBody));
+        } else {
+            qDebug() << "[MainWindow] Context manager is null, skipping context addition";
         }
         return;
     }
@@ -3039,16 +3060,37 @@ void MainWindow::createNewSequence()
     }
 }
 
+// Вспомогательная функция для суммаризации результатов поиска
+QString MainWindow::summarizeSearchResults(const QString& content, const QString& query)
+{
+    // На данный момент, возвращаем тот же контент, но помеченный как нуждающийся в суммаризации
+    // Реальная суммаризация будет происходить асинхронно или по требованию
+    QString summaryPrompt = QString(
+        "=== АВТОМАТИЧЕСКАЯ СУММАРИЗАЦИЯ ТРЕБУЕТСЯ ===\n"
+        "Запрос: %1\n"
+        "Содержимое для суммаризации:\n\n%2\n\n"
+        "=== КОНТЕНТ ИСТОЧНИКОВ ===\n"
+        "Для получения суммаризованного результата выполните команду с LLM."
+    ).arg(query).arg(content);
+    
+    return summaryPrompt;
+}
+
 void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 {
     if (!m_contextManager || !cmd) {
+        qDebug() << "[MainWindow] Context manager is null or cmd is null, skipping context addition";
         return;
     }
     
+    qDebug() << "[MainWindow] Adding command" << cmd->name() << "to context with result length:" << result.length();
+    
     // If we're in a sequence mode, add to the current sequence, otherwise add directly
     if (m_sequenceMode && !m_currentSeqId.isEmpty()) {
+        qDebug() << "[MainWindow] Adding command to sequence" << m_currentSeqId;
         m_contextManager->addCommandToSequence(cmd, m_currentSeqId, result);
     } else {
+        qDebug() << "[MainWindow] Adding command directly to context manager";
         // The ContextManager will handle duplicate detection internally
         m_contextManager->addCommand(cmd, result);
     }

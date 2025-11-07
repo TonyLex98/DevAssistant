@@ -17,6 +17,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <functional>
+#include <QDebug>
 
 namespace {
 
@@ -359,8 +360,11 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
 {
     m_results.clear();
     const QString query = m_params.value("query").toString().trimmed();
+    qDebug() << "[SearchWebCommand] Starting search with query:" << query;
+    
     if (query.isEmpty()) {
         if (err) *err = QStringLiteral("SEARCH_WEB: пустой запрос");
+        qDebug() << "[SearchWebCommand] Empty query error";
         return false;
     }
 
@@ -369,86 +373,234 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
     QSet<QString> seen;
     QVector<SearchHit> hits;
 
-    warmupDuckDuckGo(query);
+    try {
+        qDebug() << "[SearchWebCommand] Starting warmup for query:" << query;
+        warmupDuckDuckGo(query);
 
-    // 1. Попытка через JSON API DuckDuckGo
-    {
-        QUrl apiUrl(QStringLiteral("https://api.duckduckgo.com/"));
-        QUrlQuery q;
-        q.addQueryItem(QStringLiteral("q"), query);
-        q.addQueryItem(QStringLiteral("format"), QStringLiteral("json"));
-        q.addQueryItem(QStringLiteral("pretty"), QStringLiteral("1"));
-        q.addQueryItem(QStringLiteral("no_redirect"), QStringLiteral("1"));
-        q.addQueryItem(QStringLiteral("no_html"), QStringLiteral("1"));
-        q.addQueryItem(QStringLiteral("no_language"), QStringLiteral("1"));
-        apiUrl.setQuery(q);
+        // 1. Попытка через JSON API DuckDuckGo
+        qDebug() << "[SearchWebCommand] Attempting JSON API request";
+        {
+            QUrl apiUrl(QStringLiteral("https://api.duckduckgo.com/"));
+            QUrlQuery q;
+            q.addQueryItem(QStringLiteral("q"), query);
+            q.addQueryItem(QStringLiteral("format"), QStringLiteral("json"));
+            q.addQueryItem(QStringLiteral("pretty"), QStringLiteral("1"));
+            q.addQueryItem(QStringLiteral("no_redirect"), QStringLiteral("1"));
+            q.addQueryItem(QStringLiteral("no_html"), QStringLiteral("1"));
+            q.addQueryItem(QStringLiteral("no_language"), QStringLiteral("1"));
+            apiUrl.setQuery(q);
 
-        QByteArray body;
-        int status = 0;
-        if (httpGet(apiUrl, &body, &status, &lastError, QStringLiteral("https://duckduckgo.com/"))) {
-            if (status == 200) {
-                hits = parseDuckJson(body, maxResults, &seen);
-            } else {
-                lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo API вернул %1").arg(status);
-            }
-        }
-    }
-
-    // 2. Fallback — HTML-страница
-    if (hits.isEmpty()) {
-        QUrl htmlUrl(QStringLiteral("https://html.duckduckgo.com/html/"));
-        QUrlQuery form;
-        form.addQueryItem(QStringLiteral("q"), query);
-        form.addQueryItem(QStringLiteral("b"), QString());
-        form.addQueryItem(QStringLiteral("kl"), QStringLiteral("ru-ru"));
-        QByteArray payload = form.toString(QUrl::FullyEncoded).toUtf8();
-
-        QByteArray body;
-        int status = 0;
-        QString htmlError;
-        if (httpPost(htmlUrl, payload, &body, &status, &htmlError, QStringLiteral("https://html.duckduckgo.com/"))) {
-            if (status == 200) {
-                const QString html = QString::fromUtf8(body);
-                if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
-                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo запрос требует прохождения капчи");
+            qDebug() << "[SearchWebCommand] API URL:" << apiUrl.toString();
+            QByteArray body;
+            int status = 0;
+            if (httpGet(apiUrl, &body, &status, &lastError, QStringLiteral("https://duckduckgo.com/"))) {
+                qDebug() << "[SearchWebCommand] API request successful, status:" << status;
+                if (status >= 200 && status < 300) {  // Accept any 2xx status code as success
+                    hits = parseDuckJson(body, maxResults, &seen);
+                    qDebug() << "[SearchWebCommand] API results count:" << hits.size();
+                    for (int i = 0; i < qMin(hits.size(), 3); ++i) {  // Log first 3 hits
+                        qDebug() << "  Hit" << i+1 << ":" << hits[i].title << "at" << hits[i].url;
+                    }
                 } else {
-                    hits = parseDuckHtml(html, maxResults, &seen);
-                    if (hits.isEmpty())
-                        lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML не вернул результатов");
+                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo API вернул %1").arg(status);
+                    qDebug() << "[SearchWebCommand] API request failed with status:" << status;
                 }
             } else {
-                lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML вернул %1").arg(status);
+                qDebug() << "[SearchWebCommand] API request failed with error:" << lastError;
+                qDebug() << "[SearchWebCommand] API request error details: HTTP request failed at network level";
             }
+        }
+
+        // 2. Fallback — HTML-страница
+        if (hits.isEmpty()) {
+            qDebug() << "[SearchWebCommand] API returned no results, trying HTML fallback";
+            QUrl htmlUrl(QStringLiteral("https://html.duckduckgo.com/html/"));
+            QUrlQuery form;
+            form.addQueryItem(QStringLiteral("q"), query);
+            form.addQueryItem(QStringLiteral("b"), QString());
+            form.addQueryItem(QStringLiteral("kl"), QStringLiteral("ru-ru"));
+            QByteArray payload = form.toString(QUrl::FullyEncoded).toUtf8();
+
+            qDebug() << "[SearchWebCommand] HTML URL:" << htmlUrl.toString();
+            QByteArray body;
+            int status = 0;
+            QString htmlError;
+            if (httpPost(htmlUrl, payload, &body, &status, &htmlError, QStringLiteral("https://html.duckduckgo.com/"))) {
+                qDebug() << "[SearchWebCommand] HTML request successful, status:" << status;
+                if (status == 200) {
+                    const QString html = QString::fromUtf8(body);
+                    if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
+                        lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo запрос требует прохождения капчи");
+                        qDebug() << "[SearchWebCommand] CAPTCHA required";
+                    } else {
+                        hits = parseDuckHtml(html, maxResults, &seen);
+                        qDebug() << "[SearchWebCommand] HTML parsing results count:" << hits.size();
+                        for (int i = 0; i < qMin(hits.size(), 3); ++i) {  // Log first 3 hits
+                            qDebug() << "  HTML Hit" << i+1 << ":" << hits[i].title << "at" << hits[i].url;
+                        }
+                        if (hits.isEmpty()) {
+                            lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML не вернул результатов");
+                            qDebug() << "[SearchWebCommand] HTML parsing returned no results";
+                        } else {
+                            qDebug() << "[SearchWebCommand] Successfully parsed HTML results";
+                        }
+                    }
+                } else {
+                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML вернул %1").arg(status);
+                    qDebug() << "[SearchWebCommand] HTML request failed with status:" << status;
+                }
+            } else {
+                lastError = htmlError;
+                qDebug() << "[SearchWebCommand] HTML request failed with error:" << htmlError;
+            }
+        }
+
+        qDebug() << "[SearchWebCommand] Final hits count before processing:" << hits.size();
+        if (hits.isEmpty()) {
+            qDebug() << "[SearchWebCommand] No hits found, lastError:" << lastError;
+            // Если была TLS ошибка, таймаут или другая ошибка сети, всё равно сохранить информацию
+            if (!lastError.isEmpty() && 
+                (lastError.contains("TLS", Qt::CaseInsensitive) || 
+                 lastError.contains("SSL", Qt::CaseInsensitive) ||
+                 lastError.contains("certificate", Qt::CaseInsensitive) || 
+                 lastError.contains("handshake", Qt::CaseInsensitive) ||
+                 lastError.contains("network", Qt::CaseInsensitive) ||
+                 lastError.contains("connection", Qt::CaseInsensitive) ||
+                 lastError.contains("timeout", Qt::CaseInsensitive) ||
+                 lastError.contains("превысил тайм-аут", Qt::CaseInsensitive) ||
+                 lastError.contains("timed out", Qt::CaseInsensitive))) {
+                
+                // Сохраняем информацию об ошибке как результат
+                QStringList errorResult;
+                errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                errorResult << QString("Ошибка поиска: %1").arg(lastError);
+                errorResult << "Возможные причины:";
+                errorResult << "- Проблемы с SSL/TLS сертификатами";
+                errorResult << "- Блокировка соединений антивирусом/брандмауэром";
+                errorResult << "- Ограничения сетевых настроек";
+                errorResult << "- Превышение времени ожидания ответа от сервера";
+                errorResult << "";
+                errorResult << "Рекомендации:";
+                errorResult << "- Проверить настройки брандмауэра и антивируса";
+                errorResult << "- Убедиться в наличии стабильного доступа к интернету";
+                errorResult << "- Повторить запрос позже";
+                
+                m_results = errorResult;
+                qDebug() << "[SearchWebCommand] Saved error results to m_results, count:" << m_results.size();
+                return true; // Успешно выполнено с информацией об ошибке
+            } else {
+                if (err)
+                    *err = lastError.isEmpty()
+                        ? QStringLiteral("SEARCH_WEB: совпадения не найдены")
+                        : lastError;
+                qDebug() << "[SearchWebCommand] No results and no network error, returning false";
+                return false;
+            }
+        }
+
+        QStringList blocks;
+        blocks.reserve(hits.size());
+        const int maxContentChars = 2000;
+        qDebug() << "[SearchWebCommand] Processing" << hits.size() << "hits into final results";
+        
+        QStringList fullArticles;  // Собираем полные статьи для суммаризации
+        
+        // Ограничим количество извлекаемых страниц для ускорения (например, только первые 2-3)
+        int maxPagesToExtract = qMin(3, maxResults); // Только первые 3 страницы для извлечения контента
+        
+        for (int i = 0; i < hits.size(); ++i) {
+            if (i >= maxResults) break; // Обрабатываем только maxResults
+            
+            const SearchHit& hit = hits[i];
+            QString block = hit.title;
+            block += QLatin1Char('\n') + hit.url;
+            if (!hit.snippet.isEmpty())
+                block += QLatin1Char('\n') + hit.snippet;
+            
+            // Извлекаем контент только для ограниченного числа страниц для ускорения
+            if (i < maxPagesToExtract) {
+                const QString article = fetchPageText(hit.url, maxContentChars);
+                if (!article.isEmpty()) {
+                    block += QLatin1String("\n\n---\n");
+                    block += article;
+                    
+                    // Добавляем статью для суммаризации (со ссылкой для контекста)
+                    fullArticles << QString("Заголовок: %1\nСсылка: %2\nСниппет: %3\n\nКонтент:\n%4\n\n---\n")
+                                  .arg(hit.title).arg(hit.url).arg(hit.snippet).arg(article);
+                }
+            } else {
+                // Для остальных просто добавляем информацию без извлечения контента
+                block += QLatin1String("\n\n[Контент не извлекался для ускорения]");
+            }
+            
+            blocks << block.trimmed();
+            qDebug() << "[SearchWebCommand] Added hit to results:" << hit.title.left(50) + "...";
+        }
+        
+        // Формируем результаты, включая информацию о том, что суммаризация может потребоваться
+        QStringList summaryBlocks;
+        summaryBlocks << QString("=== РЕЗУЛЬТАТЫ ПОИСКА ПО ЗАПРОСУ '%1' ===").arg(query);
+        
+        if (!fullArticles.isEmpty()) {
+            summaryBlocks << QString("Контент для суммаризации (%1 источников из %2):").arg(fullArticles.size()).arg(hits.size());
+            summaryBlocks << fullArticles.join("\n");
+            summaryBlocks << QString("\n=== ВСЕ НАЙДЕННЫЕ ССЫЛКИ ===");
         } else {
-            lastError = htmlError;
+            summaryBlocks << QString("Найдено %1 результатов:").arg(hits.size());
         }
-    }
-
-    if (hits.isEmpty()) {
-        if (err)
-            *err = lastError.isEmpty()
-                ? QStringLiteral("SEARCH_WEB: совпадения не найдены")
-                : lastError;
-        return false;
-    }
-
-    QStringList blocks;
-    blocks.reserve(hits.size());
-    const int maxContentChars = 2000;
-    for (const SearchHit& hit : hits.mid(0, maxResults)) {
-        QString block = hit.title;
-        block += QLatin1Char('\n') + hit.url;
-        if (!hit.snippet.isEmpty())
-            block += QLatin1Char('\n') + hit.snippet;
-        const QString article = fetchPageText(hit.url, maxContentChars);
-        if (!article.isEmpty()) {
-            block += QLatin1String("\n\n---\n");
-            block += article;
+        
+        // Добавляем все найденные ссылки
+        for (const SearchHit& hit : hits.mid(0, maxResults)) {
+            QString linkBlock = hit.title + QLatin1Char('\n') + hit.url;
+            if (!hit.snippet.isEmpty())
+                linkBlock += QLatin1Char('\n') + hit.snippet;
+            summaryBlocks << linkBlock;
         }
-        blocks << block.trimmed();
+        
+        m_results = summaryBlocks;
+        qDebug() << "[SearchWebCommand] Prepared results, count:" << m_results.size();
+        
+        for (int i = 0; i < qMin(m_results.size(), 2); ++i) {  // Log first 2 results
+            qDebug() << "  Final result" << i+1 << ":" << m_results[i].left(100) + "...";
+        }
+        return true;
     }
-    m_results = blocks;
-    return true;
+    catch (const std::exception& e) {
+        // Обработка исключений, которые могут возникнуть при TLS ошибках
+        qDebug() << "[SearchWebCommand] Exception caught:" << QString::fromStdString(e.what());
+        QStringList errorResult;
+        errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+        errorResult << QString("Ошибка выполнения запроса: %1").arg(QString::fromStdString(e.what()));
+        errorResult << "Возможная причина: проблема с TLS/SSL соединением или сетевыми настройками";
+        m_results = errorResult;
+        qDebug() << "[SearchWebCommand] Saved exception results to m_results, count:" << m_results.size();
+        return true; // Успешно выполнено, но с информацией об ошибке
+    }
+    catch (...) {
+        // Обработка всех остальных исключений
+        qDebug() << "[SearchWebCommand] Unknown exception caught";
+        QStringList errorResult;
+        errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+        errorResult << "Неизвестная ошибка при выполнении поискового запроса";
+        errorResult << "Возможная причина: проблема с TLS/SSL соединением или сетевыми настройками";
+        m_results = errorResult;
+        qDebug() << "[SearchWebCommand] Saved unknown exception results to m_results, count:" << m_results.size();
+        return true; // Успешно выполнено, но с информацией об ошибке
+    }
+}
+
+QString SearchWebCommand::summarizeContentInternal(const QString& content, const QString& query)
+{
+    // Заглушка для суммаризации - в реальности нужно интегрировать с LLM
+    // Возвращаем форматированный контент для передачи в LLM на более высоком уровне
+    QStringList result;
+    result << QString("Найден следующий контент по запросу '%1':").arg(query);
+    result << "";
+    result << content.left(2000); // Ограничиваем длину для отображения
+    result << "";
+    result << "Для получения детальной суммаризации содержимого рекомендуется использовать LLM.";
+    
+    return result.join("\n");
 }
 
 QJsonObject SearchWebCommand::toJson() const

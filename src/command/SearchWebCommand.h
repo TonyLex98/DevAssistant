@@ -21,4 +21,7 @@ private:
     QJsonObject m_params;
     QString m_description;
     QStringList m_results;
+    
+    // Внутренняя функция для суммаризации контента
+    QString summarizeContentInternal(const QString& content, const QString& query);
 };
