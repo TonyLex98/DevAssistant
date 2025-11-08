@@ -532,61 +532,36 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
             }
         }
 
-        QStringList blocks;
-        blocks.reserve(hits.size());
         const int maxContentChars = 2000;
         qDebug() << "[SearchWebCommand] Processing" << hits.size() << "hits into final results";
         
-        QStringList fullArticles;  // Собираем полные статьи для суммаризации
         QStringList articleContents;
-        
-        // Ограничим количество извлекаемых страниц для ускорения (например, только первые 2-3)
-        int maxPagesToExtract = qMin(3, maxResults); // Только первые 3 страницы для извлечения контента
+        const int maxPagesToExtract = qMin(3, maxResults); // Только первые 3 страницы для извлечения контента
         
         for (int i = 0; i < hits.size(); ++i) {
-            if (i >= maxResults) break; // Обрабатываем только maxResults
+            if (i >= maxResults)
+                break;
             
             const SearchHit& hit = hits[i];
-            QString block = hit.title;
-            block += QLatin1Char('\n') + hit.url;
-            if (!hit.snippet.isEmpty())
-                block += QLatin1Char('\n') + hit.snippet;
-            
-            // Извлекаем контент только для ограниченного числа страниц для ускорения
+            qDebug() << "[SearchWebCommand] Processing hit" << i + 1 << ":" << hit.title << hit.url;
             if (i < maxPagesToExtract) {
                 const QString article = fetchPageText(hit.url, maxContentChars);
-                    if (!article.isEmpty()) {
-                        block += QLatin1String("\n\n---\n");
-                        block += article;
-                        
-                        // Добавляем статью для суммаризации (со ссылкой для контекста)
-                        fullArticles << QString("Заголовок: %1\nСсылка: %2\nСниппет: %3\n\nКонтент:\n%4\n\n---\n")
-                                      .arg(hit.title).arg(hit.url).arg(hit.snippet).arg(article);
-                        articleContents << article;
-                    }
-            } else {
-                // Для остальных просто добавляем информацию без извлечения контента
-                block += QLatin1String("\n\n[Контент не извлекался для ускорения]");
+                if (!article.isEmpty()) {
+                    articleContents << article;
+                    qDebug() << "[SearchWebCommand] Extracted article content for hit" << hit.title.left(40);
+                }
             }
-            
-            blocks << block.trimmed();
-            qDebug() << "[SearchWebCommand] Added hit to results:" << hit.title.left(50) + "...";
         }
         
-        // Формируем результаты, включая информацию о том, что суммаризация может потребоваться
         QStringList summaryBlocks;
         summaryBlocks << QString("=== РЕЗУЛЬТАТЫ ПОИСКА ПО ЗАПРОСУ '%1' ===").arg(query);
         
-        if (!fullArticles.isEmpty()) {
-            summaryBlocks << QString("Контент для суммаризации (%1 источников из %2):").arg(fullArticles.size()).arg(hits.size());
-            QString combinedContent = articleContents.join("\n\n").trimmed();
-            if (combinedContent.isEmpty())
-                combinedContent = fullArticles.join("\n");
+        if (!articleContents.isEmpty()) {
+            summaryBlocks << QString("Суммаризация по %1 источникам:").arg(articleContents.size());
+            const QString combinedContent = articleContents.join(QStringLiteral("\n\n")).trimmed();
             summaryBlocks << summarizeContentInternal(combinedContent, query);
-            summaryBlocks << QString("=== ИСТОЧНИКИ ДЛЯ СУММАРИЗАЦИИ (%1) ===").arg(fullArticles.size());
-            summaryBlocks << fullArticles.join("\n");
         } else {
-            summaryBlocks << QString("Найдено %1 результатов:").arg(hits.size());
+            summaryBlocks << QString("Найдено %1 результатов, но контент для суммаризации отсутствует.").arg(hits.size());
         }
 
         summaryBlocks << QString("\n=== ВСЕ НАЙДЕННЫЕ ССЫЛКИ ===");

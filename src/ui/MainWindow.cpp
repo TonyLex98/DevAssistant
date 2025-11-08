@@ -8,6 +8,7 @@
 #include <QStatusBar>
 #include <QMessageBox>
 #include <QJsonDocument>
+#include <QDebug>
 #include "../ui/ChatDialog.h"
 #include "../ui/ModelsDialog.h"
 #include "../ui/OllamaSettingsDialog.h"
@@ -3063,18 +3064,54 @@ void MainWindow::createNewSequence()
 // Вспомогательная функция для суммаризации результатов поиска
 QString MainWindow::summarizeSearchResults(const QString& content, const QString& query)
 {
-    // На данный момент, возвращаем тот же контент, но помеченный как нуждающийся в суммаризации
-    // Реальная суммаризация будет происходить асинхронно или по требованию
-    QString summaryPrompt = QString(
-        "=== АВТОМАТИЧЕСКАЯ СУММАРИЗАЦИЯ ТРЕБУЕТСЯ ===\n"
+    const QString trimmedContent = content.trimmed();
+    if (trimmedContent.isEmpty()) {
+        return QStringLiteral("Результаты поиска не содержат текста для суммаризации.");
+    }
+
+    if (m_model.selectedModel().isEmpty()) {
+        qWarning() << "[MainWindow] Summarization skipped: LLM model not configured";
+        return QStringLiteral("LLM не настроен, суммаризация недоступна.");
+    }
+
+    QString effectiveQuery = query.trimmed();
+    if (effectiveQuery.isEmpty())
+        effectiveQuery = QStringLiteral("поисковый запрос без текста");
+
+    QString contentForPrompt = trimmedContent;
+    QString truncationNote;
+    constexpr int kMaxContextChars = 12000;
+    if (contentForPrompt.size() > kMaxContextChars) {
+        contentForPrompt = contentForPrompt.left(kMaxContextChars);
+        truncationNote = QStringLiteral("\n[Контент обрезан до %1 символов]").arg(kMaxContextChars);
+    }
+
+    const QString systemPrompt = QStringLiteral(
+        "Ты ассистент-разработчика. Сформируй на основе найденного обзора краткую, структурированную суммаризацию. "
+        "Укажи ключевые выводы, ссылки на источники и рекомендуемые действия. Отвечай на русском языке, не выдумывай фактов."
+    );
+    const QString userPrompt = QStringLiteral(
         "Запрос: %1\n"
-        "Содержимое для суммаризации:\n\n%2\n\n"
-        "=== КОНТЕНТ ИСТОЧНИКОВ ===\n"
-        "Для получения суммаризованного результата выполните команду с LLM."
-    ).arg(query).arg(content);
-    
-    return summaryPrompt;
+        "Содержимое результатов:\n%2%3\n\n"
+        "Выведи итоговое резюме (3–4 тезиса или коротких абзаца) с указанием ключевых фактов, ссылок и возможных действий."
+    ).arg(effectiveQuery, contentForPrompt, truncationNote);
+
+    qDebug() << "[MainWindow] Summarizing SEARCH_WEB results for query:" << effectiveQuery
+             << "context length:" << contentForPrompt.size();
+
+    QString summary = m_model.generateWithSystem(userPrompt, systemPrompt).trimmed();
+    const QString errorPrefix = QStringLiteral("[Ollama error]");
+    if (summary.startsWith(errorPrefix)) {
+        qWarning() << "[MainWindow] LLM error during search summary:" << summary;
+        summary = QStringLiteral("LLM вернул ошибку: %1").arg(summary.mid(errorPrefix.length()).trimmed());
+    } else if (summary.isEmpty()) {
+        qWarning() << "[MainWindow] LLM returned an empty summary for SEARCH_WEB";
+        summary = QStringLiteral("LLM не вернула ответ на суммаризацию.");
+    }
+
+    return summary;
 }
+
 
 void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 {
