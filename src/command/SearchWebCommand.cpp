@@ -16,7 +16,9 @@
 #include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QHash>
 #include <functional>
+#include <algorithm>
 #include <QDebug>
 
 namespace {
@@ -343,6 +345,38 @@ static QString fetchPageText(const QString& url, int maxChars)
     return text;
 }
 
+static QStringList tokenizeWords(const QString& source)
+{
+    static const QRegularExpression wordPattern(QStringLiteral("\\b[\\p{L}0-9]+\\b"),
+                                                QRegularExpression::UseUnicodePropertiesOption);
+    QStringList tokens;
+    auto matchIt = wordPattern.globalMatch(source.toLower());
+    while (matchIt.hasNext())
+        tokens << matchIt.next().captured(0);
+    return tokens;
+}
+
+static QStringList splitIntoSentences(const QString& text)
+{
+    QStringList sentences;
+    QString buffer;
+    for (int i = 0; i < text.size(); ++i) {
+        const QChar c = text[i];
+        if (c == QLatin1Char('\r'))
+            continue;
+        buffer.append(c);
+        if (c == '.' || c == '!' || c == '?') {
+            QString trimmed = buffer.trimmed();
+            if (trimmed.size() >= 5)
+                sentences << trimmed;
+            buffer.clear();
+        }
+    }
+    if (!buffer.trimmed().isEmpty())
+        sentences << buffer.trimmed();
+    return sentences;
+}
+
 } // namespace
 
 SearchWebCommand::SearchWebCommand(const QString& query,
@@ -427,7 +461,7 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
             QString htmlError;
             if (httpPost(htmlUrl, payload, &body, &status, &htmlError, QStringLiteral("https://html.duckduckgo.com/"))) {
                 qDebug() << "[SearchWebCommand] HTML request successful, status:" << status;
-                if (status == 200) {
+                if (status >= 200 && status < 300) {
                     const QString html = QString::fromUtf8(body);
                     if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
                         lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo запрос требует прохождения капчи");
@@ -504,6 +538,7 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
         qDebug() << "[SearchWebCommand] Processing" << hits.size() << "hits into final results";
         
         QStringList fullArticles;  // Собираем полные статьи для суммаризации
+        QStringList articleContents;
         
         // Ограничим количество извлекаемых страниц для ускорения (например, только первые 2-3)
         int maxPagesToExtract = qMin(3, maxResults); // Только первые 3 страницы для извлечения контента
@@ -520,14 +555,15 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
             // Извлекаем контент только для ограниченного числа страниц для ускорения
             if (i < maxPagesToExtract) {
                 const QString article = fetchPageText(hit.url, maxContentChars);
-                if (!article.isEmpty()) {
-                    block += QLatin1String("\n\n---\n");
-                    block += article;
-                    
-                    // Добавляем статью для суммаризации (со ссылкой для контекста)
-                    fullArticles << QString("Заголовок: %1\nСсылка: %2\nСниппет: %3\n\nКонтент:\n%4\n\n---\n")
-                                  .arg(hit.title).arg(hit.url).arg(hit.snippet).arg(article);
-                }
+                    if (!article.isEmpty()) {
+                        block += QLatin1String("\n\n---\n");
+                        block += article;
+                        
+                        // Добавляем статью для суммаризации (со ссылкой для контекста)
+                        fullArticles << QString("Заголовок: %1\nСсылка: %2\nСниппет: %3\n\nКонтент:\n%4\n\n---\n")
+                                      .arg(hit.title).arg(hit.url).arg(hit.snippet).arg(article);
+                        articleContents << article;
+                    }
             } else {
                 // Для остальных просто добавляем информацию без извлечения контента
                 block += QLatin1String("\n\n[Контент не извлекался для ускорения]");
@@ -543,12 +579,18 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
         
         if (!fullArticles.isEmpty()) {
             summaryBlocks << QString("Контент для суммаризации (%1 источников из %2):").arg(fullArticles.size()).arg(hits.size());
+            QString combinedContent = articleContents.join("\n\n").trimmed();
+            if (combinedContent.isEmpty())
+                combinedContent = fullArticles.join("\n");
+            summaryBlocks << summarizeContentInternal(combinedContent, query);
+            summaryBlocks << QString("=== ИСТОЧНИКИ ДЛЯ СУММАРИЗАЦИИ (%1) ===").arg(fullArticles.size());
             summaryBlocks << fullArticles.join("\n");
-            summaryBlocks << QString("\n=== ВСЕ НАЙДЕННЫЕ ССЫЛКИ ===");
         } else {
             summaryBlocks << QString("Найдено %1 результатов:").arg(hits.size());
         }
-        
+
+        summaryBlocks << QString("\n=== ВСЕ НАЙДЕННЫЕ ССЫЛКИ ===");
+
         // Добавляем все найденные ссылки
         for (const SearchHit& hit : hits.mid(0, maxResults)) {
             QString linkBlock = hit.title + QLatin1Char('\n') + hit.url;
@@ -591,16 +633,81 @@ bool SearchWebCommand::apply(DevAssManager*, QString* err)
 
 QString SearchWebCommand::summarizeContentInternal(const QString& content, const QString& query)
 {
-    // Заглушка для суммаризации - в реальности нужно интегрировать с LLM
-    // Возвращаем форматированный контент для передачи в LLM на более высоком уровне
-    QStringList result;
-    result << QString("Найден следующий контент по запросу '%1':").arg(query);
-    result << "";
-    result << content.left(2000); // Ограничиваем длину для отображения
-    result << "";
-    result << "Для получения детальной суммаризации содержимого рекомендуется использовать LLM.";
-    
-    return result.join("\n");
+    const QString trimmedContent = content.trimmed();
+    if (trimmedContent.isEmpty())
+        return QStringLiteral("Текст для суммаризации отсутствует.");
+
+    QStringList sentences = splitIntoSentences(trimmedContent);
+    if (sentences.isEmpty())
+        return trimmedContent.left(1000);
+
+    QStringList queryTerms = tokenizeWords(query);
+    queryTerms.removeDuplicates();
+
+    struct SentenceScore {
+        QString sentence;
+        double score;
+        int index;
+    };
+
+    QVector<SentenceScore> scored;
+    scored.reserve(sentences.size());
+
+    for (int index = 0; index < sentences.size(); ++index) {
+        const QString& sentence = sentences[index];
+        QStringList words = tokenizeWords(sentence);
+        if (words.isEmpty())
+            continue;
+
+        QHash<QString, int> frequency;
+        frequency.reserve(words.size());
+        for (const QString& word : words)
+            frequency[word]++;
+
+        double score = 0.0;
+        if (!queryTerms.isEmpty()) {
+            for (const QString& term : queryTerms) {
+                auto it = frequency.find(term);
+                if (it != frequency.end())
+                    score += it.value() * 2.5;
+            }
+            score += std::min(words.size(), 40) * 0.08;
+        } else {
+            score = words.size();
+        }
+
+        scored.append({sentence, score, index});
+    }
+
+    if (scored.isEmpty())
+        return sentences.first();
+
+    std::sort(scored.begin(), scored.end(), [](const SentenceScore& a, const SentenceScore& b) {
+        if (a.score != b.score)
+            return a.score > b.score;
+        return a.index < b.index;
+    });
+
+    const int maxSentences = std::min(3, static_cast<int>(scored.size()));
+    QVector<SentenceScore> summarySentences;
+    summarySentences.reserve(maxSentences);
+    for (int i = 0; i < maxSentences; ++i)
+        summarySentences.append(scored[i]);
+
+    std::sort(summarySentences.begin(), summarySentences.end(), [](const SentenceScore& a, const SentenceScore& b) {
+        return a.index < b.index;
+    });
+
+    QStringList summaryParts;
+    for (const auto& info : summarySentences)
+        summaryParts << info.sentence.trimmed();
+
+    QString summary = summaryParts.join(" ");
+    if (summary.isEmpty())
+        summary = sentences.first();
+
+    const QString effectiveQuery = query.trimmed().isEmpty() ? QStringLiteral("поисковый запрос") : query.trimmed();
+    return QString("Суммаризация по запросу '%1':\n%2").arg(effectiveQuery, summary.trimmed());
 }
 
 QJsonObject SearchWebCommand::toJson() const
