@@ -57,6 +57,22 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     }
     result.replace("{{HISTORY}}", hist.trimmed());
 
+    // 3.1) {{LAST_USER_MESSAGES}} – берём последние N пользовательских сообщений
+    QString userMessages;
+    const int maxUserMessages = 100;  // Limit to last 100 user messages
+    int userMsgCount = 0;
+    QList<QString> tempUserMessages;
+    // Iterate backwards through history to get the most recent user messages first
+    for (int i = history.size() - 1; i >= 0 && userMsgCount < maxUserMessages; --i) {
+        if (history[i].first == "user") {  // Only include user messages
+            tempUserMessages.prepend(history[i].second); // Prepend to maintain chronological order
+            userMsgCount++;
+        }
+    }
+    // Join all user messages with newlines
+    userMessages = tempUserMessages.join("\n");
+    result.replace("{{LAST_USER_MESSAGES}}", userMessages.trimmed());
+
     // 4) {{OPEN_FILES}} – содержимое файлов, открытых через OPEN_FILE
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
 
@@ -143,6 +159,7 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"PROJECT_ROOT",    "Корневая папка проекта"});
     vec.append({"FILE_LIST",       "Список файлов проекта"});
     vec.append({"HISTORY",         "Последние 20 сообщений из чата"});
+    vec.append({"LAST_USER_MESSAGES", "Последние 100 пользовательских сообщений из чата"});
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
     vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
