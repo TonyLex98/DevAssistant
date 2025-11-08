@@ -63,6 +63,7 @@ SOURCES += \
     src/command/RunShellCommand.cpp \
     src/command/WriteDescriptionCommand.cpp \
     src/command/ListFilesInFolderCommand.cpp \
+    src/command/ReasoningCommand.cpp \
     src/core/DevAssManager.cpp \
     src/core/PromptResolver.cpp \
     src/core/PromptSequence.cpp \
@@ -164,6 +165,7 @@ HEADERS += \
     src/command/RunShellCommand.h \
     src/command/WriteDescriptionCommand.h \
     src/command/ListFilesInFolderCommand.h \
+    src/command/ReasoningCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \
     src/core/ProjectStructureResolver.h \

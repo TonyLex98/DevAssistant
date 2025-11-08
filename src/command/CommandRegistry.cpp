@@ -18,6 +18,7 @@
 #include "OpenSequenceCommand.h"
 #include "SearchProjectCaseInsensitiveCommand.h"
 #include "ListFilesInFolderCommand.h"
+#include "ReasoningCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -75,7 +76,8 @@ QVector<Command*> CommandRegistry::all()
         new ShowResultCommand(QString()),
         new CallSequenceCommand(QString()),
         new OpenSequenceCommand(QString()),
-        new ListFilesInFolderCommand(QString())
+        new ListFilesInFolderCommand(QString()),
+        new ReasoningCommand(QString(), QString(), QJsonObject())
     };
 }
 
@@ -493,6 +495,33 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
         
         return new ListFilesInFolderCommand(folderPath, description);
+    }
+
+    if (cmd == "REASONING") {
+        const QJsonObject p = paramsObject(obj.value("params"));
+        QString reasoning = p.value("reasoning").toString();
+        QString nextCommand = p.value("nextCommand").toString();
+        QJsonObject nextCommandParams = p.value("nextCommandParams").toObject();
+        QString description = obj["description"].toString();
+
+        // Поддержка альтернативного формата
+        if (reasoning.isEmpty()) {
+            reasoning = obj["reasoning"].toString();
+        }
+        if (reasoning.isEmpty()) {
+            reasoning = p["thought_process"].toString();
+        }
+        if (reasoning.isEmpty()) {
+            reasoning = p["reasoning_text"].toString();
+        }
+        if (nextCommand.isEmpty()) {
+            nextCommand = obj["next_command"].toString();
+        }
+        if (nextCommand.isEmpty()) {
+            nextCommand = p["next_command"].toString();
+        }
+
+        return new ReasoningCommand(reasoning, nextCommand, nextCommandParams, description);
     }
 
     /* Неизвестная команда */

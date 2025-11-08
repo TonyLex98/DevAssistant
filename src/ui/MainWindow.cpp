@@ -1702,6 +1702,32 @@ void MainWindow::handleAssistantFinished()
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
             }
+        } else if (c->name() == "REASONING") {
+            // For REASONING command, we simply add the reasoning content to history
+            // so it becomes part of the conversation context, just like other commands' results
+            QString reasoning = c->params().value("reasoning").toString();
+            if (reasoning.isEmpty()) {
+                reasoning = c->params().value("thought_process").toString();
+            }
+            if (reasoning.isEmpty()) {
+                reasoning = c->params().value("reasoning_text").toString();
+            }
+            
+            // Add the reasoning to the result display widget with special styling
+            if (!reasoning.isEmpty()) {
+                if (m_resultDisplayWidget) {
+                    m_resultDisplayWidget->appendResult(tr("Рассуждение:"), 
+                        QString("<div style='background-color: #f0f8ff; padding: 10px; border-left: 4px solid #4a90e2; font-style: italic;'>%1</div>").arg(reasoning.toHtmlEscaped()));
+                } else {
+                    // Fallback: add to history as system message
+                    m_history.push_back(qMakePair(QString("system"), reasoning));
+                }
+            }
+            
+            // Add command to context manager with reasoning as result
+            if (m_contextManager) {
+                addCommandToContext(c, reasoning);
+            }
         } else if (c->name() == "CALL_SEQUENCE") {
             // Mark that we have a sequence call command and store the name
             sequenceToCall = c->params().value("sequenceName").toString();
@@ -2136,7 +2162,7 @@ void MainWindow::handleAssistantFinished()
     bool applyFailed = false;
     for (Command* c : toRun) {
         const QString name = c->name();
-        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT")
+        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT" || name == "REASONING")
             continue;
         if (name == "EDIT_IN_RANGE") {
             pendingEdits << c;
