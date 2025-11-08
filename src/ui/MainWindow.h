@@ -39,6 +39,9 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QTabWidget>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <QFrame>
 #include <MemoryLineEdit.h>
 #include <ProjectRelationView.h>
 #include "GraphWidget.h"
@@ -141,6 +144,15 @@ private:
     ChangeApplier m_applier;
     OllamaAdapter m_model;
     PromptManager m_promptMgr;
+
+    // Variables for tracking task execution time and context usage
+    QTimer* m_taskTimer;
+    QTime m_elapsedTime;  // Timer for measuring elapsed time
+    int m_totalElapsedTime; // Total elapsed time in milliseconds
+    QLabel* m_statusWidget;
+    bool m_timerActive;
+    bool m_taskRunning;  // Flag to track if a task is currently running
+    QString m_currentPrompt;  // Current prompt being sent to the model
     
     // File system monitoring to track external file changes
     QFileSystemWatcher* m_fileWatcher;
@@ -256,5 +268,12 @@ private:
 private:
     void updateContextStatusDisplay(); // Update the visual display of context commands
     void addCommandToContext(Command* cmd, const QString& result = QString()); // Wrapper to handle command addition logic
+
+    // Methods to manage the task status display
+    void createStatusWidget();
+    void updateStatusDisplay();
+    void startTaskTimer();
+    void stopTaskTimer();
+    QString formatNumber(quint64 num) const;
 
 };
