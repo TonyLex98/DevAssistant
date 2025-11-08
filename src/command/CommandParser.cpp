@@ -160,19 +160,19 @@ static QByteArray convertToObjectCommand(const QByteArray& rawObj)
     QString objStr = QString::fromUtf8(rawObj);
     
     // Проверим, содержит ли объект поля path и content (или file_path и content)
-    if ((objStr.contains("path") || objStr.contains("file_path")) && objStr.contains("content")) {
+    if ((objStr.contains("path", Qt::CaseInsensitive) || objStr.contains("file_path", Qt::CaseInsensitive)) && objStr.contains("content", Qt::CaseInsensitive)) {
         // Это может быть команда CREATE_FILE
         QJsonObject cmdObj;
         cmdObj["command"] = "CREATE_FILE";
         
         // Пытаемся извлечь путь и содержимое
-        QRegularExpression pathRegex(R"((?:\"path\"|path|\"file_path\"|file_path)\s*:\s*\"([^\"]*)\")");
+        QRegularExpression pathRegex(R"((?:\"path\"|path|\"file_path\"|file_path)\s*:\s*\"([^\"]*)\"))");
         QRegularExpressionMatch pathMatch = pathRegex.match(objStr);
         if (pathMatch.hasMatch()) {
             cmdObj["path"] = pathMatch.captured(1);
         }
         
-        QRegularExpression contentRegex(R"((?:\"content\"|content)\s*:\s*\"([^\"]*)\")");
+        QRegularExpression contentRegex(R"((?:\"content\"|content)\s*:\s*\"([^\"]*)\"))");
         QRegularExpressionMatch contentMatch = contentRegex.match(objStr);
         if (contentMatch.hasMatch()) {
             cmdObj["content"] = contentMatch.captured(1);
@@ -245,7 +245,7 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
             if (err.error == QJsonParseError::NoError) {
                 d = fixedDoc;
             } else {
-                qWarning() << "CommandParser: skip invalid JSON part:" << err.errorString() << "Content:" << p;
+                qWarning() << "CommandParser: skip invalid JSON part:" << err.errorString() << "Content:" << QString::fromUtf8(p).toLocal8Bit();
                 continue;
             }
         }
@@ -267,6 +267,37 @@ static QByteArray attemptJsonFix(const QByteArray& rawJson)
     // Исправляем кавычки вокруг ключей JSON: исправляем {key: } на {"key": }
     jsonStr = fixJsonKeys(jsonStr);
     
+    // Проверяем, есть ли незавершённые объекты/массивы и пытаемся их завершить
+    // Подсчитываем количество открывающих и закрывающих скобок
+    // Используем более простой подход для версии Qt 5.12.12
+    int openBraces = jsonStr.count('{');
+    int closeBraces = jsonStr.count('}');
+    int openBrackets = jsonStr.count('[');
+    int closeBrackets = jsonStr.count(']');
+
+    // Если есть незакрытые фигурные скобки, добавляем соответствующее количество закрывающих
+    if (openBraces > closeBraces) {
+        for (int i = 0; i < openBraces - closeBraces; ++i) {
+            jsonStr.append("}");
+        }
+    }
+
+    // Если есть незакрытые квадратные скобки, добавляем соответствующее количество закрывающих
+    if (openBrackets > closeBrackets) {
+        for (int i = 0; i < openBrackets - closeBrackets; ++i) {
+            jsonStr.append("]");
+        }
+    }
+
+    // Удаляем лишние запятые перед закрывающими скобками (еще раз после добавления закрывающих)
+    jsonStr.replace(QRegularExpression(R"(\,\s*(\}|\]))"), "\\1");
+
+    // Проверяем, не начинается ли строка с лишней запятой или другого недопустимого символа
+    jsonStr = jsonStr.trimmed();
+    if (jsonStr.startsWith(',')) {
+        jsonStr = jsonStr.mid(1).trimmed();
+    }
+
     return jsonStr.toUtf8();
 }
 

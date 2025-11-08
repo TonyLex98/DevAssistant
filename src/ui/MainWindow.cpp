@@ -3681,12 +3681,15 @@ void MainWindow::updateStatusDisplay()
     // Format the token counts with abbreviations
     QString usedTokenStr = formatNumber(usedTokens);
     QString totalTokenStr = formatNumber(totalTokens);
+    double pers = 100 - (double)usedTokens/totalTokens*100;
+    QString usedTokenStrPers = QString::number(pers,'f', 2);
     
     // Update the status widget text
-    QString statusText = QString("Time: %1 | Context: %2/%3")
+    QString statusText = QString("Time: %1 | Context left: %2/%3 (%4%)")
                             .arg(timeStr)
                             .arg(usedTokenStr)
-                            .arg(totalTokenStr);
+                            .arg(totalTokenStr)
+                            .arg(usedTokenStrPers);
     
     if (m_statusWidget) {
         m_statusWidget->setText(statusText);
