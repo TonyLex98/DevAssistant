@@ -1376,7 +1376,8 @@ void MainWindow::handleAssistantFinished()
 
     QString err;
     for (Command* c : toRun) {
-        if (!c->apply(&m_dev_manager, &err)) {
+        // Для команд, требующих LLM, используем applyWithLLM
+        if (!c->applyWithLLM(&m_dev_manager, &m_model, &err)) {
             QMessageBox::warning(this, "Ошибка выполнения", err);
             break;
         }
@@ -2115,7 +2116,7 @@ void MainWindow::handleAssistantFinished()
             pendingEdits << c;
             continue;
         }
-        if (!c->apply(&m_dev_manager, &err)) {
+        if (!c->applyWithLLM(&m_dev_manager, &m_model, &err)) {
             c->setExecutionResult(false, err);  // Set execution result before getting output
             logConsoleResult(c, err);  // Pass the error message
             QMessageBox::warning(this, tr("Ошибка выполнения"), err);
