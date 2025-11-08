@@ -77,6 +77,9 @@ public:
     QString searchResultsText() const;
     QString getContextChainText() const; // Public access to context chain (only active commands)
     QString getAllCommandsText() const;  // Public access to all commands (for full chain view)
+    
+    // Accessor for last user messages (for resolver)
+    QString getLastUserMessages() const;
 
 public slots:
     void runSequenceDialog();
@@ -221,6 +224,10 @@ private:
     QString m_currentSeqPath; // Path of the currently running sequence (for finding related sequences)
     QString m_currentSeqId;   // ID of the current command sequence being tracked
     IDEWidget *ide_widget;
+    
+    // Separate storage for last user messages (for LAST_USER_MESSAGES resolver)
+    QList<QString> m_lastUserMessages;
+    static const int MAX_USER_MESSAGES = 100; // Maximum number of user messages to store
 
     MemorySplitter *mainSplitter;
 

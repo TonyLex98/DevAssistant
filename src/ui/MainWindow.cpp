@@ -1024,6 +1024,18 @@ void MainWindow::undoLast(){
 void MainWindow::sendUserMessage(const QString& text){
     m_lastUserMessage = text;
     qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
+
+    // Add to main history
+    m_history.push_back(qMakePair(QString("user"), text));
+    // Also add to separate user messages storage (for LAST_USER_MESSAGES resolver)
+    m_lastUserMessages.append(text);
+    // Keep only last N messages
+    while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+        m_lastUserMessages.removeFirst();
+    }
+    // Debug info about LAST_USER_MESSAGES storage
+    qDebug() << "[sendUserMessage] Added message to LAST_USER_MESSAGES storage. Current count:" << m_lastUserMessages.size();
+    qDebug() << "[sendUserMessage] Last message in storage:" << (m_lastUserMessages.isEmpty() ? QString("empty") : m_lastUserMessages.last());
     
     // Debug info about managers before running sequence
     qDebug() << "[sendUserMessage] About to call runSequenceDialog";
@@ -1033,22 +1045,6 @@ void MainWindow::sendUserMessage(const QString& text){
     runSequenceDialog();
     
     qDebug() << "[sendUserMessage] runSequenceDialog completed";
-
-/*
-    QString capabilities = "";
-    QString full = m_promptMgr.buildPrompt(text, capabilities,buildProjectContext(), m_history);
-
-    qDebug()<<" ------------- full prompt --------------";
-    qDebug()<<full;
-
-    m_streamBuf.clear();
-    m_model.startStream(full);
-    m_history.push_back(qMakePair(QString("user"), text));
-
-    // ***  Оценка количества токенов ***
-    int tokens = m_promptMgr.tokenCount(full);
-    log(QString("Отправляем запрос (%1 токенов) → %2").arg(tokens).arg(text));
-*/
 
 }
 
@@ -1295,6 +1291,22 @@ void MainWindow::runNextStep()
     if (!resolved.userPrompt.isEmpty())
         log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
+    // Add the resolved user prompt to the separate user messages storage (for LAST_USER_MESSAGES resolver)
+    // Only add if it's not already the most recent message to prevent duplicates
+    if (!resolved.userPrompt.isEmpty()) {
+        if (m_lastUserMessages.isEmpty() || m_lastUserMessages.last() != resolved.userPrompt) {
+            m_history.push_back(qMakePair(QString("user"), resolved.userPrompt));
+            m_lastUserMessages.append(resolved.userPrompt);
+            // Keep only last N messages
+            while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+                m_lastUserMessages.removeFirst();
+            }
+            qDebug() << "[runNextStep] Added user prompt to LAST_USER_MESSAGES storage. Current count:" << m_lastUserMessages.size();
+        } else {
+            qDebug() << "[runNextStep] Skipping duplicate user prompt in LAST_USER_MESSAGES storage";
+        }
+    }
+
     // РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ С‚Р°Рє Р¶Рµ, РєР°Рє РѕР±С‹С‡РЅС‹Р№ РІРІРѕРґ РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
     m_streamBuf.clear();
     
@@ -1356,7 +1368,15 @@ void MainWindow::handleAssistantFinished()
         if (c->name()=="ASK_USER") {
             QString q = c->params().value("question").toString();
             bool ok=false; QString ans = QInputDialog::getText(this, tr("Ответьте на вопрос нейросети"), q, QLineEdit::Normal, QString(), &ok);
-            if (ok) { m_history.push_back(qMakePair(QString("user"), ans)); }
+            if (ok) {
+                m_history.push_back(qMakePair(QString("user"), ans));
+                // Also add to separate user messages storage (for LAST_USER_MESSAGES resolver)
+                m_lastUserMessages.append(ans);
+                // Keep only last N messages
+                while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+                    m_lastUserMessages.removeFirst();
+                }
+            }
         } else if (c->name()=="OPEN_FILE_REGION" || c->name()=="OPEN_FILE") {
             QJsonObject p = c->params(); QString path = p.value("path").toString(); QString abs = QDir(m_projectRoot).filePath(path);
             QFile f(abs); if (f.open(QIODevice::ReadOnly)) {
@@ -1683,8 +1703,15 @@ void MainWindow::handleAssistantFinished()
                                                       QLineEdit::Normal,
                                                       QString(),
                                                       &ok);
-            if (ok)
+            if (ok) {
                 m_history.push_back(qMakePair(QString("user"), ans));
+                // Also add to separate user messages storage (for LAST_USER_MESSAGES resolver)
+                m_lastUserMessages.append(ans);
+                // Keep only last N messages
+                while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+                    m_lastUserMessages.removeFirst();
+                }
+            }
         } else if (c->name() == "OPEN_FILE_REGION" || c->name() == "OPEN_FILE") {
             handleOpenCommand(c);
         } else if (c->name() == "SHOW_RESULT") {
@@ -3168,6 +3195,17 @@ QString MainWindow::summarizeSearchResults(const QString& content, const QString
 }
 
 
+QString MainWindow::getLastUserMessages() const
+{
+    QString result = m_lastUserMessages.join("\n");
+    qDebug() << "[getLastUserMessages] Returning" << m_lastUserMessages.size() << "messages, total length:" << result.length();
+    if (m_lastUserMessages.size() > 0) {
+        qDebug() << "[getLastUserMessages] First message:" << m_lastUserMessages.first();
+        qDebug() << "[getLastUserMessages] Last message:" << m_lastUserMessages.last();
+    }
+    return result;
+}
+
 void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 {
     if (!m_contextManager || !cmd) {
@@ -3595,7 +3633,14 @@ void MainWindow::runSimpleChat(const QString &text)
     m_model.startStream(text);
     
     // Update history
+    // Add to main history
     m_history.push_back(qMakePair(QString("user"), text));
+    // Also add to separate user messages storage (for LAST_USER_MESSAGES resolver)
+    m_lastUserMessages.append(text);
+    // Keep only last N messages
+    while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+        m_lastUserMessages.removeFirst();
+    }
     
     // Log the request
     int tokens = m_promptMgr.tokenCount(text);

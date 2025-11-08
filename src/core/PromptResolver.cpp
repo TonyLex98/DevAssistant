@@ -57,21 +57,11 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     }
     result.replace("{{HISTORY}}", hist.trimmed());
 
-    // 3.1) {{LAST_USER_MESSAGES}} – берём последние N пользовательских сообщений
-    QString userMessages;
-    const int maxUserMessages = 100;  // Limit to last 100 user messages
-    int userMsgCount = 0;
-    QList<QString> tempUserMessages;
-    // Iterate backwards through history to get the most recent user messages first
-    for (int i = history.size() - 1; i >= 0 && userMsgCount < maxUserMessages; --i) {
-        if (history[i].first == "user") {  // Only include user messages
-            tempUserMessages.prepend(history[i].second); // Prepend to maintain chronological order
-            userMsgCount++;
-        }
-    }
-    // Join all user messages with newlines
-    userMessages = tempUserMessages.join("\n");
-    result.replace("{{LAST_USER_MESSAGES}}", userMessages.trimmed());
+    // 3.1) {{LAST_USER_MESSAGES}} – берём последние N пользовательских сообщений из отдельного хранилища
+    QString userMessages = ctx->getLastUserMessages();
+    qDebug() << "[PromptResolver] LAST_USER_MESSAGES content:" << userMessages;
+    qDebug() << "[PromptResolver] LAST_USER_MESSAGES count:" << userMessages.split('\n').size();
+    result.replace("{{LAST_USER_MESSAGES}}", userMessages);
 
     // 4) {{OPEN_FILES}} – содержимое файлов, открытых через OPEN_FILE
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
