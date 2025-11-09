@@ -4,6 +4,8 @@
 #include <QFileDialog>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QSet>
+#include <QDateTime>
 
 #include <QStatusBar>
 #include <QMessageBox>
@@ -1024,6 +1026,7 @@ void MainWindow::undoLast(){
 void MainWindow::sendUserMessage(const QString& text){
     m_lastUserMessage = text;
     qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
+    appendUserQuestionToResultDisplay(text);
 
     // Add to main history
     m_history.push_back(qMakePair(QString("user"), text));
@@ -1724,7 +1727,10 @@ void MainWindow::handleAssistantFinished()
 
             // Add the result to the new result display widget
             if (m_resultDisplayWidget) {
-                m_resultDisplayWidget->appendResult("", QString("\n---\n%1%2\n---\n").arg(title).arg(content));
+                ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
+                m_resultDisplayWidget->appendResult("", QString("\n---\n%1%2\n---\n").arg(title).arg(content),
+                                                   ResultDisplayWidget::EntryType::Default,
+                                                   metadata);
             } else {
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
@@ -1748,10 +1754,13 @@ void MainWindow::handleAssistantFinished()
             // Add the reasoning to the result display widget with special styling
             if (!reasoning.isEmpty()) {
                 if (m_resultDisplayWidget) {
-                    QString formattedReasoning = QString("\n---\n[Рассуждение от %1]\n\n%2\n---\n\n")
-                        .arg(m_model.selectedModel())
-                        .arg(reasoning);
-                    m_resultDisplayWidget->appendResult("", formattedReasoning);
+                QString formattedReasoning = QString("\n---\n[Рассуждение от %1]\n\n%2\n---\n\n")
+                    .arg(m_model.selectedModel())
+                    .arg(reasoning);
+                ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
+                m_resultDisplayWidget->appendResult("", formattedReasoning,
+                                                    ResultDisplayWidget::EntryType::Reasoning,
+                                                    metadata);
                 } else {
                     // Fallback: add to history as system message
                     m_history.push_back(qMakePair(QString("system"), reasoning));
@@ -3536,6 +3545,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
+    appendUserQuestionToResultDisplay(text);
 
     // First, refresh to ensure we have the latest templates and sequences
     m_templateMgr.refresh();
@@ -3634,6 +3644,7 @@ void MainWindow::runSimpleChat(const QString &text)
 
     // Display user message in chat
     m_chat->appendUserMessage(text);
+    appendUserQuestionToResultDisplay(text);
 
     // Start streaming response directly without any system context or templates
     m_streamBuf.clear();
@@ -3652,6 +3663,61 @@ void MainWindow::runSimpleChat(const QString &text)
     // Log the request
     int tokens = m_promptMgr.tokenCount(text);
     log(QString("Sending simple chat request (%1 tokens) → %2").arg(tokens).arg(text));
+}
+
+void MainWindow::appendUserQuestionToResultDisplay(const QString& question)
+{
+    if (!m_resultDisplayWidget)
+        return;
+
+    const QString trimmedQuestion = question.trimmed();
+    if (trimmedQuestion.isEmpty())
+        return;
+
+    m_lastQuestionTimestamp = QDateTime::currentDateTime();
+
+    const QString formattedQuestion = QString("\n\n%1\n").arg(trimmedQuestion);
+    m_resultDisplayWidget->appendResult(tr("Вопрос пользователя"),
+                                        formattedQuestion,
+                                        ResultDisplayWidget::EntryType::UserQuestion);
+}
+
+ResultDisplayWidget::ResultEntryMetadata MainWindow::collectContextMetadataSince(const QDateTime &since) const
+{
+    ResultDisplayWidget::ResultEntryMetadata metadata;
+    if (!m_contextManager || !since.isValid())
+        return metadata;
+
+    QList<CommandContextInfo> relevantCommands;
+    QSet<QString> relevantIds;
+    for (const auto &cmd : m_contextManager->getAllCommands()) {
+        if (cmd.timestamp >= since) {
+            relevantCommands << cmd;
+            relevantIds.insert(cmd.id);
+        }
+    }
+
+    if (relevantCommands.isEmpty())
+        return metadata;
+
+    metadata.commands = relevantCommands;
+
+    for (const auto &seq : m_contextManager->getCommandSequences()) {
+        bool include = seq.timestamp >= since;
+        if (!include) {
+            for (const QString &cmdId : seq.commandIds) {
+                if (relevantIds.contains(cmdId)) {
+                    include = true;
+                    break;
+                }
+            }
+        }
+        if (include) {
+            metadata.sequences << seq;
+        }
+    }
+
+    return metadata;
 }
 
 

@@ -21,6 +21,7 @@
 #include <PromptSequenceManager.h>
 #include <QMessageBox>
 #include  <PromptResolver.h>
+#include <QDateTime>
 #include <QTimer>
 #include <PromptSequenceEditor.h>
 #include <QDialogButtonBox>
@@ -221,6 +222,7 @@ private:
 
     QString m_lastUserMessage;
     QString m_lastAssistantMessage;
+    QDateTime m_lastQuestionTimestamp;
     QString m_currentSeqPath; // Path of the currently running sequence (for finding related sequences)
     QString m_currentSeqId;   // ID of the current command sequence being tracked
     IDEWidget *ide_widget;
@@ -271,6 +273,8 @@ private:
     void handleSearchResults(Command* cmd);
 
     void retryCurrentSequenceStep();
+    void appendUserQuestionToResultDisplay(const QString& question);
+    ResultDisplayWidget::ResultEntryMetadata collectContextMetadataSince(const QDateTime &since) const;
 
 private:
     void updateContextStatusDisplay(); // Update the visual display of context commands
