@@ -81,7 +81,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
 
     if (!title.isEmpty()) {
         QLabel *titleLabel = new QLabel(title.toHtmlEscaped(), entry);
-        titleLabel->setStyleSheet("font-weight: bold; color: #2c5aa0; font-size: 1.1em;");
+        titleLabel->setStyleSheet("font-weight: bold; color: #2c5aa0; font-size: 1.3em;");
         titleLabel->setWordWrap(true);
         layout->addWidget(titleLabel);
     }

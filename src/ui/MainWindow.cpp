@@ -1728,7 +1728,7 @@ void MainWindow::handleAssistantFinished()
             // Add the result to the new result display widget
             if (m_resultDisplayWidget) {
                 ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
-                m_resultDisplayWidget->appendResult("", QString("\n---\n%1%2\n---\n").arg(title).arg(content),
+                m_resultDisplayWidget->appendResult("", content,
                                                    ResultDisplayWidget::EntryType::Default,
                                                    metadata);
             } else {
@@ -1754,9 +1754,7 @@ void MainWindow::handleAssistantFinished()
             // Add the reasoning to the result display widget with special styling
             if (!reasoning.isEmpty()) {
                 if (m_resultDisplayWidget) {
-                QString formattedReasoning = QString("\n---\n[Рассуждение от %1]\n\n%2\n---\n\n")
-                    .arg(m_model.selectedModel())
-                    .arg(reasoning);
+                QString formattedReasoning = reasoning;
                 ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
                 m_resultDisplayWidget->appendResult("", formattedReasoning,
                                                     ResultDisplayWidget::EntryType::Reasoning,
