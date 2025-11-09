@@ -119,21 +119,46 @@ MainWindow::MainWindow(QWidget *parent)
     QWidget *buttons_widget = new QWidget();
     // 3.3   Кнопки
     auto btns = new QHBoxLayout(buttons_widget);
+    m_settingsPanel = new QWidget(this, Qt::Tool);
+    m_settingsPanel->setWindowTitle(tr("Настройки действий"));
+    m_settingsPanel->setAttribute(Qt::WA_DeleteOnClose, false);
+    QVBoxLayout *settingsLayout = new QVBoxLayout(m_settingsPanel);
+    settingsLayout->setSpacing(6);
+    settingsLayout->setContentsMargins(8, 8, 8, 8);
+    m_settingsPanel->hide();
+    settingsPanelBtn = new StyledButton(tr("Открыть настройки"), this);
+    btns->addWidget(settingsPanelBtn);
+    connect(settingsPanelBtn, &StyledButton::clicked, this, [this]() {
+        if (!m_settingsPanel)
+            return;
+        const bool currentlyVisible = m_settingsPanel->isVisible();
+        if (!currentlyVisible) {
+            QPoint btnPos = settingsPanelBtn->mapToGlobal(QPoint(0, settingsPanelBtn->height()));
+            m_settingsPanel->move(btnPos);
+        }
+        m_settingsPanel->setVisible(!currentlyVisible);
+    });
     rescanBtn   = new StyledButton("Rescan", this);
     settingsBtn = new StyledButton("Ollama Settings", this);
     promptBtn   = new StyledButton("Edit Base Prompt", this);
     applyBtn    = new StyledButton("Apply changes", this);
     undoBtn     = new StyledButton("Undo", this);
     descBtn     = new StyledButton("Generate Descriptions", this);
+    settingsLayout->addWidget(rescanBtn);
+    settingsLayout->addWidget(settingsBtn);
+    settingsLayout->addWidget(descBtn);
 
     runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"));
     //btns->addWidget(runSeqBtn);
     runSeqBtn->hide();
     StyledButton *runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
     runTemplateBtn->hide();
-    //btns->addWidget(runTemplateBtn);
-    btns->addWidget(editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this));
-    btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
+    // settings panel layout placeholder to be added later
+
+    editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this);
+    newSeqBtn = new StyledButton("New sequence…", this);
+    settingsLayout->addWidget(editSeqBtn);
+    settingsLayout->addWidget(newSeqBtn);
 
     connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
 
@@ -304,7 +329,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Add button for solution templates
     StyledButton *editTemplatesBtn = new StyledButton(tr("Edit Templates"), this);
-    btns->addWidget(editTemplatesBtn);
+    settingsLayout->addWidget(editTemplatesBtn);
 
     connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
         // Create and show the template viewer
@@ -325,7 +350,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Add button to export selected sequence as template
     StyledButton *exportSequenceAsTemplateBtn = new StyledButton(tr("Export Sequence as Template"), this);
-    btns->addWidget(exportSequenceAsTemplateBtn);
+    settingsLayout->addWidget(exportSequenceAsTemplateBtn);
 
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
         // First, refresh sequence manager
@@ -391,20 +416,18 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    btns->addWidget(rescanBtn);
-    btns->addWidget(settingsBtn);
-    btns->addWidget(descBtn);
+    // buttons already added to settings panel above
 
 
     // ---------- Добавляем кнопку «Show Graph» ----------
     graphBtn = new StyledButton("Show Graph", this);
-    btns->addWidget(graphBtn);
+    settingsLayout->addWidget(graphBtn);
     connect(graphBtn, &StyledButton::clicked, this,
             &MainWindow::openGraph);
 
     // ---------- Добавляем кнопку «Show Sequence Graph» ----------
     seqGraphBtn = new StyledButton("Show Sequence Graph", this);
-    btns->addWidget(seqGraphBtn);
+    settingsLayout->addWidget(seqGraphBtn);
     connect(seqGraphBtn, &StyledButton::clicked, this,
             &MainWindow::openSequenceGraph);
     // -------------------------------------------------
@@ -414,7 +437,7 @@ MainWindow::MainWindow(QWidget *parent)
     confirmModeCombo->addItem("Auto-confirm commands", "auto");
     confirmModeCombo->addItem("Ask for command confirmation", "ask");
     confirmModeCombo->setCurrentIndex(0); // Default to auto-confirm
-    btns->addWidget(confirmModeCombo);
+    settingsLayout->addWidget(confirmModeCombo);
 
     promptBtn->hide();
     applyBtn->hide();
@@ -431,14 +454,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Toggle button to show/hide chat
     chatToggleBtn = new StyledButton(tr("Показать чат"), this);
-    btns->addWidget(chatToggleBtn);
+    settingsLayout->addWidget(chatToggleBtn);
     connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_chat->isChatLogVisible();
         m_chat->setChatLogVisible(shouldShow);
         chatToggleBtn->setText(shouldShow ? tr("Скрыть чат") : tr("Показать чат"));
     });
     logToggleBtn = new StyledButton(tr("Показать лог"), this);
-    btns->addWidget(logToggleBtn);
+    settingsLayout->addWidget(logToggleBtn);
     connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_log->isVisible();
         m_log->setVisible(shouldShow);
