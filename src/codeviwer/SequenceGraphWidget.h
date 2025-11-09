@@ -7,6 +7,7 @@
 #include "SequenceRelationView.h"
 #include <QString>
 #include "../ui/customWidgets/MemoryComboBox.h"
+#include <StyledButton.h>
 
 class SolutionTemplateManager;
 class PromptSequenceManager;  // Forward declaration instead of including header to avoid circular includes

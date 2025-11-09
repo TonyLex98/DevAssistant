@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QScrollBar>
 #include "SolutionTemplate.h"
 #include "SolutionTemplateManager.h"
 
@@ -131,6 +132,7 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                 // The first view should be the SequenceRelationView
                 SequenceRelationView* relationView = qobject_cast<SequenceRelationView*>(views.first());
                 if (relationView) {
+                    relationView->updateEdgesForNode(this);
                     qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
                     relationView->savePositions();
                     
@@ -185,7 +187,10 @@ void SequenceEdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
         return;
 
     // Draw arrow line
-    painter->setPen(QPen(QColor(100, 100, 100), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    QPen linePen(QColor(60, 60, 60), 2);
+    linePen.setCapStyle(Qt::RoundCap);
+    linePen.setJoinStyle(Qt::RoundJoin);
+    painter->setPen(linePen);
     painter->drawLine(line);
 
     // Calculate angle of the line for arrowhead (from source to destination)
@@ -194,8 +199,9 @@ void SequenceEdgeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     // Calculate the arrowhead points
     // The arrowhead should point in the direction from source to destination
     QPointF arrowTip = m_destPoint;  // Arrow tip is at the destination
-    QPointF arrowP1 = arrowTip - QPointF(10 * qCos(angle - M_PI / 6), 10 * qSin(angle - M_PI / 6));
-    QPointF arrowP2 = arrowTip - QPointF(10 * qCos(angle + M_PI / 6), 10 * qSin(angle + M_PI / 6));
+    qreal arrowSize = qMin<qreal>(12.0, line.length() / 4);
+    QPointF arrowP1 = arrowTip - QPointF(arrowSize * qCos(angle - M_PI / 6), arrowSize * qSin(angle - M_PI / 6));
+    QPointF arrowP2 = arrowTip - QPointF(arrowSize * qCos(angle + M_PI / 6), arrowSize * qSin(angle + M_PI / 6));
 
     // Draw arrowhead
     painter->setBrush(QColor(100, 100, 100));
@@ -209,13 +215,14 @@ void SequenceEdgeItem::updatePosition()
     if (!m_source || !m_dest)
         return;
 
-    // Map the center points of source and destination nodes to this item's coordinate system
-    QPointF sourceCenter = mapFromItem(m_source, 0, 0);  
-    QPointF destCenter = mapFromItem(m_dest, 0, 0);      
+    QPointF sourceCenterScene = m_source->sceneBoundingRect().center();
+    QPointF destCenterScene = m_dest->sceneBoundingRect().center();
 
-    // Calculate positions for connection points at the center of the appropriate side
-    m_sourcePoint = getSideCenterPoint(m_source, destCenter);
-    m_destPoint = getSideCenterPoint(m_dest, sourceCenter);
+    QPointF sourceScenePoint = getSideCenterPoint(m_source, destCenterScene);
+    QPointF destScenePoint = getSideCenterPoint(m_dest, sourceCenterScene);
+
+    m_sourcePoint = mapFromScene(sourceScenePoint);
+    m_destPoint = mapFromScene(destScenePoint);
     
     prepareGeometryChange();
 }
@@ -223,53 +230,28 @@ void SequenceEdgeItem::updatePosition()
 // Calculate the point at the center of the appropriate side of the node rectangle
 QPointF SequenceEdgeItem::getSideCenterPoint(SequenceNodeItem *node, const QPointF &targetPoint) const
 {
-    if (!node) return QPointF();
-    
-    // Get the node's bounding rectangle and position in the edge's coordinate system
-    QRectF nodeRect = node->boundingRect();  // Local bounding rectangle of the node
-    QPointF nodeCenterInEdgeCoords = mapFromItem(node, 0, 0);  // Center of node in edge coordinates
-    
-    // Calculate the actual rectangle in the edge's coordinate system
-    QRectF rectInEdgeCoords(
-        nodeCenterInEdgeCoords.x() + nodeRect.left(),
-        nodeCenterInEdgeCoords.y() + nodeRect.top(),
-        nodeRect.width(),
-        nodeRect.height()
-    );
-    
-    // Calculate direction vector from node center to target
-    qreal dx = targetPoint.x() - nodeCenterInEdgeCoords.x();
-    qreal dy = targetPoint.y() - nodeCenterInEdgeCoords.y();
-    
-    // Determine which side to connect to based on the direction
-    qreal absDx = qAbs(dx);
-    qreal absDy = qAbs(dy);
-    qreal aspectRatio = rectInEdgeCoords.width() / rectInEdgeCoords.height();
-    qreal slopeRatio = (absDx > 0) ? (absDy / absDx) : 1000000.0; // Avoid division by zero
-    
-    QPointF connectionPoint;
-    
-    if (slopeRatio <= 1.0 / aspectRatio) {
-        // Connect to left or right side (slope is relatively horizontal)
-        if (dx > 0) {
-            // Connect to right side center (middle of right edge)
-            connectionPoint = QPointF(rectInEdgeCoords.right(), rectInEdgeCoords.center().y());
-        } else {
-            // Connect to left side center (middle of left edge)  
-            connectionPoint = QPointF(rectInEdgeCoords.left(), rectInEdgeCoords.center().y());
-        }
-    } else {
-        // Connect to top or bottom side (slope is relatively vertical)
-        if (dy > 0) {
-            // Connect to bottom side center (middle of bottom edge)
-            connectionPoint = QPointF(rectInEdgeCoords.center().x(), rectInEdgeCoords.bottom());
-        } else {
-            // Connect to top side center (middle of top edge)
-            connectionPoint = QPointF(rectInEdgeCoords.center().x(), rectInEdgeCoords.top());
+    if (!node)
+        return QPointF();
+
+    QRectF rect = node->sceneBoundingRect();
+    QPointF center = rect.center();
+    QLineF pointer(center, targetPoint);
+
+    QVector<QLineF> edges;
+    edges << QLineF(rect.topLeft(), rect.topRight())
+          << QLineF(rect.bottomLeft(), rect.bottomRight())
+          << QLineF(rect.topLeft(), rect.bottomLeft())
+          << QLineF(rect.topRight(), rect.bottomRight());
+
+    QPointF intersection;
+    for (const QLineF &edge : edges) {
+        if (pointer.intersect(edge, &intersection) == QLineF::BoundedIntersection) {
+            return intersection;
         }
     }
-    
-    return connectionPoint;
+
+    // Fallback to center if intersection wasn't found
+    return center;
 }
 
 QVariant SequenceEdgeItem::itemChange(GraphicsItemChange change, const QVariant &value)
@@ -285,7 +267,7 @@ SequenceRelationView::SequenceRelationView(QWidget *parent)
     m_scene = new QGraphicsScene(this);
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
-    setDragMode(QGraphicsView::ScrollHandDrag);
+    setDragMode(QGraphicsView::NoDrag);
     setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
     
     // Set default view settings
@@ -314,6 +296,9 @@ void SequenceRelationView::rebuildGraph()
 {
     qDebug() << "[SequenceRelationView] rebuildGraph() called";
     
+    resetTransform();
+    m_totalScale = 1.0;
+
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
     
@@ -871,6 +856,8 @@ void SequenceRelationView::addEdge(const QString &from, const QString &to)
     SequenceEdgeItem *edgeItem = new SequenceEdgeItem(sourceItem, destItem);
     m_scene->addItem(edgeItem);
     m_edgeItems.append(edgeItem);
+    m_nodeEdges[sourceItem].append(edgeItem);
+    m_nodeEdges[destItem].append(edgeItem);
 }
 
 void SequenceRelationView::positionNodes()
@@ -903,6 +890,36 @@ void SequenceRelationView::positionNodes()
     m_scene->setSceneRect(sceneRect.adjusted(-100, -100, 100, 100));
 }
 
+void SequenceRelationView::updateEdgesForNode(SequenceNodeItem *node)
+{
+    if (!node || !m_nodeEdges.contains(node))
+        return;
+
+    const QList<SequenceEdgeItem*> edges = m_nodeEdges.value(node);
+    for (SequenceEdgeItem *edge : edges) {
+        if (edge)
+            edge->updatePosition();
+    }
+}
+
+void SequenceRelationView::fitToContents()
+{
+    if (m_nodeItems.isEmpty())
+        return;
+
+    QRectF bounds;
+    for (SequenceNodeItem *item : qAsConst(m_nodeItems)) {
+        bounds = bounds.united(item->sceneBoundingRect());
+    }
+
+    if (bounds.isNull())
+        return;
+
+    bounds = bounds.adjusted(-80, -80, 80, 80);
+    fitInView(bounds, Qt::KeepAspectRatio);
+    m_totalScale = transform().m11();
+}
+
 void SequenceRelationView::clearScene()
 {
     m_scene->clear();
@@ -921,16 +938,58 @@ void SequenceRelationView::clearScenePreservingPositions()
 
 void SequenceRelationView::wheelEvent(QWheelEvent *event)
 {
-    // Zoom in/out with Ctrl + mouse wheel
     if (event->modifiers() & Qt::ControlModifier) {
-        double factor = 1.2;
-        if (event->angleDelta().y() < 0)
-            factor = 1.0 / factor;
-        scale(factor, factor);
+        constexpr qreal ScaleStep = 1.15;
+        qreal delta = event->angleDelta().y() / 120.0;
+        qreal factor = qPow(ScaleStep, delta);
+        qreal targetScale = qBound(0.25, m_totalScale * factor, 6.0);
+        qreal actualFactor = targetScale / m_totalScale;
+        scale(actualFactor, actualFactor);
+        m_totalScale = targetScale;
     } else {
-        // Default scrolling behavior
         QGraphicsView::wheelEvent(event);
     }
+}
+
+void SequenceRelationView::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::MiddleButton ||
+        (event->button() == Qt::LeftButton && event->modifiers() & Qt::AltModifier)) {
+        m_panning = true;
+        m_lastPanPoint = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mousePressEvent(event);
+}
+
+void SequenceRelationView::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_panning) {
+        QPoint delta = event->pos() - m_lastPanPoint;
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+        m_lastPanPoint = event->pos();
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mouseMoveEvent(event);
+}
+
+void SequenceRelationView::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (m_panning && (event->button() == Qt::MiddleButton ||
+                      (event->button() == Qt::LeftButton && event->modifiers() & Qt::AltModifier))) {
+        m_panning = false;
+        setCursor(Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::mouseReleaseEvent(event);
 }
 
 void SequenceRelationView::mouseDoubleClickEvent(QMouseEvent *event)

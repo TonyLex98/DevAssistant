@@ -14,6 +14,7 @@
 #include <QVector>
 #include <QPointF>
 #include <QDebug>
+#include <QHash>
 #include "PromptSequence.h"
 #include "PromptSequenceManager.h"
 
@@ -42,6 +43,8 @@ public slots:
     void savePositions();  // Public slot for saving positions when nodes move
     void saveLayout();     // Public slot for saving layout when closing
     void restoreLayout();  // Public slot for restoring layout when opening
+    void updateEdgesForNode(SequenceNodeItem *node);
+    void fitToContents();
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -50,6 +53,9 @@ protected:
     void wheelEvent(QWheelEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
     QGraphicsScene *m_scene = nullptr;
@@ -59,6 +65,7 @@ private:
     // Node and edge tracking
     QMap<QString, SequenceNodeItem*> m_nodeItems;  // sequence name -> item
     QVector<SequenceEdgeItem*> m_edgeItems;
+    QHash<SequenceNodeItem*, QList<SequenceEdgeItem*>> m_nodeEdges;
     
     // Position storage
     QMap<QString, QPointF> m_nodePositions;  // sequence name -> position
@@ -66,6 +73,9 @@ private:
     // Template filtering
     QString m_currentTemplateFilter;  // Currently active template filter (empty = no filter)
     QString m_currentTemplateDirPath; // Current template directory path for saving positions
+    bool m_panning = false;
+    QPoint m_lastPanPoint;
+    qreal m_totalScale = 1.0;
     
     // Helper method to clear the scene while preserving positions if needed
     void clearScenePreservingPositions();

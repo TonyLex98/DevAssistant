@@ -2,6 +2,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QHBoxLayout>
+#include <QSizePolicy>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/PromptSequenceManager.h"
 
@@ -22,9 +23,16 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     auto *topLayout = new QHBoxLayout();
     topLayout->addWidget(m_templateLabel);
     topLayout->addWidget(m_templateComboBox);
+    StyledButton *fitAllBtn = new StyledButton(tr("Поместить всё"), this);
+    fitAllBtn->setFixedHeight(26);
+    fitAllBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    topLayout->addWidget(fitAllBtn);
     topLayout->addStretch(); // Add stretch to push the combo box to the left
+    connect(fitAllBtn, &StyledButton::clicked, this, [this]() {
+        if (m_view)
+            m_view->fitToContents();
+    });
     
-    // Add the top controls layout to the main layout
     m_mainLayout->addLayout(topLayout);
 
     // Create the graph view
