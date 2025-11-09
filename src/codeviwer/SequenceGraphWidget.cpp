@@ -9,7 +9,7 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
 {
     setWindowTitle("Sequence Relationships Graph");
-    setMinimumSize(800, 600);
+    setMinimumSize(200, 200);
 
     // Create the main layout
     m_mainLayout = new QVBoxLayout(this);

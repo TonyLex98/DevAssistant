@@ -6,6 +6,7 @@
 #include <QTreeWidgetItem>
 #include <QSet>
 #include <QDateTime>
+#include <QSizePolicy>
 
 #include <QStatusBar>
 #include <QMessageBox>
@@ -452,6 +453,19 @@ MainWindow::MainWindow(QWidget *parent)
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
     m_chat->setMainWindow(this);
 
+    // Initialize sequence graph widget so it can be embedded in the layout
+    m_seqGraphWindow = new SequenceGraphWidget(this);
+    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+    m_seqGraphWindow->setTemplateManager(&m_templateMgr);
+    m_seqGraphWindow->restoreLayout();
+    m_seqGraphWindow->rebuildGraph();
+    m_seqGraphWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_seqGraphWindow->setVisible(true);
+    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
+            [this](const QString &sequenceName) {
+                openSequenceEditorForName(sequenceName);
+            });
+
     // Toggle button to show/hide chat
     chatToggleBtn = new StyledButton(tr("Показать чат"), this);
     settingsLayout->addWidget(chatToggleBtn);
@@ -508,8 +522,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_contextCommandsList->setRootIsDecorated(true); // Show expand/collapse icons
     m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
 
-    // Set initial height for the context status widget
-    m_contextStatusWidget->setMaximumHeight(150);
+    // Set size preference for the context status widget
+    m_contextStatusWidget->setMinimumWidth(300);
+    m_contextStatusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
     // Connect toggle button to show/hide functionality
     connect(toggleButton, &QToolButton::toggled, this, [this, toggleButton](bool checked) {
@@ -536,16 +551,26 @@ MainWindow::MainWindow(QWidget *parent)
     rightLayout->addWidget(m_chat, 1);*/
 
 
-    // --------  5. Создаём вертикальный splitter ----------
-    mainSplitter = new MemorySplitter("MainWindowsMainSplitter",Qt::Vertical, this);
-    mainSplitter->addWidget(top_widget);
-    mainSplitter->addWidget(ide_widget);   // верхняя часть
-    //mainSplitter->addWidget(m_files);
-    mainSplitter->addWidget(m_log);
-    mainSplitter->addWidget(m_resultDisplayWidget);
-    mainSplitter->addWidget(m_chat);
-    mainSplitter->addWidget(m_contextStatusWidget); // Add context status widget
-    mainSplitter->addWidget(buttons_widget);
+    // --------  5. Формируем layout: слева context, по центру основной контент, справа graph ----------
+    m_centerSplitter = new MemorySplitter("MainWindowsCenterSplitter", Qt::Vertical, this);
+    m_centerSplitter->addWidget(top_widget);
+    m_centerSplitter->addWidget(ide_widget);   // верхняя часть
+    //m_centerSplitter->addWidget(m_files);
+    m_centerSplitter->addWidget(m_log);
+    m_centerSplitter->addWidget(m_resultDisplayWidget);
+    m_centerSplitter->addWidget(m_chat);
+    m_centerSplitter->addWidget(buttons_widget);
+
+    mainSplitter = new MemorySplitter("MainWindowsMainSplitter", Qt::Horizontal, this);
+    mainSplitter->addWidget(m_contextStatusWidget);
+    mainSplitter->addWidget(m_centerSplitter);
+    mainSplitter->addWidget(m_seqGraphWindow);
+
+    m_centerSplitter->setStretchFactor(0, 2);
+    m_centerSplitter->setStretchFactor(1, 1);
+    mainSplitter->setStretchFactor(0, 1);
+    mainSplitter->setStretchFactor(1, 3);
+    mainSplitter->setStretchFactor(2, 2);
 
     m_files->hide();
 
@@ -556,9 +581,6 @@ MainWindow::MainWindow(QWidget *parent)
     //mainSplitter->addWidget(rightPanel);
 
     // Задаём начальные размеры (опционально)
-    mainSplitter->setStretchFactor(0, 2);  // IDE
-    mainSplitter->setStretchFactor(1, 1);  // UI справа
-
     setCentralWidget(mainSplitter);
 
     // --------  6. Соединяем сигналы / слоты ----------
@@ -619,16 +641,6 @@ MainWindow::MainWindow(QWidget *parent)
     // Update templates in ChatDialog after templates have been loaded
     m_chat->setTemplateManager(&m_templateMgr);
 
-    // Initialize sequence graph window and restore layout on startup
-    // This ensures positions are restored even if the graph window was never opened
-    m_seqGraphWindow = new SequenceGraphWidget();
-    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
-    m_seqGraphWindow->setTemplateManager(&m_templateMgr);  // Set template manager too
-    m_seqGraphWindow->restoreLayout();
-    m_seqGraphWindow->rebuildGraph(); // Now rebuild the graph with restored positions
-    m_seqGraphWindow->hide(); // Hide the window, we just need it for position restoration
-    qDebug() << "[MainWindow] Initialized and restored sequence graph layout on startup";
-
     // Initialize file system watcher to monitor external file changes
     m_fileWatcher = new QFileSystemWatcher(this);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileChanged);
@@ -655,6 +667,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     reOpenRootDir();
 
+    if (m_centerSplitter)
+        m_centerSplitter->loadState();
     mainSplitter->loadState();
 
     // Initialize task timer and status widget
@@ -688,23 +702,15 @@ void MainWindow::openSequenceGraph()
     m_templateMgr.refresh();
     refreshAllSequences();
 
-    // Update the sequence manager and template manager
-    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
-    m_seqGraphWindow->setTemplateManager(&m_templateMgr);
+    ensureDefaultSequence();
 
-    // Show the window
-    m_seqGraphWindow->show();
-    m_seqGraphWindow->raise();
-    m_seqGraphWindow->activateWindow();
-
-    // Connect the signal after creating the widget (if not already connected)
-    // Remove any existing connections to avoid duplicates
-    disconnect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, nullptr);
-    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
-            [this](const QString &sequenceName) {
-                // Open the sequence editor for the selected sequence
-                openSequenceEditorForName(sequenceName);
-            });
+    if (m_seqGraphWindow) {
+        m_seqGraphWindow->setSequenceManager(&m_seqMgr);
+        m_seqGraphWindow->setTemplateManager(&m_templateMgr);
+        m_seqGraphWindow->rebuildGraph();
+        m_seqGraphWindow->setFocus();
+        m_seqGraphWindow->setVisible(true);
+    }
 }
 
 void MainWindow::updateSequenceGraphHighlight()

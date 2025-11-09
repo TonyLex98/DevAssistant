@@ -232,6 +232,7 @@ private:
     static const int MAX_USER_MESSAGES = 100; // Maximum number of user messages to store
 
     MemorySplitter *mainSplitter;
+    MemorySplitter *m_centerSplitter{nullptr};
 
     QTabWidget *project_view_tabs = new QTabWidget();
     ProjectRelationView *project_view = new ProjectRelationView;
