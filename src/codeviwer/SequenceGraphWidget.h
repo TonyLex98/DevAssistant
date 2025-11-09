@@ -29,6 +29,8 @@ public slots:
     void saveLayout();     // Save the current layout
     void restoreLayout();  // Restore the saved layout
     void onTemplateComboBoxChanged(); // Handle template selection change
+    void setTemplateSelectionByPath(const QString &templatePath);
+    QString currentTemplatePath() const;
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -40,4 +42,5 @@ private:
     MemoryComboBox *m_templateComboBox{nullptr};
     QLabel *m_templateLabel{nullptr};
     QVBoxLayout *m_mainLayout{nullptr};
+    QString m_currentTemplatePath;
 };

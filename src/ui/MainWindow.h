@@ -131,6 +131,7 @@ private slots:
     //void onFileDoubleClicked(QListWidgetItem *item);
     void setupModelWithGenerationParams(); // Configure model with generation parameters
     void onFileChanged(const QString &path); // Handle external file changes
+    void onChatTemplateSelectionChanged(const QString &templatePath);
 
 private:
     QString buildProjectContext() const;
@@ -140,6 +141,7 @@ private:
     void onModelChunk(const QString& s);
     QByteArray extractJsonPart(const QByteArray& txt) const;
     void editSequences();
+    void updateSequenceGraphTemplateSelection();
 
 
 private:
@@ -225,6 +227,7 @@ private:
     QDateTime m_lastQuestionTimestamp;
     QString m_currentSeqPath; // Path of the currently running sequence (for finding related sequences)
     QString m_currentSeqId;   // ID of the current command sequence being tracked
+    QString m_currentTemplatePath;
     IDEWidget *ide_widget;
     
     // Separate storage for last user messages (for LAST_USER_MESSAGES resolver)

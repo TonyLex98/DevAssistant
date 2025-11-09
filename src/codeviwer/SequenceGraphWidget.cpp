@@ -95,30 +95,30 @@ void SequenceGraphWidget::populateTemplateComboBox()
         return;
     }
 
-    // Get list of templates
+    QString previousSelection = m_currentTemplatePath;
+    m_templateComboBox->blockSignals(true);
+    m_templateComboBox->clear();
+
+    m_templateComboBox->addItem(tr("All Sequences"), QString());
+
     const QMap<QString, SolutionTemplate>& templates = m_templateMgr->templates();
-    
-    // Create a list for the combobox
-    QStringList templateNames;
-    
-    // Add template names to the list
     for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
         QString name = it.value().name();
-        templateNames << name;
+        QString path = it.key();
+        m_templateComboBox->addItem(name, path);
     }
-    
-    // Add option to show all sequences
-    templateNames << "All Sequences";
-    
-    // Set the items in the combobox
-    m_templateComboBox->setItems(templateNames);
-    
-    // Optionally, set the first item as default if nothing is currently selected
-    if (m_templateComboBox->currentIndex() < 0 && m_templateComboBox->count() > 0) {
-        m_templateComboBox->setCurrentIndex(0);
+
+    int index = 0;
+    if (!previousSelection.isEmpty()) {
+        index = m_templateComboBox->findData(previousSelection);
+        if (index < 0)
+            index = 0;
     }
+    m_templateComboBox->setCurrentIndex(index);
+    m_templateComboBox->blockSignals(false);
+    onTemplateComboBoxChanged();
     
-    qDebug() << "[SequenceGraphWidget] Template combobox populated with:" << templateNames;
+    qDebug() << "[SequenceGraphWidget] Template combobox populated, items count:" << m_templateComboBox->count();
 }
 
 void SequenceGraphWidget::onTemplateComboBoxChanged()
@@ -127,30 +127,14 @@ void SequenceGraphWidget::onTemplateComboBoxChanged()
         return;
     }
     
-    QString selectedName = m_templateComboBox->currentText();
-    qDebug() << "[SequenceGraphWidget] Template selection changed to:" << selectedName;
+    QString selectedPath = m_templateComboBox->currentData().toString();
+    m_currentTemplatePath = selectedPath;
+    qDebug() << "[SequenceGraphWidget] Template selection changed to data path:" << selectedPath;
     
-    if (selectedName == "All Sequences") {
-        // Rebuild graph without template filter (show all sequences)
+    if (selectedPath.isEmpty()) {
         m_view->rebuildGraph();
     } else {
-        // Find the template path by name
-        const QMap<QString, SolutionTemplate>& templates = m_templateMgr->templates();
-        for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
-            QString path = it.key();  // Get the template directory path (the key is the path)
-            QString name = it.value().name();  // Get the template name from the SolutionTemplate object
-            
-            if (name == selectedName) {
-                // Rebuild graph for the selected template
-                m_view->rebuildGraphForTemplate(path);
-                qDebug() << "[SequenceGraphWidget] Showing sequences for template:" << name << "at path:" << path;
-                return;
-            }
-        }
-        
-        // If we get here, we couldn't find the template by name, so default to showing all sequences
-        qDebug() << "[SequenceGraphWidget] Could not find template for name:" << selectedName << ", showing all sequences";
-        m_view->rebuildGraph();
+        m_view->rebuildGraphForTemplate(selectedPath);
     }
 }
 
@@ -165,4 +149,29 @@ void SequenceGraphWidget::setTemplateManager(SolutionTemplateManager *templateMg
     
     // Populate the combobox with available templates
     populateTemplateComboBox();
+}
+
+void SequenceGraphWidget::setTemplateSelectionByPath(const QString &templatePath)
+{
+    if (!m_templateComboBox || m_templateComboBox->count() == 0)
+        return;
+
+    QString target = templatePath;
+    if (target.isEmpty())
+        target.clear();
+
+    int index = target.isEmpty() ? 0 : m_templateComboBox->findData(target);
+    if (index < 0)
+        index = 0;
+
+    if (index != m_templateComboBox->currentIndex()) {
+        m_templateComboBox->setCurrentIndex(index);
+    } else {
+        onTemplateComboBoxChanged();
+    }
+}
+
+QString SequenceGraphWidget::currentTemplatePath() const
+{
+    return m_currentTemplatePath;
 }

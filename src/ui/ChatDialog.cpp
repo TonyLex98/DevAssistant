@@ -41,13 +41,18 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_templateCombo = new MemoryComboBox("defaultTemplateSelector", this);
     m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
     m_templateCombo->addItem("Простой чат", "simple_chat");
-    // Style the "Простой чат" item differently if possible
     m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
-    
+    m_templateCombo->addItems(QStringList()); // ensure initial
+
     // Populate the combobox with all available templates
     populateTemplates();
-    
+    notifyTemplateSelectionChanged();
+
     rightColumnLayout->addWidget(m_templateCombo);
+
+    connect(m_templateCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int){
+        notifyTemplateSelectionChanged();
+    });
     
     // Finally add the model selection combobox at the very bottom
     rightColumnLayout->addWidget(m_cb_model);
@@ -101,6 +106,7 @@ void ChatDialog::setChatLogVisible(bool visible)
     if (m_chat) {
         m_chat->setVisible(visible);
     }
+    notifyTemplateSelectionChanged();
 }
 
 bool ChatDialog::isChatLogVisible() const
@@ -247,6 +253,18 @@ void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManag
             }
         }
     }
+}
+
+void ChatDialog::notifyTemplateSelectionChanged()
+{
+    if (!m_templateCombo)
+        return;
+
+    QString templatePath = m_templateCombo->currentData().toString();
+    if (templatePath == "simple_chat")
+        templatePath.clear();
+
+    emit templateSelectionChanged(templatePath);
 }
 
 void ChatDialog::sendMessageToChat(const QString &text)

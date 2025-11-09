@@ -30,6 +30,7 @@ signals:
     void signal_updatelastUserMessage(const QString& lastUserMessage);
     void runTemplateRequested(const QString& templatePath, const QString& text);
     void runSimpleChat(const QString& text);
+    void templateSelectionChanged(const QString& templatePath);
 
 private slots:
     void onSend();
@@ -38,6 +39,7 @@ private slots:
 
 private:
     void populateTemplates();
+    void notifyTemplateSelectionChanged();
     StyleTextEdit* m_chat = nullptr;
     InputTextEdit* m_input = nullptr;
     StyledButton* m_send = nullptr;

@@ -459,6 +459,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_seqGraphWindow->setTemplateManager(&m_templateMgr);
     m_seqGraphWindow->restoreLayout();
     m_seqGraphWindow->rebuildGraph();
+    updateSequenceGraphTemplateSelection();
     m_seqGraphWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_seqGraphWindow->setVisible(true);
     connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
@@ -595,6 +596,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
     connect(m_chat, &ChatDialog::runTemplateRequested, this, &MainWindow::runTemplateRequested);
     connect(m_chat, &ChatDialog::runSimpleChat, this, &MainWindow::runSimpleChat);
+    connect(m_chat, &ChatDialog::templateSelectionChanged, this, &MainWindow::onChatTemplateSelectionChanged);
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
     connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
     connect(&m_model, &OllamaAdapter::streamError,
@@ -670,6 +672,8 @@ MainWindow::MainWindow(QWidget *parent)
     if (m_centerSplitter)
         m_centerSplitter->loadState();
     mainSplitter->loadState();
+
+    openSequenceGraph();
     const QList<int> storedSizes = mainSplitter->sizes();
     if (storedSizes.size() >= 3 && storedSizes.at(2) == 0) {
         QList<int> fallbackSizes = storedSizes;
@@ -718,13 +722,34 @@ void MainWindow::openSequenceGraph()
         m_seqGraphWindow->rebuildGraph();
         m_seqGraphWindow->setFocus();
         m_seqGraphWindow->setVisible(true);
+        updateSequenceGraphTemplateSelection();
     }
+}
+
+void MainWindow::onChatTemplateSelectionChanged(const QString &templatePath)
+{
+    QString normalizedPath = templatePath;
+    if (normalizedPath == "simple_chat")
+        normalizedPath.clear();
+
+    if (m_currentTemplatePath == normalizedPath)
+        return;
+
+    m_currentTemplatePath = normalizedPath;
+    updateSequenceGraphTemplateSelection();
 }
 
 void MainWindow::updateSequenceGraphHighlight()
 {
     if (m_seqGraphWindow && m_sequenceMode) {
         m_seqGraphWindow->setCurrentSequence(m_currentSeq.name());
+    }
+}
+
+void MainWindow::updateSequenceGraphTemplateSelection()
+{
+    if (m_seqGraphWindow) {
+        m_seqGraphWindow->setTemplateSelectionByPath(m_currentTemplatePath);
     }
 }
 
@@ -3598,6 +3623,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
+    onChatTemplateSelectionChanged(templatePath);
     appendUserQuestionToResultDisplay(text);
 
     // First, refresh to ensure we have the latest templates and sequences
