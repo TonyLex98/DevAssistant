@@ -2,6 +2,7 @@
 #include "../../src/md4c/src/md4c-html.h"
 
 #include <QAbstractItemView>
+#include <QAbstractScrollArea>
 #include <QApplication>
 #include <QClipboard>
 #include <QColor>
@@ -17,6 +18,8 @@
 #include <QStringList>
 #include <QTreeWidget>
 #include <QVBoxLayout>
+#include <QSizePolicy>
+#include <algorithm>
 #include <QSet>
 
 static void md4cOutputCallback(const MD_CHAR* str, MD_SIZE size, void* userdata) {
@@ -74,6 +77,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         "  border-radius: 6px;"
         "}"
     ).arg(type == EntryType::UserQuestion ? "#f2f7ff" : "#ffffff"));
+    entry->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::MinimumExpanding);
 
     QVBoxLayout *layout = new QVBoxLayout(entry);
     layout->setSpacing(8);
@@ -106,6 +110,10 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
     browser->setFrameShape(QFrame::NoFrame);
     browser->setOpenExternalLinks(true);
     browser->setContextMenuPolicy(Qt::NoContextMenu);
+    browser->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    browser->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    browser->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+    browser->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     browser->setStyleSheet(
         "QTextBrowser {"
         "  border: none;"
@@ -134,6 +142,9 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         "}"
     );
     browser->setHtml(htmlContent.isEmpty() ? tr("<i>Нет содержимого</i>") : htmlContent);
+    browser->document()->adjustSize();
+    const int docHeight = static_cast<int>(browser->document()->size().height());
+    browser->setMinimumHeight(docHeight + browser->document()->documentMargin() * 2 + 12);
     layout->addWidget(browser);
 
     if (reasoningToggle && snippetLabel) {
@@ -163,6 +174,10 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         contextTree->setSelectionMode(QAbstractItemView::NoSelection);
         contextTree->setRootIsDecorated(true);
         contextTree->setFrameShape(QFrame::NoFrame);
+        contextTree->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        contextTree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        contextTree->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+        contextTree->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
         contextTree->setVisible(false);
         contextTree->setStyleSheet(
             "QTreeWidget { background-color: #fbfbfb; border: 1px solid #e0e0e0; }"
@@ -260,6 +275,18 @@ void ResultDisplayWidget::populateContextTree(QTreeWidget *tree, const ResultEnt
     } else {
         tree->expandToDepth(0);
     }
+
+    int totalRows = 0;
+    for (int i = 0; i < tree->topLevelItemCount(); ++i) {
+        totalRows += 1;
+        totalRows += tree->topLevelItem(i)->childCount();
+    }
+    int rowHeight = tree->sizeHintForRow(0);
+    if (rowHeight <= 0)
+        rowHeight = tree->fontMetrics().height() + 4;
+    int desiredRows = std::max(1, totalRows);
+    int desiredHeight = tree->header()->height() + desiredRows * rowHeight + 4;
+    tree->setFixedHeight(desiredHeight);
 }
 
 void ResultDisplayWidget::addCommandItem(QTreeWidget *tree,

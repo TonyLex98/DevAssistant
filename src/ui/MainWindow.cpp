@@ -1727,10 +1727,11 @@ void MainWindow::handleAssistantFinished()
 
             // Add the result to the new result display widget
             if (m_resultDisplayWidget) {
+                const QString displayTitle = tr("Ответ нейросети");
                 ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
-                m_resultDisplayWidget->appendResult("", content,
-                                                   ResultDisplayWidget::EntryType::Default,
-                                                   metadata);
+                m_resultDisplayWidget->appendResult(displayTitle, content,
+                                                    ResultDisplayWidget::EntryType::Default,
+                                                    metadata);
             } else {
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
