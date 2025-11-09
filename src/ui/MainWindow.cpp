@@ -91,7 +91,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_timerActive = false;
     m_taskRunning = false;
     m_totalElapsedTime = 0;
-    
+
     // --------  1. Заголовок и корневой виджет ----------
     setWindowTitle("DevAssistantQt");
 
@@ -134,13 +134,13 @@ MainWindow::MainWindow(QWidget *parent)
     btns->addWidget(newSeqBtn  = new StyledButton("New sequence…", this));
 
     connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
-    
+
     // Connect the new template-only button
     connect(runTemplateBtn, &StyledButton::clicked, this, [this]() {
         // Directly open template mode
         refreshAllSequences();
         ensureDefaultSequence();
-        
+
         RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
         dlg.setTemplateModeOnly(); // Set to template mode
         if (dlg.exec() != QDialog::Accepted) return;
@@ -153,12 +153,12 @@ MainWindow::MainWindow(QWidget *parent)
         // Run template with selected sequence
         QString templatePath = dlg.selectedTemplatePath();
         QString sequencePath = dlg.selectedDefaultSequencePath();
-        
+
         if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
             QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
             return;
         }
-        
+
         // Load the selected sequence
         PromptSequence seq;
         QFile seqFile(sequencePath);
@@ -169,28 +169,28 @@ MainWindow::MainWindow(QWidget *parent)
                 seq = PromptSequence::fromJson(doc.object());
             }
         }
-        
+
         if (seq.name().isEmpty()) {
             QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
             return;
         }
-        
+
         m_currentSeq = seq;
         m_currentStepIdx = 0;
         m_sequenceMode = true;
         updateSequenceGraphHighlight();  // Update the graph highlighting
         runNextStep();   // сразу стартуем первый шаг
     });
-    
+
     // Add a direct button for the main "Прогер" template
     StyledButton *runProgTemplateBtn = new StyledButton(tr("Запустить Прогер-шаблон"), this);
     runProgTemplateBtn->hide();
     //btns->addWidget(runProgTemplateBtn);
-    
+
     connect(runProgTemplateBtn, &StyledButton::clicked, this, [this]() {
         refreshAllSequences();
         ensureDefaultSequence();
-        
+
         // Look for the "Прогер" template specifically
         const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
         QString progTemplatePath;
@@ -200,7 +200,7 @@ MainWindow::MainWindow(QWidget *parent)
                 break;
             }
         }
-        
+
         if (progTemplatePath.isEmpty()) {
             QMessageBox::warning(this, "Ошибка", "Шаблон 'Прогер' не найден. Пожалуйста, убедитесь, что он существует.");
             // Fallback to normal template selection
@@ -210,12 +210,12 @@ MainWindow::MainWindow(QWidget *parent)
 
             QString templatePath = dlg.selectedTemplatePath();
             QString sequencePath = dlg.selectedDefaultSequencePath();
-            
+
             if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
                 QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
                 return;
             }
-            
+
             PromptSequence seq;
             QFile seqFile(sequencePath);
             if (seqFile.open(QIODevice::ReadOnly)) {
@@ -225,12 +225,12 @@ MainWindow::MainWindow(QWidget *parent)
                     seq = PromptSequence::fromJson(doc.object());
                 }
             }
-            
+
             if (seq.name().isEmpty()) {
                 QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
                 return;
             }
-            
+
             m_currentSeq = seq;
             m_currentStepIdx = 0;
             m_sequenceMode = true;
@@ -240,11 +240,11 @@ MainWindow::MainWindow(QWidget *parent)
             runNextStep();
             return;
         }
-        
+
         // Find the main sequence for the Прогер template
         SolutionTemplate progTemplate = templates.value(progTemplatePath);
         QString mainSequencePath = progTemplate.mainSequencePath();
-        
+
         // First, try to use the main sequence path as specified in the template file,
         // resolved relative to the template directory
         if (!mainSequencePath.isEmpty()) {
@@ -269,12 +269,12 @@ MainWindow::MainWindow(QWidget *parent)
                 mainSequencePath = QDir(progTemplatePath).absoluteFilePath(sequences[0]);
             }
         }
-        
+
         if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
             QMessageBox::warning(this, "Ошибка", "Основная последовательность для шаблона 'Прогер' не найдена.");
             return;
         }
-        
+
         // Load the main sequence
         PromptSequence seq;
         QFile seqFile(mainSequencePath);
@@ -285,12 +285,12 @@ MainWindow::MainWindow(QWidget *parent)
                 seq = PromptSequence::fromJson(doc.object());
             }
         }
-        
+
         if (seq.name().isEmpty()) {
             QMessageBox::warning(this, "Ошибка", "Не удалось загрузить основную последовательность шаблона 'Прогер'.");
             return;
         }
-        
+
         m_currentSeq = seq;
         m_currentStepIdx = 0;
         m_sequenceMode = true;
@@ -303,39 +303,39 @@ MainWindow::MainWindow(QWidget *parent)
     // Add button for solution templates
     StyledButton *editTemplatesBtn = new StyledButton(tr("Edit Templates"), this);
     btns->addWidget(editTemplatesBtn);
-    
+
     connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
         // Create and show the template viewer
         SolutionTemplateViewer *viewer = new SolutionTemplateViewer(&m_templateMgr, this);
         QDialog dialog(this);
         dialog.setWindowTitle(tr("Solution Templates"));
         dialog.resize(800, 600);
-        
+
         QVBoxLayout *layout = new QVBoxLayout(&dialog);
         layout->addWidget(viewer);
-        
+
         QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
         connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
         layout->addWidget(buttonBox);
-        
+
         dialog.exec();
     });
-    
+
     // Add button to export selected sequence as template
     StyledButton *exportSequenceAsTemplateBtn = new StyledButton(tr("Export Sequence as Template"), this);
     btns->addWidget(exportSequenceAsTemplateBtn);
-    
+
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
         // First, refresh sequence manager
         refreshAllSequences();
-        
+
         // Get list of sequences
         const QMap<QString, PromptSequence>& sequences = m_seqMgr.sequences();
         if (sequences.isEmpty()) {
             QMessageBox::information(this, "No Sequences", "No sequences found to export as templates.");
             return;
         }
-        
+
         // Let user choose a sequence
         QStringList names;
         QMap<QString, QString> pathByName;      // name → path
@@ -344,7 +344,7 @@ MainWindow::MainWindow(QWidget *parent)
             names << name;
             pathByName.insert(name, filePath);
         }
-        
+
         bool ok = false;
         QString selectedName = QInputDialog::getItem(
                     this, tr("Export Sequence as Template"),
@@ -355,36 +355,36 @@ MainWindow::MainWindow(QWidget *parent)
 
         QString sequencePath = pathByName.value(selectedName);
         PromptSequence seq = sequences.value(sequencePath);
-        
+
         // Ask for template name and description
-        QString templateName = QInputDialog::getText(this, "Template Name", "Enter template name:", 
+        QString templateName = QInputDialog::getText(this, "Template Name", "Enter template name:",
             QLineEdit::Normal, seq.name(), &ok);
         if (!ok || templateName.trimmed().isEmpty()) {
             return;
         }
-        
-        QString description = QInputDialog::getMultiLineText(this, "Template Description", 
+
+        QString description = QInputDialog::getMultiLineText(this, "Template Description",
             "Enter template description (optional):", seq.description(), &ok);
         if (!ok) { // User cancelled, allow empty description
             description = seq.description();
         }
-        
+
         // Create the template directory
         QString templateDir = QDir(m_templateMgr.root()).absoluteFilePath(templateName.trimmed());
         if (QDir().exists(templateDir)) {
-            QMessageBox::warning(this, "Import Failed", 
+            QMessageBox::warning(this, "Import Failed",
                 QString("Template with name '%1' already exists. Please choose a different name.").arg(templateName));
             return;
         }
-        
+
         // Export the sequence as a template
         if (m_templateMgr.exportSequenceAsTemplate(sequencePath, templateDir, templateName.trimmed(), description)) {
             m_templateMgr.refresh();
-            QMessageBox::information(this, "Export Successful", 
+            QMessageBox::information(this, "Export Successful",
                 QString("Sequence '%1' exported as template '%2' successfully!").arg(
                     QFileInfo(sequencePath).fileName(), templateName));
         } else {
-            QMessageBox::warning(this, "Export Failed", 
+            QMessageBox::warning(this, "Export Failed",
                 "Failed to export sequence as template. Check permissions and try again.");
         }
     });
@@ -399,7 +399,7 @@ MainWindow::MainWindow(QWidget *parent)
     btns->addWidget(graphBtn);
     connect(graphBtn, &StyledButton::clicked, this,
             &MainWindow::openGraph);
-    
+
     // ---------- Добавляем кнопку «Show Sequence Graph» ----------
     seqGraphBtn = new StyledButton("Show Sequence Graph", this);
     btns->addWidget(seqGraphBtn);
@@ -425,7 +425,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_chat = new ChatDialog(&m_model, this);
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
     m_chat->setMainWindow(this);
-    
+
     // 3.5 Result display widget
     m_resultDisplayWidget = new ResultDisplayWidget(this);
 
@@ -433,20 +433,20 @@ MainWindow::MainWindow(QWidget *parent)
     m_voskWidget = new VoskWidget(this);
     connect(m_voskWidget, &VoskWidget::voiceRecognized,
             this, &MainWindow::onVoskText);
-    
+
     // Initialize context status widget to display command context state
     m_contextStatusWidget = new QWidget(this);
     m_contextCommandsList = new QTreeWidget(m_contextStatusWidget);
     m_contextCommandsList->setObjectName("contextCommandsList");
-    
+
     QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
     contextLayout->setContentsMargins(5, 5, 5, 5);
-    
+
     // Create header with toggle button
     QHBoxLayout* headerLayout = new QHBoxLayout();
     QLabel* titleLabel = new QLabel(tr("Context Commands:"), m_contextStatusWidget);
     headerLayout->addWidget(titleLabel);
-    
+
     // Add toggle button to show/hide the list
     QToolButton* toggleButton = new QToolButton(m_contextStatusWidget);
     toggleButton->setText("▼");
@@ -455,25 +455,25 @@ MainWindow::MainWindow(QWidget *parent)
     toggleButton->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
     headerLayout->addWidget(toggleButton);
     headerLayout->addStretch();
-    
+
     contextLayout->addLayout(headerLayout);
     contextLayout->addWidget(m_contextCommandsList);
-    
+
     // Set up the tree widget
     m_contextCommandsList->setHeaderLabels(QStringList() << "Time" << "Description");
     m_contextCommandsList->setColumnCount(2);
     m_contextCommandsList->setHeaderHidden(false);  // Show the header for better UX
     m_contextCommandsList->setRootIsDecorated(true); // Show expand/collapse icons
     m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
-    
+
     // Set initial height for the context status widget
     m_contextStatusWidget->setMaximumHeight(150);
-    
+
     // Connect toggle button to show/hide functionality
     connect(toggleButton, &QToolButton::toggled, this, [this, toggleButton](bool checked) {
         m_contextCommandsList->setVisible(checked);
         toggleButton->setText(checked ? "▼" : "▲");
-        
+
         // Adjust height based on visibility
         if (checked) {
             m_contextStatusWidget->setMaximumHeight(200); // Increased for tree view
@@ -641,24 +641,24 @@ void MainWindow::openGraph()
 void MainWindow::openSequenceGraph()
 {
     qDebug() << "[MainWindow] openSequenceGraph called";
-    
+
     // Refresh managers to ensure we have the latest data
     m_templateMgr.refresh();
     refreshAllSequences();
-    
+
     // Update the sequence manager and template manager
     m_seqGraphWindow->setSequenceManager(&m_seqMgr);
     m_seqGraphWindow->setTemplateManager(&m_templateMgr);
-    
+
     // Show the window
     m_seqGraphWindow->show();
     m_seqGraphWindow->raise();
     m_seqGraphWindow->activateWindow();
-    
+
     // Connect the signal after creating the widget (if not already connected)
     // Remove any existing connections to avoid duplicates
     disconnect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, nullptr);
-    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this, 
+    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
             [this](const QString &sequenceName) {
                 // Open the sequence editor for the selected sequence
                 openSequenceEditorForName(sequenceName);
@@ -676,17 +676,17 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
 {
     // Обновим кэш, чтобы включить все последовательности из папок шаблонов
     refreshAllSequences();
-    
+
     // Find the sequence by name using the new method
     log("DEBUG: Searching for sequence name: " + sequenceName + " in openSequenceEditorForName");
     QPair<QString, PromptSequence> result = m_seqMgr.findSequenceByName(sequenceName);
     QString filePath = result.first;
     PromptSequence seq = result.second;
-    
+
     if (filePath.isEmpty()) {
         // If not found in main manager, try to find in template directories
         log("DEBUG: Sequence NOT FOUND in main manager, searching in template directories...");
-        
+
         // Search in template directories
         const QStringList& templateDirs = m_templateMgr.templateDirs();
         for (const QString& templateDir : templateDirs) {
@@ -700,7 +700,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
 
                 for (const QFileInfo& fileInfo : files) {
                     QString path = fileInfo.absoluteFilePath();
-                    
+
                     // Load the sequence from this file and check its name
                     QFile seqFile(path);
                     if (seqFile.open(QIODevice::ReadOnly)) {
@@ -720,7 +720,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
                         seqFile.close();
                     }
                 }
-                
+
                 if (!filePath.isEmpty()) {
                     // Found in this template directory, exit the outer loop
                     break;
@@ -728,7 +728,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
             }
         }
     }
-    
+
     if (filePath.isEmpty()) {
         log("DEBUG: Sequence NOT FOUND in openSequenceEditorForName. Available sequences:");
         const QMap<QString, PromptSequence>& allSequences_debug = m_seqMgr.sequences();
@@ -782,7 +782,7 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
     editor->setSequence(seq);
     // Set the path of the current sequence so the editor knows which directory to look in for related sequences
     editor->setCurrentSequencePath(filePath);
-    
+
     lay->addWidget(editor);
 
     QDialogButtonBox *bb = new QDialogButtonBox(
@@ -885,7 +885,7 @@ void MainWindow::openSettings(){
         QVariantMap opts = d.params();
         // Используем параметры из диалога (которые включают как базовые, так и параметры генерации)
         if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
-        
+
         // Сохраняем параметры в конфигурацию
         AppConfig cfg;
         cfg.load();
@@ -901,7 +901,7 @@ void MainWindow::openSettings(){
         cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
         cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
         cfg.seed = opts.value("seed", 0).toULongLong();
-        
+
         // Обработка stop-слов
         if (opts.contains("stop")) {
             QJsonArray stopArray = opts.value("stop").toJsonArray();
@@ -911,13 +911,13 @@ void MainWindow::openSettings(){
             }
             cfg.stopWords = stopWords;
         }
-        
+
         cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
         cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
         cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
-        
+
         cfg.save();
-        
+
         log("Settings applied.");
     }
 }
@@ -988,7 +988,7 @@ QString MainWindow::buildProjectContext() const
     // ---------- Контент файлов, открытых командой OPEN_FILE ----------
     if (!m_contextContent.isEmpty())
         s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
-    
+
     // ---------- Context chain from command execution ----------
     if (m_contextManager) {
         QString contextChain = m_contextManager->generateContextText();
@@ -1036,14 +1036,14 @@ void MainWindow::sendUserMessage(const QString& text){
     // Debug info about LAST_USER_MESSAGES storage
     qDebug() << "[sendUserMessage] Added message to LAST_USER_MESSAGES storage. Current count:" << m_lastUserMessages.size();
     qDebug() << "[sendUserMessage] Last message in storage:" << (m_lastUserMessages.isEmpty() ? QString("empty") : m_lastUserMessages.last());
-    
+
     // Debug info about managers before running sequence
     qDebug() << "[sendUserMessage] About to call runSequenceDialog";
     qDebug() << "[sendUserMessage] Template manager root:" << m_templateMgr.root();
     qDebug() << "[sendUserMessage] Sequence manager root:" << m_seqMgr.root();
-    
+
     runSequenceDialog();
-    
+
     qDebug() << "[sendUserMessage] runSequenceDialog completed";
 
 }
@@ -1079,7 +1079,7 @@ void MainWindow::editSequences()
 {
     // Обновим кэш, чтобы включить все последовательности из папок шаблонов
     refreshAllSequences();
-    
+
     // 1. Проверяем, что есть наборы
     if (m_seqMgr.sequences().isEmpty()) {
         QMessageBox::information(this, tr("Нет наборов"),
@@ -1121,7 +1121,7 @@ void MainWindow::editSequences()
     editor->setSequence(seq);
     // Set the path of the current sequence so the editor knows which directory to look in for related sequences
     editor->setCurrentSequencePath(filePath);
-    
+
     lay->addWidget(editor);
 
     QDialogButtonBox *bb = new QDialogButtonBox(
@@ -1155,14 +1155,14 @@ void MainWindow::runSequenceDialog()
     qDebug() << "[runSequenceDialog] Starting sequence dialog";
     qDebug() << "[runSequenceDialog] Template manager root:" << m_templateMgr.root();
     qDebug() << "[runSequenceDialog] About to refresh template manager";
-    
+
     // Обновляем списки (на случай, если пользователь добавил файлы вручную)
     m_templateMgr.refresh();
     qDebug() << "[runSequenceDialog] Template manager refresh completed";
-    
+
     refreshAllSequences();
     qDebug() << "[runSequenceDialog] refreshAllSequences completed";
-    
+
     ensureDefaultSequence();
     qDebug() << "[runSequenceDialog] ensureDefaultSequence completed";
 
@@ -1171,15 +1171,15 @@ void MainWindow::runSequenceDialog()
     auto sequencesCopy = m_seqMgr.sequences();  // Copy instead of reference
     int seqCount = sequencesCopy.size();
     qDebug() << "[runSequenceDialog] Sequence count before dialog creation:" << seqCount;
-    
+
     RunTemplateOrSequenceDialog dlg(sequencesCopy, &m_templateMgr, this);
     qDebug() << "[runSequenceDialog] Created RunTemplateOrSequenceDialog with" << seqCount << "sequences";
-    
+
     if (dlg.exec() != QDialog::Accepted) {
         qDebug() << "[runSequenceDialog] Dialog cancelled";
         return;
     }
-    
+
     qDebug() << "[runSequenceDialog] Dialog completed with selection";
 
     if (dlg.selectedMode() == RunTemplateOrSequenceDialog::RunSequence) {
@@ -1207,12 +1207,12 @@ void MainWindow::runSequenceDialog()
         // Run template with selected sequence
         QString templatePath = dlg.selectedTemplatePath();
         QString sequencePath = dlg.selectedDefaultSequencePath();
-        
+
         if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
             QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
             return;
         }
-        
+
         // Load the selected sequence
         PromptSequence seq;
         QFile seqFile(sequencePath);
@@ -1223,12 +1223,12 @@ void MainWindow::runSequenceDialog()
                 seq = PromptSequence::fromJson(doc.object());
             }
         }
-        
+
         if (seq.name().isEmpty()) {
             QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
             return;
         }
-        
+
         m_currentSeq = seq;
         m_currentStepIdx = 0;
         m_sequenceMode = true;
@@ -1243,7 +1243,7 @@ void MainWindow::runNextStep()
 {
     qDebug() << "[runNextStep] m_sequenceMode:" << m_sequenceMode << "m_currentStepIdx:" << m_currentStepIdx;
     if (!m_sequenceMode) return;
-    
+
     // Check if stop was requested
     if (m_stopRequested) {
         // Reset the stop flag and exit sequence mode
@@ -1251,13 +1251,13 @@ void MainWindow::runNextStep()
         m_sequenceMode = false;
         m_currentSeqId.clear(); // Clear the current sequence ID
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
-        
+
         // Show message that execution was stopped
         QMessageBox::information(this, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
         return;
     }
-    
+
     if (m_currentStepIdx < 0 ||
             m_currentStepIdx >= m_currentSeq.steps().size()) {
         // конец последовательности
@@ -1309,12 +1309,12 @@ void MainWindow::runNextStep()
 
     // РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ С‚Р°Рє Р¶Рµ, РєР°Рє РѕР±С‹С‡РЅС‹Р№ РІРІРѕРґ РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
     m_streamBuf.clear();
-    
+
     // Добавляем отладочный вывод, чтобы понять, что отправляем в LLM
     qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
-    
+
     m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;  // Store the current prompt
     m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
     // В истории сохраняем только запрос (не пользовательский текст)
@@ -1455,7 +1455,7 @@ void MainWindow::handleAssistantFinished()
         m_sequenceMode = false;
         m_currentSeqId.clear(); // Clear the current sequence ID
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
-        
+
         // Show message that execution was stopped
         QMessageBox::information(this, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
@@ -1482,11 +1482,11 @@ void MainWindow::handleAssistantFinished()
         log("DEBUG: NEXT_SEQUENCE requested, searching for: " + nextSeqName);
         // Refresh all sequences to ensure latest templates are loaded
         refreshAllSequences();
-        
+
         const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
         PromptSequence foundSeq;
         QString foundPath;
-        
+
         // First try to find by internal sequence name
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == nextSeqName) {
@@ -1496,7 +1496,7 @@ void MainWindow::handleAssistantFinished()
                 break;
             }
         }
-        
+
         // If not found by name, try by filename
         if (foundPath.isEmpty()) {
             for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
@@ -1509,7 +1509,7 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // Try with expected extension if not already present
         if (foundPath.isEmpty()) {
             QString expectedFileName = nextSeqName;
@@ -1526,7 +1526,7 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // Try base name match (without extension)
         if (foundPath.isEmpty()) {
             for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
@@ -1539,7 +1539,7 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // Try base name matching for .seq extension case
         if (foundPath.isEmpty()) {
             for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
@@ -1552,40 +1552,40 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // If still not found and we're currently in a sequence from a template,
         // try to find the sequence file in the same directory as the current sequence
         if (foundPath.isEmpty() && !m_currentSeqPath.isEmpty()) {
             QFileInfo currentSeqInfo(m_currentSeqPath);
             QDir templateDir = currentSeqInfo.absoluteDir();
-            
+
             // Try multiple possible formats for the sequence filename
             QStringList possibleFilenames;
-            
+
             // Add the exact name as provided
             possibleFilenames << nextSeqName;
-            
+
             // Add with .seq.json extension if not already present
             if (!nextSeqName.endsWith(".seq.json")) {
                 possibleFilenames << (nextSeqName + ".seq.json");
             }
-            
+
             // Add with just .json extension if not already present
             if (!nextSeqName.endsWith(".json")) {
                 possibleFilenames << (nextSeqName + ".json");
             }
-            
-            // Add with just .seq extension if not already present  
+
+            // Add with just .seq extension if not already present
             if (!nextSeqName.endsWith(".seq")) {
                 possibleFilenames << (nextSeqName + ".seq");
             }
-            
+
             // Try each possible filename in the template directory
             for (const QString& filename : possibleFilenames) {
                 QString sequenceFilePath = templateDir.filePath(filename);
 
                 qDebug()<<"templateDir === "<<templateDir;
-                
+
                 if (QFile::exists(sequenceFilePath)) {
                     // Load the sequence from this file
                     QFile seqFile(sequenceFilePath);
@@ -1601,11 +1601,11 @@ void MainWindow::handleAssistantFinished()
                         seqFile.close();
                     }
                 }
-                
+
                 if (!foundPath.isEmpty()) break; // Found, exit the loop
             }
         }
-        
+
         if (!foundPath.isEmpty()) {
             m_currentSeq = foundSeq;
             m_currentStepIdx = 0;
@@ -1618,7 +1618,7 @@ void MainWindow::handleAssistantFinished()
             qDeleteAll(CommandParser::parse(payload));  // Clean up parsed commands
             return;
         }
-        
+
         // If sequence not found, log error and continue with normal flow
         log("Указанная последовательность не найдена: " + nextSeqName);
         // Add extensive debugging to identify what sequences are available
@@ -1646,7 +1646,7 @@ void MainWindow::handleAssistantFinished()
         if (!usedRaw)
             appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
         log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
-        
+
         // В режиме последовательности - переходим к следующему шагу, даже если команд нет
         if (m_sequenceMode) {
             // Check if stop was requested before advancing to next step
@@ -1655,7 +1655,7 @@ void MainWindow::handleAssistantFinished()
                 m_sequenceMode = false;
                 m_currentSeqId.clear(); // Clear the current sequence ID
                 updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
-                
+
                 // Show message that execution was stopped
                 QMessageBox::information(this, "Остановлено",
                                          "Выполнение шаблона остановлено пользователем.");
@@ -1674,7 +1674,7 @@ void MainWindow::handleAssistantFinished()
     if (confirmModeCombo->currentData().toString() == "auto") {
         // Auto-confirm mode: All commands are confirmed by default
         toRun = cmds.toList();
-        
+
         // Log that commands are running without confirmation
         log(QString("Команды запускаются без подтверждения (режим: %1).").arg(confirmModeCombo->currentText()));
     } else {
@@ -1692,7 +1692,7 @@ void MainWindow::handleAssistantFinished()
     bool hasOpenSequenceCommand = false;
     QString sequenceToCall;
     QString openSequenceName;
-    
+
     for (Command* c : toRun) {
         if (c->name() == "ASK_USER") {
             const QString question = c->params().value("question").toString();
@@ -1717,19 +1717,19 @@ void MainWindow::handleAssistantFinished()
         } else if (c->name() == "SHOW_RESULT") {
             QString title = c->params().value("title").toString();
             if (title.isEmpty())
-                title = tr("Есть результат:");
-            QString content = "\n" + c->params().value("content").toString() + "\n";
+                title = tr("Ответ от %1:\n\n").arg(m_model.selectedModel());
+            QString content = c->params().value("content").toString() + "\n\n\n";
             if (content.isEmpty())
-                content = tr("SHOW_RESULT вызван без текста.");
-            
+                content = tr("SHOW_RESULT вызван без текста.\n\n\n");
+
             // Add the result to the new result display widget
             if (m_resultDisplayWidget) {
-                m_resultDisplayWidget->appendResult(title, content);
+                m_resultDisplayWidget->appendResult("", QString("\n---\n%1%2\n---\n").arg(title).arg(content));
             } else {
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
             }
-            
+
             // Add command to context manager with result
             if (m_contextManager) {
                 addCommandToContext(c, c->getResult());
@@ -1744,18 +1744,20 @@ void MainWindow::handleAssistantFinished()
             if (reasoning.isEmpty()) {
                 reasoning = c->params().value("reasoning_text").toString();
             }
-            
+
             // Add the reasoning to the result display widget with special styling
             if (!reasoning.isEmpty()) {
                 if (m_resultDisplayWidget) {
-                    m_resultDisplayWidget->appendResult(tr("Рассуждение:"), 
-                        QString("<div style='background-color: #f0f8ff; padding: 10px; border-left: 4px solid #4a90e2; font-style: italic;'>%1</div>").arg(reasoning.toHtmlEscaped()));
+                    QString formattedReasoning = QString("\n---\n[Рассуждение от %1]\n\n%2\n---\n\n")
+                        .arg(m_model.selectedModel())
+                        .arg(reasoning);
+                    m_resultDisplayWidget->appendResult("", formattedReasoning);
                 } else {
                     // Fallback: add to history as system message
                     m_history.push_back(qMakePair(QString("system"), reasoning));
                 }
             }
-            
+
             // Add command to context manager with reasoning as result
             if (m_contextManager) {
                 addCommandToContext(c, c->getResult());
@@ -1770,7 +1772,7 @@ void MainWindow::handleAssistantFinished()
             hasOpenSequenceCommand = true;
         }
     }
-    
+
     // If we have a CALL_SEQUENCE command, switch to that sequence
     if (hasCallSequenceCommand && !sequenceToCall.isEmpty()) {
         // First try to find the sequence in the main manager
@@ -1781,7 +1783,7 @@ void MainWindow::handleAssistantFinished()
             if (it.value().name() == sequenceToCall) {
                 foundSeq = it.value();
                 foundPath = it.key();
-                
+
                 // Check if summary is needed (analyze the params for a summary flag)
                 Command* callSeqCommand = nullptr;
                 for (Command* c : toRun) {
@@ -1790,14 +1792,14 @@ void MainWindow::handleAssistantFinished()
                         break;
                     }
                 }
-                
+
                 bool needSummary = true; // Default to true, could be controlled by a parameter
-                
-                if (callSeqCommand && callSeqCommand->params().contains("summarize") && 
+
+                if (callSeqCommand && callSeqCommand->params().contains("summarize") &&
                     callSeqCommand->params().value("summarize").isBool()) {
                     needSummary = callSeqCommand->params().value("summarize").toBool();
                 }
-                
+
                 if (needSummary) {
                     // Summarize what was done in the current sequence before switching
                     QStringList completedStepsSummary;
@@ -1808,27 +1810,27 @@ void MainWindow::handleAssistantFinished()
                             completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
                         }
                     }
-                    
+
                     // End the current command sequence before starting the new one
                     if (!m_currentSeqId.isEmpty() && m_contextManager) {
                         m_contextManager->endCommandSequence(m_currentSeqId);
                     }
-                    
+
                     m_currentSeq = foundSeq;
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
-                    
+
                     // Start a new command sequence for the new sequence
                     m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                    
+
                     m_currentSeqPath = foundPath; // Update the sequence path
-                    
+
                     // Add context about what was done in the previous sequence
                     if (!completedStepsSummary.isEmpty()) {
                         QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
                         m_history.push_back(qMakePair(QString("system"), summaryText));
                     }
-                    
+
                     addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
                     updateSequenceGraphHighlight();  // Update the graph highlighting
                     qDeleteAll(toRun);  // Clean up the commands
@@ -1840,16 +1842,16 @@ void MainWindow::handleAssistantFinished()
                     if (!m_currentSeqId.isEmpty() && m_contextManager) {
                         m_contextManager->endCommandSequence(m_currentSeqId);
                     }
-                    
+
                     m_currentSeq = foundSeq;
                     m_currentStepIdx = 0;
                     m_sequenceMode = true;
-                    
+
                     // Start a new command sequence for the new sequence
                     m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                    
+
                     m_currentSeqPath = foundPath; // Update the sequence path
-                    
+
                     addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
                     updateSequenceGraphHighlight();  // Update the graph highlighting
                     qDeleteAll(toRun);  // Clean up the commands
@@ -1858,35 +1860,35 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // If not found in main manager, try to find in the template directory where the current sequence is located
         if (foundPath.isEmpty() && !m_currentSeqPath.isEmpty()) {
             QFileInfo currentSeqInfo(m_currentSeqPath);
             QDir templateDir = currentSeqInfo.absoluteDir();
-            
+
             // Try multiple possible formats for the sequence filename
             QStringList possibleFilenames;
-            
+
             // Add the exact name as provided
             possibleFilenames << sequenceToCall;
-            
+
             // Add with .seq.json extension if not already present
             if (!sequenceToCall.endsWith(".seq.json")) {
                 possibleFilenames << (sequenceToCall + ".seq.json");
             }
-            
+
             // Add with just .json extension if not already present
             if (!sequenceToCall.endsWith(".json")) {
                 possibleFilenames << (sequenceToCall + ".json");
             }
-            
-            // Add with just .seq extension if not already present  
+
+            // Add with just .seq extension if not already present
             if (!sequenceToCall.endsWith(".seq")) {
                 possibleFilenames << (sequenceToCall + ".seq");
             }
-            
+
             log("DEBUG: CALL_SEQUENCE - Searching for '" + sequenceToCall + "' in current sequence directory: " + templateDir.absolutePath());
-            
+
             // Try each possible filename in the sequence directory
             for (const QString& filename : possibleFilenames) {
                 QString sequenceFilePath = templateDir.filePath(filename);
@@ -1901,7 +1903,7 @@ void MainWindow::handleAssistantFinished()
                             foundSeq = PromptSequence::fromJson(doc.object());
                             foundPath = sequenceFilePath;
                             log("DEBUG: CALL_SEQUENCE - Found sequence in current sequence directory: " + sequenceFilePath); // Debug log
-                            
+
                             // Check if summary is needed (analyze the params for a summary flag)
                             Command* callSeqCommand = nullptr;
                             for (Command* c : toRun) {
@@ -1910,14 +1912,14 @@ void MainWindow::handleAssistantFinished()
                                     break;
                                 }
                             }
-                            
+
                             bool needSummary = true; // Default to true, could be controlled by a parameter
-                            
-                            if (callSeqCommand && callSeqCommand->params().contains("summarize") && 
+
+                            if (callSeqCommand && callSeqCommand->params().contains("summarize") &&
                                 callSeqCommand->params().value("summarize").isBool()) {
                                 needSummary = callSeqCommand->params().value("summarize").toBool();
                             }
-                            
+
                             if (needSummary) {
                                 // Summarize what was done in the current sequence before switching
                                 QStringList completedStepsSummary;
@@ -1928,27 +1930,27 @@ void MainWindow::handleAssistantFinished()
                                         completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
                                     }
                                 }
-                                
+
                                 // End the current command sequence before starting the new one
                                 if (!m_currentSeqId.isEmpty() && m_contextManager) {
                                     m_contextManager->endCommandSequence(m_currentSeqId);
                                 }
-                                
+
                                 m_currentSeq = foundSeq;
                                 m_currentStepIdx = 0;
                                 m_sequenceMode = true;
-                                
+
                                 // Start a new command sequence for the new sequence
                                 m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                                
+
                                 m_currentSeqPath = foundPath; // Update the sequence path
-                                
+
                                 // Add context about what was done in the previous sequence
                                 if (!completedStepsSummary.isEmpty()) {
                                     QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
                                     m_history.push_back(qMakePair(QString("system"), summaryText));
                                 }
-                                
+
                                 addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
                                 updateSequenceGraphHighlight();  // Update the graph highlighting
                                 qDeleteAll(toRun);  // Clean up the commands
@@ -1960,16 +1962,16 @@ void MainWindow::handleAssistantFinished()
                                 if (!m_currentSeqId.isEmpty() && m_contextManager) {
                                     m_contextManager->endCommandSequence(m_currentSeqId);
                                 }
-                                
+
                                 m_currentSeq = foundSeq;
                                 m_currentStepIdx = 0;
                                 m_sequenceMode = true;
-                                
+
                                 // Start a new command sequence for the new sequence
                                 m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                                
+
                                 m_currentSeqPath = foundPath; // Update the sequence path
-                                
+
                                 addSequenceTransitionToHistory(sequenceToCall);  // Add transition to history
                                 updateSequenceGraphHighlight();  // Update the graph highlighting
                                 qDeleteAll(toRun);  // Clean up the commands
@@ -1982,7 +1984,7 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // If sequence not found, log error and continue with normal flow
         log("Указанная последовательность не найдена: " + sequenceToCall);
         // Add extensive debugging to identify what sequences are available
@@ -2017,7 +2019,7 @@ void MainWindow::handleAssistantFinished()
             log("    - Match details: name='" + seqName + "', filename='" + fileName + "', basename='" + baseName + "'");
         }
     }
-    
+
     // If we have an OPEN_SEQUENCE command, switch to that sequence
     if (hasOpenSequenceCommand && !openSequenceName.isEmpty()) {
         // First try to find the sequence in the main manager
@@ -2028,21 +2030,21 @@ void MainWindow::handleAssistantFinished()
             if (it.value().name() == openSequenceName) {
                 foundSeq2 = it.value();
                 foundPath2 = it.key();
-                
+
                 // End the current command sequence before starting the new one
                 if (!m_currentSeqId.isEmpty() && m_contextManager) {
                     m_contextManager->endCommandSequence(m_currentSeqId);
                 }
-                
+
                 m_currentSeq = foundSeq2;
                 m_currentStepIdx = 0;
                 m_sequenceMode = true;
-                
+
                 // Start a new command sequence for the new sequence
                 m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                
+
                 m_currentSeqPath = foundPath2; // Update the sequence path
-                
+
                 addSequenceTransitionToHistory(openSequenceName);  // Add transition to history
                 updateSequenceGraphHighlight();  // Update the graph highlighting
                 qDeleteAll(toRun);  // Clean up the commands
@@ -2050,35 +2052,35 @@ void MainWindow::handleAssistantFinished()
                 return;  // Exit early to switch to new sequence
             }
         }
-        
+
         // If not found in main manager, try to find in the template directory where the current sequence is located
         if (foundPath2.isEmpty() && !m_currentSeqPath.isEmpty()) {
             QFileInfo currentSeqInfo(m_currentSeqPath);
             QDir templateDir = currentSeqInfo.absoluteDir();
-            
+
             // Try multiple possible formats for the sequence filename
             QStringList possibleFilenames;
-            
+
             // Add the exact name as provided
             possibleFilenames << openSequenceName;
-            
+
             // Add with .seq.json extension if not already present
             if (!openSequenceName.endsWith(".seq.json")) {
                 possibleFilenames << (openSequenceName + ".seq.json");
             }
-            
+
             // Add with just .json extension if not already present
             if (!openSequenceName.endsWith(".json")) {
                 possibleFilenames << (openSequenceName + ".json");
             }
-            
-            // Add with just .seq extension if not already present  
+
+            // Add with just .seq extension if not already present
             if (!openSequenceName.endsWith(".seq")) {
                 possibleFilenames << (openSequenceName + ".seq");
             }
-            
+
             log("DEBUG: OPEN_SEQUENCE - Searching for '" + openSequenceName + "' in current sequence directory: " + templateDir.absolutePath());
-            
+
             // Try each possible filename in the sequence directory
             for (const QString& filename : possibleFilenames) {
                 QString sequenceFilePath = templateDir.filePath(filename);
@@ -2093,21 +2095,21 @@ void MainWindow::handleAssistantFinished()
                             foundSeq2 = PromptSequence::fromJson(doc.object());
                             foundPath2 = sequenceFilePath;
                             log("DEBUG: OPEN_SEQUENCE - Found sequence in current sequence directory: " + sequenceFilePath); // Debug log
-                            
+
                             // End the current command sequence before starting the new one
                             if (!m_currentSeqId.isEmpty() && m_contextManager) {
                                 m_contextManager->endCommandSequence(m_currentSeqId);
                             }
-                            
+
                             m_currentSeq = foundSeq2;
                             m_currentStepIdx = 0;
                             m_sequenceMode = true;
-                            
+
                             // Start a new command sequence for the new sequence
                             m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
-                            
+
                             m_currentSeqPath = foundPath2; // Update the sequence path
-                            
+
                             addSequenceTransitionToHistory(openSequenceName);  // Add transition to history
                             updateSequenceGraphHighlight();  // Update the graph highlighting
                             qDeleteAll(toRun);  // Clean up the commands
@@ -2119,7 +2121,7 @@ void MainWindow::handleAssistantFinished()
                 }
             }
         }
-        
+
         // If sequence not found, log error and continue with normal flow
         log("Указанная последовательность не найдена: " + openSequenceName);
         // Add extensive debugging to identify what sequences are available
@@ -2173,17 +2175,17 @@ void MainWindow::handleAssistantFinished()
     auto logConsoleResult = [&](Command* cmd, const QString& errorMessage = QString()){
         // Use the new getResult method to get the command result
         QString result = cmd->getResult();
-        
+
         if (!result.isEmpty()) {
             // Extract title from the first line - include the command and its parameter for uniqueness
             QString fullTitle = result.split('\n').first();  // Get the full first line like "RUN_SHELL: command" or "RUN_PYTHON: script"
-            
+
             appendConsoleContext(fullTitle, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
-            
+
             // Also add to history so user can see command results in the chat
             m_history.push_back(qMakePair(QString("system"), result));
         }
-        
+
         // Add command to context manager with result
         if (m_contextManager) {
             addCommandToContext(cmd, result);
@@ -2236,14 +2238,14 @@ void MainWindow::handleAssistantFinished()
             m_sequenceMode = false;
             m_currentSeqId.clear(); // Clear the current sequence ID
             updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
-            
+
             // Show message that execution was stopped
             QMessageBox::information(this, "Остановлено",
                                      "Выполнение шаблона остановлено пользователем.");
             qDeleteAll(toRun);
             return;
         }
-        
+
         const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
         if (step.loop()) {
             // Если установлен флаг зацикливания, повторяем текущий шаг
@@ -2307,7 +2309,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
             }
             return;
         }
-        
+
         if (endLine > allLines.size()) {
             // Error: requested end line is beyond the end of the file
             QString errorMsg = QString("ERROR: Cannot OPEN_FILE_REGION %1: requested end line %2 is beyond file length of %3 lines. Remember: line numbering starts from 1, not 0.")
@@ -2318,7 +2320,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
             }
             return;
         }
-        
+
         startLine = qMax(1, startLine);
         endLine = qMin(endLine, allLines.size());
         snippet = allLines.mid(startLine - 1, endLine - startLine + 1);
@@ -2393,7 +2395,7 @@ void MainWindow::rebuildContextCache()
             m_contextContent += "\n\n";
         m_contextContent += m_externalSources.join("\n\n");
     }
-    
+
     // If ContextManager is available, append its generated context
     if (m_contextManager) {
         QString contextManagerContent = m_contextManager->generateContextText();
@@ -2543,7 +2545,7 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
         QString scriptPath = p.value("scriptPath").toString();
         QString code = p.value("code").toString();
         QString identifier = !scriptPath.isEmpty() ? scriptPath : "inline code";
-        
+
         if (!identifier.isEmpty()) {
             // Remove existing output for this Python script/command
             auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
@@ -2585,18 +2587,18 @@ void MainWindow::handleSearchResults(Command* cmd)
         } else {
             qDebug() << "[MainWindow] SEARCH_WEB result body is empty";
         }
-        
+
         // Проверяем, содержит ли результат пометку о необходимости суммаризации
         bool needsSummarization = body.contains("Контент для суммаризации", Qt::CaseInsensitive);
-        
+
         QString resultBody = body;
         if (needsSummarization) {
             // Помечаем, что результат требует суммаризации (в реальной реализации вызовем LLM асинхронно)
             resultBody = summarizeSearchResults(body, query);
         }
-        
+
         appendExternalContext(QString("%1\n%2").arg(title, resultBody));
-        
+
         // Add to context manager
         if (m_contextManager) {
             qDebug() << "[MainWindow] Adding SEARCH_WEB command to context manager";
@@ -2612,7 +2614,7 @@ void MainWindow::handleSearchResults(Command* cmd)
         QString title = QString("==== SEARCH_PROJECT: %1 ====").arg(cmd->params().value("query").toString());
         QString body = local->matches().join("\n\n");
         appendExternalContext(QString("%1\n%2").arg(title, body));
-        
+
         // Add to context manager
         if (m_contextManager) {
             addCommandToContext(cmd, QString("%1\n%2").arg(title, body));
@@ -2638,7 +2640,7 @@ void MainWindow::appendConsoleContext(const QString& title,
         block += "[stderr]\n" + stdErr.trimmed() + "\n";
     }
     block += QString("exitCode=%1").arg(exitCode);
-    
+
     // If this is a RUN_SHELL command output, replace existing output for the same command
     if (title.startsWith("RUN_SHELL: ")) {
         QString cmd = title.mid(11); // Extract the command part after "RUN_SHELL: "
@@ -2661,7 +2663,7 @@ void MainWindow::appendConsoleContext(const QString& title,
         m_consoleLogs.erase(it, m_consoleLogs.end());
         m_pythonScriptOutputs.remove(script);
     }
-    
+
     m_consoleLogs << block.trimmed();
     const int maxLogs = 5;
     while (m_consoleLogs.size() > maxLogs)
@@ -2684,20 +2686,20 @@ void MainWindow::retryCurrentSequenceStep()
 {
     if (!m_sequenceMode)
         return;
-    
+
     // Check if stop was requested
     if (m_stopRequested) {
         m_stopRequested = false;
         m_sequenceMode = false;
         m_currentSeqId.clear(); // Clear the current sequence ID
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
-        
+
         // Show message that execution was stopped
         QMessageBox::information(this, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
         return;
     }
-    
+
     QTimer::singleShot(200, this, &MainWindow::runNextStep);
 }
 
@@ -2740,12 +2742,12 @@ void MainWindow::runNextSequence()
 
     // Отправляем запрос так же, как обычный ввод пользователя
     m_streamBuf.clear();
-    
+
     // Добавляем отладочный вывод, чтобы понять, что отправляем в LLM
     qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
-    
+
     m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;  // Store the current prompt
     m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
 }
@@ -2893,7 +2895,7 @@ void MainWindow::setupModelWithGenerationParams()
     // Загружаем параметры генерации
     AppConfig cfg;
     cfg.load();
-    
+
     // Подготовим карту параметров для Ollama
     QVariantMap genParams;
     genParams["temperature"] = cfg.temperature;
@@ -2908,7 +2910,7 @@ void MainWindow::setupModelWithGenerationParams()
     genParams["mirostat_tau"] = cfg.mirostatTau;
     genParams["mirostat_eta"] = cfg.mirostatEta;
     genParams["seed"] = cfg.seed;
-    
+
     // Если есть stop-слова, добавим их
     if (!cfg.stopWords.isEmpty()) {
         QJsonArray stopArray;
@@ -2917,7 +2919,7 @@ void MainWindow::setupModelWithGenerationParams()
         }
         genParams["stop"] = stopArray;
     }
-    
+
     genParams["reasoning_effort"] = cfg.reasoningEffort;
     genParams["temperature_decay"] = cfg.temperatureDecay;
     genParams["repeat_last_n"] = cfg.repeatLastN;
@@ -3050,14 +3052,14 @@ QString MainWindow::getAllCommandsText() const
         // Generate text from ALL commands, not just active ones
         QStringList contextParts;
         QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
-        
+
         for (const auto& cmdInfo : allCommands) {
             QString commandText = cmdInfo.result;
             if (commandText.isEmpty()) {
                 // If no specific result, use description as fallback
                 commandText = cmdInfo.description;
             }
-            
+
             if (!commandText.isEmpty()) {
                 QString status = "";
                 switch (cmdInfo.state) {
@@ -3122,25 +3124,25 @@ void MainWindow::createNewSequence()
         QMessageBox::information(this, "OK", "Sequence created:\n" + filePath);
     } else if (msgBox.clickedButton() == templateButton) {
         // Create in template folder - user needs to select a template directory
-        QString templateDir = QFileDialog::getExistingDirectory(this, "Select Template Folder", 
+        QString templateDir = QFileDialog::getExistingDirectory(this, "Select Template Folder",
                                                               QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
         if (templateDir.isEmpty()) return;
-        
+
         // Verify that the selected directory is a valid template directory by checking for template.templ.json
         QString templateJsonPath = QDir(templateDir).filePath("template.templ.json");
         if (!QFile::exists(templateJsonPath)) {
-            QMessageBox::warning(this, "Invalid Template Directory", 
+            QMessageBox::warning(this, "Invalid Template Directory",
                                "The selected directory is not a valid template directory (missing template.templ.json).");
             return;
         }
-        
+
         // Use the SolutionTemplateManager to create the new sequence in the template folder
         // This will create a default sequence structure in the template directory
         if (!m_templateMgr.createNewSequenceInTemplate(templateDir, name.trimmed())) {
             QMessageBox::warning(this, "Error", "Cannot create sequence in template directory: " + templateDir);
             return;
         }
-        
+
         // Now we need to refresh both sequence and template managers to recognize the new sequence
         m_templateMgr.refresh();
         refreshAllSequences(); // This will refresh both the main sequences and those in templates
@@ -3217,9 +3219,9 @@ void MainWindow::addCommandToContext(Command* cmd, const QString& result)
         qDebug() << "[MainWindow] Context manager is null or cmd is null, skipping context addition";
         return;
     }
-    
+
     qDebug() << "[MainWindow] Adding command" << cmd->name() << "to context with result length:" << result.length();
-    
+
     // If we're in a sequence mode, add to the current sequence, otherwise add directly
     if (m_sequenceMode && !m_currentSeqId.isEmpty()) {
         qDebug() << "[MainWindow] Adding command to sequence" << m_currentSeqId;
@@ -3234,16 +3236,16 @@ void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 void MainWindow::refreshAllSequences()
 {
     qDebug() << "[refreshAllSequences] Starting refresh of all sequences";
-    
+
     // First, refresh the main sequence manager to get base sequences
     m_seqMgr.refresh();
     QStringList allSequencePaths = m_seqMgr.fileList();
     qDebug() << "[refreshAllSequences] Main sequence manager refreshed, base file count:" << allSequencePaths.size();
-    
+
     // Then scan template folders for additional sequences and load them into the sequence manager
     const QStringList& templateDirs = m_templateMgr.templateDirs();
     qDebug() << "[refreshAllSequences] Processing" << templateDirs.size() << "template directories";
-    
+
     for (const QString& templateDir : templateDirs) {
         QDir dir(templateDir);
         if (dir.exists()) {
@@ -3256,7 +3258,7 @@ void MainWindow::refreshAllSequences()
 
             for (const QFileInfo& fileInfo : files) {
                 QString path = fileInfo.absoluteFilePath();
-                
+
                 // Check if this sequence is already loaded to avoid duplicates
                 if (!allSequencePaths.contains(path)) {
                     // Load the sequence from the file and add it to the sequence manager
@@ -3278,11 +3280,11 @@ void MainWindow::refreshAllSequences()
             }
         }
     }
-    
+
     // Update the allSequencePaths list to reflect the current state after adding template sequences
     allSequencePaths = m_seqMgr.fileList();
     qDebug() << "[refreshAllSequences] Completed discovery and loading, total sequence files in manager:" << allSequencePaths.size();
-    
+
     // Add comprehensive logging about all available sequences for debugging
     const QMap<QString, PromptSequence>& allSequences = m_seqMgr.sequences();
     qDebug() << "[refreshAllSequences] Detailed sequence list for debugging:";
@@ -3303,32 +3305,32 @@ void MainWindow::updateContextStatusDisplay()
     if (!m_contextCommandsList) {
         return;
     }
-    
+
     m_contextCommandsList->clear();
-    
+
     // Get all sequences from context manager
     QList<CommandSequenceInfo> allSequences = m_contextManager->getCommandSequences();
-    
+
     if (allSequences.isEmpty()) {
         // If no sequences, fall back to showing individual commands as before
         QList<CommandContextInfo> allCommands = m_contextManager->getAllCommands();
-        
+
         for (const auto& cmdInfo : allCommands) {
             // Create top-level item for the command
             QTreeWidgetItem* commandItem = new QTreeWidgetItem(m_contextCommandsList);
-            
+
             // First column: timestamp
             commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
-            
+
             // Second column: description
             commandItem->setText(1, cmdInfo.description);
-            
+
             // If this command belongs to a sequence, indicate that
             if (!cmdInfo.sequenceId.isEmpty()) {
                 CommandSequenceInfo seqInfo = m_contextManager->getSequenceInfo(cmdInfo.sequenceId);
                 commandItem->setText(1, QString("[%1] %2").arg(seqInfo.name).arg(cmdInfo.description));
             }
-            
+
             switch (cmdInfo.state) {
                 case CommandState::Active: {
                     // Active commands in context shown in green
@@ -3362,10 +3364,10 @@ void MainWindow::updateContextStatusDisplay()
                     break;
                 }
             }
-            
+
             // Store command ID in userData for potential future use
             commandItem->setData(0, Qt::UserRole, cmdInfo.id);
-            
+
             // Add result as child item if it exists
             if (!cmdInfo.result.isEmpty()) {
                 QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
@@ -3375,7 +3377,7 @@ void MainWindow::updateContextStatusDisplay()
                 resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
                 resultItem->setForeground(0, Qt::darkBlue);
                 resultItem->setForeground(1, Qt::darkBlue);
-                
+
                 // Format the result in a more readable way if it's long
                 QStringList resultLines = cmdInfo.result.split('\n');
                 if (resultLines.size() > 10) {
@@ -3393,36 +3395,36 @@ void MainWindow::updateContextStatusDisplay()
         for (const auto& seqInfo : allSequences) {
             // Create top-level item for the sequence
             QTreeWidgetItem* seqItem = new QTreeWidgetItem(m_contextCommandsList);
-            
+
             // First column: timestamp
             seqItem->setText(0, seqInfo.timestamp.toString("hh:mm:ss"));
-            
+
             // Second column: sequence name with description
             seqItem->setText(1, QString("SEQUENCE: %1").arg(seqInfo.name));
             if (!seqInfo.description.isEmpty()) {
                 seqItem->setToolTip(1, seqInfo.description);
             }
-            
+
             // Set different color for sequence items (to distinguish from commands)
             seqItem->setBackground(0, QColor(255, 235, 205)); // Light orange background for sequences
             seqItem->setBackground(1, QColor(255, 235, 205)); // Light orange background
             seqItem->setForeground(0, Qt::darkBlue);
             seqItem->setForeground(1, Qt::darkBlue);
-            
+
             // Store sequence ID in userData for potential future use
             seqItem->setData(0, Qt::UserRole, seqInfo.id);
-            
+
             // Get commands in this sequence and add them as child items
             QList<CommandContextInfo> commandsInSequence = m_contextManager->getCommandsInSequence(seqInfo.id);
             for (const auto& cmdInfo : commandsInSequence) {
                 QTreeWidgetItem* commandItem = new QTreeWidgetItem(seqItem);
-                
+
                 // First column: timestamp
                 commandItem->setText(0, cmdInfo.timestamp.toString("hh:mm:ss"));
-                
+
                 // Second column: command description
                 commandItem->setText(1, cmdInfo.description);
-                
+
                 switch (cmdInfo.state) {
                     case CommandState::Active: {
                         // Active commands in context shown in green
@@ -3456,10 +3458,10 @@ void MainWindow::updateContextStatusDisplay()
                         break;
                     }
                 }
-                
+
                 // Store command ID in userData for potential future use
                 commandItem->setData(0, Qt::UserRole, cmdInfo.id);
-                
+
                 // Add result as child item if it exists
                 if (!cmdInfo.result.isEmpty()) {
                     QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
@@ -3469,7 +3471,7 @@ void MainWindow::updateContextStatusDisplay()
                     resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
                     resultItem->setForeground(0, Qt::darkBlue);
                     resultItem->setForeground(1, Qt::darkBlue);
-                    
+
                     // Format the result in a more readable way if it's long
                     QStringList resultLines = cmdInfo.result.split('\n');
                     if (resultLines.size() > 10) {
@@ -3484,13 +3486,13 @@ void MainWindow::updateContextStatusDisplay()
             }
         }
     }
-    
+
     // Expand only the top-level sequence/command items, keeping result items collapsed by default
     // This shows the structure but keeps the display compact
     for (int i = 0; i < m_contextCommandsList->topLevelItemCount(); ++i) {
         QTreeWidgetItem* topLevelItem = m_contextCommandsList->topLevelItem(i);
         topLevelItem->setExpanded(true);
-        
+
         // Collapse any child items (results) by default, so they can be expanded when needed
         for (int j = 0; j < topLevelItem->childCount(); ++j) {
             QTreeWidgetItem* childItem = topLevelItem->child(j);
@@ -3503,24 +3505,24 @@ void MainWindow::updateContextStatusDisplay()
 void MainWindow::onFileChanged(const QString &path)
 {
     qDebug() << "[MainWindow] File changed externally:" << path;
-    
+
     // Remove the file from the watcher to avoid immediate re-triggering
     m_fileWatcher->removePath(path);
-    
+
     // Add a small delay to allow file operations to complete
     QTimer::singleShot(100, this, [this, path]() {
         // Re-add the file to the watcher
         if (QFileInfo::exists(path)) {
             m_fileWatcher->addPath(path);
         }
-        
+
         // Check if this file has context in our tracking
         if (m_fileToContextCommands.contains(path)) {
             qDebug() << "[MainWindow] Clearing context for file due to external change:" << path;
-            
+
             // Clear contexts related to this file
             clearContextForPath(path);
-            
+
             // Also remove from file-to-commands mapping
             m_fileToContextCommands.remove(path);
         }
@@ -3531,20 +3533,20 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 {
     // This method is called when a specific template is selected from the combobox
     // We need to run the selected template with the provided text as the user query
-    
+
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
-    
+
     // First, refresh to ensure we have the latest templates and sequences
     m_templateMgr.refresh();
     refreshAllSequences(); // Refresh sequences including those in templates
     ensureDefaultSequence();
-    
+
     // Find the template by path
     const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
     SolutionTemplate selectedTemplate;
     QString foundTemplatePath;
-    
+
     for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
         if (it.key() == templatePath) {
             selectedTemplate = it.value();
@@ -3552,15 +3554,15 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
             break;
         }
     }
-    
+
     if (foundTemplatePath.isEmpty()) {
         QMessageBox::warning(this, "Error", "Selected template not found: " + templatePath);
         return;
     }
-    
+
     // Get the main sequence for this template
     QString mainSequencePath = selectedTemplate.mainSequencePath();
-    
+
     // First, try to use the main sequence path as specified in the template file,
     // resolved relative to the template directory
     if (!mainSequencePath.isEmpty()) {
@@ -3585,12 +3587,12 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
             mainSequencePath = QDir(foundTemplatePath).absoluteFilePath(sequenceNames[0]);
         }
     }
-    
+
     if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
         QMessageBox::warning(this, "Error", "No valid sequence found for template: " + selectedTemplate.name());
         return;
     }
-    
+
     // Load the selected sequence
     PromptSequence seq;
     QFile seqFile(mainSequencePath);
@@ -3602,12 +3604,12 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
         }
         seqFile.close();
     }
-    
+
     if (seq.name().isEmpty()) {
         QMessageBox::warning(this, "Error", "Could not load the sequence for template: " + selectedTemplate.name());
         return;
     }
-    
+
     // Set up the sequence to run and store the user query for use in templates
     m_currentSeq = seq;
     m_currentStepIdx = 0;
@@ -3615,7 +3617,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
     m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
     m_lastUserMessage = text; // Save the user's query for resolution in prompts
-    
+
     updateSequenceGraphHighlight();  // Update the graph highlighting
     qDebug() << "[runTemplateRequested] About to start task timer for template execution";
     startTaskTimer(); // Start the task timer when template begins
@@ -3627,16 +3629,16 @@ void MainWindow::runSimpleChat(const QString &text)
 {
     // This method is called when "Простой чат" is selected - direct chat mode
     // Send the message directly to the model in streaming mode without templates/sequences
-    
+
     qDebug() << "[runSimpleChat] Text:" << text;
-    
+
     // Display user message in chat
     m_chat->appendUserMessage(text);
-    
+
     // Start streaming response directly without any system context or templates
     m_streamBuf.clear();
     m_model.startStream(text);
-    
+
     // Update history
     // Add to main history
     m_history.push_back(qMakePair(QString("user"), text));
@@ -3646,7 +3648,7 @@ void MainWindow::runSimpleChat(const QString &text)
     while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
         m_lastUserMessages.removeFirst();
     }
-    
+
     // Log the request
     int tokens = m_promptMgr.tokenCount(text);
     log(QString("Sending simple chat request (%1 tokens) → %2").arg(tokens).arg(text));
@@ -3657,7 +3659,7 @@ void MainWindow::stopTemplateExecution()
 {
     // Set the stop flag to true to indicate that template execution should be stopped
     m_stopRequested = true;
-    
+
     // If we're in sequence mode, the next runNextStep call will check the flag and stop
     if (m_sequenceMode) {
         log("Шаблонное выполнение остановлено пользователем.");
@@ -3668,7 +3670,7 @@ void MainWindow::stopTemplateExecution()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     qDebug() << "[MainWindow] closeEvent called";
-    
+
     // Save sequence graph layout before closing if it exists and is initialized
     if (m_seqGraphWindow) {
         qDebug() << "[MainWindow] Saving sequence graph layout";
@@ -3676,13 +3678,13 @@ void MainWindow::closeEvent(QCloseEvent *event)
     } else {
         qDebug() << "[MainWindow] No sequence graph window to save";
     }
-    
+
     // Clean up the sequence graph window
     if (m_seqGraphWindow) {
         delete m_seqGraphWindow;
         m_seqGraphWindow = nullptr;
     }
-    
+
     QMainWindow::closeEvent(event);
 }
 
@@ -3694,7 +3696,7 @@ void MainWindow::createStatusWidget()
     m_statusWidget->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_statusWidget->setMinimumWidth(300); // Set minimum width for the status widget
     m_statusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    
+
     // Add the status widget to the main window's status bar
     statusBar()->addPermanentWidget(m_statusWidget);
 }
@@ -3722,11 +3724,11 @@ void MainWindow::updateStatusDisplay()
         timeStr = "00:00:00";
         qDebug() << "[DEBUG] Timer not active - Showing default time";
     }
-    
+
     // Get context usage using estimateTokens for both used and total
     quint64 usedTokens = 0;
     quint64 totalTokens = 0;
-    
+
     // Calculate context usage based on the current prompt being sent to the model
     if (!m_currentPrompt.isEmpty()) {
         // Use the actual prompt that's being sent to the model
@@ -3739,34 +3741,34 @@ void MainWindow::updateStatusDisplay()
         } else {
             usedTokens = m_model.estimateTokens(m_contextContent);
         }
-        
+
         // Add currently streamed content if any
         if (!m_streamBuf.isEmpty()) {
             usedTokens += m_model.estimateTokens(m_streamBuf);
         }
     }
-    
+
     // Get total context window size from Ollama adapter
     totalTokens = m_model.generationParams().num_ctx;
-    
+
     // Make sure usedTokens doesn't exceed totalTokens
     if (usedTokens > totalTokens) {
         usedTokens = totalTokens; // Cap at maximum
     }
-    
+
     // Format the token counts with abbreviations
     QString usedTokenStr = formatNumber(usedTokens);
     QString totalTokenStr = formatNumber(totalTokens);
     double pers = 100 - (double)usedTokens/totalTokens*100;
     QString usedTokenStrPers = QString::number(pers,'f', 2);
-    
+
     // Update the status widget text
     QString statusText = QString("Time: %1 | Context left: %2/%3 (%4%)")
                             .arg(timeStr)
                             .arg(usedTokenStr)
                             .arg(totalTokenStr)
                             .arg(usedTokenStrPers);
-    
+
     if (m_statusWidget) {
         m_statusWidget->setText(statusText);
     }
