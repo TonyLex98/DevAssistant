@@ -238,6 +238,8 @@ private:
 
     StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
     StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
+    StyledButton *chatToggleBtn{nullptr};
+    StyledButton *logToggleBtn{nullptr};
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
 

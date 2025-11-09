@@ -22,6 +22,8 @@ public:
     void sendMessageToChat(const QString& text);
     void setTemplateManager(class SolutionTemplateManager* templateManager);
     void setMainWindow(class MainWindow* mainWnd);
+    void setChatLogVisible(bool visible);
+    bool isChatLogVisible() const;
 
 signals:
     void sendMessage(const QString& text);

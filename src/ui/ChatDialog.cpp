@@ -17,6 +17,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     auto v = new QVBoxLayout(this);
     m_chat = new StyleTextEdit(this);
     m_chat->setReadOnly(true);
+    m_chat->setVisible(false);
     m_cb_model = new MemoryComboBox("modelSelector", this);
     v->addWidget(m_chat,1);
     auto mainLayout = new QHBoxLayout();
@@ -93,6 +94,18 @@ void ChatDialog::appendAssistantChunk(const QString& s){
     if (first) { m_chat->append("Assistant: \n"); first=false; }
     m_chat->moveCursor(QTextCursor::End);
     m_chat->insertPlainText(s);
+}
+
+void ChatDialog::setChatLogVisible(bool visible)
+{
+    if (m_chat) {
+        m_chat->setVisible(visible);
+    }
+}
+
+bool ChatDialog::isChatLogVisible() const
+{
+    return m_chat ? m_chat->isVisible() : false;
 }
 
 void ChatDialog::finishAssistantMessage(){

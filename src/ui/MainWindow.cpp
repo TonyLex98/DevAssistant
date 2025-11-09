@@ -423,10 +423,27 @@ MainWindow::MainWindow(QWidget *parent)
     // 3.4   Логи и чат
     m_log = new StyleTextEdit(this);
     m_log->setReadOnly(true);
+    m_log->setVisible(false);
 
     m_chat = new ChatDialog(&m_model, this);
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
     m_chat->setMainWindow(this);
+
+    // Toggle button to show/hide chat
+    chatToggleBtn = new StyledButton(tr("Показать чат"), this);
+    btns->addWidget(chatToggleBtn);
+    connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
+        const bool shouldShow = !m_chat->isChatLogVisible();
+        m_chat->setChatLogVisible(shouldShow);
+        chatToggleBtn->setText(shouldShow ? tr("Скрыть чат") : tr("Показать чат"));
+    });
+    logToggleBtn = new StyledButton(tr("Показать лог"), this);
+    btns->addWidget(logToggleBtn);
+    connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
+        const bool shouldShow = !m_log->isVisible();
+        m_log->setVisible(shouldShow);
+        logToggleBtn->setText(shouldShow ? tr("Скрыть лог") : tr("Показать лог"));
+    });
 
     // 3.5 Result display widget
     m_resultDisplayWidget = new ResultDisplayWidget(this);
