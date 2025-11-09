@@ -8,7 +8,7 @@ DeleteFileCommand::DeleteFileCommand(const QString& path,
 {
     m_params["path"] = path;
     m_description = descr.isEmpty()
-        ? QString("Удалить файл «%1»").arg(path)
+        ? QString("Удалить файл; используется для удаления файлов из проекта")
         : descr;
 }
 

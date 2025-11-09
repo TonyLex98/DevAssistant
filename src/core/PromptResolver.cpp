@@ -78,7 +78,7 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
 
         QJsonObject example = c->toJson();
         QString json = QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString());
-        allowedList += "- " + c->name() + "\n  Формат: " + json + "\n\n";
+        allowedList += "- " + c->name() + ": " + c->description() + "\n  Формат: " + json + "\n\n";
         delete c;
     }
     result.replace("{{SUPPORTED_COMMANDS}}", allowedList.trimmed());

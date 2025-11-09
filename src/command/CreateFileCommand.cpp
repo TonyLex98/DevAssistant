@@ -13,7 +13,7 @@ CreateFileCommand::CreateFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Создать файл «%1»").arg(path)
+        ? QString("Создать новый файл; используется для добавления новых файлов в проект")
         : descr;
 }
 

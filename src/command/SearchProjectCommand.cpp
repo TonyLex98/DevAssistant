@@ -24,7 +24,7 @@ SearchProjectCommand::SearchProjectCommand(const QString& query,
         m_params["include"] = arr;
     }
     m_description = descr.isEmpty()
-        ? QString("Поиск по проекту: \"%1\"").arg(query)
+        ? QString("Поиск текста по всем файлам проекта; используется для поиска упоминаний, определений или участков кода в проекте")
         : descr;
 }
 

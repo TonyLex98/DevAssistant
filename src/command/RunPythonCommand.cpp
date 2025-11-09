@@ -24,9 +24,7 @@ RunPythonCommand::RunPythonCommand(const QString& scriptPath,
         m_params["code"] = QString::fromUtf8(inlineCode);
     }
     m_description = descr.isEmpty()
-        ? (scriptPath.isEmpty()
-               ? QString("Запустить Python-код")
-               : QString("Запустить скрипт «%1»").arg(scriptPath))
+        ? QString("Запустить Python-скрипт или код; используется для выполнения аналитических, вычислительных или служебных задач на Python")
         : descr;
 }
 

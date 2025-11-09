@@ -20,11 +20,11 @@ public:
         // Создаем более информативное описание, которое четко подскажет модели, какие параметры используются
         if (descr.isEmpty()) {
             if (startLine >= 1 && endLine >= startLine) {
-                m_description = QString("Открыть участок файла «%1» СТРОГИЙ ФОРМАТ: строки с %2 по %3 (startLine=%2, endLine=%3) - КЛЮЧЕВОЕ: используй именно эти параметры!").arg(path).arg(startLine).arg(endLine);
+                m_description = QString("Открыть конкретный участок файла (строки с %2 по %3); используется для чтения определенной части файла").arg(path).arg(startLine).arg(endLine);
             } else if (!regionExpr.isEmpty()) {
-                m_description = QString("Открыть участок файла «%1» по регулярному выражению «%2»").arg(path).arg(regionExpr);
+                m_description = QString("Открыть участок файла «%1» по регулярному выражению; используется для поиска и чтения участка кода по паттерну").arg(path).arg(regionExpr);
             } else {
-                m_description = QString("Открыть участок файла «%1» - ВАЖНО: используй startLine и endLine параметры для указания конкретных строк!").arg(path);
+                m_description = QString("Открыть участок файла по указанным строкам (startLine и endLine); используется для чтения определенной части файла").arg(path);
             }
         } else {
             m_description = descr;

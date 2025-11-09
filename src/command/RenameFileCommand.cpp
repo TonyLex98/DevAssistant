@@ -11,8 +11,7 @@ RenameFileCommand::RenameFileCommand(const QString& oldPath,
     m_params["oldPath"] = oldPath;
     m_params["newPath"] = newPath;
     m_description = descr.isEmpty()
-        ? QString("Переименовать файл из «%1» в «%2»")
-              .arg(oldPath).arg(newPath)
+        ? QString("Переименовать или переместить файл; используется для изменения имени или расположения файла в проекте")
         : descr;
 }
 

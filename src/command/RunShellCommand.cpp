@@ -17,7 +17,7 @@ RunShellCommand::RunShellCommand(const QString& command,
 {
     m_params["command"] = command;
     m_description = descr.isEmpty()
-        ? QString("Запустить команду «%1»").arg(command)
+        ? QString("Запустить shell-команду; используется для выполнения команд в терминале, проверки состояния системы или запуска утилит")
         : descr;
 }
 

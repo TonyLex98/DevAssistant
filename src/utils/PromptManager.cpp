@@ -105,12 +105,13 @@ QString PromptManager::supportedCommandsText() const
 
     for (Command* cmd : CommandRegistry::all()) {
         QString name = cmd->name();
+        QString description = cmd->description();
 
         /* Получаем «пример» JSON‑объекта.  Можно взять сразу fromJson
            или вручную сконструировать – здесь берём просто команду‑шаблон. */
         QJsonObject example = cmd->toJson();
 
-        result += "- " + name + "\n";
+        result += "- " + name + ": " + description + "\n";
         result += "  Формат: " + QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString()) + "\n\n";
 
         delete cmd; // шаблоны только для чтения – удаляем

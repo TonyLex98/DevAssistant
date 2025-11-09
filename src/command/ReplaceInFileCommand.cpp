@@ -11,7 +11,7 @@ ReplaceInFileCommand::ReplaceInFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Заменить содержимое файла «%1»").arg(path)
+        ? QString("Заменить содержимое файла; используется для изменения содержимого существующего файла")
         : descr;
 }
 

@@ -1729,6 +1729,11 @@ void MainWindow::handleAssistantFinished()
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
             }
+            
+            // Add command to context manager with result
+            if (m_contextManager) {
+                addCommandToContext(c, c->getResult());
+            }
         } else if (c->name() == "REASONING") {
             // For REASONING command, we simply add the reasoning content to history
             // so it becomes part of the conversation context, just like other commands' results
@@ -1753,7 +1758,7 @@ void MainWindow::handleAssistantFinished()
             
             // Add command to context manager with reasoning as result
             if (m_contextManager) {
-                addCommandToContext(c, reasoning);
+                addCommandToContext(c, c->getResult());
             }
         } else if (c->name() == "CALL_SEQUENCE") {
             // Mark that we have a sequence call command and store the name

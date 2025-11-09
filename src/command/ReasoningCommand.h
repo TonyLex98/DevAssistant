@@ -8,7 +8,7 @@ public:
         m_params["reasoning"] = reasoning;
         m_params["nextCommand"] = nextCommand;
         m_params["nextCommandParams"] = nextCommandParams;
-        m_description = descr.isEmpty() ? QString("Выполнить рассуждение и вернуть результат в виде контекста") : descr;
+        m_description = descr.isEmpty() ? QString("Выполнить рассуждение и вернуть результат в виде контекста; используется для логических размышлений, планирования и анализа перед выполнением действий") : descr;
     }
     
     QString name() const override { return "REASONING"; }

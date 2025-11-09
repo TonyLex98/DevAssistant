@@ -13,6 +13,7 @@ public:
     QString description() const override { return m_description; }
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
+    QString getResult() const override;
 
     QString title() const { return m_params.value("title").toString(); }
     QString content() const { return m_params.value("content").toString(); }

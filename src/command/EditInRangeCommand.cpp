@@ -24,8 +24,7 @@ EditInRangeCommand::EditInRangeCommand(const QString& path,
     m_params["endLine"]   = endLine;
 
     m_description = descr.isEmpty()
-        ? QString("Edit lines %1-%2 in \"%3\" (line-by-line patch).")
-              .arg(startLine).arg(endLine).arg(path)
+        ? QString("Редактировать конкретный участок файла (строки); используется для точечных изменений в существующем файле")
         : descr;
 
     if (!replacementLines.isEmpty()) {

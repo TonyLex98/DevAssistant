@@ -191,10 +191,25 @@ static QJsonArray toCommandArray(const QJsonDocument& doc)
     QJsonArray out;
     if (doc.isArray()){
         for (const QJsonValue& v : doc.array()){
-            if (v.isObject()) out.append(v.toObject());
+            if (v.isObject()) {
+                out.append(v.toObject());
+            }
             else if (v.isArray()){
-                for (const QJsonValue& vv : v.toArray())
-                    if (vv.isObject()) out.append(vv.toObject());
+                // Handle nested arrays recursively
+                for (const QJsonValue& vv : v.toArray()) {
+                    if (vv.isObject()) {
+                        out.append(vv.toObject());
+                    }
+                    else if (vv.isArray()) {
+                        // Handle deeper nesting if needed
+                        QJsonArray nestedArr = toCommandArray(QJsonDocument(vv.toArray()));
+                        for (const QJsonValue& vvv : nestedArr) {
+                            if (vvv.isObject()) {
+                                out.append(vvv.toObject());
+                            }
+                        }
+                    }
+                }
             }
         }
     } else if (doc.isObject()){
