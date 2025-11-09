@@ -670,6 +670,14 @@ MainWindow::MainWindow(QWidget *parent)
     if (m_centerSplitter)
         m_centerSplitter->loadState();
     mainSplitter->loadState();
+    const QList<int> storedSizes = mainSplitter->sizes();
+    if (storedSizes.size() >= 3 && storedSizes.at(2) == 0) {
+        QList<int> fallbackSizes = storedSizes;
+        fallbackSizes[0] = qMax(200, fallbackSizes.at(0));
+        fallbackSizes[1] = qMax(400, fallbackSizes.at(1));
+        fallbackSizes[2] = 250;
+        mainSplitter->setSizes(fallbackSizes);
+    }
 
     // Initialize task timer and status widget
     m_taskTimer = new QTimer(this);
