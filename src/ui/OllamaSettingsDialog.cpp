@@ -10,14 +10,13 @@
 #include <QJsonObject>
 #include <QTimer>
 #include <QEventLoop>
-#include "customWidgets/MemoryComboBox.h"
 
 OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     setWindowTitle("Ollama Settings");
     auto f = new QFormLayout(this);
     m_endpoint = new MemoryLineEdit("ollama_endpoint", this);
     m_endpoint->setText("http://127.0.0.1:11434");
-    
+
     m_embeddingModel = new MemoryComboBox("ollama_embedding_model", this);
     m_embeddingModel->addItem("nomic-embed-text", "nomic-embed-text");
     m_embeddingModel->addItem("all-minilm", "all-minilm");
@@ -34,7 +33,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     m_numCtx = new QSpinBox(this); m_numCtx->setRange(256, 128000); m_numCtx->setValue(64000); // Увеличили значение по умолчанию
     m_mirostat = new QSpinBox(this); m_mirostat->setRange(0, 2); m_mirostat->setValue(0);
     m_mirostatTau = new QDoubleSpinBox(this); m_mirostatTau->setRange(0.0, 10.0); m_mirostatTau->setSingleStep(0.1); m_mirostatTau->setValue(5.0);
-    m_mirostatEta = new QDoubleSpinBox(this); m_mirostatEta->setRange(0.0, 1.0); m_mirostatEta->setSingleStep(0.01); m_mirostatEta->setValue(0.1);
+    m_mirostatEta = new QDoubleSpinBox(this); m_mirostatEta->setRange(0.0, 1.0); m_mirostatEta->setSingleStep(0.1); m_mirostatEta->setValue(0.1);
     m_seed = new QSpinBox(this); m_seed->setRange(0, 1000000000); m_seed->setValue(0);
     m_stopWords = new QTextEdit(this); m_stopWords->setMaximumHeight(100); // Для ввода нескольких слов
     m_reasoningEffort = new MemoryLineEdit("ollama_reasoning_effort", this); m_reasoningEffort->setText("medium");
@@ -76,22 +75,22 @@ void OllamaSettingsDialog::loadEmbeddingModels()
 {
     QUrl url(m_endpoint->text());
     url.setPath("/api/tags");
-    
+
     QNetworkAccessManager manager;
     QNetworkRequest request(url);
     QNetworkReply* reply = manager.get(request);
-    
+
     QEventLoop loop;
     QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-    
+
     QTimer timeoutTimer;
     timeoutTimer.setSingleShot(true);
     timeoutTimer.setInterval(5000); // 5 seconds timeout
     QObject::connect(&timeoutTimer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    
+
     timeoutTimer.start();
     loop.exec();
-    
+
     if (timeoutTimer.isActive()) {
         timeoutTimer.stop();
     } else {
@@ -100,30 +99,30 @@ void OllamaSettingsDialog::loadEmbeddingModels()
         reply->deleteLater();
         return;
     }
-    
+
     if (reply->error() == QNetworkReply::NoError) {
         QByteArray data = reply->readAll();
         QJsonDocument doc = QJsonDocument::fromJson(data);
         QJsonObject obj = doc.object();
         QJsonArray models = obj.value("models").toArray();
-        
+
         // Clear existing items except default ones
         m_embeddingModel->clear();
         m_embeddingModel->addItem("nomic-embed-text", "nomic-embed-text");
         m_embeddingModel->addItem("all-minilm", "all-minilm");
         m_embeddingModel->addItem("mxbai-embed-large", "mxbai-embed-large");
-        
+
         // Add all models that might be embedding models
         for (const QJsonValue& val : models) {
             QJsonObject modelObj = val.toObject();
             QString name = modelObj.value("name").toString();
-            
+
             // Check if this looks like an embedding model by name
-            if (name.contains("embed", Qt::CaseInsensitive) || 
+            if (name.contains("embed", Qt::CaseInsensitive) ||
                 name.contains("minilm", Qt::CaseInsensitive) ||
                 name.contains("all", Qt::CaseInsensitive) ||
                 name.contains("bert", Qt::CaseInsensitive)) {
-                
+
                 // Only add if not already in the list
                 bool exists = false;
                 for (int i = 0; i < m_embeddingModel->count(); ++i) {
@@ -132,7 +131,7 @@ void OllamaSettingsDialog::loadEmbeddingModels()
                         break;
                     }
                 }
-                
+
                 if (!exists) {
                     m_embeddingModel->addItem(name, name);
                 }
@@ -140,6 +139,8 @@ void OllamaSettingsDialog::loadEmbeddingModels()
         }
     }
     
+    m_embeddingModel->loadState();
+
     reply->deleteLater();
 }
 

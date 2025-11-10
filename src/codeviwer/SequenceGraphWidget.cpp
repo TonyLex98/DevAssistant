@@ -3,6 +3,7 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QSizePolicy>
+#include <QComboBox>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/PromptSequenceManager.h"
 

@@ -5,8 +5,8 @@
 #include <QFormLayout>
 #include <QCheckBox>
 #include <QTextEdit>
-#include <QComboBox>
 #include "customWidgets/MemoryLineEdit.h"
+#include "customWidgets/MemoryComboBox.h"
 
 class OllamaSettingsDialog : public QDialog {
     Q_OBJECT
@@ -22,7 +22,7 @@ private slots:
 
 private:
     MemoryLineEdit* m_endpoint=nullptr;
-    QComboBox* m_embeddingModel=nullptr;  // Model for embeddings - now a combobox
+    MemoryComboBox* m_embeddingModel=nullptr;  // Model for embeddings - now a combobox
     // Основные параметры генерации
     QDoubleSpinBox* m_temperature=nullptr;
     QDoubleSpinBox* m_topP=nullptr;

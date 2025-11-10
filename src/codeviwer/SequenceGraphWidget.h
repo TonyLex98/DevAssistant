@@ -3,7 +3,6 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QComboBox>
 #include "SequenceRelationView.h"
 #include <QString>
 #include "../ui/customWidgets/MemoryComboBox.h"

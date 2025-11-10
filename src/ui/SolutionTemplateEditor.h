@@ -7,7 +7,6 @@
 #include <QListWidget>
 #include <QDialogButtonBox>
 #include <QTabWidget>
-#include <QComboBox>
 #include <QToolButton>
 #include <QFileDialog>
 #include <QMessageBox>
