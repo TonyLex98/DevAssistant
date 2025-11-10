@@ -54,40 +54,80 @@ void RAGProcessor::indexFolder(const QString &rootPath)
         qDebug() << "RAGProcessor not initialized";
         return;
     }
-    
+
+    qDebug() << "About to start indexing folder:" << rootPath;
     emit statusUpdate("Starting indexing of folder: " + rootPath);
-    
+
     // Run indexing in a separate thread to keep UI responsive
     QMetaObject::invokeMethod(this, [this, rootPath = rootPath]() {
-        int totalFiles = 0;
+        qDebug() << "Starting indexing thread for path:" << rootPath;
+        qDebug() << "Supported extensions:" << supportedExtensions;
+        
+        // First, collect all files to be indexed - manually filtering by extension
+        QStringList allFiles;
+        QDirIterator it_all(rootPath, QDir::Files, QDirIterator::Subdirectories);
+        while (it_all.hasNext()) {
+            QString filePath = it_all.next();
+            QFileInfo fileInfo(filePath);
+            QString ext = fileInfo.suffix().toLower();
+            if (supportedExtensions.contains(ext)) {
+                allFiles << filePath;
+            }
+        }
+        
+        qDebug() << "Found total files to consider:" << allFiles.size();
+        if (allFiles.size() == 0) {
+            // Let's check what's in the directory and what extensions we're looking for
+            QDir dir(rootPath);
+            QStringList allEntries = dir.entryList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+            qDebug() << "All entries in directory:" << allEntries;
+            
+            // Let's also check with a recursive search to see what's available in subdirectories
+            QDirIterator fullIterator(rootPath, QDir::Files, QDirIterator::Subdirectories);
+            QStringList allFilesNoFilter;
+            while (fullIterator.hasNext()) {
+                allFilesNoFilter << fullIterator.next();
+            }
+            qDebug() << "All files in directory and subdirectories (no filter):" << allFilesNoFilter.size();
+            for (const QString &file : allFilesNoFilter) {
+                QFileInfo info(file);
+                qDebug() << "Unfiltered file:" << info.fileName() << "Extension:" << info.suffix();
+            }
+        }
+
+        // Update the file index status table to clean up stale entries
+        mDb->cleanupStaleEntries(allFiles);
+
+        // Filter files that need to be indexed (new or modified files)
+        QStringList filesToIndex;
+        for (const QString &filePath : allFiles) {
+            bool alreadyIndexed = mDb->hasFileBeenIndexed(filePath);
+            qDebug() << "File:" << filePath << "Already indexed:" << alreadyIndexed;
+            if (!alreadyIndexed) {
+                filesToIndex << filePath;
+            }
+        }
+
+        qDebug() << "Total files found:" << allFiles.size() << "Files to index:" << filesToIndex.size();
+
+        int totalFiles = filesToIndex.size();
         int processed = 0;
         QVector<Fragment> fragments;
 
-        // First, count files
-        QDirIterator it_count(rootPath, supportedExtensions, QDir::Files, QDirIterator::Subdirectories);
-        while (it_count.hasNext()) {
-            ++totalFiles;
-            it_count.next();
-        }
-
         emit progress(0, totalFiles);
 
-        // Create a new iterator for the real work since QDirIterator doesn't have reset()
-        QDirIterator it_process(rootPath, supportedExtensions, QDir::Files, QDirIterator::Subdirectories);
-        while (it_process.hasNext()) {
-            it_process.next();
-            const QString filePath = it_process.filePath();
+        for (const QString &filePath : filesToIndex) {
             const QFileInfo fi(filePath);
             const QString ext = fi.suffix().toLower();
-            
+
             QString content;
             if (ext == "pdf") {
                 content = processPDF(filePath);
-            } else if (ext == "txt" || ext == "cpp" || ext == "c" || ext == "h" || ext == "hpp" || 
-                      ext == "py" || ext == "js" || ext == "ts" || ext == "java" || ext == "cs" || 
-                      ext == "go" || ext == "rust" || ext == "rb" || ext == "php" || ext == "html" || 
-                      ext == "css" || ext == "json" || ext == "xml" || ext == "yaml" || ext == "yml" || 
-                      ext == "md" || ext == "sql" || ext == "sh" || ext == "bat" || ext == "ini" || 
+            } else if (ext == "txt" || ext == "cpp" || ext == "c" || ext == "h" || ext == "hpp" ||
+                      ext == "py" || ext == "js" || ext == "ts" || ext == "java" || ext == "cs" ||
+                      ext == "go" || ext == "rust" || ext == "rb" || ext == "php" || ext == "html" ||
+                      ext == "css" || ext == "json" || ext == "xml" || ext == "yaml" || ext == "yml" ||
+                      ext == "md" || ext == "sql" || ext == "sh" || ext == "bat" || ext == "ini" ||
                       ext == "cfg" || ext == "config") {
                 // Read programming and text files directly
                 QFile file(filePath);
@@ -99,13 +139,16 @@ void RAGProcessor::indexFolder(const QString &rootPath)
             } else if (ext == "docx") {
                 content = processDOCX(filePath);
             }
-            
+
             if (content.isEmpty()) {
                 processed++;
                 emit progress(processed, totalFiles);
+                // Still update the index status for files with no content so they're not repeatedly processed
+                mDb->updateFileIndexTime(filePath, mDb->getFileLastModified(filePath));
+                qDebug() << "File has no content, updated index time for:" << filePath;
                 continue;
             }
-            
+
             // Split into 2K character fragments. Here we split by code blocks intelligently.
             const QStringList parts = splitCodeIntoFragments(content, 2000);
             int partIdx = 0;
@@ -114,7 +157,7 @@ void RAGProcessor::indexFolder(const QString &rootPath)
                 frag.filePath = filePath;
                 frag.paragraphNumber = partIdx;
                 frag.text = part.trimmed();
-                
+
                 if (!frag.text.isEmpty()) {
                     emit statusUpdate(QString("Processing fragment %1 of %2 from %3").arg(partIdx + 1).arg(parts.size()).arg(QFileInfo(filePath).fileName()));
                     frag.embedding = mEncoder->embed(frag.text);
@@ -122,13 +165,25 @@ void RAGProcessor::indexFolder(const QString &rootPath)
                 }
                 ++partIdx;
             }
+            
+            // Update the index status for this file after successful processing
+            mDb->updateFileIndexTime(filePath, mDb->getFileLastModified(filePath));
+            qDebug() << "Indexed file and updated index time for:" << filePath;
             processed++;
             emit progress(processed, totalFiles);
         }
 
-        // Bulk insert into DB
+        // Bulk insert new fragments into DB
         mDb->insertFragments(fragments);
-        emit statusUpdate("Indexing completed. Processed " + QString::number(fragments.size()) + " fragments.");
+        
+        if (totalFiles == 0) {
+            emit statusUpdate("Indexing completed. No new or modified files found. Database contains data from previously indexed files.");
+            qDebug() << "No new files to index, total fragments in DB:" << fragments.size();
+        } else {
+            emit statusUpdate("Indexing completed. Processed " + QString::number(fragments.size()) + " fragments from " + QString::number(processed) + " new or modified files.");
+            qDebug() << "Indexing complete, processed fragments:" << fragments.size() << "from files:" << processed;
+        }
+        
         emit indexingFinished();
     });
 }
@@ -137,10 +192,10 @@ void RAGProcessor::indexFolder(const QString &rootPath)
 QStringList RAGProcessor::splitCodeIntoFragments(const QString &content, int maxFragmentSize)
 {
     QStringList fragments;
-    
+
     // Try to split by functions/classes when possible, otherwise by lines
     QStringList lines = content.split('\n');
-    
+
     QString currentFragment;
     for (const QString &line : lines) {
         if (currentFragment.length() + line.length() + 1 > maxFragmentSize && !currentFragment.isEmpty()) {
@@ -153,12 +208,12 @@ QStringList RAGProcessor::splitCodeIntoFragments(const QString &content, int max
             currentFragment += line + "\n";
         }
     }
-    
+
     // Add the last fragment
     if (!currentFragment.trimmed().isEmpty()) {
         fragments.append(currentFragment);
     }
-    
+
     return fragments;
 }
 
@@ -168,15 +223,15 @@ void RAGProcessor::ask(const QString &question)
         qDebug() << "RAGProcessor not initialized";
         return;
     }
-    
+
     emit statusUpdate("Processing query: " + question.left(50) + "...");
-    
+
     QMetaObject::invokeMethod(this, [this, question = question]() {
         emit statusUpdate("Generating embedding for query...");
         QVector<float> queryVec = mEncoder->embed(question);
         emit statusUpdate("Searching for similar fragments...");
         QVector<Fragment> nearest = mDb->searchSimilar(queryVec, 5);
-        
+
         // Concatenate fragments and feed into LLM.
         QString context;
         for (const auto &f : nearest) {
@@ -185,7 +240,7 @@ void RAGProcessor::ask(const QString &question)
                           .arg(f.paragraphNumber)
                           .arg(f.text);
         }
-        
+
         emit statusUpdate("Generating answer using LLM...");
         QString answer = mEncoder->generateAnswer(question, context);
         emit statusUpdate("Answer generation completed.");
@@ -218,9 +273,9 @@ void RAGProcessor::indexSpecificFiles(const QStringList &filePaths)
         qDebug() << "RAGProcessor not initialized";
         return;
     }
-    
+
     emit statusUpdate("Starting indexing of specific files: " + QString::number(filePaths.size()) + " files");
-    
+
     // Run indexing in a separate thread to keep UI responsive
     QMetaObject::invokeMethod(this, [this, filePaths = filePaths]() {
         int totalFiles = filePaths.size();
@@ -228,19 +283,19 @@ void RAGProcessor::indexSpecificFiles(const QStringList &filePaths)
         QVector<Fragment> fragments;
 
         emit progress(0, totalFiles);
-        
+
         for (const QString &filePath : filePaths) {
             const QFileInfo fi(filePath);
             const QString ext = fi.suffix().toLower();
-            
+
             QString content;
             if (ext == "pdf") {
                 content = processPDF(filePath);
-            } else if (ext == "txt" || ext == "cpp" || ext == "c" || ext == "h" || ext == "hpp" || 
-                      ext == "py" || ext == "js" || ext == "ts" || ext == "java" || ext == "cs" || 
-                      ext == "go" || ext == "rust" || ext == "rb" || ext == "php" || ext == "html" || 
-                      ext == "css" || ext == "json" || ext == "xml" || ext == "yaml" || ext == "yml" || 
-                      ext == "md" || ext == "sql" || ext == "sh" || ext == "bat" || ext == "ini" || 
+            } else if (ext == "txt" || ext == "cpp" || ext == "c" || ext == "h" || ext == "hpp" ||
+                      ext == "py" || ext == "js" || ext == "ts" || ext == "java" || ext == "cs" ||
+                      ext == "go" || ext == "rust" || ext == "rb" || ext == "php" || ext == "html" ||
+                      ext == "css" || ext == "json" || ext == "xml" || ext == "yaml" || ext == "yml" ||
+                      ext == "md" || ext == "sql" || ext == "sh" || ext == "bat" || ext == "ini" ||
                       ext == "cfg" || ext == "config") {
                 // Read programming and text files directly
                 QFile file(filePath);
@@ -252,13 +307,13 @@ void RAGProcessor::indexSpecificFiles(const QStringList &filePaths)
             } else if (ext == "docx") {
                 content = processDOCX(filePath);
             }
-            
+
             if (content.isEmpty()) {
                 processed++;
                 emit progress(processed, totalFiles);
                 continue;
             }
-            
+
             // Split into 2K character fragments
             const QStringList parts = splitCodeIntoFragments(content, 2000);
             int partIdx = 0;
@@ -267,7 +322,7 @@ void RAGProcessor::indexSpecificFiles(const QStringList &filePaths)
                 frag.filePath = filePath;
                 frag.paragraphNumber = partIdx;
                 frag.text = part.trimmed();
-                
+
                 if (!frag.text.isEmpty()) {
                     emit statusUpdate(QString("Processing fragment %1 of %2 from %3").arg(partIdx + 1).arg(parts.size()).arg(fi.fileName()));
                     frag.embedding = mEncoder->embed(frag.text);
@@ -292,18 +347,18 @@ QVector<Fragment> RAGProcessor::search(const QString &query, int limit)
         qDebug() << "RAGProcessor not initialized";
         return QVector<Fragment>();
     }
-    
+
     emit statusUpdate("Searching for: " + query.left(50) + "...");
-    
+
     // Generate embedding for the query
     QVector<float> queryVec = mEncoder->embed(query);
     emit statusUpdate("Searching for similar fragments...");
-    
+
     // Search for similar fragments in the database
     QVector<Fragment> results = mDb->searchSimilar(queryVec, limit);
-    
+
     emit statusUpdate("Search completed. Found " + QString::number(results.size()) + " results.");
-    
+
     return results;
 }
 
