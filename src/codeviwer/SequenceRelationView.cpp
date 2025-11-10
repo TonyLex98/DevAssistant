@@ -1,4 +1,4 @@
-#include "SequenceRelationView.h"
+﻿#include "SequenceRelationView.h"
 #include <QWheelEvent>
 #include <QPainter>
 #include <QPen>
@@ -113,35 +113,45 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
         
         // When this node moves, we need to update all edges connected to it
         // Get only the edges that overlap with this item's movement to be more efficient
-        QList<QGraphicsItem*> overlappingItems = scene()->items(sceneBoundingRect(), Qt::IntersectsItemShape, Qt::AscendingOrder);
-        for (QGraphicsItem* item : overlappingItems) {
-            if (item->type() == SequenceEdgeItem::Type) {
-                SequenceEdgeItem* edge = static_cast<SequenceEdgeItem*>(item);
-                if (edge->source() == this || edge->dest() == this) {
-                    edge->updatePosition();
+        QGraphicsScene* currentScene = scene();
+        if (currentScene) {
+            // Safety check: ensure scene is still valid before using it
+            QList<QGraphicsItem*> overlappingItems = currentScene->items(sceneBoundingRect(), Qt::IntersectsItemShape, Qt::AscendingOrder);
+            for (QGraphicsItem* item : overlappingItems) {
+                if (item && item->type() == SequenceEdgeItem::Type) {
+                    SequenceEdgeItem* edge = static_cast<SequenceEdgeItem*>(item);
+                    if (edge && (edge->source() == this || edge->dest() == this)) {
+                        edge->updatePosition();
+                    }
                 }
             }
+        } else {
+            qDebug() << "[SequenceNodeItem] No scene available, skipping edge updates";
+            return QGraphicsItem::itemChange(change, value);
         }
         
         // Also save the new position - find the parent SequenceRelationView to call savePositions
         // We can access it through the scene
-        QGraphicsScene* currentScene = scene();
         if (currentScene) {
             QList<QGraphicsView*> views = currentScene->views();
             if (!views.isEmpty()) {
                 // The first view should be the SequenceRelationView
-                SequenceRelationView* relationView = qobject_cast<SequenceRelationView*>(views.first());
-                if (relationView) {
-                    relationView->updateEdgesForNode(this);
-                    qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
-                    relationView->savePositions();
-                    
-                    // If we have a current template directory set, save positions to that template as well
-                    if (!relationView->currentTemplateDirPath().isEmpty() && relationView->templateManager()) {
-                        relationView->savePositionsToTemplate(relationView->currentTemplateDirPath());
+                QGraphicsView* view = views.first();
+                if (view) {
+                    SequenceRelationView* relationView = qobject_cast<SequenceRelationView*>(view);
+                    if (relationView) {
+                        // Double-check that the relationView is still valid before calling methods
+                        relationView->updateEdgesForNode(this);
+                        qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
+                        relationView->savePositions();
+                        
+                        // If we have a current template directory set, save positions to that template as well
+                        if (!relationView->currentTemplateDirPath().isEmpty() && relationView->templateManager()) {
+                            relationView->savePositionsToTemplate(relationView->currentTemplateDirPath());
+                        }
                     }
                 } else {
-                    qDebug() << "[SequenceNodeItem] Could not cast view to SequenceRelationView";
+                    qDebug() << "[SequenceNodeItem] View is null, cannot cast";
                 }
             } else {
                 qDebug() << "[SequenceNodeItem] No views found for scene";
@@ -215,6 +225,13 @@ void SequenceEdgeItem::updatePosition()
     if (!m_source || !m_dest)
         return;
 
+    // Check if both source and destination are still in the scene
+    QGraphicsScene* currentScene = scene();
+    if (!currentScene || !currentScene->items().contains(m_source) || !currentScene->items().contains(m_dest)) {
+        // If either node is no longer in the scene, skip updating this edge
+        return;
+    }
+
     QPointF sourceCenterScene = m_source->sceneBoundingRect().center();
     QPointF destCenterScene = m_dest->sceneBoundingRect().center();
 
@@ -223,6 +240,7 @@ void SequenceEdgeItem::updatePosition()
 
     m_sourcePoint = mapFromScene(sourceScenePoint);
     m_destPoint = mapFromScene(destScenePoint);
+
     
     prepareGeometryChange();
 }
@@ -354,7 +372,9 @@ void SequenceRelationView::rebuildGraph()
     
     // Update all edges to reflect current positions
     for (SequenceEdgeItem *edge : m_edgeItems) {
-        edge->updatePosition();
+        if (edge && m_scene && m_scene->items().contains(edge)) {
+            edge->updatePosition();
+        }
     }
     
     qDebug() << "[SequenceRelationView] rebuildGraph() completed";
@@ -452,7 +472,9 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     
     // Update all edges to reflect current positions
     for (SequenceEdgeItem *edge : m_edgeItems) {
-        edge->updatePosition();
+        if (edge && m_scene && m_scene->items().contains(edge)) {
+            edge->updatePosition();
+        }
     }
     
     qDebug() << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
@@ -879,7 +901,9 @@ void SequenceRelationView::positionNodes()
     // Force an update for all edges to recalculate their positions after nodes are positioned
     // Batch update to improve performance
     for (SequenceEdgeItem *edge : m_edgeItems) {
-        edge->updatePosition();
+        if (edge && m_scene && m_scene->items().contains(edge)) {
+            edge->updatePosition();
+        }
     }
     
     // Adjust scene rectangle
@@ -897,8 +921,9 @@ void SequenceRelationView::updateEdgesForNode(SequenceNodeItem *node)
 
     const QList<SequenceEdgeItem*> edges = m_nodeEdges.value(node);
     for (SequenceEdgeItem *edge : edges) {
-        if (edge)
+        if (edge && m_scene && m_scene->items().contains(edge)) {
             edge->updatePosition();
+        }
     }
 }
 
@@ -1047,12 +1072,19 @@ void SequenceRelationView::saveNodePositions()
     // Update internal map with current positions
     for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
         QString nodeName = it.key();
-        QPointF pos = it.value()->pos();
+        SequenceNodeItem* node = it.value();
         
-        // Update the internal map with current position
-        m_nodePositions[nodeName] = pos;
-        
-        qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
+        // Check if node still exists in scene before getting its position
+        if (node && m_scene && m_scene->items().contains(node)) {
+            QPointF pos = node->pos();
+
+            // Update the internal map with current position
+            m_nodePositions[nodeName] = pos;
+            
+            qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
+        } else {
+            qDebug() << "[SequenceRelationView] Node" << nodeName << "not found in scene, skipping";
+        }
     }
 }
 
@@ -1119,3 +1151,5 @@ void SequenceRelationView::loadNodePositions()
     // If we have positions already stored in our internal map, we'll use them
     // In the future, this will come from template files that are loaded by SolutionTemplateManager
 }
+
+
