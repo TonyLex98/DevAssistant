@@ -38,10 +38,11 @@ void RAGProcessor::init()
     mInitialized = true;
 }
 
-void RAGProcessor::initWithOllamaAdapter(OllamaAdapter* adapter)
+void RAGProcessor::initWithOllamaAdapter(OllamaAdapter* adapter, const QString& embeddingModel)
 {
     if (mEncoder) {
         mEncoder->setOllamaAdapter(adapter);
+        mEncoder->setEmbeddingModel(embeddingModel.isEmpty() ? "nomic-embed-text" : embeddingModel);
     }
     mInitialized = true;
     emit statusUpdate("RAGProcessor initialized with main Ollama adapter");

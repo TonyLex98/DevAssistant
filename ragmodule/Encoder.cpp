@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QEventLoop>
 #include <QTimer>
+#include "../src/adapters/OllamaAdapter.h"
 
 namespace Rag
 {
@@ -19,6 +20,11 @@ void Encoder::setOllamaAdapter(OllamaAdapter* adapter)
     mOllamaAdapter = adapter;
 }
 
+void Encoder::setEmbeddingModel(const QString &model)
+{
+    mEmbeddingModel = model;
+}
+
 QVector<float> Encoder::embed(const QString &text)
 {
     // Cache simple string-to-vector map
@@ -26,17 +32,16 @@ QVector<float> Encoder::embed(const QString &text)
     if (mCache.contains(key)) {
         return mCache[key];
     }
-    
+
     // Use the main application's Ollama adapter for embeddings if available
     if (mOllamaAdapter) {
-        // Use OllamaAdapter's embedding functionality
-        // This assumes OllamaAdapter has an embedding method
-        // For now, I'll use the direct API approach as a fallback
-        auto vec = requestEmbedding(text);
-        mCache[key] = vec;
-        return vec;
+        // Use OllamaAdapter's getEmbedding method with the selected model
+        QVector<float> result = mOllamaAdapter->getEmbedding(text, mEmbeddingModel);
+        mCache[key] = result;
+        return result;
     }
-    
+
+    // Fallback to direct API call if no adapter is set
     auto vec = requestEmbedding(text);
     mCache[key] = vec;
     return vec;
@@ -63,7 +68,7 @@ QVector<float> Encoder::requestEmbedding(const QString &text)
     // This is a fallback implementation that directly calls Ollama
     // In a real implementation, we would use the main OllamaAdapter
     QJsonObject payload;
-    payload["model"] = "nomic-embed-text"; // Using a more appropriate embedding model
+    payload["model"] = mEmbeddingModel; // Using the selected embedding model
     payload["input"] = text;
     QString json = QJsonDocument(payload).toJson(QJsonDocument::Compact);
     QNetworkRequest req(QUrl("http://localhost:11434/api/embeddings"));

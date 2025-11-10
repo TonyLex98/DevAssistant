@@ -16,9 +16,10 @@ void AppConfig::load(){
     QSettings s;
     lastProjectPath = s.value("ui/lastProjectPath").toString();
     selectedModel   = s.value("model/selected","").toString();
+    embeddingModel  = s.value("model/embedding_model", "nomic-embed-text").toString();
     endpoint        = QUrl(s.value("model/endpoint","http://127.0.0.1:11434").toString());
     params          = s.value("model/params").toMap();
-    
+
     // Загрузка параметров генерации
     temperature = s.value("generation/temperature", 0.1).toDouble();
     topP = s.value("generation/top_p", 0.9).toDouble();
@@ -32,13 +33,13 @@ void AppConfig::load(){
     mirostatTau = s.value("generation/mirostat_tau", 5.0).toDouble();
     mirostatEta = s.value("generation/mirostat_eta", 0.1).toDouble();
     seed = s.value("generation/seed", 0).toULongLong();
-    
+
     // Загрузка stop words
     QStringList stopList = s.value("generation/stop_words").toStringList();
     if (!stopList.isEmpty()) {
         stopWords = stopList;
     }
-    
+
     reasoningEffort = s.value("generation/reasoning_effort", "medium").toString();
     temperatureDecay = s.value("generation/temperature_decay", 0.0).toDouble();
     repeatLastN = s.value("generation/repeat_last_n", 64).toInt();
@@ -48,9 +49,10 @@ void AppConfig::save() const{
     QSettings s;
     s.setValue("ui/lastProjectPath", lastProjectPath);
     s.setValue("model/selected", selectedModel);
+    s.setValue("model/embedding_model", embeddingModel);  // Сохраняем модель для эмбеддингов
     s.setValue("model/endpoint", endpoint.toString());
     s.setValue("model/params", params);
-    
+
     // Сохранение параметров генерации
     s.setValue("generation/temperature", temperature);
     s.setValue("generation/top_p", topP);

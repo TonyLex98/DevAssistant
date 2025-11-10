@@ -7,6 +7,7 @@ class AppConfig {
 public:
     QString lastProjectPath;
     QString selectedModel;
+    QString embeddingModel;  // Model for embeddings 
     QUrl    endpoint;
     QVariantMap params;
     // Параметры генерации для Ollama

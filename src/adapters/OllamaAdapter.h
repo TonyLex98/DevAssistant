@@ -8,7 +8,10 @@
 #include <QUrl>
 #include <QVariantMap>
 #include <QStringList>
+#include <QVector>
 #include "../core/ModelAdapter.h"
+#include <QJsonArray>
+#include <QJsonObject>
 
 // Структура параметров генерации для Ollama
 struct OllamaGenerationParams {
@@ -71,11 +74,14 @@ public:
 
     QString selectedModel() const { return m_model; }
     QJsonObject lastRequestBody() const { return m_lastBody; }
-    
+
     // Методы для управления параметрами генерации
     void setGenerationParams(const OllamaGenerationParams& params) { m_genParams = params; }
     const OllamaGenerationParams& generationParams() const { return m_genParams; }
     
+    // Method to get embeddings using a specific model
+    QVector<float> getEmbedding(const QString& text, const QString& model = QString());
+
 private:
     OllamaGenerationParams m_genParams;  // Параметры генерации
 

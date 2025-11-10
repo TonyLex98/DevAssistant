@@ -1026,6 +1026,9 @@ void MainWindow::openSettings(){
         cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
         cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
         cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
+        
+        // Сохраняем модель для эмбеддингов
+        cfg.embeddingModel = d.embeddingModel();
 
         cfg.save();
 
@@ -3008,6 +3011,11 @@ void MainWindow::reOpenRootDir(){
     // Initialize or update LightRAG widget if it exists
     if (m_lightRagWidget) {
         m_lightRagWidget->setProjectPath(m_projectRoot);
+        
+        // Also update the embedding model in case it changed
+        AppConfig cfg;
+        cfg.load();
+        m_lightRagWidget->mProcessor->initWithOllamaAdapter(&m_model, cfg.embeddingModel);
     }
 
     rescan();
@@ -3051,6 +3059,9 @@ void MainWindow::setupModelWithGenerationParams()
     if (!m_model.selectedModel().isEmpty()) {
         m_model.configure(m_model.selectedModel(), genParams);
     }
+    
+    // Store the embedding model in the model adapter for later use
+    // This ensures the model selection is available when needed for embeddings
 }
 
 
@@ -4072,8 +4083,12 @@ void MainWindow::openLightRag()
     if (!m_lightRagWidget) {
         m_lightRagWidget = new Rag::RagWidget(this);
         
-        // Initialize the RAG processor with the main Ollama adapter
-        m_lightRagWidget->mProcessor->initWithOllamaAdapter(&m_model);
+        // Load AppConfig to get the selected embedding model
+        AppConfig cfg;
+        cfg.load();
+        
+        // Initialize the RAG processor with the main Ollama adapter and selected embedding model
+        m_lightRagWidget->mProcessor->initWithOllamaAdapter(&m_model, cfg.embeddingModel);
         
         // Set the main Ollama adapter for summarization
         m_lightRagWidget->setMainOllamaAdapter(&m_model);

@@ -3,6 +3,14 @@
 #include <QLabel>
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTimer>
+#include <QEventLoop>
+#include "customWidgets/MemoryComboBox.h"
 
 OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     setWindowTitle("Ollama Settings");
@@ -10,6 +18,11 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     m_endpoint = new MemoryLineEdit("ollama_endpoint", this);
     m_endpoint->setText("http://127.0.0.1:11434");
     
+    m_embeddingModel = new MemoryComboBox("ollama_embedding_model", this);
+    m_embeddingModel->addItem("nomic-embed-text", "nomic-embed-text");
+    m_embeddingModel->addItem("all-minilm", "all-minilm");
+    m_embeddingModel->addItem("mxbai-embed-large", "mxbai-embed-large");
+
     // Основные параметры генерации
     m_temperature = new QDoubleSpinBox(this); m_temperature->setRange(0.0, 2.0); m_temperature->setSingleStep(0.1); m_temperature->setValue(0.1);
     m_topP = new QDoubleSpinBox(this); m_topP->setRange(0.0, 1.0); m_topP->setSingleStep(0.05); m_topP->setValue(0.9);
@@ -27,9 +40,10 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     m_reasoningEffort = new MemoryLineEdit("ollama_reasoning_effort", this); m_reasoningEffort->setText("medium");
     m_temperatureDecay = new QDoubleSpinBox(this); m_temperatureDecay->setRange(0.0, 1.0); m_temperatureDecay->setSingleStep(0.01); m_temperatureDecay->setValue(0.0);
     m_repeatLastN = new QSpinBox(this); m_repeatLastN->setRange(0, 1000); m_repeatLastN->setValue(64);
-    
+
     f->addRow("Endpoint:", m_endpoint);
-    
+    f->addRow("Embedding Model:", m_embeddingModel);
+
     // Группировка параметров для лучшей организации
     f->addRow(new QLabel("=== GENERATION PARAMETERS ==="));
     f->addRow("temperature:", m_temperature);
@@ -49,10 +63,84 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     f->addRow("temperature_decay:", m_temperatureDecay);
     f->addRow("repeat_last_n:", m_repeatLastN);
 
+    // Load available embedding models from Ollama
+    QTimer::singleShot(0, this, &OllamaSettingsDialog::loadEmbeddingModels);
+
     QDialogButtonBox* bb = new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel,this);
     f->addRow(bb);
     connect(bb, &QDialogButtonBox::accepted, this, &OllamaSettingsDialog::accept);
     connect(bb, &QDialogButtonBox::rejected, this, &OllamaSettingsDialog::reject);
+}
+
+void OllamaSettingsDialog::loadEmbeddingModels()
+{
+    QUrl url(m_endpoint->text());
+    url.setPath("/api/tags");
+    
+    QNetworkAccessManager manager;
+    QNetworkRequest request(url);
+    QNetworkReply* reply = manager.get(request);
+    
+    QEventLoop loop;
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+    timeoutTimer.setInterval(5000); // 5 seconds timeout
+    QObject::connect(&timeoutTimer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    
+    timeoutTimer.start();
+    loop.exec();
+    
+    if (timeoutTimer.isActive()) {
+        timeoutTimer.stop();
+    } else {
+        // Timeout occurred
+        reply->abort();
+        reply->deleteLater();
+        return;
+    }
+    
+    if (reply->error() == QNetworkReply::NoError) {
+        QByteArray data = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject obj = doc.object();
+        QJsonArray models = obj.value("models").toArray();
+        
+        // Clear existing items except default ones
+        m_embeddingModel->clear();
+        m_embeddingModel->addItem("nomic-embed-text", "nomic-embed-text");
+        m_embeddingModel->addItem("all-minilm", "all-minilm");
+        m_embeddingModel->addItem("mxbai-embed-large", "mxbai-embed-large");
+        
+        // Add all models that might be embedding models
+        for (const QJsonValue& val : models) {
+            QJsonObject modelObj = val.toObject();
+            QString name = modelObj.value("name").toString();
+            
+            // Check if this looks like an embedding model by name
+            if (name.contains("embed", Qt::CaseInsensitive) || 
+                name.contains("minilm", Qt::CaseInsensitive) ||
+                name.contains("all", Qt::CaseInsensitive) ||
+                name.contains("bert", Qt::CaseInsensitive)) {
+                
+                // Only add if not already in the list
+                bool exists = false;
+                for (int i = 0; i < m_embeddingModel->count(); ++i) {
+                    if (m_embeddingModel->itemData(i).toString() == name) {
+                        exists = true;
+                        break;
+                    }
+                }
+                
+                if (!exists) {
+                    m_embeddingModel->addItem(name, name);
+                }
+            }
+        }
+    }
+    
+    reply->deleteLater();
 }
 
 QVariantMap OllamaSettingsDialog::params() const{
@@ -69,7 +157,7 @@ QVariantMap OllamaSettingsDialog::params() const{
     o["mirostat_tau"] = m_mirostatTau->value();
     o["mirostat_eta"] = m_mirostatEta->value();
     o["seed"] = m_seed->value();
-    
+
     // Добавляем stop-слова
     if (!m_stopWords->toPlainText().trimmed().isEmpty()) {
         QStringList stopWords = m_stopWords->toPlainText().split("\n", QString::SkipEmptyParts);
@@ -83,10 +171,10 @@ QVariantMap OllamaSettingsDialog::params() const{
             o["stop"] = stopArray;
         }
     }
-    
+
     o["reasoning_effort"] = m_reasoningEffort->text();
     o["temperature_decay"] = m_temperatureDecay->value();
     o["repeat_last_n"] = m_repeatLastN->value();
-    
+
     return o;
 }

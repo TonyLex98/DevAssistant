@@ -5,6 +5,7 @@
 #include <QFormLayout>
 #include <QCheckBox>
 #include <QTextEdit>
+#include <QComboBox>
 #include "customWidgets/MemoryLineEdit.h"
 
 class OllamaSettingsDialog : public QDialog {
@@ -12,10 +13,16 @@ class OllamaSettingsDialog : public QDialog {
 public:
     explicit OllamaSettingsDialog(QWidget* parent=nullptr);
     QString endpoint() const { return m_endpoint->text(); }
+    QString embeddingModel() const { return m_embeddingModel->currentText(); }
+    void setEmbeddingModel(const QString& model) { m_embeddingModel->setCurrentText(model); }
     QVariantMap params() const;
+
+private slots:
+    void loadEmbeddingModels();
 
 private:
     MemoryLineEdit* m_endpoint=nullptr;
+    QComboBox* m_embeddingModel=nullptr;  // Model for embeddings - now a combobox
     // Основные параметры генерации
     QDoubleSpinBox* m_temperature=nullptr;
     QDoubleSpinBox* m_topP=nullptr;

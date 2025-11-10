@@ -57,7 +57,7 @@ public:
      * @brief initWithOllamaAdapter Initialize with main application's Ollama adapter
      * This allows using the main application's Ollama settings and connections
      */
-    void initWithOllamaAdapter(OllamaAdapter* adapter);
+    void initWithOllamaAdapter(OllamaAdapter* adapter, const QString& embeddingModel = QString());
 
     /// Starts indexing of the directory. Emits progress signals.
     Q_INVOKABLE void indexFolder(const QString &rootPath);

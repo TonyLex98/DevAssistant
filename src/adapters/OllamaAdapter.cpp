@@ -98,19 +98,32 @@ QStringList OllamaAdapter::listModels(){
 }
 
 void OllamaAdapter::startStream(const QString& prompt, const QVariantMap& options) {
-    startStreamWithSystem(prompt, QString(), options);
+    QUrl url = m_endpoint; url.setPath("/api/chat");
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    QJsonObject body = buildRequestBody(prompt, options, true, QString());
+
+    QJsonArray messages;
+    QJsonObject userMsg;
+    userMsg["role"] = "user";
+    userMsg["content"] = prompt;
+    messages.append(userMsg);
+    body.insert("messages", messages);
+
+    QNetworkReply* r = m_nam.post(req, QJsonDocument(body).toJson());
+    m_streamReply = r;
+    QObject::connect(r, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
+    QObject::connect(r, SIGNAL(finished()), this, SLOT(onStreamFinished()));
 }
 
 void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
                                           const QString& systemPrompt,
                                           const QVariantMap& options) {
-    if (m_streamReply) { m_streamReply->abort(); m_streamReply->deleteLater(); }
-    m_buffer.clear();
-
     QUrl url = m_endpoint; url.setPath("/api/chat");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QJsonObject body = buildRequestBody(userPrompt, options, true, systemPrompt);
+
     QJsonArray messages;
     if (!systemPrompt.isEmpty()) {
         QJsonObject systemMsg;
@@ -123,83 +136,146 @@ void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
     userMsg["content"] = userPrompt;
     messages.append(userMsg);
     body.insert("messages", messages);
-    m_lastBody = body;
 
-    m_streamReply = m_nam.post(req, QJsonDocument(body).toJson());
-    QObject::connect(m_streamReply, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
-    QObject::connect(m_streamReply, SIGNAL(finished()), this, SLOT(onStreamFinished()));
+    QNetworkReply* r = m_nam.post(req, QJsonDocument(body).toJson());
+    m_streamReply = r;
+    QObject::connect(r, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
+    QObject::connect(r, SIGNAL(finished()), this, SLOT(onStreamFinished()));
 }
 
-void OllamaAdapter::stopStream(){
-    if (m_streamReply) { m_streamReply->abort(); m_streamReply->deleteLater(); m_streamReply=nullptr; }
-}
-
-void OllamaAdapter::onReadyRead(){
-    m_buffer += m_streamReply->readAll();
-    while (true) {
-        int nl = m_buffer.indexOf('\n');
-        if (nl<0) break;
-        QByteArray one = m_buffer.left(nl);
-        m_buffer.remove(0,nl+1);
-        if (one.trimmed().isEmpty()) continue; // Skip empty lines
-        QJsonObject o = QJsonDocument::fromJson(one).object();
-        QString part = o.value("message").toObject().value("content").toString();
-        if (!part.isEmpty()) emit streamChunk(part);
+void OllamaAdapter::stopStream() {
+    if (m_streamReply) {
+        m_streamReply->abort();
+        m_streamReply = nullptr;
     }
 }
 
-void OllamaAdapter::onStreamFinished(){
-    emit streamFinished();
-    if (m_streamReply) { m_streamReply->deleteLater(); m_streamReply=nullptr; }
+void OllamaAdapter::onReadyRead() {
+    if (!m_streamReply) return;
+    m_buffer += m_streamReply->readAll();
+    int lastNewLine = -1;
+    forever {
+        int nextNewLine = m_buffer.indexOf('\n', lastNewLine+1);
+        if (nextNewLine == -1) break;
+        QByteArray line = m_buffer.mid(lastNewLine+1, nextNewLine - lastNewLine - 1);
+        lastNewLine = nextNewLine;
+        if (line.trimmed().isEmpty()) continue;
+        QJsonDocument doc = QJsonDocument::fromJson(line);
+        if (!doc.isObject()) continue;
+        QJsonObject obj = doc.object();
+        if (obj.contains("error")) {
+            emit streamError(obj.value("error").toString());
+            return; // stop processing
+        }
+        if (obj.contains("message")) {
+            QJsonObject msg = obj.value("message").toObject();
+            QString content = msg.value("content").toString();
+            if (!content.isEmpty())
+                emit streamChunk(content);
+        }
+        if (obj.value("done").toBool()) {
+            emit streamFinished();
+        }
+    }
+}
+
+void OllamaAdapter::onStreamFinished() {
+    if (!m_streamReply) return;
+    onReadyRead(); // process remainder
+    m_streamReply->deleteLater();
+    m_streamReply = nullptr;
 }
 
 QJsonObject OllamaAdapter::buildRequestBody(const QString& prompt,
                                             const QVariantMap& options,
                                             bool stream,
-                                            const QString& systemPrompt) const
-{
-    QJsonObject body;
-    body.insert("model", m_model);
-    body.insert("stream", stream);
-
-    // Create options object for generation parameters
-    QJsonObject optionsObj;
-
-    // Add only standard Ollama parameters to options object
-    QJsonObject genParamsObj = m_genParams.toJsonObject();
-    for (auto it = genParamsObj.begin(); it != genParamsObj.end(); ++it) {
-        QString key = it.key();
-        // Filter out parameters that cause warnings in Ollama
-        if (key != "reasoning_effort" && key != "temperature_decay" && 
-            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
-            optionsObj.insert(key, it.value());
+                                            const QString& systemPrompt) const {
+    QJsonObject o;
+    o["model"] = m_model;
+    o["stream"] = stream;
+    if (!systemPrompt.isEmpty()) {
+        o["options"] = m_genParams.toJsonObject();
+    } else {
+        // Apply options from the parameter map
+        if (options.contains("temperature")) o["temperature"] = options.value("temperature").toDouble();
+        if (options.contains("top_p")) o["top_p"] = options.value("top_p").toDouble();
+        if (options.contains("top_k")) o["top_k"] = options.value("top_k").toInt();
+        if (options.contains("repeat_penalty")) o["repeat_penalty"] = options.value("repeat_penalty").toDouble();
+        if (options.contains("presence_penalty")) o["presence_penalty"] = options.value("presence_penalty").toDouble();
+        if (options.contains("frequency_penalty")) o["frequency_penalty"] = options.value("frequency_penalty").toDouble();
+        if (options.contains("num_predict")) o["num_predict"] = options.value("num_predict").toInt();
+        if (options.contains("num_ctx")) o["num_ctx"] = options.value("num_ctx").toInt();
+        if (options.contains("mirostat")) o["mirostat"] = options.value("mirostat").toInt();
+        if (options.contains("mirostat_tau")) o["mirostat_tau"] = options.value("mirostat_tau").toDouble();
+        if (options.contains("mirostat_eta")) o["mirostat_eta"] = options.value("mirostat_eta").toDouble();
+        if (options.contains("seed")) o["seed"] = qint64(options.value("seed").toULongLong());
+        if (options.contains("stop")) {
+            QJsonArray stopArray = options.value("stop").toJsonArray();
+            o["stop"] = stopArray;
         }
+        if (options.contains("reasoning_effort")) o["reasoning_effort"] = options.value("reasoning_effort").toString();
+        if (options.contains("temperature_decay")) o["temperature_decay"] = options.value("temperature_decay").toDouble();
+        if (options.contains("repeat_last_n")) o["repeat_last_n"] = options.value("repeat_last_n").toInt();
     }
+    return o;
+}
 
-    // Add parameters from m_params (from configure) to options object
-    for (auto it = m_params.begin(); it != m_params.end(); ++it) {
-        QString key = it.key(); // it.key() already returns QString in QVariantMap
-        // Filter out parameters that cause warnings in Ollama
-        if (key != "reasoning_effort" && key != "temperature_decay" && 
-            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
-            optionsObj.insert(key, QJsonValue::fromVariant(it.value()));
-        }
+// Method to get embeddings using a specific model
+QVector<float> OllamaAdapter::getEmbedding(const QString& text, const QString& model) {
+    QUrl url = m_endpoint; 
+    url.setPath("/api/embeddings");
+    
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    
+    QJsonObject payload;
+    payload["model"] = model.isEmpty() ? "nomic-embed-text" : model;
+    payload["input"] = text;
+    
+    QEventLoop loop;
+    QNetworkReply* r = m_nam.post(req, QJsonDocument(payload).toJson());
+    QObject::connect(r, SIGNAL(finished()), &loop, SLOT(quit()));
+    QTimer t; 
+    t.setSingleShot(true); 
+    QObject::connect(&t, SIGNAL(timeout()), &loop, SLOT(quit())); 
+    t.start(30000);  // 30 second timeout
+    loop.exec();
+
+    if (r->error() != QNetworkReply::NoError) {
+        QString err = r->errorString();
+        r->deleteLater(); 
+        qWarning() << "Embedding error:" << err;
+        return QVector<float>(); // Return empty vector
     }
     
-    // Add parameters from options (local overrides) to options object
-    for (auto it = options.begin(); it != options.end(); ++it) {
-        QString key = it.key();
-        // Filter out parameters that cause warnings in Ollama
-        if (key != "reasoning_effort" && key != "temperature_decay" && 
-            key != "mirostat" && key != "mirostat_eta" && key != "mirostat_tau") {
-            optionsObj.insert(key, QJsonValue::fromVariant(it.value()));
+    QByteArray data = r->readAll(); 
+    r->deleteLater();
+    
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
+    QJsonObject json = jsonDoc.object();
+    
+    // Ollama v2+ returns embeddings in an array
+    QJsonArray embeddingsArray = json["embeddings"].toArray();
+    if (!embeddingsArray.isEmpty()) {
+        QJsonArray firstEmbedding = embeddingsArray[0].toArray();
+        QVector<float> result;
+        for (const QJsonValue& val : firstEmbedding) {
+            result.append(static_cast<float>(val.toDouble()));
         }
+        return result;
     }
-
-    // Insert options object if it has values
-    if (!optionsObj.isEmpty()) {
-        body.insert("options", optionsObj);
+    
+    // Fallback: older format or different structure
+    // Some models might return embeddings as a direct array rather than in an embeddings object
+    QJsonArray arr = json["embedding"].toArray(); // Different possible field name
+    if (!arr.isEmpty()) {
+        QVector<float> result;
+        for (const QJsonValue& val : arr) {
+            result.append(static_cast<float>(val.toDouble()));
+        }
+        return result;
     }
-
-    return body;
+    
+    qWarning() << "Could not parse embedding response:" << data;
+    return QVector<float>(); // Return empty vector
 }
