@@ -1,4 +1,4 @@
-QT       += core gui network
+QT       += core gui network sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 SOURCES += \
     RAGProcessor.cpp \
@@ -10,9 +10,9 @@ HEADERS += \
     Database.h \
     Encoder.h \
     RagWidget.h
-# Enable in-memory SQLite if sqlite3 is available
-CONFIG += link_pkgconfig
-PKGCONFIG += sqlite3
+# Enable SQLite support
+# CONFIG += link_pkgconfig
+# PKGCONFIG += sqlite3
 # To use external tools (pdftotext, docx2txt, tesseract) the user must install them.
 DISTFILES = \
     RAGProcessor.h \

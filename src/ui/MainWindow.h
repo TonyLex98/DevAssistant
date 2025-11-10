@@ -57,6 +57,9 @@
 // Solution templates
 #include "../core/SolutionTemplateManager.h"
 
+// LightRAG module
+#include "../ragmodule/RagWidget.h"
+
 class ChatDialog;
 class ModelsDialog;
 class OllamaSettingsDialog;
@@ -116,6 +119,14 @@ private slots:
     // New slots for template selection combobox in ChatDialog
     void runTemplateRequested(const QString &templatePath, const QString &text);
     void runSimpleChat(const QString &text);
+    
+    // LightRAG slots
+    void openLightRag();
+    
+    // File change handling
+
+    void onFileChangedForRag(const QString &path); // Handle file changes for RAG update
+    void updateRagIndexForFiles(const QStringList &filePaths); // Update RAG for specific files
 
 
 public:
@@ -165,6 +176,7 @@ private:
     QMap<QString, QSet<QString>> m_fileToContextCommands; // Maps files to commands that created context from them
     QMap<QString, QString> m_shellCommandOutputs; // Maps shell commands to their output titles
     QMap<QString, QString> m_pythonScriptOutputs; // Maps python scripts to their output titles
+    QSet<QString> m_trackedRagFiles; // Files currently tracked by RAG system
     
     // New context management system
     ContextManager* m_contextManager;
@@ -245,9 +257,11 @@ private:
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
     StyledButton *settingsPanelBtn{nullptr};
+    StyledButton *lightRagBtn{nullptr};  // кнопка для открытия LightRAG
     QWidget *m_settingsPanel{nullptr};
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
+    Rag::RagWidget *m_lightRagWidget{nullptr};  // виджет LightRAG
 
     struct ContextRange {
         int startLine = -1;

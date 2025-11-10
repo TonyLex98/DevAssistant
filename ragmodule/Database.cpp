@@ -53,7 +53,12 @@ void Database::insertFragments(const QVector<Fragment> &frags)
 QVector<Fragment> Database::searchSimilar(const QVector<float> &query, int k)
 {
     QVector<Fragment> result;
-    QSqlQuery q(mDb, "SELECT file_path, page_number, paragraph_number, embedding, text FROM fragments");
+    QSqlQuery q(mDb);
+    q.prepare("SELECT file_path, page_number, paragraph_number, embedding, text FROM fragments");
+    if (!q.exec()) {
+        qWarning() << "Query execution failed:" << q.lastError();
+        return result;
+    }
     QVector<float> maxValues;
     while (q.next()) {
         Fragment f;

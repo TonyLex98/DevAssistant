@@ -2,7 +2,7 @@
 TEMPLATE = app
 TARGET = DevAssistantQt
 CONFIG += qt warn_on release
-QT += widgets network multimedia core gui widgets
+QT += widgets network multimedia core gui widgets sql
 QMAKE_CXXFLAGS += -std=gnu++1z
 
 CONFIG += c++17 object_parallel_to_source
@@ -17,7 +17,8 @@ INCLUDEPATH += \
     src/audio \
     src/uiide \
     src/ui/customWidgets \
-    src/codeviwer
+    src/codeviwer \
+    ragmodule
 
 INCLUDEPATH += \
     $$PWD/src/uiide/tree-sitter/lib/src \
@@ -123,7 +124,11 @@ SOURCES += \
     src/uiide/tree-sitter-dart/src/scanner.c \
     src/md4c/src/entity.c \
     src/md4c/src/md4c.c \
-    src/md4c/src/md4c-html.c
+    src/md4c/src/md4c-html.c \
+    ragmodule/RAGProcessor.cpp \
+    ragmodule/Database.cpp \
+    ragmodule/Encoder.cpp \
+    ragmodule/RagWidget.cpp
 
 HEADERS += \
     src/audio/MicStreamWidget.h \
@@ -219,7 +224,12 @@ HEADERS += \
     src/uiide/cpphighlighter.h \
     src/uiide/methodeditdialog.h \
     src/utils/DescriptionGenerator.h \
-    src/utils/PromptManager.h
+    src/utils/PromptManager.h \
+    ragmodule/RAGProcessor.h \
+    ragmodule/Database.h \
+    ragmodule/Encoder.h \
+    ragmodule/RagWidget.h \
+    ragmodule/Fragment.h
 
 
 #INCLUDEPATH += $$PWD/external/whisper.cpp

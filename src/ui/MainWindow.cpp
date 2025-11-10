@@ -433,6 +433,13 @@ MainWindow::MainWindow(QWidget *parent)
             &MainWindow::openSequenceGraph);
     // -------------------------------------------------
 
+    // ---------- Добавляем кнопку «LightRAG» ----------
+    lightRagBtn = new StyledButton("Open LightRAG", this);
+    settingsLayout->addWidget(lightRagBtn);
+    connect(lightRagBtn, &StyledButton::clicked, this,
+            &MainWindow::openLightRag);
+    // -------------------------------------------------
+
     // Add confirmation mode combo box
     confirmModeCombo = new MemoryComboBox("confirmMode", this);
     confirmModeCombo->addItem("Auto-confirm commands", "auto");
@@ -954,7 +961,30 @@ void MainWindow::rescan(){
 
     emit missingFilesUpdated(needRed_set);
 
-
+    // Add programming/text files to file watcher and RAG tracking
+    for (const QString& rel : m_index.files()) {
+        const QString absPath = QDir(projectRootPath).filePath(rel);
+        QFileInfo fileInfo(absPath);
+        QString ext = fileInfo.suffix().toLower();
+        
+        // Check if this is a programming/text file that should be tracked by RAG
+        QStringList supportedExtensions = {"cpp", "c", "h", "hpp", "py", "js", "ts", "java", "cs", 
+                                          "go", "rust", "rb", "php", "html", "css", "json", "xml", 
+                                          "yaml", "yml", "md", "sql", "sh", "txt", "bat", "ini", 
+                                          "cfg", "config"};
+        
+        if (supportedExtensions.contains(ext)) {
+            // Add to file watcher
+            if (!m_fileWatcher->files().contains(absPath) && QFileInfo::exists(absPath)) {
+                m_fileWatcher->addPath(absPath);
+            }
+            
+            // Track for RAG if the LightRAG widget is initialized
+            if (m_lightRagWidget && m_lightRagWidget->mProcessor) {
+                m_trackedRagFiles.insert(absPath);
+            }
+        }
+    }
 
     log("Rescanned project.");
 }
@@ -2956,6 +2986,7 @@ void MainWindow::reOpenRootDir(){
     m_fileToContextCommands.clear();
     m_shellCommandOutputs.clear();
     m_pythonScriptOutputs.clear();
+    m_trackedRagFiles.clear(); // Clear RAG tracked files when switching projects
 
     ide_widget->openProjectbyPath(m_projectRoot);
 
@@ -2972,6 +3003,11 @@ void MainWindow::reOpenRootDir(){
     if (!m_dev_manager.generateDescrFiles())
     {
         qCritical() << "Ошибка при создании .dadescr файлов";
+    }
+
+    // Initialize or update LightRAG widget if it exists
+    if (m_lightRagWidget) {
+        m_lightRagWidget->setProjectPath(m_projectRoot);
     }
 
     rescan();
@@ -3613,7 +3649,61 @@ void MainWindow::onFileChanged(const QString &path)
             // Also remove from file-to-commands mapping
             m_fileToContextCommands.remove(path);
         }
+        
+        // Check if this file is tracked by RAG and should be updated
+        if (m_trackedRagFiles.contains(path)) {
+            onFileChangedForRag(path);
+        }
     });
+}
+
+void MainWindow::onFileChangedForRag(const QString &path)
+{
+    qDebug() << "[MainWindow] Updating RAG index for changed file:" << path;
+    
+    // Schedule RAG update after a brief delay to allow file operations to complete
+    QTimer::singleShot(500, this, [this, path]() {
+        // Check if the file still exists and is one that should be indexed by RAG
+        QFileInfo fileInfo(path);
+        if (!fileInfo.exists()) {
+            // If file was deleted, remove from RAG index if it was tracked
+            m_trackedRagFiles.remove(path);
+            if (m_lightRagWidget && m_lightRagWidget->mProcessor) {
+                // In a real implementation, we'd have a method to remove deleted files from RAG
+                qDebug() << "[MainWindow] File deleted, removed from RAG tracking:" << path;
+            }
+            return;
+        }
+        
+        // Only process files with programming/text extensions
+        QString ext = fileInfo.suffix().toLower();
+        QStringList supportedExtensions = {"cpp", "c", "h", "hpp", "py", "js", "ts", "java", "cs", 
+                                          "go", "rust", "rb", "php", "html", "css", "json", "xml", 
+                                          "yaml", "yml", "md", "sql", "sh", "txt", "bat", "ini", 
+                                          "cfg", "config"};
+        
+        if (supportedExtensions.contains(ext)) {
+            // Update the RAG index with the changed file
+            updateRagIndexForFiles(QStringList() << path);
+        }
+    });
+}
+
+void MainWindow::updateRagIndexForFiles(const QStringList &filePaths)
+{
+    if (m_lightRagWidget && m_lightRagWidget->mProcessor) {
+        qDebug() << "[MainWindow] Updating RAG index for files:" << filePaths;
+        
+        // Add the files to tracked RAG files
+        for (const QString &path : filePaths) {
+            m_trackedRagFiles.insert(path);
+        }
+        
+        // Index the specific files using the RAG processor
+        m_lightRagWidget->mProcessor->indexSpecificFiles(filePaths);
+    } else {
+        qDebug() << "[MainWindow] LightRAG widget not initialized, cannot update files:" << filePaths;
+    }
 }
 
 void MainWindow::runTemplateRequested(const QString &templatePath, const QString &text)
@@ -3973,5 +4063,61 @@ QString MainWindow::formatNumber(quint64 num) const
         }
     } else {
         return QString::number(num);
+    }
+}
+
+void MainWindow::openLightRag()
+{
+    // Initialize LightRAG widget if not already created
+    if (!m_lightRagWidget) {
+        m_lightRagWidget = new Rag::RagWidget(this);
+        
+        // Initialize the RAG processor with the main Ollama adapter
+        m_lightRagWidget->mProcessor->initWithOllamaAdapter(&m_model);
+        
+        // Set the main Ollama adapter for summarization
+        m_lightRagWidget->setMainOllamaAdapter(&m_model);
+        
+        // Set the project path for the LightRAG widget
+        if (!m_projectRoot.isEmpty()) {
+            m_lightRagWidget->setProjectPath(m_projectRoot);
+        }
+    }
+    
+    // Check if the widget is already in a dialog and show that dialog, or create a new one
+    QWidget *parentWidget = qobject_cast<QWidget*>(m_lightRagWidget->parent());
+    QDialog *existingDialog = nullptr;
+    
+    // Find if there's an existing dialog containing our widget
+    while (parentWidget) {
+        if (QDialog *dialog = qobject_cast<QDialog*>(parentWidget)) {
+            existingDialog = dialog;
+            break;
+        }
+        parentWidget = qobject_cast<QWidget*>(parentWidget->parent());
+    }
+    
+    if (existingDialog) {
+        // If dialog exists, just bring it to front
+        existingDialog->show();
+        existingDialog->raise();
+        existingDialog->activateWindow();
+    } else {
+        // Create a new dialog to host the LightRAG widget
+        QDialog *dialog = new QDialog(this);
+        dialog->setWindowTitle("LightRAG - Project Search and Context");
+        dialog->resize(1000, 700);
+        
+        QVBoxLayout *layout = new QVBoxLayout(dialog);
+        layout->addWidget(m_lightRagWidget);
+        
+        QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, dialog);
+        connect(buttonBox, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
+        
+        layout->addWidget(buttonBox);
+        
+        // Set the dialog to delete on close to avoid memory leaks
+        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+        dialog->show();
     }
 }
