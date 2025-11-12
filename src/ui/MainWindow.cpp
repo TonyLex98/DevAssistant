@@ -499,18 +499,10 @@ MainWindow::MainWindow(QWidget *parent)
     QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
     contextLayout->setContentsMargins(5, 5, 5, 5);
 
-    // Create header with toggle button
+    // Create header without toggle button
     QHBoxLayout* headerLayout = new QHBoxLayout();
     QLabel* titleLabel = new QLabel(tr("Context Commands:"), m_contextStatusWidget);
     headerLayout->addWidget(titleLabel);
-
-    // Add toggle button to show/hide the list
-    QToolButton* toggleButton = new QToolButton(m_contextStatusWidget);
-    toggleButton->setText("▼");
-    toggleButton->setCheckable(true);
-    toggleButton->setChecked(true);
-    toggleButton->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
-    headerLayout->addWidget(toggleButton);
     headerLayout->addStretch();
 
     contextLayout->addLayout(headerLayout);
@@ -524,21 +516,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
 
     // Set size preference for the context status widget
-    m_contextStatusWidget->setMinimumWidth(300);
+    m_contextStatusWidget->setMinimumWidth(200);
     m_contextStatusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-
-    // Connect toggle button to show/hide functionality
-    connect(toggleButton, &QToolButton::toggled, this, [this, toggleButton](bool checked) {
-        m_contextCommandsList->setVisible(checked);
-        toggleButton->setText(checked ? "▼" : "▲");
-
-        // Adjust height based on visibility
-        if (checked) {
-            m_contextStatusWidget->setMaximumHeight(200); // Increased for tree view
-        } else {
-            m_contextStatusWidget->setMaximumHeight(25); // Just header height
-        }
-    });
 
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
     m_chat->setMainWindow(this);
