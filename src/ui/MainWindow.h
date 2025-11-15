@@ -50,6 +50,7 @@
 #include <QVector>
 #include "customWidgets/MemoryComboBox.h"
 #include "../core/ContextManager.h"
+#include "LightRagWidget.h"
 
 // Need the complete definition for sequence graph widget
 #include "../codeviwer/SequenceGraphWidget.h"
@@ -116,6 +117,7 @@ private slots:
     // New slots for template selection combobox in ChatDialog
     void runTemplateRequested(const QString &templatePath, const QString &text);
     void runSimpleChat(const QString &text);
+    void openLightRag();
 
 
 public:
@@ -245,9 +247,11 @@ private:
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
     StyledButton *settingsPanelBtn{nullptr};
+    StyledButton *lightRagBtn{nullptr}; // кнопка «LightRAG»
     QWidget *m_settingsPanel{nullptr};
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
+    LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
 
     struct ContextRange {
         int startLine = -1;

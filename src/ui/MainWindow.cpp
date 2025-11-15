@@ -431,6 +431,12 @@ MainWindow::MainWindow(QWidget *parent)
     settingsLayout->addWidget(seqGraphBtn);
     connect(seqGraphBtn, &StyledButton::clicked, this,
             &MainWindow::openSequenceGraph);
+
+    // ---------- Добавляем кнопку «LightRAG» ----------
+    lightRagBtn = new StyledButton("LightRAG", this);
+    settingsLayout->addWidget(lightRagBtn);
+    connect(lightRagBtn, &StyledButton::clicked, this,
+            &MainWindow::openLightRag);
     // -------------------------------------------------
 
     // Add confirmation mode combo box
@@ -683,6 +689,18 @@ void MainWindow::openGraph()
     m_graphWindow->show();
     m_graphWindow->raise();
     m_graphWindow->activateWindow();
+}
+
+void MainWindow::openLightRag()
+{
+    if (!m_lightRagWidget) {
+        m_lightRagWidget = new LightRagWidget();
+        m_lightRagWidget->setAttribute(Qt::WA_DeleteOnClose, true);
+    }
+
+    m_lightRagWidget->show();
+    m_lightRagWidget->raise();
+    m_lightRagWidget->activateWindow();
 }
 
 void MainWindow::openSequenceGraph()
