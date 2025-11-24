@@ -5,6 +5,7 @@
 #include <QGraphicsEllipseItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsLineItem>
+#include <QGraphicsSceneHoverEvent>
 #include <QWheelEvent>
 #include <QAction>
 #include <QMenu>
@@ -15,6 +16,7 @@
 #include <QPointF>
 #include <QDebug>
 #include <QHash>
+#include <QKeyEvent>
 #include "PromptSequence.h"
 #include "PromptSequenceManager.h"
 
@@ -45,6 +47,7 @@ public slots:
     void restoreLayout();  // Public slot for restoring layout when opening
     void updateEdgesForNode(SequenceNodeItem *node);
     void fitToContents();
+    void resetZoom();
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -56,6 +59,9 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+    void drawBackground(QPainter *painter, const QRectF &rect) override;
 
 private:
     QGraphicsScene *m_scene = nullptr;
@@ -74,8 +80,12 @@ private:
     QString m_currentTemplateFilter;  // Currently active template filter (empty = no filter)
     QString m_currentTemplateDirPath; // Current template directory path for saving positions
     bool m_panning = false;
+    bool m_spacePanning = false;
     QPoint m_lastPanPoint;
     qreal m_totalScale = 1.0;
+    qreal m_minScale = 0.25;
+    qreal m_maxScale = 6.0;
+    qreal m_zoomStep = 1.15;
     
     // Helper method to clear the scene while preserving positions if needed
     void clearScenePreservingPositions();
@@ -99,6 +109,8 @@ private:
     
     // Context menu
     void showContextMenu(const QPoint &pos);
+    QRectF contentBounds() const;
+    void focusOnSelection();
 };
 
 // Node item representing a sequence
@@ -119,12 +131,15 @@ public:
 
 protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+    void hoverEnterEvent(QGraphicsSceneHoverEvent *event) override;
+    void hoverLeaveEvent(QGraphicsSceneHoverEvent *event) override;
 
 private:
     QString m_name;
     QString m_description;
     QRectF m_rect;
     bool m_highlighted;
+    bool m_hovered{false};
 };
 
 // Edge item representing the connection between sequences

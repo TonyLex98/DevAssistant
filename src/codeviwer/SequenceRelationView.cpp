@@ -11,11 +11,14 @@
 #include <QRegularExpression>
 #include <QtMath>
 #include <QSettings>
+#include <QKeyEvent>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QScrollBar>
+#include <QGraphicsSceneHoverEvent>
+#include <QLinearGradient>
 #include "SolutionTemplate.h"
 #include "SolutionTemplateManager.h"
 
@@ -33,6 +36,12 @@ SequenceNodeItem::SequenceNodeItem(const QString &name, const QString &descripti
     setFlag(QGraphicsItem::ItemIsMovable);
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+    setAcceptHoverEvents(true);
+    if (!m_description.isEmpty()) {
+        setToolTip(QString("%1\n%2").arg(m_name, m_description));
+    } else {
+        setToolTip(m_name);
+    }
     
     // Calculate bounding rect based on text
     QFont font;
@@ -67,13 +76,19 @@ void SequenceNodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     Q_UNUSED(widget)
 
     // Draw background
+    QColor fillColor(200, 200, 200);
     if (m_highlighted) {
-        painter->setBrush(QBrush(QColor(144, 238, 144))); // Light green for current sequence
-    } else {
-        painter->setBrush(QBrush(QColor(200, 200, 200))); // Light gray for normal
+        fillColor = QColor(144, 238, 144); // Light green for current sequence
+    } else if (m_hovered) {
+        fillColor = QColor(215, 215, 230); // Slightly brighter on hover
     }
-    
-    painter->setPen(QPen(QColor(100, 100, 100), 2));
+
+    QLinearGradient gradient(m_rect.topLeft(), m_rect.bottomRight());
+    gradient.setColorAt(0, fillColor.lighter(105));
+    gradient.setColorAt(1, fillColor.darker(105));
+
+    painter->setBrush(QBrush(gradient));
+    painter->setPen(QPen(QColor(80, 80, 80), m_highlighted ? 3 : 2));
     painter->drawRoundedRect(m_rect, 10, 10);
     
     // Draw text
@@ -161,6 +176,20 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
         }
     }
     return QGraphicsItem::itemChange(change, value);
+}
+
+void SequenceNodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
+{
+    Q_UNUSED(event)
+    m_hovered = true;
+    update();
+}
+
+void SequenceNodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
+{
+    Q_UNUSED(event)
+    m_hovered = false;
+    update();
 }
 
 // SequenceEdgeItem Implementation
@@ -285,12 +314,17 @@ SequenceRelationView::SequenceRelationView(QWidget *parent)
     m_scene = new QGraphicsScene(this);
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
-    setDragMode(QGraphicsView::NoDrag);
+    setRenderHint(QPainter::TextAntialiasing);
+    setCacheMode(QGraphicsView::CacheBackground);
+    setDragMode(QGraphicsView::RubberBandDrag);
     setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
+    setOptimizationFlag(QGraphicsView::DontSavePainterState, true);
+    setOptimizationFlag(QGraphicsView::IndirectPainting, true);
+    setBackgroundBrush(QColor(245, 245, 250));
     
     // Set default view settings
-    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-    setResizeAnchor(QGraphicsView::AnchorUnderMouse);
+    setTransformationAnchor(QGraphicsView::NoAnchor);
+    setResizeAnchor(QGraphicsView::AnchorViewCenter);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 }
@@ -376,6 +410,8 @@ void SequenceRelationView::rebuildGraph()
             edge->updatePosition();
         }
     }
+
+    fitToContents();
     
     qDebug() << "[SequenceRelationView] rebuildGraph() completed";
 }
@@ -383,6 +419,9 @@ void SequenceRelationView::rebuildGraph()
 void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPath)
 {
     qDebug() << "[SequenceRelationView] rebuildGraphForTemplate called for:" << templateDirPath;
+
+    resetTransform();
+    m_totalScale = 1.0;
     
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
@@ -476,6 +515,8 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
             edge->updatePosition();
         }
     }
+
+    fitToContents();
     
     qDebug() << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
 }
@@ -929,15 +970,8 @@ void SequenceRelationView::updateEdgesForNode(SequenceNodeItem *node)
 
 void SequenceRelationView::fitToContents()
 {
-    if (m_nodeItems.isEmpty())
-        return;
-
-    QRectF bounds;
-    for (SequenceNodeItem *item : qAsConst(m_nodeItems)) {
-        bounds = bounds.united(item->sceneBoundingRect());
-    }
-
-    if (bounds.isNull())
+    QRectF bounds = contentBounds();
+    if (bounds.isNull() || !bounds.isValid())
         return;
 
     bounds = bounds.adjusted(-80, -80, 80, 80);
@@ -963,23 +997,51 @@ void SequenceRelationView::clearScenePreservingPositions()
 
 void SequenceRelationView::wheelEvent(QWheelEvent *event)
 {
-    if (event->modifiers() & Qt::ControlModifier) {
-        constexpr qreal ScaleStep = 1.15;
-        qreal delta = event->angleDelta().y() / 120.0;
-        qreal factor = qPow(ScaleStep, delta);
-        qreal targetScale = qBound(0.25, m_totalScale * factor, 6.0);
-        qreal actualFactor = targetScale / m_totalScale;
-        scale(actualFactor, actualFactor);
-        m_totalScale = targetScale;
-    } else {
+    const bool zooming = event->modifiers().testFlag(Qt::ControlModifier);
+    if (!zooming) {
         QGraphicsView::wheelEvent(event);
+        return;
     }
+
+    qreal delta = event->angleDelta().y();
+    if (qFuzzyIsNull(delta) && !event->pixelDelta().isNull()) {
+        delta = event->pixelDelta().y();
+    }
+
+    if (qFuzzyIsNull(delta)) {
+        QGraphicsView::wheelEvent(event);
+        return;
+    }
+
+    const QPoint viewportPos = event->pos();
+    const QPointF scenePosBefore = mapToScene(viewportPos);
+
+    qreal steps = delta / 120.0; // 120 == one mouse wheel step
+    qreal factor = qPow(m_zoomStep, steps);
+    qreal targetScale = qBound(m_minScale, m_totalScale * factor, m_maxScale);
+    qreal actualFactor = targetScale / m_totalScale;
+
+    if (qFuzzyCompare(actualFactor, 1.0)) {
+        event->accept();
+        return;
+    }
+
+    scale(actualFactor, actualFactor);
+    m_totalScale = targetScale;
+
+    // Keep the point under cursor stationary in view coordinates
+    const QPointF scenePosAfter = mapToScene(viewportPos);
+    const QPointF move = scenePosAfter - scenePosBefore;
+    translate(-move.x(), -move.y());
+    event->accept();
 }
 
 void SequenceRelationView::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::MiddleButton ||
-        (event->button() == Qt::LeftButton && event->modifiers() & Qt::AltModifier)) {
+    const bool panButton = event->button() == Qt::MiddleButton ||
+                           (event->button() == Qt::LeftButton && (event->modifiers() & Qt::AltModifier)) ||
+                           (event->button() == Qt::LeftButton && m_spacePanning);
+    if (panButton) {
         m_panning = true;
         m_lastPanPoint = event->pos();
         setCursor(Qt::ClosedHandCursor);
@@ -1007,14 +1069,64 @@ void SequenceRelationView::mouseMoveEvent(QMouseEvent *event)
 void SequenceRelationView::mouseReleaseEvent(QMouseEvent *event)
 {
     if (m_panning && (event->button() == Qt::MiddleButton ||
-                      (event->button() == Qt::LeftButton && event->modifiers() & Qt::AltModifier))) {
+                      (event->button() == Qt::LeftButton && ((event->modifiers() & Qt::AltModifier) || m_spacePanning)))) {
         m_panning = false;
-        setCursor(Qt::ArrowCursor);
+        setCursor(m_spacePanning ? Qt::OpenHandCursor : Qt::ArrowCursor);
         event->accept();
         return;
     }
 
     QGraphicsView::mouseReleaseEvent(event);
+}
+
+void SequenceRelationView::keyPressEvent(QKeyEvent *event)
+{
+    if (event->isAutoRepeat()) {
+        QGraphicsView::keyPressEvent(event);
+        return;
+    }
+
+    if (event->key() == Qt::Key_Space) {
+        m_spacePanning = true;
+        if (!m_panning) {
+            setCursor(Qt::OpenHandCursor);
+        }
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_0 && event->modifiers().testFlag(Qt::ControlModifier)) {
+        resetZoom();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_F) {
+        focusOnSelection();
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::keyPressEvent(event);
+}
+
+void SequenceRelationView::keyReleaseEvent(QKeyEvent *event)
+{
+    if (event->isAutoRepeat()) {
+        QGraphicsView::keyReleaseEvent(event);
+        return;
+    }
+
+    if (event->key() == Qt::Key_Space) {
+        m_spacePanning = false;
+        if (!m_panning) {
+            setCursor(Qt::ArrowCursor);
+        }
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::keyReleaseEvent(event);
 }
 
 void SequenceRelationView::mouseDoubleClickEvent(QMouseEvent *event)
@@ -1026,6 +1138,8 @@ void SequenceRelationView::mouseDoubleClickEvent(QMouseEvent *event)
     if (item && item->type() == SequenceNodeItem::Type) {
         SequenceNodeItem *nodeItem = static_cast<SequenceNodeItem*>(item);
         emit sequenceSelected(nodeItem->name());
+    } else {
+        fitToContents();
     }
     
     QGraphicsView::mouseDoubleClickEvent(event);
@@ -1054,12 +1168,56 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
 {
     QMenu menu(this);
     
-    QAction *refreshAction = menu.addAction("Refresh Graph");
+    QAction *fitAction = menu.addAction(tr("Поместить всё"));
+    QAction *focusAction = menu.addAction(tr("Показать выделенное"));
+    QAction *resetAction = menu.addAction(tr("Сбросить масштаб"));
+    QAction *refreshAction = menu.addAction(tr("Обновить граф"));
     QAction *selectedAction = menu.exec(mapToGlobal(pos));
     
-    if (selectedAction == refreshAction) {
+    if (selectedAction == fitAction) {
+        fitToContents();
+    } else if (selectedAction == focusAction) {
+        focusOnSelection();
+    } else if (selectedAction == resetAction) {
+        resetZoom();
+    } else if (selectedAction == refreshAction) {
         rebuildGraph();
     }
+}
+
+QRectF SequenceRelationView::contentBounds() const
+{
+    QRectF bounds;
+    for (SequenceNodeItem *item : m_nodeItems) {
+        if (item) {
+            bounds = bounds.united(item->sceneBoundingRect());
+        }
+    }
+
+    if (bounds.isNull() && m_scene) {
+        bounds = m_scene->itemsBoundingRect();
+    }
+
+    return bounds;
+}
+
+void SequenceRelationView::focusOnSelection()
+{
+    QRectF bounds;
+    for (SequenceNodeItem *item : m_nodeItems) {
+        if (item && item->isSelected()) {
+            bounds = bounds.united(item->sceneBoundingRect());
+        }
+    }
+
+    if (bounds.isNull() || !bounds.isValid()) {
+        fitToContents();
+        return;
+    }
+
+    bounds = bounds.adjusted(-60, -60, 60, 60);
+    fitInView(bounds, Qt::KeepAspectRatio);
+    m_totalScale = transform().m11();
 }
 
 void SequenceRelationView::saveNodePositions()
@@ -1150,6 +1308,46 @@ void SequenceRelationView::loadNodePositions()
     
     // If we have positions already stored in our internal map, we'll use them
     // In the future, this will come from template files that are loaded by SolutionTemplateManager
+}
+
+void SequenceRelationView::resetZoom()
+{
+    if (!m_scene || m_scene->items().isEmpty()) {
+        resetTransform();
+        m_totalScale = 1.0;
+        return;
+    }
+
+    fitToContents();
+}
+
+void SequenceRelationView::drawBackground(QPainter *painter, const QRectF &rect)
+{
+    painter->fillRect(rect, backgroundBrush());
+
+    const int gridSize = 40;
+    const int boldStep = 5;
+    QPen lightPen(QColor(230, 230, 240));
+    lightPen.setWidth(1);
+    QPen boldPen(QColor(210, 210, 220));
+    boldPen.setWidth(1);
+
+    int left = static_cast<int>(qFloor(rect.left() / gridSize)) * gridSize;
+    int right = static_cast<int>(qCeil(rect.right() / gridSize)) * gridSize;
+    int top = static_cast<int>(qFloor(rect.top() / gridSize)) * gridSize;
+    int bottom = static_cast<int>(qCeil(rect.bottom() / gridSize)) * gridSize;
+
+    int index = 0;
+    for (int x = left; x <= right; x += gridSize, ++index) {
+        painter->setPen((index % boldStep == 0) ? boldPen : lightPen);
+        painter->drawLine(x, top, x, bottom);
+    }
+
+    index = 0;
+    for (int y = top; y <= bottom; y += gridSize, ++index) {
+        painter->setPen((index % boldStep == 0) ? boldPen : lightPen);
+        painter->drawLine(left, y, right, y);
+    }
 }
 
 
