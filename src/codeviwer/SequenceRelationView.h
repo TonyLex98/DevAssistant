@@ -88,6 +88,7 @@ private:
     bool m_panning = false;
     bool m_spacePanning = false;
     QPoint m_lastPanPoint;
+    QPointF m_lastContextScenePos;
     qreal m_totalScale = 1.0;
     qreal m_minScale = 0.25;
     qreal m_maxScale = 6.0;

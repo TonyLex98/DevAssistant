@@ -1266,6 +1266,7 @@ void SequenceRelationView::mouseDoubleClickEvent(QMouseEvent *event)
 
 void SequenceRelationView::contextMenuEvent(QContextMenuEvent *event)
 {
+    m_lastContextScenePos = mapToScene(event->pos());
     showContextMenu(event->pos());
 }
 
@@ -1300,6 +1301,10 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
     QAction *focusAction = menu.addAction(tr("Показать выделенное"));
     QAction *resetAction = menu.addAction(tr("Сбросить масштаб"));
     QAction *refreshAction = menu.addAction(tr("Обновить граф"));
+    QAction *createAction = nullptr;
+    if (!m_currentTemplateDirPath.isEmpty()) {
+        createAction = menu.addAction(tr("Создать последовательность здесь"));
+    }
 
     if (nodeItem) {
         menu.addSeparator();
@@ -1323,6 +1328,20 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                 rebuildGraph();
             } else {
                 rebuildGraphForTemplate(m_currentTemplateDirPath);
+            }
+        } else if (nodeChoice == createAction && createAction) {
+            QString name = QInputDialog::getText(this, tr("Новая последовательность"),
+                                                 tr("Название последовательности:"));
+            if (!name.isEmpty()) {
+                if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
+                    rebuildGraphForTemplate(m_currentTemplateDirPath);
+                    if (m_nodeItems.contains(name)) {
+                        m_nodeItems[name]->setPos(m_lastContextScenePos);
+                        savePositions();
+                    }
+                } else {
+                    QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+                }
             }
         } else if (nodeChoice == openAction) {
             emit sequenceSelected(nodeItem->name());
@@ -1413,6 +1432,20 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
             } else {
                 rebuildGraphForTemplate(m_currentTemplateDirPath);
             }
+        } else if (choice == createAction && createAction) {
+            QString name = QInputDialog::getText(this, tr("Новая последовательность"),
+                                                 tr("Название последовательности:"));
+            if (!name.isEmpty()) {
+                if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
+                    rebuildGraphForTemplate(m_currentTemplateDirPath);
+                    if (m_nodeItems.contains(name)) {
+                        m_nodeItems[name]->setPos(m_lastContextScenePos);
+                        savePositions();
+                    }
+                } else {
+                    QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+                }
+            }
         }
         return;
     }
@@ -1427,6 +1460,20 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
         resetZoom();
     } else if (selectedAction == refreshAction) {
         rebuildGraph();
+    } else if (selectedAction == createAction && createAction) {
+        QString name = QInputDialog::getText(this, tr("Новая последовательность"),
+                                             tr("Название последовательности:"));
+        if (!name.isEmpty()) {
+            if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
+                rebuildGraphForTemplate(m_currentTemplateDirPath);
+                if (m_nodeItems.contains(name)) {
+                    m_nodeItems[name]->setPos(m_lastContextScenePos);
+                    savePositions();
+                }
+            } else {
+                QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+            }
+        }
     }
 }
 
