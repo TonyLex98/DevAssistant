@@ -13,12 +13,15 @@
 #include <QSettings>
 #include <QKeyEvent>
 #include <QFileInfo>
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QScrollBar>
 #include <QGraphicsSceneHoverEvent>
 #include <QLinearGradient>
+#include <QMessageBox>
+#include <QDir>
 #include "SolutionTemplate.h"
 #include "SolutionTemplateManager.h"
 
@@ -79,8 +82,12 @@ void SequenceNodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     QColor fillColor(200, 200, 200);
     if (m_highlighted) {
         fillColor = QColor(144, 238, 144); // Light green for current sequence
-    } else if (m_hovered) {
-        fillColor = QColor(215, 215, 230); // Slightly brighter on hover
+    } else if (m_connectionSource) {
+        fillColor = QColor(255, 230, 180);
+    } else if (isSelected()) {
+        fillColor = QColor(180, 205, 255);
+    } else if (m_hovered || m_connectionTargetHover) {
+        fillColor = QColor(215, 215, 230); // Slightly brighter on hover/target
     }
 
     QLinearGradient gradient(m_rect.topLeft(), m_rect.bottomRight());
@@ -88,7 +95,10 @@ void SequenceNodeItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     gradient.setColorAt(1, fillColor.darker(105));
 
     painter->setBrush(QBrush(gradient));
-    painter->setPen(QPen(QColor(80, 80, 80), m_highlighted ? 3 : 2));
+    QColor borderColor = m_connectionSource ? QColor(220, 140, 60) : QColor(80, 80, 80);
+    QPen pen(borderColor, (m_highlighted || m_connectionSource) ? 3 : (isSelected() ? 3 : 2));
+    pen.setJoinStyle(Qt::RoundJoin);
+    painter->setPen(pen);
     painter->drawRoundedRect(m_rect, 10, 10);
     
     // Draw text
@@ -119,6 +129,22 @@ void SequenceNodeItem::setHighlighted(bool highlighted)
 {
     m_highlighted = highlighted;
     update();
+}
+
+void SequenceNodeItem::setConnectionSource(bool on)
+{
+    if (m_connectionSource != on) {
+        m_connectionSource = on;
+        update();
+    }
+}
+
+void SequenceNodeItem::setConnectionTargetHover(bool on)
+{
+    if (m_connectionTargetHover != on) {
+        m_connectionTargetHover = on;
+        update();
+    }
 }
 
 QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
@@ -182,6 +208,16 @@ void SequenceNodeItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
 {
     Q_UNUSED(event)
     m_hovered = true;
+    // Highlight as potential target when connecting
+    if (scene()) {
+        auto views = scene()->views();
+        if (!views.isEmpty()) {
+            SequenceRelationView *view = qobject_cast<SequenceRelationView*>(views.first());
+            if (view && view->isConnecting() && view->connectionSource() != this) {
+                m_connectionTargetHover = true;
+            }
+        }
+    }
     update();
 }
 
@@ -189,6 +225,7 @@ void SequenceNodeItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 {
     Q_UNUSED(event)
     m_hovered = false;
+    m_connectionTargetHover = false;
     update();
 }
 
@@ -348,8 +385,9 @@ void SequenceRelationView::rebuildGraph()
 {
     qDebug() << "[SequenceRelationView] rebuildGraph() called";
     
-    resetTransform();
-    m_totalScale = 1.0;
+    QTransform prevTransform = transform();
+    QPointF prevCenter = mapToScene(viewport()->rect().center());
+    bool hadViewState = !m_scene->items().isEmpty();
 
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
@@ -371,9 +409,12 @@ void SequenceRelationView::rebuildGraph()
     
     qDebug() << "[SequenceRelationView] Adding nodes for sequences:" << sequences.keys();
     
+    m_sequenceToBaseName.clear();
     // Add all nodes first
     for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
         const PromptSequence &seq = it.value();
+        QString baseName = QFileInfo(it.key()).baseName();
+        m_sequenceToBaseName.insert(seq.name(), baseName);
         addNode(seq.name(), seq.description());
     }
     
@@ -410,8 +451,18 @@ void SequenceRelationView::rebuildGraph()
             edge->updatePosition();
         }
     }
+    
+    bool restored = false;
+    if (hadViewState && !m_scene->items().isEmpty()) {
+        setTransform(prevTransform);
+        centerOn(prevCenter);
+        m_totalScale = transform().m11();
+        restored = true;
+    }
 
-    fitToContents();
+    if (!restored) {
+        fitToContents();
+    }
     
     qDebug() << "[SequenceRelationView] rebuildGraph() completed";
 }
@@ -419,9 +470,9 @@ void SequenceRelationView::rebuildGraph()
 void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPath)
 {
     qDebug() << "[SequenceRelationView] rebuildGraphForTemplate called for:" << templateDirPath;
-
-    resetTransform();
-    m_totalScale = 1.0;
+    QTransform prevTransform = transform();
+    QPointF prevCenter = mapToScene(viewport()->rect().center());
+    bool hadViewState = !m_scene->items().isEmpty();
     
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
@@ -443,6 +494,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     QStringList filters = {"*.seq.json"};
     QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     
+    m_sequenceToBaseName.clear();
     // Load and add only sequences that exist in this template
     for (const QFileInfo& fileInfo : fileInfoList) {
         QString seqPath = fileInfo.absoluteFilePath();
@@ -461,6 +513,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
         }
         
         PromptSequence seq = PromptSequence::fromJson(seqDoc.object());
+        m_sequenceToBaseName.insert(seq.name(), fileInfo.baseName());
         addNode(seq.name(), seq.description());
     }
     
@@ -515,8 +568,18 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
             edge->updatePosition();
         }
     }
+    
+    bool restored = false;
+    if (hadViewState && !m_scene->items().isEmpty()) {
+        setTransform(prevTransform);
+        centerOn(prevCenter);
+        m_totalScale = transform().m11();
+        restored = true;
+    }
 
-    fitToContents();
+    if (!restored) {
+        fitToContents();
+    }
     
     qDebug() << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
 }
@@ -599,33 +662,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     }
     
     QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
-    
-    // Process each source sequence and its targets from the template
-    for (auto it = sequenceTargets.constBegin(); it != sequenceTargets.constEnd(); ++it) {
-        QString sourceBaseName = it.key();  // This is the base filename of the source sequence
-        QJsonArray targetArray = it.value().toArray();
-        
-        // Get the actual sequence name for the source
-        QString sourceSequenceName = baseNameToSequenceNameMap.value(sourceBaseName, sourceBaseName);
-        
-        // Process each target sequence
-        for (const QJsonValue& targetValue : targetArray) {
-            QString targetBaseName = targetValue.toString();
-            
-            // Get the actual sequence name for the target
-            QString targetSequenceName = baseNameToSequenceNameMap.value(targetBaseName, targetBaseName);
-            
-            // Verify both sequences exist in this template
-            if (baseNameToSequenceNameMap.contains(sourceBaseName) && 
-                baseNameToSequenceNameMap.contains(targetBaseName)) {
-                
-                addEdge(sourceSequenceName, targetSequenceName);
-                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
-            } else {
-                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
-            }
-        }
-    }
+    setEdgesFromTemplate(sequenceTargets, baseNameToSequenceNameMap);
 }
 
 void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QString &templateDirPath)
@@ -783,33 +820,8 @@ void SequenceRelationView::findSequenceConnections()
         baseNameToSequenceNameMap[baseName] = it.value().name();
         baseNameToSequencePathMap[baseName] = filePath;
     }
-    
-    // Process each source sequence and its targets
-    for (auto it = sequenceTargets.constBegin(); it != sequenceTargets.constEnd(); ++it) {
-        QString sourceBaseName = it.key();  // This is the base filename of the source sequence
-        QJsonArray targetArray = it.value().toArray();
-        
-        // Get the actual sequence name for the source
-        QString sourceSequenceName = baseNameToSequenceNameMap.value(sourceBaseName, sourceBaseName);
-        
-        // Process each target sequence
-        for (const QJsonValue& targetValue : targetArray) {
-            QString targetBaseName = targetValue.toString();
-            
-            // Get the actual sequence name for the target
-            QString targetSequenceName = baseNameToSequenceNameMap.value(targetBaseName, targetBaseName);
-            
-            // Verify both sequences exist in our manager
-            if (baseNameToSequenceNameMap.contains(sourceBaseName) && 
-                baseNameToSequenceNameMap.contains(targetBaseName)) {
-                
-                addEdge(sourceSequenceName, targetSequenceName);
-                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
-            } else {
-                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
-            }
-        }
-    }
+
+    setEdgesFromTemplate(sequenceTargets, baseNameToSequenceNameMap);
 }
 
 void SequenceRelationView::findSequenceConnectionsLegacy()
@@ -911,6 +923,10 @@ void SequenceRelationView::addNode(const QString &name, const QString &descripti
 
 void SequenceRelationView::addEdge(const QString &from, const QString &to)
 {
+    QString key = from + "->" + to;
+    if (m_edgesSet.contains(key))
+        return;
+
     SequenceNodeItem *sourceItem = m_nodeItems.value(from);
     SequenceNodeItem *destItem = m_nodeItems.value(to);
     
@@ -921,6 +937,7 @@ void SequenceRelationView::addEdge(const QString &from, const QString &to)
     m_edgeItems.append(edgeItem);
     m_nodeEdges[sourceItem].append(edgeItem);
     m_nodeEdges[destItem].append(edgeItem);
+    m_edgesSet.insert(key);
 }
 
 void SequenceRelationView::positionNodes()
@@ -968,6 +985,51 @@ void SequenceRelationView::updateEdgesForNode(SequenceNodeItem *node)
     }
 }
 
+void SequenceRelationView::removeEdgeItem(const QString &sourceName, const QString &targetName)
+{
+    QString key = sourceName + "->" + targetName;
+    for (int i = 0; i < m_edgeItems.size(); ++i) {
+        SequenceEdgeItem *edge = m_edgeItems.at(i);
+        if (edge && edge->source() && edge->dest() &&
+            edge->source()->name() == sourceName && edge->dest()->name() == targetName) {
+            m_scene->removeItem(edge);
+            m_nodeEdges[edge->source()].removeAll(edge);
+            m_nodeEdges[edge->dest()].removeAll(edge);
+            delete edge;
+            m_edgeItems.removeAt(i);
+            m_edgesSet.remove(key);
+            break;
+        }
+    }
+}
+
+void SequenceRelationView::removeNodeItem(const QString &sequenceName)
+{
+    SequenceNodeItem *item = m_nodeItems.take(sequenceName);
+    if (!item)
+        return;
+
+    // Remove connected edges
+    QList<SequenceEdgeItem*> edges = m_nodeEdges.take(item);
+    for (SequenceEdgeItem *edge : edges) {
+        if (!edge) continue;
+        QString key = (edge->source() ? edge->source()->name() : QString()) + "->" +
+                      (edge->dest() ? edge->dest()->name() : QString());
+        m_edgesSet.remove(key);
+        SequenceNodeItem *other = edge->source() == item ? edge->dest() : edge->source();
+        if (other && m_nodeEdges.contains(other)) {
+            m_nodeEdges[other].removeAll(edge);
+        }
+        m_scene->removeItem(edge);
+        delete edge;
+        m_edgeItems.removeOne(edge);
+    }
+
+    m_scene->removeItem(item);
+    delete item;
+    m_nodePositions.remove(sequenceName);
+}
+
 void SequenceRelationView::fitToContents()
 {
     QRectF bounds = contentBounds();
@@ -981,18 +1043,26 @@ void SequenceRelationView::fitToContents()
 
 void SequenceRelationView::clearScene()
 {
+    cancelConnection();
     m_scene->clear();
     m_nodeItems.clear();
     m_edgeItems.clear();
     m_nodePositions.clear();  // Clear positions map when scene is cleared completely
+    m_edgesSet.clear();
+    m_sequenceToBaseName.clear();
+    cancelConnection();
 }
 
 void SequenceRelationView::clearScenePreservingPositions()
 {
+    cancelConnection();
     m_scene->clear();
     m_nodeItems.clear();
     m_edgeItems.clear();
     // Don't clear m_nodePositions to preserve positions for rebuild
+    m_edgesSet.clear();
+    m_sequenceToBaseName.clear();
+    cancelConnection();
 }
 
 void SequenceRelationView::wheelEvent(QWheelEvent *event)
@@ -1049,6 +1119,43 @@ void SequenceRelationView::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    if (m_connectSource && event->button() == Qt::LeftButton) {
+        QPointF scenePos = mapToScene(event->pos());
+        SequenceNodeItem *targetNode = nullptr;
+        const QList<QGraphicsItem*> itemsAtPos = m_scene->items(scenePos, Qt::IntersectsItemShape, Qt::DescendingOrder, transform());
+        for (QGraphicsItem *it : itemsAtPos) {
+            if (it && it->type() == SequenceNodeItem::Type) {
+                SequenceNodeItem *candidate = static_cast<SequenceNodeItem*>(it);
+                if (candidate != m_connectSource) {
+                    targetNode = candidate;
+                    break;
+                }
+            }
+        }
+        if (targetNode) {
+            if (!addDirectedConnection(m_connectSource->name(), targetNode->name())) {
+                QMessageBox::warning(this, tr("Связь не создана"),
+                                     tr("Не удалось создать связь между %1 и %2.")
+                                         .arg(m_connectSource->name(), targetNode->name()));
+            }
+            cancelConnection();
+        } else {
+            // keep connection mode active, just update temp line
+            updateTempConnectionTo(scenePos);
+        }
+        event->accept();
+        return;
+    }
+
+    if (event->button() == Qt::LeftButton) {
+        QPointF scenePos = mapToScene(event->pos());
+        QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
+        if (item && item->type() == SequenceNodeItem::Type) {
+            SequenceNodeItem *node = static_cast<SequenceNodeItem*>(item);
+            setCurrentSequence(node->name());
+        }
+    }
+
     QGraphicsView::mousePressEvent(event);
 }
 
@@ -1063,6 +1170,12 @@ void SequenceRelationView::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
+    if (m_connectSource) {
+        updateTempConnectionTo(mapToScene(event->pos()));
+        event->accept();
+        return;
+    }
+
     QGraphicsView::mouseMoveEvent(event);
 }
 
@@ -1072,6 +1185,12 @@ void SequenceRelationView::mouseReleaseEvent(QMouseEvent *event)
                       (event->button() == Qt::LeftButton && ((event->modifiers() & Qt::AltModifier) || m_spacePanning)))) {
         m_panning = false;
         setCursor(m_spacePanning ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+
+    if (m_connectSource && event->button() == Qt::RightButton) {
+        cancelConnection();
         event->accept();
         return;
     }
@@ -1166,12 +1285,138 @@ void SequenceRelationView::setCurrentSequence(const QString &sequenceName)
 
 void SequenceRelationView::showContextMenu(const QPoint &pos)
 {
+    QPointF scenePos = mapToScene(pos);
+    QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
+    SequenceNodeItem *nodeItem = (item && item->type() == SequenceNodeItem::Type)
+                                     ? static_cast<SequenceNodeItem*>(item)
+                                     : nullptr;
+    SequenceEdgeItem *edgeItem = (item && item->type() == SequenceEdgeItem::Type)
+                                     ? static_cast<SequenceEdgeItem*>(item)
+                                     : nullptr;
+
     QMenu menu(this);
     
     QAction *fitAction = menu.addAction(tr("Поместить всё"));
     QAction *focusAction = menu.addAction(tr("Показать выделенное"));
     QAction *resetAction = menu.addAction(tr("Сбросить масштаб"));
     QAction *refreshAction = menu.addAction(tr("Обновить граф"));
+
+    if (nodeItem) {
+        menu.addSeparator();
+        QAction *openAction = menu.addAction(tr("Открыть/редактировать"));
+        QAction *connectAction = menu.addAction(tr("Начать связь отсюда"));
+        connectAction->setEnabled(!m_currentTemplateDirPath.isEmpty());
+        QAction *deleteAction = nullptr;
+        if (!m_currentTemplateDirPath.isEmpty()) {
+            deleteAction = menu.addAction(tr("Удалить из шаблона"));
+        }
+
+        QAction *nodeChoice = menu.exec(mapToGlobal(pos));
+        if (nodeChoice == fitAction) {
+            fitToContents();
+        } else if (nodeChoice == focusAction) {
+            focusOnSelection();
+        } else if (nodeChoice == resetAction) {
+            resetZoom();
+        } else if (nodeChoice == refreshAction) {
+            if (m_currentTemplateDirPath.isEmpty()) {
+                rebuildGraph();
+            } else {
+                rebuildGraphForTemplate(m_currentTemplateDirPath);
+            }
+        } else if (nodeChoice == openAction) {
+            emit sequenceSelected(nodeItem->name());
+        } else if (nodeChoice == connectAction) {
+            startConnectionFrom(nodeItem);
+        } else if (nodeChoice == deleteAction && deleteAction) {
+            if (QMessageBox::question(this, tr("Удалить последовательность"),
+                                      tr("Удалить \"%1\" из шаблона?").arg(nodeItem->name()))
+                == QMessageBox::Yes) {
+                QString base = m_sequenceToBaseName.value(nodeItem->name());
+                QString fileName = base.isEmpty() ? QString() : base + ".seq.json";
+                QString absPath = fileName.isEmpty() ? QString() : QDir(m_currentTemplateDirPath).filePath(fileName);
+
+                SolutionTemplate tmpl;
+                if (loadCurrentTemplate(tmpl)) {
+                    QVector<QString> updatedSeqs;
+                    for (const QString &seqPath : tmpl.sequences()) {
+                        if (seqPath == fileName || seqPath == absPath)
+                            continue;
+                        updatedSeqs.append(seqPath);
+                    }
+
+                    tmpl.clearSequences();
+                    for (const QString &s : updatedSeqs) {
+                        tmpl.addSequence(s);
+                    }
+
+                    if (tmpl.mainSequencePath() == fileName || tmpl.mainSequencePath() == absPath) {
+                        tmpl.setMainSequencePath(QString());
+                    }
+
+                    QJsonObject targets = tmpl.getSequenceTargets();
+                    if (!base.isEmpty()) {
+                        targets.remove(base);
+                        for (auto it = targets.begin(); it != targets.end();) {
+                            QJsonArray arr = it.value().toArray();
+                            QJsonArray filtered;
+                            for (const QJsonValue &val : arr) {
+                                if (val.toString() != base) {
+                                    filtered.append(val);
+                                }
+                            }
+                            if (filtered.isEmpty()) {
+                                it = targets.erase(it);
+                            } else {
+                                it.value() = filtered;
+                                ++it;
+                            }
+                        }
+                    }
+                    tmpl.setSequenceTargets(targets);
+
+                    QMap<QString, QPointF> positions = tmpl.positions();
+                    positions.remove(nodeItem->name());
+                    tmpl.clearPositions();
+                    for (auto it = positions.begin(); it != positions.end(); ++it) {
+                        tmpl.setPositionForSequence(it.key(), it.value());
+                    }
+
+                    if (saveTemplate(tmpl)) {
+                        if (!absPath.isEmpty() && QFile::exists(absPath)) {
+                            QFile::remove(absPath);
+                        }
+                        rebuildGraphForTemplate(m_currentTemplateDirPath);
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    if (edgeItem) {
+        menu.addSeparator();
+        QAction *removeEdgeAction = menu.addAction(tr("Удалить связь"));
+        removeEdgeAction->setEnabled(!m_currentTemplateDirPath.isEmpty());
+        QAction *choice = menu.exec(mapToGlobal(pos));
+        if (choice == removeEdgeAction) {
+            removeDirectedConnection(edgeItem->source()->name(), edgeItem->dest()->name());
+        } else if (choice == fitAction) {
+            fitToContents();
+        } else if (choice == focusAction) {
+            focusOnSelection();
+        } else if (choice == resetAction) {
+            resetZoom();
+        } else if (choice == refreshAction) {
+            if (m_currentTemplateDirPath.isEmpty()) {
+                rebuildGraph();
+            } else {
+                rebuildGraphForTemplate(m_currentTemplateDirPath);
+            }
+        }
+        return;
+    }
+
     QAction *selectedAction = menu.exec(mapToGlobal(pos));
     
     if (selectedAction == fitAction) {
@@ -1218,6 +1463,89 @@ void SequenceRelationView::focusOnSelection()
     bounds = bounds.adjusted(-60, -60, 60, 60);
     fitInView(bounds, Qt::KeepAspectRatio);
     m_totalScale = transform().m11();
+}
+
+bool SequenceRelationView::addDirectedConnection(const QString &sourceName, const QString &targetName)
+{
+    if (sourceName.isEmpty() || targetName.isEmpty() || sourceName == targetName)
+        return false;
+
+    qDebug() << "[SequenceRelationView] Adding connection" << sourceName << "->" << targetName << "templateDir" << m_currentTemplateDirPath;
+
+    QString sourceBase = resolveBaseName(sourceName);
+    QString targetBase = resolveBaseName(targetName);
+
+    SolutionTemplate tmpl;
+    if (!loadCurrentTemplate(tmpl)) {
+        qDebug() << "[SequenceRelationView] Cannot load current template for connection";
+        return false;
+    }
+
+    QJsonObject targets = tmpl.getSequenceTargets();
+    QJsonArray arr = targets.value(sourceBase).toArray();
+    bool added = false;
+    if (!arr.contains(targetBase)) {
+        arr.append(targetBase);
+        added = true;
+    }
+    targets[sourceBase] = arr;
+    tmpl.setSequenceTargets(targets);
+    if (saveTemplate(tmpl)) {
+        // show edge immediately even if it already existed in file
+        addEdge(sourceName, targetName);
+        if (!m_currentTemplateDirPath.isEmpty()) {
+            m_nodePositions.insert(sourceName, m_nodeItems.value(sourceName)->pos());
+            m_nodePositions.insert(targetName, m_nodeItems.value(targetName)->pos());
+        }
+        // Refresh template cache so further operations stay in sync
+        if (m_templateMgr) {
+            m_templateMgr->refresh();
+        }
+        // Rebuild to ensure on-disk data is in sync and edges visible
+        rebuildGraphForTemplate(m_currentTemplateDirPath);
+        return true;
+    }
+
+    qDebug() << "[SequenceRelationView] Failed to save template when adding connection" << sourceName << "->" << targetName;
+    return false;
+}
+
+bool SequenceRelationView::removeDirectedConnection(const QString &sourceName, const QString &targetName)
+{
+    QString sourceBase = resolveBaseName(sourceName);
+    QString targetBase = resolveBaseName(targetName);
+    if (sourceBase.isEmpty() || targetBase.isEmpty())
+        return false;
+
+    SolutionTemplate tmpl;
+    if (!loadCurrentTemplate(tmpl))
+        return false;
+
+    QJsonObject targets = tmpl.getSequenceTargets();
+    if (!targets.contains(sourceBase))
+        return false;
+
+    QJsonArray arr = targets.value(sourceBase).toArray();
+    QJsonArray updated;
+    for (const QJsonValue &val : arr) {
+        if (val.toString() != targetBase) {
+            updated.append(val);
+        }
+    }
+
+    if (updated.isEmpty()) {
+        targets.remove(sourceBase);
+    } else {
+        targets[sourceBase] = updated;
+    }
+
+    tmpl.setSequenceTargets(targets);
+    if (saveTemplate(tmpl)) {
+        removeEdgeItem(sourceName, targetName);
+        return true;
+    }
+
+    return false;
 }
 
 void SequenceRelationView::saveNodePositions()
@@ -1310,6 +1638,123 @@ void SequenceRelationView::loadNodePositions()
     // In the future, this will come from template files that are loaded by SolutionTemplateManager
 }
 
+void SequenceRelationView::setEdgesFromTemplate(const QJsonObject &sequenceTargets, const QMap<QString, QString> &baseNameToSequenceNameMap)
+{
+    for (auto it = sequenceTargets.constBegin(); it != sequenceTargets.constEnd(); ++it) {
+        QString sourceBaseName = it.key();
+        QJsonArray targetArray = it.value().toArray();
+
+        QString sourceSequenceName = baseNameToSequenceNameMap.value(sourceBaseName, sourceBaseName);
+
+        for (const QJsonValue &targetValue : targetArray) {
+            QString targetBaseName = targetValue.toString();
+            QString targetSequenceName = baseNameToSequenceNameMap.value(targetBaseName, targetBaseName);
+
+            if (baseNameToSequenceNameMap.contains(sourceBaseName) &&
+                baseNameToSequenceNameMap.contains(targetBaseName)) {
+                addEdge(sourceSequenceName, targetSequenceName);
+                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
+            } else {
+                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
+            }
+        }
+    }
+}
+
+bool SequenceRelationView::loadCurrentTemplate(SolutionTemplate &tmpl) const
+{
+    if (m_currentTemplateDirPath.isEmpty())
+        return false;
+
+    QString templateJsonPath = QDir(m_currentTemplateDirPath).filePath("template.templ.json");
+    QFile file(templateJsonPath);
+    if (!file.open(QIODevice::ReadOnly))
+        return false;
+
+    QByteArray data = file.readAll();
+    file.close();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject())
+        return false;
+
+    tmpl = SolutionTemplate::fromJson(doc.object());
+    // Ensure sequenceTargets object exists (even if empty)
+    if (!tmpl.getSequenceTargets().isEmpty()) {
+        // already present
+    }
+    return true;
+}
+
+QString SequenceRelationView::resolveBaseName(const QString &sequenceName)
+{
+    // Fast path: map populated during graph build
+    if (m_sequenceToBaseName.contains(sequenceName)) {
+        return m_sequenceToBaseName.value(sequenceName);
+    }
+
+    // Try to derive from sequence manager (if present) by matching names and template path
+    if (m_seqMgr && !m_currentTemplateDirPath.isEmpty()) {
+        const QMap<QString, PromptSequence> &seqs = m_seqMgr->sequences();
+        for (auto it = seqs.constBegin(); it != seqs.constEnd(); ++it) {
+            if (it.value().name() == sequenceName) {
+                QFileInfo fi(it.key());
+                if (fi.absolutePath() == m_currentTemplateDirPath) {
+                    QString base = fi.baseName();
+                    m_sequenceToBaseName.insert(sequenceName, base);
+                    return base;
+                }
+            }
+        }
+    }
+
+    // As a fallback, scan template directory for a file with matching sequence name
+    if (!m_currentTemplateDirPath.isEmpty()) {
+        QDir dir(m_currentTemplateDirPath);
+        QStringList filters{"*.seq.json"};
+        QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
+        for (const QFileInfo &fi : files) {
+            QFile f(fi.absoluteFilePath());
+            if (!f.open(QIODevice::ReadOnly))
+                continue;
+            QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+            f.close();
+            if (!doc.isObject())
+                continue;
+            PromptSequence seq = PromptSequence::fromJson(doc.object());
+            if (seq.name() == sequenceName) {
+                QString base = fi.baseName();
+                m_sequenceToBaseName.insert(sequenceName, base);
+                return base;
+            }
+        }
+    }
+
+    // Fallback to using the sequence name itself
+    return sequenceName;
+}
+
+bool SequenceRelationView::saveTemplate(const SolutionTemplate &tmpl)
+{
+    QString templateJsonPath = QDir(m_currentTemplateDirPath).filePath("template.templ.json");
+
+    if (m_templateMgr) {
+        if (m_templateMgr->save(tmpl, m_currentTemplateDirPath)) {
+            return true;
+        }
+        qDebug() << "[SequenceRelationView] TemplateManager save failed, fallback to manual write";
+    }
+
+    if (m_currentTemplateDirPath.isEmpty())
+        return false;
+
+    QFile file(templateJsonPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+        return false;
+    file.write(QJsonDocument(tmpl.toJson()).toJson(QJsonDocument::Indented));
+    file.close();
+    return true;
+}
+
 void SequenceRelationView::resetZoom()
 {
     if (!m_scene || m_scene->items().isEmpty()) {
@@ -1347,6 +1792,58 @@ void SequenceRelationView::drawBackground(QPainter *painter, const QRectF &rect)
     for (int y = top; y <= bottom; y += gridSize, ++index) {
         painter->setPen((index % boldStep == 0) ? boldPen : lightPen);
         painter->drawLine(left, y, right, y);
+    }
+}
+
+void SequenceRelationView::startConnectionFrom(SequenceNodeItem *source)
+{
+    if (!source || m_currentTemplateDirPath.isEmpty())
+        return;
+    cancelConnection();
+    m_connectSource = source;
+    m_connecting = true;
+    if (m_connectSource) {
+        m_connectSource->setConnectionSource(true);
+    }
+    if (m_scene) {
+        QPointF start = source->sceneBoundingRect().center();
+        QPen pen(QColor(90, 90, 90, 180), 2, Qt::DashLine);
+        pen.setCapStyle(Qt::RoundCap);
+        m_tempConnectionLine = m_scene->addLine(QLineF(start, start), pen);
+    }
+    setCursor(Qt::CrossCursor);
+}
+
+void SequenceRelationView::updateTempConnectionTo(const QPointF &scenePos)
+{
+    if (m_tempConnectionLine && m_connectSource) {
+        QPointF start = m_connectSource->sceneBoundingRect().center();
+        m_tempConnectionLine->setLine(QLineF(start, scenePos));
+    }
+}
+
+void SequenceRelationView::cancelConnection()
+{
+    if (m_tempConnectionLine) {
+        QGraphicsScene *lineScene = m_tempConnectionLine->scene();
+        if (lineScene) {
+            lineScene->removeItem(m_tempConnectionLine);
+        }
+        delete m_tempConnectionLine;
+        m_tempConnectionLine = nullptr;
+    }
+    if (m_connectSource) {
+        if (m_connectSource->scene()) {
+            m_connectSource->setConnectionSource(false);
+        }
+    }
+    for (SequenceNodeItem *node : m_nodeItems) {
+        if (node) node->setConnectionTargetHover(false);
+    }
+    m_connectSource = nullptr;
+    m_connecting = false;
+    if (!m_panning && !m_spacePanning) {
+        setCursor(Qt::ArrowCursor);
     }
 }
 

@@ -887,7 +887,12 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
     // Refresh after editing
     refreshAllSequences();
     if (m_seqGraphWindow) {
-        m_seqGraphWindow->rebuildGraph(); // Update the graph if it's open
+        if (m_currentTemplatePath.isEmpty()) {
+            m_seqGraphWindow->rebuildGraph(); // Update the graph if it's open
+        } else {
+            m_seqGraphWindow->rebuildGraphForTemplate(m_currentTemplatePath);
+            m_seqGraphWindow->setTemplateSelectionByPath(m_currentTemplatePath);
+        }
     }
 }
 

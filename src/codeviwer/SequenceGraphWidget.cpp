@@ -140,6 +140,7 @@ void SequenceGraphWidget::onTemplateComboBoxChanged()
     qDebug() << "[SequenceGraphWidget] Template selection changed to data path:" << selectedPath;
     
     if (selectedPath.isEmpty()) {
+        m_view->setCurrentTemplateDir(QString());
         m_view->rebuildGraph();
     } else {
         m_view->rebuildGraphForTemplate(selectedPath);

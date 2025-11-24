@@ -7,6 +7,7 @@
 #include <QGraphicsLineItem>
 #include <QGraphicsSceneHoverEvent>
 #include <QWheelEvent>
+#include <QMouseEvent>
 #include <QAction>
 #include <QMenu>
 #include <QInputDialog>
@@ -16,11 +17,14 @@
 #include <QPointF>
 #include <QDebug>
 #include <QHash>
+#include <QSet>
 #include <QKeyEvent>
+#include <QJsonObject>
 #include "PromptSequence.h"
 #include "PromptSequenceManager.h"
 
 class SolutionTemplateManager;  // Forward declaration
+class SolutionTemplate;
 
 class SequenceNodeItem;
 class SequenceEdgeItem;
@@ -48,6 +52,8 @@ public slots:
     void updateEdgesForNode(SequenceNodeItem *node);
     void fitToContents();
     void resetZoom();
+    bool isConnecting() const { return m_connecting; }
+    SequenceNodeItem* connectionSource() const { return m_connectSource; }
 
 signals:
     void sequenceSelected(const QString &sequenceName);
@@ -86,6 +92,11 @@ private:
     qreal m_minScale = 0.25;
     qreal m_maxScale = 6.0;
     qreal m_zoomStep = 1.15;
+    QSet<QString> m_edgesSet; // source->target
+    QMap<QString, QString> m_sequenceToBaseName; // sequence display name -> base filename
+    SequenceNodeItem *m_connectSource{nullptr};
+    QGraphicsLineItem *m_tempConnectionLine{nullptr};
+    bool m_connecting{false};
     
     // Helper method to clear the scene while preserving positions if needed
     void clearScenePreservingPositions();
@@ -111,6 +122,17 @@ private:
     void showContextMenu(const QPoint &pos);
     QRectF contentBounds() const;
     void focusOnSelection();
+    void setEdgesFromTemplate(const QJsonObject &sequenceTargets, const QMap<QString, QString> &baseNameToSequenceNameMap);
+    bool loadCurrentTemplate(SolutionTemplate &tmpl) const;
+    bool saveTemplate(const SolutionTemplate &tmpl);
+    QString resolveBaseName(const QString &sequenceName);
+    bool addDirectedConnection(const QString &sourceName, const QString &targetName);
+    bool removeDirectedConnection(const QString &sourceName, const QString &targetName);
+    void removeEdgeItem(const QString &sourceName, const QString &targetName);
+    void removeNodeItem(const QString &sequenceName);
+    void startConnectionFrom(SequenceNodeItem *source);
+    void updateTempConnectionTo(const QPointF &scenePos);
+    void cancelConnection();
 };
 
 // Node item representing a sequence
@@ -125,6 +147,8 @@ public:
     QString description() const { return m_description; }
     
     void setHighlighted(bool highlighted);
+    void setConnectionSource(bool on);
+    void setConnectionTargetHover(bool on);
     
     enum { Type = UserType + 1 };
     int type() const override { return Type; }
@@ -140,6 +164,8 @@ private:
     QRectF m_rect;
     bool m_highlighted;
     bool m_hovered{false};
+    bool m_connectionSource{false};
+    bool m_connectionTargetHover{false};
 };
 
 // Edge item representing the connection between sequences
