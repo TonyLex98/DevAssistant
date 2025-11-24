@@ -18,6 +18,7 @@ public:
     QString description() const override { return m_description; }
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
+    QString getResult() const override;
 
     const QString& path() const { return m_path; }
     int startLine() const { return m_startLine; }

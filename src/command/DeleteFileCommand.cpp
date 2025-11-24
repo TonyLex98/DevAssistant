@@ -2,36 +2,47 @@
 #include "DeleteFileCommand.h"
 #include <QFile>
 #include <QDebug>
+#include <QFileInfo>
+#include <QDir>
 
 DeleteFileCommand::DeleteFileCommand(const QString& path,
                                      const QString& descr)
 {
     m_params["path"] = path;
     m_description = descr.isEmpty()
-        ? QString("Удалить файл; используется для удаления файлов из проекта")
+        ? QString("Delete a file from the project")
         : descr;
 }
 
 bool DeleteFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
+    if (path.trimmed().isEmpty()) {
+        if (err) *err = "DELETE_FILE: path is empty";
+        return false;
+    }
     
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Normalize path relative to project root
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
-        // Обновляем путь в параметрах для отображения в результатах
+        // Update stored path for reporting
         m_params["path"] = path;
     }
 
-    if (!QFile::remove(path)) {
-        if (err) *err = QString("Не удалось удалить файл %1").arg(path);
+    if (!QFileInfo::exists(path)) {
+        if (err) *err = QString("DELETE_FILE: file not found: %1").arg(path);
         return false;
     }
 
-    /* удалить запись в .dapro, если есть */
+    if (!QFile::remove(path)) {
+        if (err) *err = QString("Failed to delete file %1").arg(path);
+        return false;
+    }
+
+    /* remove entry in .dapro if present */
     if (devAss) {
-        devAss->findFileDescription(path);   // нет прямого remove; можно оставить как есть
-        devAss->save(); // можно оставить без изменений
+        devAss->findFileDescription(path);   // no direct remove; keep behaviour
+        devAss->save();
     }
     return true;
 }
@@ -56,7 +67,6 @@ QString DeleteFileCommand::getResult() const
                .arg(m_params["path"].toString());
     }
     
-    // Add error message if command failed
     if (!getErrorMessage().isEmpty()) {
         result += QString("\n[error]\n%1").arg(getErrorMessage());
     }

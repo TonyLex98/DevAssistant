@@ -13,8 +13,10 @@ public:
     QString description() const override { return m_description; }
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
+    QString getResult() const override;
 
 private:
     QJsonObject m_params;   // { "sourceFilePath": "...", "description": "..." }
-    QString m_description;  // для *.dadescr
+    QString m_description;  // text stored to descriptor
+    QString m_writtenDescriptorPath;
 };

@@ -13,38 +13,42 @@ CreateFileCommand::CreateFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Создать новый файл; используется для добавления новых файлов в проект")
+        ? QString("Create a new file at the given path")
         : descr;
 }
 
 bool CreateFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
+    if (path.trimmed().isEmpty()) {
+        if (err) *err = "CREATE_FILE: path is empty";
+        return false;
+    }
     
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Normalize path relative to project root
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
-        // Обновляем путь в параметрах для отображения в результатах
+        // Update stored path for reporting
         m_params["path"] = path;
     }
 
-    // Создаем родительскую директорию, если она не существует
+    // Create parent directory if needed
     QDir dir = QFileInfo(path).absoluteDir();
     if (!dir.exists() && !dir.mkpath(".")) {
-        if (err) *err = QString("Не удалось создать директорию для файла: %1").arg(dir.path());
+        if (err) *err = QString("Failed to create directory for file: %1").arg(dir.path());
         return false;
     }
 
-    // Проверяем, существует ли файл
+    // Prevent overwriting existing files
     QFile f(path);
     if (f.exists()) {
-        if (err) *err = QString("Файл уже существует: %1").arg(path);
+        if (err) *err = QString("File already exists: %1").arg(path);
         return false;
     }
 
-    // Создаем файл
+    // Write file content
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (err) *err = QString("Не удалось создать файл: %1").arg(path);
+        if (err) *err = QString("Failed to create file: %1").arg(path);
         return false;
     }
 
@@ -53,12 +57,12 @@ bool CreateFileCommand::apply(DevAssManager* devAss, QString* err)
     f.close();
 
     if (bytesWritten != content.size()) {
-        if (err) *err = QString("Ошибка записи в файл: %1 (записано %2 байт из %3)")
+        if (err) *err = QString("Write error for file: %1 (wrote %2 of %3 bytes)")
                        .arg(path).arg(bytesWritten).arg(content.size());
         return false;
     }
 
-    /* обновляем запись о файле в .dapro (если надо) */
+    /* update descriptor entry */
     if (devAss) {
         devAss->updateFileDescription(path,
                                       QDateTime::currentDateTime(),
@@ -88,7 +92,6 @@ QString CreateFileCommand::getResult() const
                .arg(m_params["path"].toString());
     }
     
-    // Add error message if command failed
     if (!getErrorMessage().isEmpty()) {
         result += QString("\n[error]\n%1").arg(getErrorMessage());
     }

@@ -5,6 +5,8 @@
 #include <QDateTime>
 #include <QFileInfo>
 #include <QDebug>
+#include <QDir>
+#include <algorithm>
 
 ContextManager::ContextManager(QObject *parent)
     : QObject(parent)
@@ -33,6 +35,58 @@ QString ContextManager::findExistingCommandId(const QString& commandName, const 
     return QString(); // Not found
 }
 
+static QString normalizePath(const QString& path, DevAssManager* devAss)
+{
+    if (path.trimmed().isEmpty())
+        return QString();
+
+    QFileInfo info(path);
+    if (info.isAbsolute())
+        return QDir::cleanPath(info.absoluteFilePath());
+
+    if (devAss) {
+        return QDir::cleanPath(devAss->projectRoot().absoluteFilePath(path));
+    }
+    return QDir::cleanPath(QFileInfo(path).absoluteFilePath());
+}
+
+QStringList ContextManager::collectPathsFromParams(const QJsonObject& params) const
+{
+    static const QStringList keys = {
+        "path",
+        "oldPath",
+        "newPath",
+        "scriptPath",
+        "folderPath",
+        "sourceFilePath"
+    };
+
+    QStringList paths;
+    for (const QString& key : keys) {
+        const QString raw = params.value(key).toString();
+        const QString normalized = normalizePath(raw, m_devAssManager);
+        if (!normalized.isEmpty()) {
+            paths << normalized;
+        }
+    }
+    paths.removeDuplicates();
+    return paths;
+}
+
+void ContextManager::addPathsToWatcher(const QStringList& paths)
+{
+    if (!m_fileWatcher)
+        return;
+
+    QStringList existing = m_fileWatcher->files();
+    for (const QString& path : paths) {
+        QFileInfo fileInfo(path);
+        if (fileInfo.exists() && !existing.contains(fileInfo.absoluteFilePath())) {
+            m_fileWatcher->addPath(fileInfo.absoluteFilePath());
+        }
+    }
+}
+
 void ContextManager::addCommand(Command* cmd, const QString& result)
 {
     if (!cmd) return;
@@ -47,6 +101,8 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
         info.result = result;
         info.state = CommandState::Active; // Reset to active
         info.reason.clear(); // Clear any previous reason
+        info.affectedPaths = collectPathsFromParams(info.params);
+        addPathsToWatcher(info.affectedPaths);
         
         emit commandAdded(existingActiveId);
         emit contextChanged();
@@ -66,6 +122,8 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
                     info.result = result;
                     info.state = CommandState::Active; // Reset to active
                     info.reason.clear(); // Clear any previous reason
+                    info.affectedPaths = collectPathsFromParams(info.params);
+                    addPathsToWatcher(info.affectedPaths);
                     
                     emit commandAdded(it.key());
                     emit contextChanged();
@@ -85,17 +143,11 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
     info.timestamp = QDateTime::currentDateTime();
     info.result = result;
     info.state = CommandState::Active;
+    info.affectedPaths = collectPathsFromParams(info.params);
     
     m_commandHistory.insert(uniqueId, info);
     
-    // If command involves file operations, add those files to watcher
-    QString filePath = info.params.value("path").toString();
-    if (!filePath.isEmpty()) {
-        QFileInfo fileInfo(filePath);
-        if (fileInfo.exists()) {
-            m_fileWatcher->addPath(fileInfo.absoluteFilePath());
-        }
-    }
+    addPathsToWatcher(info.affectedPaths);
     
     emit commandAdded(uniqueId);
     emit contextChanged();
@@ -116,6 +168,12 @@ void ContextManager::invalidateCommand(const QString& commandId, const QString& 
 void ContextManager::removeCommand(const QString& commandId)
 {
     if (m_commandHistory.remove(commandId) > 0) {
+        // Remove the command ID from any sequence it belonged to
+        for (auto it = m_sequenceHistory.begin(); it != m_sequenceHistory.end(); ++it) {
+            it.value().commandIds.removeAll(commandId);
+        }
+        cleanupEmptySequences();
+        rebuildFileWatcher();
         emit commandRemoved(commandId);
         emit contextChanged();
     }
@@ -194,6 +252,7 @@ QString ContextManager::generateContextText() const
 void ContextManager::clearAll()
 {
     m_commandHistory.clear();
+    m_sequenceHistory.clear();
     m_fileWatcher->removePaths(m_fileWatcher->files());
     emit contextChanged();
 }
@@ -206,6 +265,19 @@ void ContextManager::setDevAssManager(DevAssManager* manager)
 void ContextManager::setMainWindow(MainWindow* mainWindow)
 {
     m_mainWindow = mainWindow;
+}
+
+void ContextManager::cleanupEmptySequences()
+{
+    QList<QString> emptyIds;
+    for (auto it = m_sequenceHistory.constBegin(); it != m_sequenceHistory.constEnd(); ++it) {
+        if (it.value().commandIds.isEmpty()) {
+            emptyIds << it.key();
+        }
+    }
+    for (const QString& id : emptyIds) {
+        m_sequenceHistory.remove(id);
+    }
 }
 
 QString ContextManager::generateUniqueId(const QString& commandName)
@@ -222,26 +294,7 @@ void ContextManager::onFileChanged(const QString &path)
             m_fileWatcher->addPath(path);
         }
         
-        // Check which commands are affected by this file change
-        for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
-            CommandContextInfo& cmdInfo = it.value();
-            
-            // Check if this command involves the changed file
-            QString cmdPath = cmdInfo.params.value("path").toString();
-            if (!cmdPath.isEmpty()) {
-                QFileInfo cmdFileInfo(cmdPath);
-                QFileInfo changedFileInfo(path);
-                
-                if (cmdFileInfo.absoluteFilePath() == changedFileInfo.absoluteFilePath()) {
-                    // Mark command as invalid due to file change
-                    cmdInfo.state = CommandState::Invalidated;
-                    cmdInfo.reason = QString("File changed externally: %1").arg(path);
-                    emit commandInvalidated(cmdInfo.id, cmdInfo.reason);
-                }
-            }
-        }
-        
-        emit contextChanged();
+        cleanupForPath(path, QString("File changed externally: %1").arg(path));
     });
 }
 
@@ -350,21 +403,14 @@ void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceI
     info.result = result;
     info.state = CommandState::Active;
     info.sequenceId = sequenceId; // Link to the sequence
-    
+
     m_commandHistory.insert(commandId, info);
     
+    addPathsToWatcher(info.affectedPaths);
+
     // Add command ID to the sequence
     CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
     seqInfo.commandIds.append(commandId);
-    
-    // If command involves file operations, add those files to watcher
-    QString filePath = info.params.value("path").toString();
-    if (!filePath.isEmpty()) {
-        QFileInfo fileInfo(filePath);
-        if (fileInfo.exists()) {
-            m_fileWatcher->addPath(fileInfo.absoluteFilePath());
-        }
-    }
     
     emit commandAddedToSequence(commandId, sequenceId);
     emit commandAdded(commandId);
@@ -400,4 +446,60 @@ CommandSequenceInfo ContextManager::getSequenceInfo(const QString& sequenceId) c
         return m_sequenceHistory[sequenceId];
     }
     return CommandSequenceInfo(); // Return empty sequence info if not found
+}
+
+void ContextManager::cleanupForPath(const QString& path, const QString& reason)
+{
+    const QString normalizedPath = normalizePath(path, m_devAssManager);
+    QStringList toRemove;
+
+    for (auto it = m_commandHistory.begin(); it != m_commandHistory.end(); ++it) {
+        CommandContextInfo& cmdInfo = it.value();
+        const bool touchesFile = std::any_of(cmdInfo.affectedPaths.constBegin(),
+                                             cmdInfo.affectedPaths.constEnd(),
+                                             [&](const QString& p){
+                                                 return QFileInfo(p).absoluteFilePath() == normalizedPath;
+                                             });
+        if (!touchesFile)
+            continue;
+
+        if (cmdInfo.state == CommandState::Active) {
+            cmdInfo.state = CommandState::Invalidated;
+            cmdInfo.reason = reason.isEmpty()
+                ? QString("Context invalidated because %1 changed").arg(normalizedPath)
+                : reason;
+            emit commandInvalidated(cmdInfo.id, cmdInfo.reason);
+        }
+        toRemove << cmdInfo.id;
+    }
+
+    for (const QString& id : toRemove) {
+        removeCommand(id);
+    }
+
+    emit contextChanged();
+}
+
+void ContextManager::rebuildFileWatcher()
+{
+    if (!m_fileWatcher)
+        return;
+
+    const QStringList current = m_fileWatcher->files();
+    if (!current.isEmpty())
+        m_fileWatcher->removePaths(current);
+
+    QSet<QString> paths;
+    for (auto it = m_commandHistory.constBegin(); it != m_commandHistory.constEnd(); ++it) {
+        for (const QString& path : it.value().affectedPaths) {
+            QFileInfo info(path);
+            if (info.exists()) {
+                paths.insert(info.absoluteFilePath());
+            }
+        }
+    }
+
+    if (!paths.isEmpty()) {
+        m_fileWatcher->addPaths(paths.values());
+    }
 }

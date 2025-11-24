@@ -4,10 +4,11 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QDebug>
+#include <QDateTime>
 
 WriteDescriptionCommand::WriteDescriptionCommand(const QString& sourceFilePath,
                                                 const QString& descr)
-    : m_description(descr)
+    : m_description(descr.isEmpty() ? QString("Write/update descriptor for a source file") : descr)
 {
     m_params["sourceFilePath"] = sourceFilePath;
     m_params["description"]    = descr;
@@ -15,37 +16,52 @@ WriteDescriptionCommand::WriteDescriptionCommand(const QString& sourceFilePath,
 
 bool WriteDescriptionCommand::apply(DevAssManager* devAss, QString* err)
 {
-    if (!devAss) return false;
+    if (!devAss) {
+        if (err) *err = "WRITE_DESCRIPTION: DevAssManager is not available";
+        return false;
+    }
 
     QString srcPath = m_params["sourceFilePath"].toString();
+    if (srcPath.trimmed().isEmpty()) {
+        if (err) *err = "WRITE_DESCRIPTION: sourceFilePath is empty";
+        return false;
+    }
     
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Normalize path relative to project root when needed
     if (!QFileInfo(srcPath).isAbsolute()) {
         srcPath = QDir(devAss->projectRoot().absolutePath()).filePath(srcPath);
-        // Обновляем путь в параметрах для отображения в результатах
         m_params["sourceFilePath"] = srcPath;
     }
     
-    const QString descr  = m_params["description"].toString();
+    if (!QFileInfo::exists(srcPath)) {
+        if (err) *err = QString("WRITE_DESCRIPTION: source file not found: %1").arg(srcPath);
+        return false;
+    }
 
-    // Получаем относительный путь относительно корня проекта
+    const QString descr  = m_params["description"].toString();
+    if (descr.isEmpty()) {
+        if (err) *err = "WRITE_DESCRIPTION: description text is empty";
+        return false;
+    }
+
+    // Build descriptor path relative to project root
     QString rel = QDir(devAss->projectRoot().absolutePath())
                       .relativeFilePath(srcPath);
 
-    QString descrPath = devAss->devAssDir().filePath(rel + ".dadescr");
+    m_writtenDescriptorPath = devAss->devAssDir().filePath(rel + ".dadescr");
 
-    // создаём необходимые папки
-    QDir().mkpath(QFileInfo(descrPath).absolutePath());
+    // Ensure target directory exists
+    QDir().mkpath(QFileInfo(m_writtenDescriptorPath).absolutePath());
 
-    QFile f(descrPath);
+    QFile f(m_writtenDescriptorPath);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (err) *err = QString("Не удалось записать дескриптор %1").arg(descrPath);
+        if (err) *err = QString("Failed to write descriptor %1").arg(m_writtenDescriptorPath);
         return false;
     }
     f.write(descr.toUtf8());
     f.close();
 
-    /* обновляем статус в .dapro */
+    /* update entry in .dapro */
     devAss->updateFileDescription(srcPath,
                                   QDateTime::currentDateTime(),
                                   true);
@@ -61,4 +77,21 @@ QJsonObject WriteDescriptionCommand::toJson() const
     obj["params"] = m_params;
     obj["description"] = description();
     return obj;
+}
+
+QString WriteDescriptionCommand::getResult() const
+{
+    const bool ok = wasSuccessful();
+    QString result = QString("WRITE_DESCRIPTION: %1\n[status]\n%2\nexitCode=%3")
+            .arg(m_params.value("sourceFilePath").toString())
+            .arg(ok ? "Description file updated" : "Failed to write description")
+            .arg(ok ? 0 : 1);
+
+    if (!m_writtenDescriptorPath.isEmpty()) {
+        result += QString("\n[descriptor]\n%1").arg(m_writtenDescriptorPath);
+    }
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    return result;
 }

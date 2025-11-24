@@ -33,6 +33,7 @@ struct CommandContextInfo {
     QString reason;              // Reason for state (invalidation reason, etc.)
     QString result;              // Command result/output
     QString sequenceId;          // ID of the command sequence this command belongs to
+    QStringList affectedPaths;   // Normalized file/folder paths the command touches
     
     CommandContextInfo() : state(CommandState::Active) {}
 };
@@ -97,6 +98,9 @@ public:
     QList<CommandContextInfo> getCommandsInSequence(const QString& sequenceId) const;
     CommandSequenceInfo getSequenceInfo(const QString& sequenceId) const;
 
+    // Remove commands tied to a specific path (e.g. when the file was changed externally)
+    void cleanupForPath(const QString& path, const QString& reason = QString());
+
 signals:
     // Signal emitted when command context changes
     void contextChanged();
@@ -120,8 +124,10 @@ private:
     int m_sequenceCounter; // To generate unique sequence IDs
     
     QString generateUniqueId(const QString& commandName);
-    void setupFileWatcher();
     void rebuildFileWatcher();
+    QStringList collectPathsFromParams(const QJsonObject& params) const;
+    void addPathsToWatcher(const QStringList& paths);
+    void cleanupEmptySequences();
     
     // Get file modification time
     QDateTime getFileModificationTime(const QString& path) const;

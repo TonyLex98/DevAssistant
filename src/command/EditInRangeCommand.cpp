@@ -71,6 +71,10 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
         return true;
 
     QString path = commands.first()->path();
+    if (path.trimmed().isEmpty()) {
+        if (err) *err = "EDIT_IN_RANGE: path is empty";
+        return false;
+    }
     // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
@@ -193,4 +197,27 @@ QJsonObject EditInRangeCommand::toJson() const
     obj["params"]      = m_params;
     obj["description"] = description();
     return obj;
+}
+
+QString EditInRangeCommand::getResult() const
+{
+    const bool ok = wasSuccessful();
+    QString contentPreview = m_newLines.join("\n");
+    const int maxPreview = 400;
+    if (contentPreview.size() > maxPreview) {
+        contentPreview = contentPreview.left(maxPreview) + "...";
+    }
+
+    QString result = QString("EDIT_IN_RANGE: %1 [%2-%3]\n[status]\n%4\n[replacement]\n%5\nexitCode=%6")
+            .arg(m_params.value("path").toString())
+            .arg(m_params.value("startLine").toInt())
+            .arg(m_params.value("endLine").toInt())
+            .arg(ok ? "Lines updated successfully" : "Failed to update lines")
+            .arg(contentPreview.isEmpty() ? "(empty replacement)" : contentPreview)
+            .arg(ok ? 0 : 1);
+
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    return result;
 }

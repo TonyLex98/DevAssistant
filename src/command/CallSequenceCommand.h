@@ -16,7 +16,10 @@ public:
     
     bool apply(DevAssManager* devAss, QString* err) override { 
         Q_UNUSED(devAss); 
-        Q_UNUSED(err); 
+        if (m_params.value("sequenceName").toString().trimmed().isEmpty()) {
+            if (err) *err = "CALL_SEQUENCE: sequenceName is empty";
+            return false;
+        }
         // This command is handled specially in MainWindow, not through normal apply
         return true; 
     }
@@ -27,6 +30,18 @@ public:
         o["params"] = m_params; 
         o["description"] = m_description; 
         return o; 
+    }
+
+    QString getResult() const override {
+        const bool ok = wasSuccessful();
+        QString result = QString("CALL_SEQUENCE: %1\n[status]\n%2\nexitCode=%3")
+                .arg(m_params.value("sequenceName").toString())
+                .arg(ok ? "Sequence execution requested" : "Failed to request sequence")
+                .arg(ok ? 0 : 1);
+        if (!getErrorMessage().isEmpty()) {
+            result += QString("\n[error]\n%1").arg(getErrorMessage());
+        }
+        return result;
     }
     
     QString sequenceName() const { 

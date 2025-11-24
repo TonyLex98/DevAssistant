@@ -3,6 +3,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDebug>
+#include <QDir>
+#include <QDateTime>
 
 RenameFileCommand::RenameFileCommand(const QString& oldPath,
                                      const QString& newPath,
@@ -20,6 +22,11 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
     QString oldPath = m_params["oldPath"].toString();
     QString newPath = m_params["newPath"].toString();
 
+    if (oldPath.trimmed().isEmpty() || newPath.trimmed().isEmpty()) {
+        if (err) *err = "Missing oldPath or newPath for rename";
+        return false;
+    }
+
     // Нормализуем пути: если пути относительные, делаем их относительно корневой директории проекта
     if (devAss) {
         if (!QFileInfo(oldPath).isAbsolute()) {
@@ -31,6 +38,16 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
         // Обновляем пути в параметрах для отображения в результатах
         m_params["oldPath"] = oldPath;
         m_params["newPath"] = newPath;
+    }
+
+    if (!QFileInfo::exists(oldPath)) {
+        if (err) *err = QString("Source file does not exist: %1").arg(oldPath);
+        return false;
+    }
+
+    if (QFileInfo::exists(newPath)) {
+        if (err) *err = QString("Target path already exists: %1").arg(newPath);
+        return false;
     }
 
     // Создаем родительские директории для нового пути, если они не существуют
@@ -63,4 +80,21 @@ QJsonObject RenameFileCommand::toJson() const
     obj["params"] = m_params;
     obj["description"] = description();
     return obj;
+}
+
+QString RenameFileCommand::getResult() const
+{
+    const QString oldPath = m_params.value("oldPath").toString();
+    const QString newPath = m_params.value("newPath").toString();
+    const bool ok = wasSuccessful();
+
+    QString result = QString("RENAME_FILE: %1 -> %2\n[status]\n%3\nexitCode=%4")
+            .arg(oldPath, newPath)
+            .arg(ok ? "File moved/renamed successfully" : "File move/rename failed")
+            .arg(ok ? 0 : 1);
+
+    if (!getErrorMessage().isEmpty()) {
+        result += QString("\n[error]\n%1").arg(getErrorMessage());
+    }
+    return result;
 }

@@ -14,6 +14,7 @@ public:
     QString description() const override { return m_description; }
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
+    QString getResult() const override;
 
 private:
     QJsonObject m_params;

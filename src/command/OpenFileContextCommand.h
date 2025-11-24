@@ -3,6 +3,7 @@
 #include "Command.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include <QDebug>
 
 class OpenFileContextCommand : public Command
@@ -13,7 +14,7 @@ public:
         : m_path(path)
     {
         m_description = descr.isEmpty()
-            ? QString("Открыть файл и добавить в контекст; используется для чтения содержимого файла когда требуется информация из исходного кода")
+            ? QString("Open a file and push its content into context")
             : descr;
     }
 
@@ -29,16 +30,19 @@ public:
     bool apply(DevAssManager* devAss, QString* err) override
     {
         QString path = m_path;
-        // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+        if (path.trimmed().isEmpty()) {
+            if (err) *err = "OPEN_FILE: path is empty";
+            return false;
+        }
+        // Normalize path to project root if needed
         if (devAss && !QFileInfo(path).isAbsolute()) {
             path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
-            // Обновляем путь для отображения в результатах
             m_path = path;
         }
         
         QFile f(path);
         if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            if (err) *err = QString("Не удалось открыть файл %1").arg(path);
+            if (err) *err = QString("Failed to open file %1").arg(path);
             return false;
         }
 
@@ -47,7 +51,7 @@ public:
         return true;
     }
 
-    /* После применения можно получить содержимое файла */
+    /* After apply() call get the file content */
     const QString& content() const { return m_content; }
 
     const QString& path() const { return m_path; }
@@ -61,8 +65,19 @@ public:
         return obj;
     }
 
+    QString getResult() const override {
+        QString result = QString("OPEN_FILE: %1\n[status]\n%2\nexitCode=%3")
+                .arg(m_path)
+                .arg(wasSuccessful() ? "File loaded into context" : "Failed to open file")
+                .arg(wasSuccessful() ? 0 : 1);
+        if (!getErrorMessage().isEmpty()) {
+            result += QString("\n[error]\n%1").arg(getErrorMessage());
+        }
+        return result;
+    }
+
 private:
     QString m_path;
     QString m_description;
-    QString m_content;   // хранит прочитанное содержимое
+    QString m_content;   // stored content
 };

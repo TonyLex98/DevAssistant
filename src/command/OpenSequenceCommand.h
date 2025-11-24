@@ -15,7 +15,10 @@ public:
     
     bool apply(DevAssManager* devAss, QString* err) override { 
         Q_UNUSED(devAss); 
-        Q_UNUSED(err); 
+        if (m_params.value("sequenceName").toString().trimmed().isEmpty()) {
+            if (err) *err = "OPEN_SEQUENCE: sequenceName is empty";
+            return false;
+        }
         // This command is handled specially in MainWindow, not through normal apply
         return true; 
     }
@@ -30,6 +33,18 @@ public:
     
     QString sequenceName() const { 
         return m_params.value("sequenceName").toString(); 
+    }
+
+    QString getResult() const override {
+        const bool ok = wasSuccessful();
+        QString result = QString("OPEN_SEQUENCE: %1\n[status]\n%2\nexitCode=%3")
+                .arg(m_params.value("sequenceName").toString())
+                .arg(ok ? "Sequence opened" : "Failed to open sequence")
+                .arg(ok ? 0 : 1);
+        if (!getErrorMessage().isEmpty()) {
+            result += QString("\n[error]\n%1").arg(getErrorMessage());
+        }
+        return result;
     }
 
 private:

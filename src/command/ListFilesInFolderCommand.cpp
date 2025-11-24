@@ -1,3 +1,4 @@
+// ListFilesInFolderCommand.cpp
 #include "ListFilesInFolderCommand.h"
 #include <QDir>
 #include <QFileInfo>
@@ -10,37 +11,39 @@ ListFilesInFolderCommand::ListFilesInFolderCommand(const QString& folderPath,
 {
     m_params["folderPath"] = folderPath;
     m_description = descr.isEmpty()
-        ? QString("Открыть список файлов в папке «%1»").arg(folderPath)
+        ? QString("List files in folder \"%1\"").arg(folderPath)
         : descr;
 }
 
 bool ListFilesInFolderCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString folderPath = m_params["folderPath"].toString();
+    if (folderPath.trimmed().isEmpty()) {
+        if (err) *err = "LIST_FILES_IN_FOLDER: folderPath is empty";
+        return false;
+    }
     
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Normalize path relative to project root
     if (devAss && !QFileInfo(folderPath).isAbsolute()) {
         folderPath = QDir(devAss->projectRoot().absolutePath()).filePath(folderPath);
-        // Обновляем путь в параметрах для отображения в результатах
+        // Update path in params for reporting
         m_params["folderPath"] = folderPath;
     }
 
-    // Проверяем, существует ли папка
     QDir dir(folderPath);
     if (!dir.exists()) {
-        if (err) *err = QString("Папка не существует: %1").arg(folderPath);
+        if (err) *err = QString("Folder does not exist: %1").arg(folderPath);
         return false;
     }
 
-    // Получаем список файлов в папке (только файлы, без рекурсии)
+    // Get list of files (non-recursive)
     QFileInfoList fileInfoList = dir.entryInfoList(QDir::Files, QDir::Name);
     
     if (fileInfoList.isEmpty()) {
-        if (err) *err = QString("Папка не содержит файлов: %1").arg(folderPath);
+        if (err) *err = QString("Folder has no files: %1").arg(folderPath);
         return false;
     }
 
-    // Подсчитываем количество строк в каждом файле
     QStringList fileResults;
     for (const QFileInfo& fileInfo : fileInfoList) {
         QString filePath = fileInfo.absoluteFilePath();
@@ -54,14 +57,14 @@ bool ListFilesInFolderCommand::apply(DevAssManager* devAss, QString* err)
                 ++lineCount;
             }
             
-            fileResults << QString("%1 (%2 строк)").arg(fileInfo.fileName()).arg(lineCount);
+            fileResults << QString("%1 (%2 lines)").arg(fileInfo.fileName()).arg(lineCount);
             file.close();
         } else {
-            fileResults << QString("%1 (не удалось открыть)").arg(fileInfo.fileName());
+            fileResults << QString("%1 (unable to open)").arg(fileInfo.fileName());
         }
     }
 
-    // Сохраняем результат
+    // Store result
     m_result = fileResults.join("\n");
 
     return true;
@@ -87,7 +90,6 @@ QString ListFilesInFolderCommand::getResult() const
                .arg(m_params["folderPath"].toString());
     }
     
-    // Add error message if command failed
     if (!getErrorMessage().isEmpty()) {
         result += QString("\n[error]\n%1").arg(getErrorMessage());
     }

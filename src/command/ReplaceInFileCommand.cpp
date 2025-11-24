@@ -2,7 +2,9 @@
 #include "ReplaceInFileCommand.h"
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include <QDebug>
+#include <QDateTime>
 
 ReplaceInFileCommand::ReplaceInFileCommand(const QString& path,
                                           const QByteArray& content,
@@ -11,39 +13,54 @@ ReplaceInFileCommand::ReplaceInFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Заменить содержимое файла; используется для изменения содержимого существующего файла")
+        ? QString("Replace the entire content of an existing file")
         : descr;
 }
 
 bool ReplaceInFileCommand::apply(DevAssManager* devAss, QString* err)
 {
     QString path = m_params["path"].toString();
+    if (path.trimmed().isEmpty()) {
+        if (err) *err = "REPLACE_IN_FILE: path is empty";
+        return false;
+    }
     
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Normalize path relative to project root
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
-        // Обновляем путь в параметрах для отображения в результатах
+        // Update stored path for reporting
         m_params["path"] = path;
+    }
+
+    if (!QFileInfo::exists(path)) {
+        if (err) *err = QString("REPLACE_IN_FILE: file not found: %1").arg(path);
+        return false;
     }
 
     QByteArray cont = m_params["content"].toString().toUtf8();
 
-    // Создаем родительские директории, если они не существуют
+    // Create parent directories if needed
     QDir dir = QFileInfo(path).absoluteDir();
     if (!dir.exists() && !dir.mkpath(".")) {
-        if (err) *err = QString("Не удалось создать директорию для файла: %1").arg(dir.path());
+        if (err) *err = QString("Failed to create directory for file: %1").arg(dir.path());
         return false;
     }
 
     QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (err) *err = QString("Не удалось открыть файл для записи: %1").arg(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        if (err) *err = QString("Failed to open file for writing: %1").arg(path);
         return false;
     }
-    f.write(cont);
+    qint64 bytesWritten = f.write(cont);
     f.close();
 
-    /* обновляем запись о файле в .dapro */
+    if (bytesWritten != cont.size()) {
+        if (err) *err = QString("Write error for file: %1 (wrote %2 of %3 bytes)")
+                       .arg(path).arg(bytesWritten).arg(cont.size());
+        return false;
+    }
+
+    /* update descriptor entry */
     if (devAss) {
         devAss->updateFileDescription(path,
                                       QDateTime::currentDateTime(),
@@ -73,7 +90,6 @@ QString ReplaceInFileCommand::getResult() const
                .arg(m_params["path"].toString());
     }
     
-    // Add error message if command failed
     if (!getErrorMessage().isEmpty()) {
         result += QString("\n[error]\n%1").arg(getErrorMessage());
     }

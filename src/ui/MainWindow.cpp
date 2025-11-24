@@ -3615,6 +3615,11 @@ void MainWindow::onFileChanged(const QString &path)
             // Also remove from file-to-commands mapping
             m_fileToContextCommands.remove(path);
         }
+
+        // Inform ContextManager so command history is cleaned as well
+        if (m_contextManager) {
+            m_contextManager->cleanupForPath(path, QString("Context invalidated: %1 changed externally").arg(path));
+        }
     });
 }
 
