@@ -1096,9 +1096,6 @@ void SequenceRelationView::wheelEvent(QWheelEvent *event)
         return;
     }
 
-    const QPoint viewportPos = event->pos();
-    const QPointF scenePosBefore = mapToScene(viewportPos);
-
     qreal steps = delta / 120.0; // 120 == one mouse wheel step
     qreal factor = qPow(m_zoomStep, steps);
     qreal targetScale = qBound(m_minScale, m_totalScale * factor, m_maxScale);
@@ -1109,13 +1106,15 @@ void SequenceRelationView::wheelEvent(QWheelEvent *event)
         return;
     }
 
+    // Perform zoom centered on cursor position
+    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     scale(actualFactor, actualFactor);
+    setTransformationAnchor(QGraphicsView::NoAnchor); // Reset to default behavior
+
     m_totalScale = targetScale;
 
-    // Keep the point under cursor stationary in view coordinates
-    const QPointF scenePosAfter = mapToScene(viewportPos);
-    const QPointF move = scenePosAfter - scenePosBefore;
-    translate(-move.x(), -move.y());
+    // Expand scene if needed after zooming
+    expandSceneIfNeeded();
     event->accept();
 }
 

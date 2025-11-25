@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QMap>
+#include <QtMath>
 #include <QScrollBar>
 
 class ASTGraphView : public QGraphicsView {
@@ -30,10 +31,6 @@ private:
     QJsonObject rootAst_;                          // ← хранит весь JSON‑объект
     QMap<int, QJsonObject> nodeMap_;    // id → JSON‑узел
 
-    // Variables for panning functionality
-    bool m_dragging = false;
-    QPoint m_lastPanPoint;
-
     // Вспомогательные функции для формирования надписей
     QString nodeLabel(const QJsonObject &node) const;
     QString nodeIdentifier(const QJsonObject &node) const;
@@ -43,7 +40,21 @@ private:
     QString findIdentifier(const QJsonObject &node) const;
     QString findEnclosingClassName(const QJsonObject &node) const;
 
+    // Zoom functionality
+    void wheelEvent(QWheelEvent *event) override;
+    void resetZoom();
+
 private:
+    // Variables for panning functionality
+    bool m_dragging = false;
+    QPoint m_lastPanPoint;
+
+    // Variables for zoom functionality
+    qreal m_totalScale = 1.0;
+    qreal m_minScale = 0.1;
+    qreal m_maxScale = 10.0;
+    qreal m_zoomStep = 1.15;
+
     // Function to expand scene when panning near edges
     void expandSceneIfNeeded();
 };

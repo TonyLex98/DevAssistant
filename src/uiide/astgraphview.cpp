@@ -293,3 +293,55 @@ void ASTGraphView::mouseDoubleClickEvent(QMouseEvent *event) {
     }
     QGraphicsView::mouseDoubleClickEvent(event);
 }
+
+void ASTGraphView::wheelEvent(QWheelEvent *event)
+{
+    const bool zooming = event->modifiers().testFlag(Qt::ControlModifier);
+    if (!zooming) {
+        QGraphicsView::wheelEvent(event);
+        return;
+    }
+
+    qreal delta = event->angleDelta().y();
+    if (qFuzzyIsNull(delta) && !event->pixelDelta().isNull()) {
+        delta = event->pixelDelta().y();
+    }
+
+    if (qFuzzyIsNull(delta)) {
+        QGraphicsView::wheelEvent(event);
+        return;
+    }
+
+    qreal steps = delta / 120.0; // 120 == one mouse wheel step
+    qreal factor = qPow(m_zoomStep, steps);
+    qreal targetScale = qBound(m_minScale, m_totalScale * factor, m_maxScale);
+    qreal actualFactor = targetScale / m_totalScale;
+
+    if (qFuzzyCompare(actualFactor, 1.0)) {
+        event->accept();
+        return;
+    }
+
+    // Perform zoom centered on cursor position
+    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    scale(actualFactor, actualFactor);
+    setTransformationAnchor(QGraphicsView::NoAnchor); // Reset to default behavior
+
+    m_totalScale = targetScale;
+
+    // Expand scene if needed after zooming
+    expandSceneIfNeeded();
+    event->accept();
+}
+
+void ASTGraphView::resetZoom()
+{
+    if (!scene_ || scene_->items().isEmpty()) {
+        resetTransform();
+        m_totalScale = 1.0;
+        return;
+    }
+
+    fitInView(scene_->itemsBoundingRect(), Qt::KeepAspectRatio);
+    m_totalScale = transform().m11();
+}
