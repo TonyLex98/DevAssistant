@@ -972,7 +972,7 @@ void MainWindow::openSettings(){
         // Сохраняем параметры в конфигурацию
         AppConfig cfg;
         cfg.load();
-        cfg.temperature = opts.value("temperature", 0.1).toDouble();
+        cfg.temperature = opts.value("temperature", 1).toDouble();
         cfg.topP = opts.value("top_p", 0.9).toDouble();
         cfg.topK = opts.value("top_k", 40).toInt();
         cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();

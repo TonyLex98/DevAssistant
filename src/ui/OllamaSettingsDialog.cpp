@@ -11,7 +11,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent):QDialog(parent){
     m_endpoint->setText("http://127.0.0.1:11434");
     
     // Основные параметры генерации
-    m_temperature = new QDoubleSpinBox(this); m_temperature->setRange(0.0, 2.0); m_temperature->setSingleStep(0.1); m_temperature->setValue(0.1);
+    m_temperature = new QDoubleSpinBox(this); m_temperature->setRange(0.0, 2.0); m_temperature->setSingleStep(0.1); m_temperature->setValue(1);
     m_topP = new QDoubleSpinBox(this); m_topP->setRange(0.0, 1.0); m_topP->setSingleStep(0.05); m_topP->setValue(0.9);
     m_topK = new QSpinBox(this); m_topK->setRange(0, 200); m_topK->setValue(40);
     m_repeatPenalty = new QDoubleSpinBox(this); m_repeatPenalty->setRange(0.0, 2.0); m_repeatPenalty->setSingleStep(0.1); m_repeatPenalty->setValue(1.1);
