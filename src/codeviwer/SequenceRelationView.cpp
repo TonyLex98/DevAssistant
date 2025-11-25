@@ -237,6 +237,7 @@ SequenceEdgeItem::SequenceEdgeItem(SequenceNodeItem *source, SequenceNodeItem *d
 {
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+    setZValue(-1); // Устанавливаем z-значение, чтобы стрелки отображались под узлами
     updatePosition();
 }
 
@@ -353,7 +354,7 @@ SequenceRelationView::SequenceRelationView(QWidget *parent)
     setRenderHint(QPainter::Antialiasing);
     setRenderHint(QPainter::TextAntialiasing);
     setCacheMode(QGraphicsView::CacheBackground);
-    setDragMode(QGraphicsView::RubberBandDrag);
+    setDragMode(QGraphicsView::NoDrag);
     setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
     setOptimizationFlag(QGraphicsView::DontSavePainterState, true);
     setOptimizationFlag(QGraphicsView::IndirectPainting, true);
@@ -1149,10 +1150,22 @@ void SequenceRelationView::mousePressEvent(QMouseEvent *event)
 
     if (event->button() == Qt::LeftButton) {
         QPointF scenePos = mapToScene(event->pos());
-        QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
-        if (item && item->type() == SequenceNodeItem::Type) {
-            SequenceNodeItem *node = static_cast<SequenceNodeItem*>(item);
-            setCurrentSequence(node->name());
+
+        // Если нажата клавиша Shift, выбираем нижний элемент (в порядке z-значений)
+        Qt::SortOrder order = event->modifiers() & Qt::ShiftModifier ? Qt::AscendingOrder : Qt::DescendingOrder;
+        QList<QGraphicsItem*> itemsAtPos = m_scene->items(scenePos, Qt::IntersectsItemShape, order, transform());
+
+        // Ищем SequenceNodeItem среди элементов
+        SequenceNodeItem *targetNode = nullptr;
+        for (QGraphicsItem *item : itemsAtPos) {
+            if (item && item->type() == SequenceNodeItem::Type) {
+                targetNode = static_cast<SequenceNodeItem*>(item);
+                break; // Выбираем первый элемент в зависимости от порядка сортировки
+            }
+        }
+
+        if (targetNode) {
+            setCurrentSequence(targetNode->name());
         }
     }
 
