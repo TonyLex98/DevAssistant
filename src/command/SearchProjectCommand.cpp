@@ -6,6 +6,13 @@
 #include <QTextStream>
 #include <QRegExp>
 #include <QJsonArray>
+#include <QRegularExpression>
+#include <QtConcurrent/QtConcurrent>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QThread>
+#include <QMutex>
+#include <QWaitCondition>
 
 SearchProjectCommand::SearchProjectCommand(const QString& query,
                                            int maxMatches,
@@ -47,24 +54,33 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
     QDir root = devAss->projectRoot();
     QString rootPath = root.absolutePath();
 
+    // Сначала соберем список файлов для поиска (предварительная фильтрация)
+    QStringList filePaths;
     QDirIterator it(rootPath, QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext() && m_matches.size() < maxMatches) {
+    while (it.hasNext() && filePaths.size() < 10000) { // Ограничиваем список файлов для предотвращения переполнения памяти
         const QString path = it.next();
-        if (shouldSkipFile(path))
-            continue;
+        if (!shouldSkipFile(path)) {
+            filePaths << path;
+        }
+    }
+
+    for (const QString& path : filePaths) {
+        if (m_matches.size() >= maxMatches) break;
+
         QFile f(path);
         if (!f.open(QIODevice::ReadOnly))
             continue;
+
         QByteArray content = f.readAll();
         f.close();
-        
+
         // Try to decode with UTF-8 first, fallback to system encoding if needed
         QString text = QString::fromUtf8(content);
         if (text.isNull() || (content.size() > 0 && text.toUtf8() != content)) {
             // Fallback to system locale encoding if UTF-8 doesn't work
             text = QString::fromLocal8Bit(content);
         }
-        
+
         QStringList lines = text.split('\n', QString::KeepEmptyParts);
         for (int i = 0; i < lines.size() && m_matches.size() < maxMatches; ++i) {
             const QString& line = lines[i];
