@@ -7,7 +7,7 @@ ASTGraphView::ASTGraphView(QWidget *parent) : QGraphicsView(parent) {
     scene_ = new QGraphicsScene(this);
     setScene(scene_);
     setRenderHint(QPainter::Antialiasing);
-    setDragMode(QGraphicsView::ScrollHandDrag);
+    setDragMode(QGraphicsView::NoDrag); // Disable default drag mode to implement custom panning
 }
 
 
@@ -55,14 +55,50 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
 
 // ------------------------------------------------------------------
 void ASTGraphView::mousePressEvent(QMouseEvent *event) {
-    QPointF p = mapToScene(event->pos());
-    for (const auto &n : nodes) {
-        if (n.rect.contains(p)) {
-            emit openAt(n.start_row, n.start_col);
-            break;
+    if (event->button() == Qt::LeftButton) {
+        QPointF p = mapToScene(event->pos());
+        bool nodeClicked = false;
+
+        // Check if any node was clicked
+        for (const auto &n : nodes) {
+            if (n.rect.contains(p)) {
+                nodeClicked = true;
+                emit openAt(n.start_row, n.start_col);
+                break;
+            }
+        }
+
+        // If no node was clicked, start panning
+        if (!nodeClicked) {
+            m_dragging = true;
+            m_lastPanPoint = event->pos();
+            setCursor(Qt::ClosedHandCursor); // Change cursor to indicate panning
         }
     }
     QGraphicsView::mousePressEvent(event);
+}
+
+void ASTGraphView::mouseMoveEvent(QMouseEvent *event) {
+    if (m_dragging) {
+        // Calculate the difference in mouse position
+        QPoint delta = event->pos() - m_lastPanPoint;
+
+        // Scroll the view by the delta
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+
+        // Update the last pan point
+        m_lastPanPoint = event->pos();
+    }
+    QGraphicsView::mouseMoveEvent(event);
+}
+
+void ASTGraphView::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton && m_dragging) {
+        m_dragging = false;
+        setCursor(Qt::ArrowCursor); // Restore default cursor
+    }
+    QGraphicsView::mouseReleaseEvent(event);
 }
 
 // ---------- Вспомогательные функции ----------

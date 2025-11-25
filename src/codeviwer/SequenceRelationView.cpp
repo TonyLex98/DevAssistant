@@ -1166,6 +1166,13 @@ void SequenceRelationView::mousePressEvent(QMouseEvent *event)
 
         if (targetNode) {
             setCurrentSequence(targetNode->name());
+        } else {
+            // If no node was clicked, start panning
+            m_panning = true;
+            m_lastPanPoint = event->pos();
+            setCursor(Qt::ClosedHandCursor); // Change cursor to indicate panning
+            event->accept();
+            return;
         }
     }
 
@@ -1198,6 +1205,14 @@ void SequenceRelationView::mouseReleaseEvent(QMouseEvent *event)
                       (event->button() == Qt::LeftButton && ((event->modifiers() & Qt::AltModifier) || m_spacePanning)))) {
         m_panning = false;
         setCursor(m_spacePanning ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+
+    // Handle stopping of panning for left mouse button on empty space
+    if (m_panning && event->button() == Qt::LeftButton) {
+        m_panning = false;
+        setCursor(Qt::ArrowCursor); // Restore default cursor
         event->accept();
         return;
     }

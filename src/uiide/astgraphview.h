@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QMap>
+#include <QScrollBar>
 
 class ASTGraphView : public QGraphicsView {
     Q_OBJECT
@@ -17,7 +18,9 @@ signals:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
-     void mouseDoubleClickEvent(QMouseEvent *event) override;   // добавлено
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;   // добавлено
 
 private:
     QGraphicsScene *scene_;
@@ -26,6 +29,10 @@ private:
 
     QJsonObject rootAst_;                          // ← хранит весь JSON‑объект
     QMap<int, QJsonObject> nodeMap_;    // id → JSON‑узел
+
+    // Variables for panning functionality
+    bool m_dragging = false;
+    QPoint m_lastPanPoint;
 
     // Вспомогательные функции для формирования надписей
     QString nodeLabel(const QJsonObject &node) const;
