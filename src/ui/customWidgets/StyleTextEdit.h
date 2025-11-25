@@ -59,7 +59,7 @@ public:
     {
         // Initialize syntax highlighter
         m_syntaxHighlighter = new TemplateSyntaxHighlighter(this->document());
-        
+
         // --------- Стили, как у MemoryComboBox ----------
         setStyleSheet(
             "QTextEdit {"
@@ -69,7 +69,20 @@ public:
             "  font: 18px \"Arial\", sans-serif;"  // шрифт
             "}"
         );
+
+        // Remove any size constraints to allow unlimited text
+        setAcceptRichText(false);  // Use plain text to reduce overhead
+        setMaximumHeight(QWIDGETSIZE_MAX);  // Remove height limit
+        setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);  // Ensure scroll bar appears when needed
+
         qDebug() << "[StyleTextEdit] ctor, parent =" << parent;
+    }
+
+    // Ensure unlimited text by not limiting the document
+    void setPlainText(const QString &text) {
+        QTextEdit::setPlainText(text);
+        // Adjust document size without limits
+        document()->setDocumentMargin(2);
     }
 
 protected:

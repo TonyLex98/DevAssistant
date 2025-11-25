@@ -42,5 +42,9 @@ private:
 
     QString findIdentifier(const QJsonObject &node) const;
     QString findEnclosingClassName(const QJsonObject &node) const;
+
+private:
+    // Function to expand scene when panning near edges
+    void expandSceneIfNeeded();
 };
 

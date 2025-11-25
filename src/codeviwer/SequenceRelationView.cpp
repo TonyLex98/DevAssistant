@@ -965,12 +965,24 @@ void SequenceRelationView::positionNodes()
         }
     }
     
-    // Adjust scene rectangle
+    // Adjust scene rectangle with more flexible bounds for infinite workspace
     QRectF sceneRect;
     for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
         sceneRect = sceneRect.united(it.value()->sceneBoundingRect());
     }
-    m_scene->setSceneRect(sceneRect.adjusted(-100, -100, 100, 100));
+    if (sceneRect.isEmpty()) {
+        // Default scene size if no items
+        m_scene->setSceneRect(-500, -500, 1000, 1000);
+    } else {
+        // Use the bounding rect but ensure minimum size for panning
+        QRectF adjustedRect = sceneRect.adjusted(-100, -100, 100, 100);
+        // Ensure minimum size for panning
+        qreal width = qMax(adjustedRect.width(), 1000.0);
+        qreal height = qMax(adjustedRect.height(), 1000.0);
+        qreal left = adjustedRect.left() - (width - adjustedRect.width()) / 2;
+        qreal top = adjustedRect.top() - (height - adjustedRect.height()) / 2;
+        m_scene->setSceneRect(left, top, width, height);
+    }
 }
 
 void SequenceRelationView::updateEdgesForNode(SequenceNodeItem *node)
@@ -1186,6 +1198,10 @@ void SequenceRelationView::mouseMoveEvent(QMouseEvent *event)
         horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
         verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
         m_lastPanPoint = event->pos();
+
+        // Expand scene if we're panning near the edges
+        expandSceneIfNeeded();
+
         event->accept();
         return;
     }
@@ -1197,6 +1213,49 @@ void SequenceRelationView::mouseMoveEvent(QMouseEvent *event)
     }
 
     QGraphicsView::mouseMoveEvent(event);
+}
+
+void SequenceRelationView::expandSceneIfNeeded() {
+    // Get current view area in scene coordinates
+    QRectF viewRect = mapToScene(rect()).boundingRect();
+
+    // Get current scene rectangle
+    QRectF sceneRect = scene()->sceneRect();
+
+    // Calculate margins - expand if view is near the edge of the scene
+    qreal margin = 200.0; // pixels of margin
+
+    qreal newLeft = sceneRect.left();
+    qreal newTop = sceneRect.top();
+    qreal newRight = sceneRect.right();
+    qreal newBottom = sceneRect.bottom();
+
+    // Check if we need to expand in any direction
+    bool needsExpansion = false;
+
+    if (viewRect.left() < sceneRect.left() + margin) {
+        newLeft = viewRect.left() - margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.top() < sceneRect.top() + margin) {
+        newTop = viewRect.top() - margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.right() > sceneRect.right() - margin) {
+        newRight = viewRect.right() + margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.bottom() > sceneRect.bottom() - margin) {
+        newBottom = viewRect.bottom() + margin * 2;
+        needsExpansion = true;
+    }
+
+    if (needsExpansion) {
+        QRectF newSceneRect(newLeft, newTop,
+                           newRight - newLeft,
+                           newBottom - newTop);
+        scene()->setSceneRect(newSceneRect);
+    }
 }
 
 void SequenceRelationView::mouseReleaseEvent(QMouseEvent *event)

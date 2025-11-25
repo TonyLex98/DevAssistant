@@ -20,5 +20,9 @@ public:
             "  color: #000000;"                    // черный текст
             "}"
         );
+
+        // Remove any size constraints to allow unlimited text
+        setMaximumHeight(QWIDGETSIZE_MAX);  // Remove height limit
+        setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);  // Ensure scroll bar appears when needed
     }
 };

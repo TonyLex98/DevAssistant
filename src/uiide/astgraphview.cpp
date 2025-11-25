@@ -50,7 +50,21 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
         }
     }
 
-    scene_->setSceneRect(scene_->itemsBoundingRect().adjusted(-50, -50, 50, 50));
+    // Set scene with larger bounds to allow panning, but with a default size
+    QRectF itemsRect = scene_->itemsBoundingRect();
+    if (itemsRect.isEmpty()) {
+        // Default scene size if no items
+        scene_->setSceneRect(-500, -500, 1000, 1000);
+    } else {
+        // Use the bounding rect but ensure minimum size for panning
+        QRectF adjustedRect = itemsRect.adjusted(-100, -100, 100, 100);
+        // Ensure minimum size for panning
+        qreal width = qMax(adjustedRect.width(), 1000.0);
+        qreal height = qMax(adjustedRect.height(), 1000.0);
+        qreal left = adjustedRect.left() - (width - adjustedRect.width()) / 2;
+        qreal top = adjustedRect.top() - (height - adjustedRect.height()) / 2;
+        scene_->setSceneRect(left, top, width, height);
+    }
 }
 
 // ------------------------------------------------------------------
@@ -87,10 +101,56 @@ void ASTGraphView::mouseMoveEvent(QMouseEvent *event) {
         horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
         verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
 
+        // Expand scene if we're panning near the edges
+        expandSceneIfNeeded();
+
         // Update the last pan point
         m_lastPanPoint = event->pos();
     }
     QGraphicsView::mouseMoveEvent(event);
+}
+
+void ASTGraphView::expandSceneIfNeeded() {
+    // Get current view area in scene coordinates
+    QRectF viewRect = mapToScene(rect()).boundingRect();
+
+    // Get current scene rectangle
+    QRectF currentSceneRect = scene_->sceneRect();
+
+    // Calculate margins - expand if view is near the edge of the scene
+    qreal margin = 200.0; // pixels of margin
+
+    qreal newLeft = currentSceneRect.left();
+    qreal newTop = currentSceneRect.top();
+    qreal newRight = currentSceneRect.right();
+    qreal newBottom = currentSceneRect.bottom();
+
+    // Check if we need to expand in any direction
+    bool needsExpansion = false;
+
+    if (viewRect.left() < currentSceneRect.left() + margin) {
+        newLeft = viewRect.left() - margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.top() < currentSceneRect.top() + margin) {
+        newTop = viewRect.top() - margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.right() > currentSceneRect.right() - margin) {
+        newRight = viewRect.right() + margin * 2;
+        needsExpansion = true;
+    }
+    if (viewRect.bottom() > currentSceneRect.bottom() - margin) {
+        newBottom = viewRect.bottom() + margin * 2;
+        needsExpansion = true;
+    }
+
+    if (needsExpansion) {
+        QRectF newSceneRect(newLeft, newTop,
+                           newRight - newLeft,
+                           newBottom - newTop);
+        scene_->setSceneRect(newSceneRect);
+    }
 }
 
 void ASTGraphView::mouseReleaseEvent(QMouseEvent *event) {

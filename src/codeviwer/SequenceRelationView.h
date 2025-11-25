@@ -118,7 +118,7 @@ private:
     // Position saving/loading
     void saveNodePositions();
     void loadNodePositions();
-    
+
     // Context menu
     void showContextMenu(const QPoint &pos);
     QRectF contentBounds() const;
@@ -134,6 +134,10 @@ private:
     void startConnectionFrom(SequenceNodeItem *source);
     void updateTempConnectionTo(const QPointF &scenePos);
     void cancelConnection();
+
+private:
+    // Function to expand scene when panning near edges
+    void expandSceneIfNeeded();
 };
 
 // Node item representing a sequence
