@@ -18,17 +18,37 @@ SearchProjectCommand::SearchProjectCommand(const QString& query,
                                            int maxMatches,
                                            bool caseSensitive,
                                            const QStringList& includeGlobs,
+                                           bool useRegex,
+                                           int contextLines,
+                                           const QStringList& includePaths,
+                                           const QStringList& excludePaths,
                                            const QString& descr)
     : m_includeGlobs(includeGlobs)
+    , m_includePaths(includePaths)
+    , m_excludePaths(excludePaths)
 {
     m_params["query"] = query;
     m_params["maxMatches"] = qMax(1, maxMatches);
     m_params["caseSensitive"] = caseSensitive;
+    m_params["useRegex"] = useRegex;
+    m_params["contextLines"] = contextLines;
     if (!includeGlobs.isEmpty()) {
         QJsonArray arr;
         for (const QString& g : includeGlobs)
             arr.append(g);
         m_params["include"] = arr;
+    }
+    if (!includePaths.isEmpty()) {
+        QJsonArray arr;
+        for (const QString& path : includePaths)
+            arr.append(path);
+        m_params["includePaths"] = arr;
+    }
+    if (!excludePaths.isEmpty()) {
+        QJsonArray arr;
+        for (const QString& path : excludePaths)
+            arr.append(path);
+        m_params["excludePaths"] = arr;
     }
     m_description = descr.isEmpty()
         ? QString("Поиск текста по всем файлам проекта; используется для поиска упоминаний, определений или участков кода в проекте")
@@ -50,6 +70,8 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
 
     const int maxMatches = qMax(1, m_params.value("maxMatches").toInt(10));
     const bool caseSensitive = m_params.value("caseSensitive").toBool(false);
+    const bool useRegex = m_params.value("useRegex").toBool(false);
+    const int contextLines = m_params.value("contextLines").toInt(0);
     const Qt::CaseSensitivity cs = caseSensitive ? Qt::CaseSensitive : Qt::CaseInsensitive;
     QDir root = devAss->projectRoot();
     QString rootPath = root.absolutePath();
@@ -62,6 +84,15 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
         if (!shouldSkipFile(path)) {
             filePaths << path;
         }
+    }
+
+    // Создаем регулярное выражение при необходимости
+    QRegularExpression regex;
+    if (useRegex) {
+        QRegularExpression::PatternOptions options = caseSensitive ?
+            QRegularExpression::NoPatternOption :
+            QRegularExpression::CaseInsensitiveOption;
+        regex = QRegularExpression(query, options);
     }
 
     for (const QString& path : filePaths) {
@@ -85,12 +116,43 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
         for (int i = 0; i < lines.size() && m_matches.size() < maxMatches; ++i) {
             const QString& line = lines[i];
             int lineNo = i + 1; // Line numbers start from 1
-            if (line.contains(query, cs)) {
+
+            bool found = false;
+            if (useRegex) {
+                QRegularExpressionMatch match = regex.match(line);
+                found = match.hasMatch();
+            } else {
+                found = line.contains(query, cs);
+            }
+
+            if (found) {
                 QString absPath = QFileInfo(path).absoluteFilePath();  // Use absolute path
-                QString snippet = line.trimmed();
-                if (snippet.size() > 200)
-                    snippet = snippet.left(197) + "...";
-                m_matches << QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(snippet);
+                QString matchLine = line.trimmed();
+
+                // Добавляем контекст, если требуется
+                QString result;
+                if (contextLines > 0) {
+                    // Собираем строки контекста до и после
+                    int start = qMax(0, i - contextLines);
+                    int end = qMin(lines.size(), i + contextLines + 1);
+
+                    QStringList contextLinesList;
+                    for (int j = start; j < end; j++) {
+                        QString prefix = (j == i) ? QString(">>>%1>>> ").arg(j + 1) : QString("%1 ").arg(j + 1);
+                        QString contextLine = lines[j].trimmed();
+                        if (contextLine.size() > 200)
+                            contextLine = contextLine.left(197) + "...";
+                        contextLinesList << prefix + contextLine;
+                    }
+                    result = QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(contextLinesList.join("\n"));
+                } else {
+                    // Только найденная строка
+                    if (matchLine.size() > 200)
+                        matchLine = matchLine.left(197) + "...";
+                    result = QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(matchLine);
+                }
+
+                m_matches << result;
             }
         }
     }
@@ -103,21 +165,60 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
 
 bool SearchProjectCommand::shouldSkipFile(const QString& path) const
 {
-    // Пропускаем файлы в подкаталоге DevelopersAssistant проекта
     QString normalizedPath = QDir::cleanPath(path);
+    QFileInfo fileInfo(path);
+    QString fileName = fileInfo.fileName();
+    QString filePath = fileInfo.absolutePath();
+
+    // Проверяем исключения по директориям
+    if (!m_excludePaths.isEmpty()) {
+        for (const QString& excludePath : m_excludePaths) {
+            QFileInfo excludeInfo(excludePath);
+            QString absoluteExcludePath = excludeInfo.isAbsolute() ?
+                excludeInfo.absoluteFilePath() : QDir::cleanPath(excludePath);
+
+            if (normalizedPath.startsWith(absoluteExcludePath + "/") ||
+                normalizedPath.startsWith(absoluteExcludePath + "\\") ||
+                normalizedPath == absoluteExcludePath) {
+                return true;
+            }
+        }
+    }
+
+    // Если заданы директории для включения, проверяем, что файл находится в одной из них
+    if (!m_includePaths.isEmpty()) {
+        bool inIncludePath = false;
+        for (const QString& includePath : m_includePaths) {
+            QFileInfo includeInfo(includePath);
+            QString absoluteIncludePath = includeInfo.isAbsolute() ?
+                includeInfo.absoluteFilePath() : QDir::cleanPath(includePath);
+
+            if (filePath.startsWith(absoluteIncludePath + "/") ||
+                filePath.startsWith(absoluteIncludePath + "\\") ||
+                filePath == absoluteIncludePath) {
+                inIncludePath = true;
+                break;
+            }
+        }
+        if (!inIncludePath) {
+            return true;
+        }
+    }
+
+    // Пропускаем файлы в подкаталоге DevelopersAssistant проекта
     QStringList pathParts = normalizedPath.split('/');
     for (const QString& part : pathParts) {
         if (part == "DevelopersAssistant") {
             return true;
         }
     }
-    
-    QFileInfo info(path);
+
+    // Проверяем маски файлов
     if (!m_includeGlobs.isEmpty()) {
         bool match = false;
         for (const QString& glob : m_includeGlobs) {
             QRegExp rx(glob, Qt::CaseInsensitive, QRegExp::Wildcard);
-            if (rx.exactMatch(info.fileName())) {
+            if (rx.exactMatch(fileName)) {
                 match = true;
                 break;
             }
@@ -125,11 +226,14 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
         if (!match)
             return true;
     }
+
+    // Проверяем бинарные расширения
     static const QStringList binaryExt = {
         "png","jpg","jpeg","gif","bmp","ico","exe","dll","so","bin","pdf","zip","tar","gz"
     };
-    if (binaryExt.contains(info.suffix(), Qt::CaseInsensitive))
+    if (binaryExt.contains(fileInfo.suffix(), Qt::CaseInsensitive))
         return true;
+
     return false;
 }
 

@@ -9,6 +9,10 @@ public:
                          int maxMatches = 10,
                          bool caseSensitive = false,
                          const QStringList& includeGlobs = QStringList(),
+                         bool useRegex = false,
+                         int contextLines = 0,
+                         const QStringList& includePaths = QStringList(),
+                         const QStringList& excludePaths = QStringList(),
                          const QString& descr = QString());
 
     QString name() const override { return "SEARCH_PROJECT"; }
@@ -18,7 +22,7 @@ public:
     QJsonObject toJson() const override;
 
     const QStringList& matches() const { return m_matches; }
-    
+
     QString getResult() const override;
 
 private:
@@ -27,5 +31,7 @@ private:
     QJsonObject m_params;
     QString m_description;
     QStringList m_includeGlobs;
+    QStringList m_includePaths;
+    QStringList m_excludePaths;
     QStringList m_matches;
 };

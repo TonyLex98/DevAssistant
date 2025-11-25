@@ -390,7 +390,24 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             query = p["search_query"].toString();
         }
         
-        return new SearchProjectCommand(query, maxMatches, caseSensitive, includes, description);
+        bool useRegex = p.value("useRegex").toBool(false);
+        int contextLines = p.value("contextLines").toInt(0);
+        QStringList includePaths = QStringList();
+        QStringList excludePaths = QStringList();
+
+        // Читаем includePaths если они есть
+        QJsonArray includePathsArr = p.value("includePaths").toArray();
+        for (const QJsonValue& v : includePathsArr) {
+            includePaths << v.toString();
+        }
+
+        // Читаем excludePaths если они есть
+        QJsonArray excludePathsArr = p.value("excludePaths").toArray();
+        for (const QJsonValue& v : excludePathsArr) {
+            excludePaths << v.toString();
+        }
+
+        return new SearchProjectCommand(query, maxMatches, caseSensitive, includes, useRegex, contextLines, includePaths, excludePaths, description);
     }
 
     if (cmd == "SEARCH_PROJECT_CASE_INSENSITIVE") {
