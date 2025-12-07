@@ -50,24 +50,92 @@ def num_to_russian(match):
     else:
         return str(num)  # Too large, keep as is
 
-# English to Russian transliteration
-TRANSLIT_MAP = {
-    'a': 'а', 'b': 'б', 'c': 'к', 'd': 'д', 'e': 'е', 'f': 'ф', 'g': 'г',
-    'h': 'х', 'i': 'и', 'j': 'дж', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н',
-    'o': 'о', 'p': 'п', 'q': 'к', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у',
-    'v': 'в', 'w': 'в', 'x': 'кс', 'y': 'й', 'z': 'з',
-    'A': 'А', 'B': 'Б', 'C': 'К', 'D': 'Д', 'E': 'Е', 'F': 'Ф', 'G': 'Г',
-    'H': 'Х', 'I': 'И', 'J': 'Дж', 'K': 'К', 'L': 'Л', 'M': 'М', 'N': 'Н',
-    'O': 'О', 'P': 'П', 'Q': 'К', 'R': 'Р', 'S': 'С', 'T': 'Т', 'U': 'У',
-    'V': 'В', 'W': 'В', 'X': 'Кс', 'Y': 'Й', 'Z': 'З'
+# Common English words with correct Russian pronunciation
+WORD_DICT = {
+    # Tech terms
+    'python': 'пайтон', 'java': 'джава', 'javascript': 'джаваскрипт',
+    'function': 'фанкшн', 'class': 'класс', 'method': 'метод',
+    'file': 'файл', 'code': 'код', 'error': 'эррор', 'warning': 'ворнинг',
+    'string': 'стринг', 'array': 'эррей', 'object': 'объект',
+    'template': 'темплейт', 'model': 'модель', 'server': 'сервер',
+    'client': 'клиент', 'database': 'датабейс', 'query': 'квери',
+    'hello': 'хелло', 'world': 'ворлд', 'test': 'тест',
+    'version': 'версия', 'update': 'апдейт', 'install': 'инсталл',
+    'download': 'даунлоад', 'upload': 'аплоад', 'delete': 'делит',
+    'create': 'криейт', 'edit': 'эдит', 'save': 'сейв',
+    'open': 'оупен', 'close': 'клоуз', 'start': 'старт', 'stop': 'стоп',
+    'run': 'ран', 'build': 'билд', 'debug': 'дебаг',
+    'input': 'инпут', 'output': 'аутпут', 'result': 'резалт',
+    'true': 'тру', 'false': 'фолс', 'null': 'налл', 'none': 'нан',
+    'ok': 'окей', 'yes': 'йес', 'no': 'ноу',
+    'api': 'эйпиай', 'url': 'юрл', 'http': 'эйчтитипи', 'https': 'эйчтитипиэс',
+    'json': 'джейсон', 'xml': 'иксэмэль', 'html': 'эйчтиэмэль',
+    'css': 'сиэсэс', 'sql': 'эскюэль',
+    'gpu': 'джипиу', 'cpu': 'сипию', 'ram': 'рам', 'ssd': 'эсэсди',
+    'ai': 'эйай', 'ml': 'эмэль', 'llm': 'эльэльэм',
+    'token': 'токен', 'prompt': 'промпт', 'response': 'респонс',
+    'whisper': 'виспер', 'silero': 'силеро', 'ollama': 'оллама',
 }
 
+# Phonetic digraphs/trigraphs (order matters - longer first)
+PHONETIC_RULES = [
+    ('tion', 'шн'), ('sion', 'жн'), ('ight', 'айт'),
+    ('ough', 'оу'), ('ould', 'уд'), ('ould', 'уд'),
+    ('th', 'з'), ('sh', 'ш'), ('ch', 'ч'), ('ph', 'ф'),
+    ('wh', 'в'), ('ck', 'к'), ('ng', 'нг'), ('nk', 'нк'),
+    ('qu', 'кв'), ('wr', 'р'), ('kn', 'н'), ('gh', ''),
+    ('ee', 'и'), ('ea', 'и'), ('oo', 'у'), ('ou', 'ау'),
+    ('ow', 'оу'), ('oi', 'ой'), ('oy', 'ой'),
+    ('ai', 'ей'), ('ay', 'ей'), ('au', 'о'),
+    ('ie', 'ай'), ('ei', 'ей'),
+]
+
+# Single letter mapping (fallback)
+LETTER_MAP = {
+    'a': 'а', 'b': 'б', 'c': 'к', 'd': 'д', 'e': 'е', 'f': 'ф', 'g': 'г',
+    'h': 'х', 'i': 'и', 'j': 'дж', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н',
+    'o': 'о', 'p': 'п', 'q': 'к', 'r': 'р', 's': 'с', 't': 'т', 'u': 'а',
+    'v': 'в', 'w': 'в', 'x': 'кс', 'y': 'и', 'z': 'з',
+}
+
+def transliterate_word(word):
+    """Transliterate a single English word using phonetic rules"""
+    lower = word.lower()
+    
+    # Check dictionary first
+    if lower in WORD_DICT:
+        result = WORD_DICT[lower]
+        # Preserve capitalization
+        if word[0].isupper():
+            result = result[0].upper() + result[1:]
+        return result
+    
+    # Apply phonetic rules
+    result = lower
+    for pattern, replacement in PHONETIC_RULES:
+        result = result.replace(pattern, replacement)
+    
+    # Apply letter-by-letter for remaining
+    final = []
+    for char in result:
+        final.append(LETTER_MAP.get(char, char))
+    result = ''.join(final)
+    
+    # Preserve capitalization
+    if word[0].isupper():
+        result = result[0].upper() + result[1:]
+    
+    return result
+
 def transliterate(text):
-    """Transliterate English letters to Russian"""
-    result = []
-    for char in text:
-        result.append(TRANSLIT_MAP.get(char, char))
-    return ''.join(result)
+    """Transliterate English words in text to Russian phonetics"""
+    # Find English words and transliterate them
+    def replace_word(match):
+        word = match.group()
+        return transliterate_word(word)
+    
+    # Match sequences of English letters
+    return re.sub(r'[a-zA-Z]+', replace_word, text)
 
 def preprocess_for_tts(text):
     """Preprocess text for Russian TTS: convert numbers and transliterate English"""
