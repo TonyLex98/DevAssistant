@@ -390,7 +390,8 @@ SearchWebCommand::SearchWebCommand(const QString& query,
     m_params["query"] = query;
     m_params["maxResults"] = qMax(1, maxResults);
     m_description = descr.isEmpty()
-        ? QString::fromLatin1("Поиск информации в интернете; используется для получения актуальной информации, документации или внешних данных")
+        ? QString("Searches the web for information. "
+                  "Example: { \"command\": \"SEARCH_WEB\", \"params\": { \"query\": \"Qt 6 QNetworkAccessManager example\", \"maxResults\": 3 } }")
         : descr;
     // Initialize raw results
     m_rawResults.clear();

@@ -51,7 +51,8 @@ SearchProjectCommand::SearchProjectCommand(const QString& query,
         m_params["excludePaths"] = arr;
     }
     m_description = descr.isEmpty()
-        ? QString("Поиск текста по всем файлам проекта; используется для поиска упоминаний, определений или участков кода в проекте")
+        ? QString("Searches for text in all project files. "
+                  "Example: { \"command\": \"SEARCH_PROJECT\", \"params\": { \"query\": \"class MainWindow\", \"maxMatches\": 5 } }")
         : descr;
 }
 

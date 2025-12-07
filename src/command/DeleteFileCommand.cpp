@@ -10,7 +10,8 @@ DeleteFileCommand::DeleteFileCommand(const QString& path,
 {
     m_params["path"] = path;
     m_description = descr.isEmpty()
-        ? QString("Delete a file from the project")
+        ? QString("Permanently deletes a file. "
+                  "Example: { \"command\": \"DELETE_FILE\", \"params\": { \"path\": \"src/temp.cpp\" } }")
         : descr;
 }
 

@@ -13,7 +13,10 @@ ReplaceInFileCommand::ReplaceInFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Replace the entire content of an existing file")
+        ? QString("Overwrites the ENTIRE content of an existing file. "
+                  "Use this only if you want to replace the whole file. "
+                  "For partial edits, use EDIT_IN_RANGE. "
+                  "Example: { \"command\": \"REPLACE_IN_FILE\", \"params\": { \"path\": \"src/config.h\", \"content\": \"#define VERSION 2\" } }")
         : descr;
 }
 

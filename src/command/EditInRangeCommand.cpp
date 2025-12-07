@@ -24,7 +24,10 @@ EditInRangeCommand::EditInRangeCommand(const QString& path,
     m_params["endLine"]   = endLine;
 
     m_description = descr.isEmpty()
-        ? QString("Редактировать конкретный участок файла (строки); используется для точечных изменений в существующем файле")
+        ? QString("Replaces a specific range of lines in a file. "
+                  "IMPORTANT: Use the line numbers from OPEN_FILE or OPEN_FILE_REGION output! "
+                  "The 'startLine' and 'endLine' must match the line numbers you see in the file content. "
+                  "Example: { \"command\": \"EDIT_IN_RANGE\", \"params\": { \"path\": \"src/main.cpp\", \"startLine\": 10, \"endLine\": 12, \"replacementLines\": [ { \"line\": 10, \"text\": \"int a = 1;\" } ] } }")
         : descr;
 
     if (!replacementLines.isEmpty()) {

@@ -6,7 +6,10 @@ class OpenSequenceCommand : public Command
 public:
     OpenSequenceCommand(const QString& sequenceName = QString(), const QString& description = QString()) {
         m_params["sequenceName"] = sequenceName;
-        m_description = description.isEmpty() ? QString("Открыть другую последовательность: %1").arg(sequenceName) : description;
+        m_description = description.isEmpty() 
+            ? QString("Opens a different command sequence. "
+                      "Example: { \"command\": \"OPEN_SEQUENCE\", \"params\": { \"sequenceName\": \"testing\" } }")
+            : description;
     }
     
     QString name() const override { return "OPEN_SEQUENCE"; }

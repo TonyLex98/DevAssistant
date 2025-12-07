@@ -8,7 +8,11 @@ public:
         m_params["reasoning"] = reasoning;
         m_params["nextCommand"] = nextCommand;
         m_params["nextCommandParams"] = nextCommandParams;
-        m_description = descr.isEmpty() ? QString("Выполнить рассуждение и вернуть результат в виде контекста; используется для логических размышлений, планирования и анализа перед выполнением действий") : descr;
+        m_description = descr.isEmpty()
+            ? QString("Logs a reasoning step or thought process. "
+                      "Use this to plan complex actions or explain your logic before executing commands. "
+                      "Example: { \"command\": \"REASONING\", \"params\": { \"reasoning\": \"I need to check the file content first to see where to add the new function.\" } }")
+            : descr;
     }
     
     QString name() const override { return "REASONING"; }

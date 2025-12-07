@@ -7,7 +7,10 @@ public:
     CallSequenceCommand(const QString& sequenceName = QString(), bool needSummary = true, const QString& description = QString()) {
         m_params["sequenceName"] = sequenceName;
         m_params["summarize"] = false;//needSummary;
-        m_description = description.isEmpty() ? QString("Вызвать другую последовательность: %1").arg(sequenceName) : description;
+        m_description = description.isEmpty() 
+            ? QString("Calls another sequence of commands. "
+                      "Example: { \"command\": \"CALL_SEQUENCE\", \"params\": { \"sequenceName\": \"deploy_app\" } }")
+            : description;
     }
     
     QString name() const override { return "CALL_SEQUENCE"; }

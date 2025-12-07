@@ -8,7 +8,9 @@ ShowResultCommand::ShowResultCommand(const QString& content,
     if (!title.isEmpty())
         m_params["title"] = title;
     m_description = descr.isEmpty()
-        ? QString("Показать результат пользователю; используется для вывода информации, результатов анализа или промежуточных выводов")
+        ? QString("Shows a result or message to the user. "
+                  "Use this to present final answers, summaries, or important information. "
+                  "Example: { \"command\": \"SHOW_RESULT\", \"params\": { \"title\": \"Analysis Complete\", \"content\": \"The bug was found in line 42...\" } }")
         : descr;
 }
 

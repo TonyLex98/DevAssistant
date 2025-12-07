@@ -14,7 +14,9 @@ public:
         : m_path(path)
     {
         m_description = descr.isEmpty()
-            ? QString("Open a file and push its content into context")
+            ? QString("Reads a file and returns its content with line numbers. Use this to examine a file before editing. "
+                      "Output format: '<line_number>: <content>'. "
+                      "Example: { \"command\": \"OPEN_FILE\", \"params\": { \"path\": \"src/main.cpp\" } }")
             : descr;
     }
 
@@ -46,7 +48,13 @@ public:
             return false;
         }
 
-        m_content = QString::fromUtf8(f.readAll());
+        QTextStream in(&f);
+        QStringList lines;
+        int lineNum = 1;
+        while (!in.atEnd()) {
+            lines << QString("%1: %2").arg(lineNum++).arg(in.readLine());
+        }
+        m_content = lines.join("\n");
         f.close();
         return true;
     }

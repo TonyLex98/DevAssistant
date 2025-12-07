@@ -17,7 +17,8 @@ RunShellCommand::RunShellCommand(const QString& command,
 {
     m_params["command"] = command;
     m_description = descr.isEmpty()
-        ? QString("Запустить shell-команду; используется для выполнения команд в терминале, проверки состояния системы или запуска утилит")
+        ? QString("Executes a shell command. "
+                  "Example: { \"command\": \"RUN_SHELL\", \"params\": { \"command\": \"ls -la\" } }")
         : descr;
 }
 

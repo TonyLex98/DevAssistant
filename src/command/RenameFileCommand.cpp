@@ -13,7 +13,8 @@ RenameFileCommand::RenameFileCommand(const QString& oldPath,
     m_params["oldPath"] = oldPath;
     m_params["newPath"] = newPath;
     m_description = descr.isEmpty()
-        ? QString("Переименовать или переместить файл; используется для изменения имени или расположения файла в проекте")
+        ? QString("Renames or moves a file. "
+                  "Example: { \"command\": \"RENAME_FILE\", \"params\": { \"oldPath\": \"src/old.cpp\", \"newPath\": \"src/new.cpp\" } }")
         : descr;
 }
 

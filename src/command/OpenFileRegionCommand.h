@@ -8,6 +8,8 @@
 
 class OpenFileRegionCommand : public Command
 {
+    QString m_content;
+
 public:
     OpenFileRegionCommand(const QString& path,
                           const QString& regionExpr = QString(),
@@ -19,13 +21,9 @@ public:
         if (startLine>=1 && endLine>=startLine){ m_params["startLine"]=startLine; m_params["endLine"]=endLine; }
         
         if (descr.isEmpty()) {
-            if (startLine >= 1 && endLine >= startLine) {
-                m_description = QString("Open file lines %1-%2 into context").arg(startLine).arg(endLine);
-            } else if (!regionExpr.isEmpty()) {
-                m_description = QString("Open file region by regex");
-            } else {
-                m_description = QString("Open a specific region of a file");
-            }
+            m_description = "Reads a specific range of lines from a file. Returns content with line numbers. "
+                            "Use this to read large files in chunks. "
+                            "Example: { \"command\": \"OPEN_FILE_REGION\", \"params\": { \"path\": \"src/main.cpp\", \"startLine\": 10, \"endLine\": 50 } }";
         } else {
             m_description = descr;
         }
@@ -48,12 +46,49 @@ public:
         }
         const int startLine = m_params.value("startLine").toInt(-1);
         const int endLine = m_params.value("endLine").toInt(-1);
-        if ((startLine > 0 || endLine > 0) && (startLine <= 0 || endLine <= 0 || endLine < startLine)) {
-            if (err) *err = "OPEN_FILE_REGION: invalid start/end line range";
+        const QString regionExpr = m_params.value("region").toString();
+
+        if (startLine == -1 && endLine == -1 && regionExpr.isEmpty()) {
+             if (err) *err = "OPEN_FILE_REGION: specify startLine/endLine or region regex";
+             return false;
+        }
+
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            if (err) *err = QString("Failed to open file %1").arg(path);
             return false;
         }
+
+        QTextStream in(&f);
+        QStringList lines;
+        int lineNum = 1;
+        QRegularExpression regex(regionExpr);
+
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            bool include = false;
+            
+            if (startLine != -1 && endLine != -1) {
+                if (lineNum >= startLine && lineNum <= endLine) {
+                    include = true;
+                }
+            } else if (!regionExpr.isEmpty()) {
+                if (regex.match(line).hasMatch()) {
+                    include = true;
+                }
+            }
+            
+            if (include) {
+                 lines << QString("%1: %2").arg(lineNum).arg(line);
+            }
+            lineNum++;
+        }
+        m_content = lines.join("\n");
+        f.close();
         return true;
     }
+
+    const QString& content() const { return m_content; }
 
     QJsonObject toJson() const override {
         QJsonObject obj; obj["command"]=name(); obj["params"]=m_params; obj["description"]=m_description; return obj;
@@ -69,9 +104,10 @@ public:
             rangeInfo = "unspecified region";
         }
 
-        QString result = QString("OPEN_FILE_REGION: %1 (%2)\n[status]\n%3\nexitCode=%4")
+        QString result = QString("OPEN_FILE_REGION: %1 (%2)\n[status]\n%3\n[content]\n%4\nexitCode=%5")
                 .arg(m_params.value("path").toString(), rangeInfo)
-                .arg(wasSuccessful() ? "Region added to context" : "Failed to add region")
+                .arg(wasSuccessful() ? "Region read successfully" : "Failed to read region")
+                .arg(m_content)
                 .arg(wasSuccessful() ? 0 : 1);
         if (!getErrorMessage().isEmpty()) {
             result += QString("\n[error]\n%1").arg(getErrorMessage());

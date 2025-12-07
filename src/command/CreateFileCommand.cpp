@@ -13,7 +13,9 @@ CreateFileCommand::CreateFileCommand(const QString& path,
     m_params["path"]    = path;
     m_params["content"] = QString::fromUtf8(content);
     m_description = descr.isEmpty()
-        ? QString("Create a new file at the given path")
+        ? QString("Creates a new file with the specified content. "
+                  "Fails if the file already exists. "
+                  "Example: { \"command\": \"CREATE_FILE\", \"params\": { \"path\": \"src/new_file.cpp\", \"content\": \"#include <iostream>\\n...\" } }")
         : descr;
 }
 

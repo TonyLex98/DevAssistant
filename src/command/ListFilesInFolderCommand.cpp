@@ -11,7 +11,8 @@ ListFilesInFolderCommand::ListFilesInFolderCommand(const QString& folderPath,
 {
     m_params["folderPath"] = folderPath;
     m_description = descr.isEmpty()
-        ? QString("List files in folder \"%1\"").arg(folderPath)
+        ? QString("Lists files in a directory with line counts. "
+                  "Example: { \"command\": \"LIST_FILES_IN_FOLDER\", \"params\": { \"folderPath\": \"src/ui\" } }")
         : descr;
 }
 

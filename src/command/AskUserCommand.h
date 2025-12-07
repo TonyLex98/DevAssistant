@@ -6,7 +6,11 @@ class AskUserCommand : public Command
 public:
     AskUserCommand(const QString& question = QString(), const QString& descr = QString()){
         m_params["question"] = question;
-        m_description = descr.isEmpty() ? QString("Задать пользователю уточняющий вопрос; используется когда требуется дополнительная информация для выполнения задачи") : descr;
+        m_description = descr.isEmpty()
+            ? QString("Asks the user a question. "
+                      "Use this when you need clarification or more information. "
+                      "Example: { \"command\": \"ASK_USER\", \"params\": { \"question\": \"Should I create a new file or edit the existing one?\" } }")
+            : descr;
     }
     QString name() const override { return "ASK_USER"; }
     QJsonObject params() const override { return m_params; }
