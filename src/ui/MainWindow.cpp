@@ -440,11 +440,32 @@ MainWindow::MainWindow(QWidget *parent)
     // -------------------------------------------------
 
     // ---------- Добавляем кнопку «TTS» ----------
-    m_ttsToggleBtn = new StyledButton("🔊 Озвучка: Выкл", this);
+    // Load TTS state from settings (default: enabled)
+    QSettings ttsSettings;
+    m_ttsEnabled = ttsSettings.value("tts/enabled", true).toBool();
+    
+    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? "🔊 Озвучка: Вкл" : "🔊 Озвучка: Выкл", this);
     settingsLayout->addWidget(m_ttsToggleBtn);
+    
+    // Initialize TTS if enabled
+    if (m_ttsEnabled) {
+        m_ttsRunner = new TtsRunner(this);
+        connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& msg) {
+            log("TTS: " + msg);
+        });
+        connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
+            log("TTS Error: " + err);
+        });
+    }
+    
     connect(m_ttsToggleBtn, &StyledButton::clicked, this, [this]() {
         m_ttsEnabled = !m_ttsEnabled;
         m_ttsToggleBtn->setText(m_ttsEnabled ? "🔊 Озвучка: Вкл" : "🔊 Озвучка: Выкл");
+        
+        // Save state to settings
+        QSettings settings;
+        settings.setValue("tts/enabled", m_ttsEnabled);
+        
         if (m_ttsEnabled && !m_ttsRunner) {
             m_ttsRunner = new TtsRunner(this);
             connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& msg) {
@@ -456,6 +477,7 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
     // -------------------------------------------------
+
 
     // Add confirmation mode combo box
     confirmModeCombo = new MemoryComboBox("confirmMode", this);

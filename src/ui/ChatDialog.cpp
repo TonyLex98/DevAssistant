@@ -25,7 +25,23 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_send = new StyledButton("Отправить", this);
     m_stop = new StyledButton("Остановить", this);
     m_micBtn = new StyledButton("🎤", this);
-    m_micBtn->setFixedWidth(30);
+    m_micBtn->setFixedSize(36, 36);
+    m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
+    m_micBtn->setStyleSheet(R"(
+        QPushButton {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+        }
+        QPushButton:hover {
+            background-color: #2980b9;
+        }
+        QPushButton:pressed {
+            background-color: #1f6693;
+        }
+    )");
     
     // Add only the input field to the main horizontal layout
     mainLayout->addWidget(m_input, 1);
@@ -97,8 +113,21 @@ void ChatDialog::onMicClicked() {
     if (m_isRecording) {
         m_whisperRunner->stopRecording();
         
-        m_micBtn->setText("...");
-        m_micBtn->setEnabled(false);
+        // Switch to "not recording" state - blue microphone
+        m_micBtn->setText("🎤");
+        m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
+        m_micBtn->setStyleSheet(R"(
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 18px;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+        )");
         m_isRecording = false;
         
         // Hide chat log if it was only showing status
@@ -110,8 +139,22 @@ void ChatDialog::onMicClicked() {
         // Use Faster Whisper by default for streaming experience
         m_whisperRunner->startRecording();
         
-        m_micBtn->setText("⏹");
-        m_micBtn->setStyleSheet("background-color: red; color: white;");
+        // Switch to "recording" state - red crossed microphone
+        m_micBtn->setText("🎙️");
+        m_micBtn->setToolTip("Идёт запись... (нажмите для остановки)");
+        m_micBtn->setStyleSheet(R"(
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                border-radius: 18px;
+                font-size: 16px;
+                animation: pulse 1s infinite;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+        )");
         m_isRecording = true;
     }
 }
