@@ -25,7 +25,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_send = new StyledButton("Отправить", this);
     m_stop = new StyledButton("Остановить", this);
     m_micBtn = new StyledButton("🎤", this);
-    m_micBtn->setFixedWidth(30); // Small button
+    m_micBtn->setFixedWidth(30);
     
     // Add only the input field to the main horizontal layout
     mainLayout->addWidget(m_input, 1);
@@ -164,6 +164,7 @@ void ChatDialog::setChatLogVisible(bool visible)
 {
     if (m_chat) {
         m_chat->setVisible(visible);
+        if (m_mainWnd) m_mainWnd->updateChatToggleButton(visible);
     }
     notifyTemplateSelectionChanged();
 }

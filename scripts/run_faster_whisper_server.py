@@ -36,26 +36,46 @@ def main():
     # Initialize model
     model_size = "medium"
     
+    # Check if model needs to be downloaded
+    from huggingface_hub import snapshot_download, hf_hub_download
+    import huggingface_hub
+    
+    model_repo = f"Systran/faster-whisper-{model_size}"
+    
+    print(f"Проверка модели '{model_size}'...", file=sys.stderr)
+    
+    # Check if model is cached
+    try:
+        cache_dir = huggingface_hub.constants.HF_HUB_CACHE
+        # Try to download with progress
+        print(f"Загрузка модели '{model_size}' (если не в кэше)...", file=sys.stderr)
+        snapshot_download(
+            repo_id=model_repo,
+            local_files_only=False,
+        )
+        print(f"Модель '{model_size}' готова.", file=sys.stderr)
+    except Exception as e:
+        print(f"Ошибка при проверке/загрузке модели: {e}", file=sys.stderr)
+        # Continue anyway, WhisperModel will try to download
+    
     # Try GPU first
     try:
         device = "cuda"
         compute_type = "float16"
-        print(f"Loading Faster Whisper model '{model_size}' on {device}...", file=sys.stderr)
+        print(f"Загрузка Faster Whisper модели '{model_size}' на {device}...", file=sys.stderr)
         model = WhisperModel(model_size, device=device, compute_type=compute_type)
         
         # Perform a dummy transcription to verify CUDA works (catches DLL errors early)
-        # This is CRITICAL to catch the DLL error inside the try/except block
-        # instead of crashing the process later.
-        print("Verifying GPU model...", file=sys.stderr)
+        print("Проверка GPU модели...", file=sys.stderr)
         
-        print("Model loaded on GPU.", file=sys.stderr)
+        print("Модель загружена на GPU.", file=sys.stderr)
     except Exception as e:
-        print(f"Failed to load on GPU: {e}", file=sys.stderr)
-        print("Falling back to CPU...", file=sys.stderr)
+        print(f"Ошибка загрузки на GPU: {e}", file=sys.stderr)
+        print("Переключение на CPU...", file=sys.stderr)
         device = "cpu"
         compute_type = "int8"
         model = WhisperModel(model_size, device=device, compute_type=compute_type)
-        print("Model loaded on CPU.", file=sys.stderr)
+        print("Модель загружена на CPU.", file=sys.stderr)
 
     print("READY") # Signal to C++ that we are ready
     sys.stdout.flush()

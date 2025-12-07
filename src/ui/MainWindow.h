@@ -58,6 +58,9 @@
 // Solution templates
 #include "../core/SolutionTemplateManager.h"
 
+// TTS
+#include "../audio/TtsRunner.h"
+
 class ChatDialog;
 class ModelsDialog;
 class OllamaSettingsDialog;
@@ -82,6 +85,8 @@ public:
     
     // Accessor for last user messages (for resolver)
     QString getLastUserMessages() const;
+
+    void updateChatToggleButton(bool visible);
 
 public slots:
     void runSequenceDialog();
@@ -253,6 +258,9 @@ private:
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
+    TtsRunner *m_ttsRunner{nullptr}; // TTS Runner
+    StyledButton *m_ttsToggleBtn{nullptr}; // TTS toggle button
+    bool m_ttsEnabled{false}; // TTS enabled flag
 
     struct ContextRange {
         int startLine = -1;

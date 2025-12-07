@@ -439,6 +439,24 @@ MainWindow::MainWindow(QWidget *parent)
             &MainWindow::openLightRag);
     // -------------------------------------------------
 
+    // ---------- Добавляем кнопку «TTS» ----------
+    m_ttsToggleBtn = new StyledButton("🔊 Озвучка: Выкл", this);
+    settingsLayout->addWidget(m_ttsToggleBtn);
+    connect(m_ttsToggleBtn, &StyledButton::clicked, this, [this]() {
+        m_ttsEnabled = !m_ttsEnabled;
+        m_ttsToggleBtn->setText(m_ttsEnabled ? "🔊 Озвучка: Вкл" : "🔊 Озвучка: Выкл");
+        if (m_ttsEnabled && !m_ttsRunner) {
+            m_ttsRunner = new TtsRunner(this);
+            connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& msg) {
+                log("TTS: " + msg);
+            });
+            connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
+                log("TTS Error: " + err);
+            });
+        }
+    });
+    // -------------------------------------------------
+
     // Add confirmation mode combo box
     confirmModeCombo = new MemoryComboBox("confirmMode", this);
     confirmModeCombo->addItem("Auto-confirm commands", "auto");
@@ -1820,6 +1838,19 @@ void MainWindow::handleAssistantFinished()
             } else {
                 // Fallback: show in external context as before
                 appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+            }
+
+            // Speak the SHOW_RESULT content if TTS is enabled
+            if (m_ttsEnabled && m_ttsRunner && m_ttsRunner->isReady()) {
+                QString textToSpeak = c->params().value("content").toString();
+                textToSpeak.replace("\\n", " ").replace("\\r", "").replace("\n", " ");
+                // Limit length for TTS
+                if (textToSpeak.length() > 1000) {
+                    textToSpeak = textToSpeak.left(1000) + "...";
+                }
+                if (!textToSpeak.isEmpty() && textToSpeak.length() > 5) {
+                    m_ttsRunner->speak(textToSpeak);
+                }
             }
 
             // Add command to context manager with result
@@ -3998,5 +4029,11 @@ void MainWindow::onOmniAsrText(const QString& text)
              // Maybe show a toast or status message
              statusBar()->showMessage("ASR Text: " + text, 5000);
         }
+    }
+}
+void MainWindow::updateChatToggleButton(bool visible)
+{
+    if (chatToggleBtn) {
+        chatToggleBtn->setText(visible ? tr("РЎРєСЂС‹С‚СЊ С‡Р°С‚") : tr("РџРѕРєР°Р·Р°С‚СЊ С‡Р°С‚"));
     }
 }

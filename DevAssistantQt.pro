@@ -35,6 +35,7 @@ SOURCES += \
     src/audio/OmniAsrRunner.cpp \
     src/audio/OmniAsrWidget.cpp \
     src/audio/FasterWhisperRunner.cpp \
+    src/audio/TtsRunner.cpp \
     src/core/ContextManager.cpp \
     src/core/ContextChainResolver.cpp \
     src/codeviwer/CodePatcher.cpp \
@@ -142,6 +143,7 @@ HEADERS += \
     src/audio/OmniAsrRunner.h \
     src/audio/OmniAsrWidget.h \
     src/audio/FasterWhisperRunner.h \
+    src/audio/TtsRunner.h \
     src/core/ContextManager.h \
     src/core/ContextChainResolver.h \
     src/codeviwer/CodePatcher.h \
