@@ -39,7 +39,8 @@ private slots:
 private:
     void setupUI();
     void loadTemplateInfo(const QString& templateDir);
-    
+    QString wrapTextByCharacterCount(const QString& text, int maxCharsPerLine);
+
     SolutionTemplateManager* m_templateManager;
     StyledListWidget* m_templateList;
     StyledLabel* m_templateNameLabel;
@@ -53,4 +54,5 @@ private:
     MemoryComboBox* m_defaultSequenceCombo; // Для выбора последовательности по умолчанию
     StyledButton* m_runTemplateBtn;          // Для запуска шаблона с выбранной последовательностью
     QString m_currentTemplateDir;
+    static const int MAX_CHARS_PER_LINE = 50; // Максимальное количество символов в строке описания
 };

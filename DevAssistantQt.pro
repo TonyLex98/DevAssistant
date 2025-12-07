@@ -32,6 +32,9 @@ SOURCES += \
     src/audio/VoskRunner.cpp \
     src/audio/VoskWidget.cpp \
     src/audio/WavWriter.cpp \
+    src/audio/OmniAsrRunner.cpp \
+    src/audio/OmniAsrWidget.cpp \
+    src/audio/FasterWhisperRunner.cpp \
     src/core/ContextManager.cpp \
     src/core/ContextChainResolver.cpp \
     src/codeviwer/CodePatcher.cpp \
@@ -136,6 +139,9 @@ HEADERS += \
     src/audio/VoskRunner.h \
     src/audio/VoskWidget.h \
     src/audio/WavWriter.h \
+    src/audio/OmniAsrRunner.h \
+    src/audio/OmniAsrWidget.h \
+    src/audio/FasterWhisperRunner.h \
     src/core/ContextManager.h \
     src/core/ContextChainResolver.h \
     src/codeviwer/CodePatcher.h \

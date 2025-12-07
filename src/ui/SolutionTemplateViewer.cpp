@@ -3,6 +3,7 @@
 #include <QGroupBox>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QTextStream>
 #include "SolutionTemplateEditor.h"
 
 SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* templateManager, QWidget *parent)
@@ -10,7 +11,7 @@ SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* template
 {
     setupUI();
     updateTemplateList();
-    
+
     // Connect signals
     connect(m_templateList, &QListWidget::currentRowChanged, this, &SolutionTemplateViewer::onTemplateSelected);
     connect(m_editTemplateBtn, &StyledButton::clicked, this, &SolutionTemplateViewer::onEditTemplate);
@@ -24,13 +25,63 @@ SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* template
             QString selectedSeq = m_defaultSequenceCombo->currentData().toString();
             if (!selectedSeq.isEmpty()) {
                 // Here we would run the selected sequence, but for now just show a message
-                QMessageBox::information(this, "Run Template", 
+                QMessageBox::information(this, "Run Template",
                     QString("Would run template with sequence: %1").arg(selectedSeq));
             } else {
                 QMessageBox::warning(this, "No Sequence", "No sequence selected for this template.");
             }
         }
     });
+}
+
+QString SolutionTemplateViewer::wrapTextByCharacterCount(const QString& text, int maxCharsPerLine)
+{
+    if (text.isEmpty() || maxCharsPerLine <= 0) {
+        return text;
+    }
+
+    QString wrappedText;
+    QString currentLine;
+
+    for (int i = 0; i < text.length(); ++i) {
+        QChar ch = text.at(i);
+        currentLine += ch;
+
+        // Если текущая строка достигла максимальной длины
+        if (currentLine.length() >= maxCharsPerLine) {
+            // Проверяем, не разбиваем ли мы слово посередине
+            // Пытаемся найти последний пробел в пределах maxCharsPerLine
+            int lastSpaceIndex = -1;
+
+            // Ищем последний пробел в currentLine
+            for (int j = currentLine.length() - 1; j >= 0; --j) {
+                if (currentLine.at(j).isSpace()) {
+                    lastSpaceIndex = j;
+                    break;
+                }
+            }
+
+            if (lastSpaceIndex > 0) {
+                // Разбиваем по последнему пробелу, чтобы не рвать слова
+                QString lineToAdd = currentLine.left(lastSpaceIndex);
+                wrappedText += lineToAdd + "\n";
+
+                // Оставшуюся часть строки переносим в начало следующей строки
+                currentLine = currentLine.mid(lastSpaceIndex + 1);
+            } else {
+                // Если слово слишком длинное и не содержит пробелов, разбиваем жестко
+                wrappedText += currentLine + "\n";
+                currentLine.clear();
+            }
+        }
+    }
+
+    // Добавляем оставшуюся часть строки, если она есть
+    if (!currentLine.isEmpty()) {
+        wrappedText += currentLine;
+    }
+
+    return wrappedText;
 }
 
 void SolutionTemplateViewer::setupUI()
@@ -264,7 +315,9 @@ void SolutionTemplateViewer::loadTemplateInfo(const QString& templateDir)
     SolutionTemplate tmpl = m_templateManager->templates().value(templateDir);
     
     m_templateNameLabel->setText(tmpl.name());
-    m_templateDescriptionLabel->setText(tmpl.description());
+    // Wrap the description text to ensure it wraps after a specific number of characters
+    QString wrappedDescription = wrapTextByCharacterCount(tmpl.description(), SolutionTemplateViewer::MAX_CHARS_PER_LINE);
+    m_templateDescriptionLabel->setText(wrappedDescription);
     
     // Load image if available
     if (!tmpl.imagePath().isEmpty()) {

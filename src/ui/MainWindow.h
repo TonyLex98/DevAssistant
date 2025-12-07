@@ -108,6 +108,7 @@ private slots:
 
     void generateDescriptions();      // <‑‑ новый слот
     void onVoskText(const QString&);  // <‑‑ новый слот
+    void onOmniAsrText(const QString&);
 
     void openGraph();
     void openSequenceGraph();

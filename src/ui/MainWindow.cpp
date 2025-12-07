@@ -497,6 +497,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_voskWidget, &VoskWidget::voiceRecognized,
             this, &MainWindow::onVoskText);
 
+
+
+
+
     // Initialize context status widget to display command context state
     m_contextStatusWidget = new QWidget(this);
     m_contextCommandsList = new QTreeWidget(m_contextStatusWidget);
@@ -3871,10 +3875,10 @@ void MainWindow::updateStatusDisplay()
         // Timer is not active, but we have accumulated time from last run, show it
         QTime elapsedTime = QTime(0, 0).addMSecs(m_totalElapsedTime);
         timeStr = elapsedTime.toString("hh:mm:ss");
-        qDebug() << "[DEBUG] Timer not active but showing accumulated time (ms):" << m_totalElapsedTime << "Time string:" << timeStr;
+        //qDebug() << "[DEBUG] Timer not active but showing accumulated time (ms):" << m_totalElapsedTime << "Time string:" << timeStr;
     } else {
         timeStr = "00:00:00";
-        qDebug() << "[DEBUG] Timer not active - Showing default time";
+        //qDebug() << "[DEBUG] Timer not active - Showing default time";
     }
 
     // Get context usage using estimateTokens for both used and total
@@ -3980,5 +3984,19 @@ QString MainWindow::formatNumber(quint64 num) const
         }
     } else {
         return QString::number(num);
+    }
+}
+
+void MainWindow::onOmniAsrText(const QString& text)
+{
+    if (text.isEmpty()) return;
+    log("OmniASR Recognized: " + text);
+    if (m_chat) {
+        m_chat->setInputText(text);
+        // Ensure chat is visible if needed, or just notify user
+        if (!m_chat->isVisible()) {
+             // Maybe show a toast or status message
+             statusBar()->showMessage("ASR Text: " + text, 5000);
+        }
     }
 }

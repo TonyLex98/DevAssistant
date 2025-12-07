@@ -10,6 +10,7 @@
 #include <InputTextEdit.h>
 #include <MemoryComboBox.h>
 #include <StyleTextEdit.h>
+#include "../audio/FasterWhisperRunner.h"
 
 class ChatDialog : public QWidget {
     Q_OBJECT
@@ -20,6 +21,7 @@ public:
     void appendUserMessage(const QString& s);
     void finishAssistantMessage();
     void sendMessageToChat(const QString& text);
+    void setInputText(const QString& text);
     void setTemplateManager(class SolutionTemplateManager* templateManager);
     void setMainWindow(class MainWindow* mainWnd);
     void setChatLogVisible(bool visible);
@@ -36,6 +38,9 @@ private slots:
     void onSend();
     void onStop();
     void pslot_updateModelsList();
+    void onMicClicked();
+    void onAsrFinished(const QString& text);
+    void onAsrError(const QString& msg);
 
 private:
     void populateTemplates();
@@ -49,4 +54,7 @@ private:
     MemoryComboBox * m_templateCombo;
     class SolutionTemplateManager* m_templateManager = nullptr;
     class MainWindow* m_mainWnd = nullptr;
+    StyledButton* m_micBtn = nullptr;
+    FasterWhisperRunner* m_whisperRunner = nullptr;
+    bool m_isRecording = false;
 };

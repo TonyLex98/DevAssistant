@@ -24,6 +24,8 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_input = new InputTextEdit(this);
     m_send = new StyledButton("Отправить", this);
     m_stop = new StyledButton("Остановить", this);
+    m_micBtn = new StyledButton("🎤", this);
+    m_micBtn->setFixedWidth(30); // Small button
     
     // Add only the input field to the main horizontal layout
     mainLayout->addWidget(m_input, 1);
@@ -35,6 +37,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     auto buttonsLayout = new QHBoxLayout();
     buttonsLayout->addWidget(m_send);
     buttonsLayout->addWidget(m_stop);
+    buttonsLayout->addWidget(m_micBtn);
     rightColumnLayout->addLayout(buttonsLayout);
     
     // Add the template selection combobox below the buttons
@@ -76,6 +79,62 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
         emit signal_updatelastUserMessage(str);
     });
 
+    m_whisperRunner = new FasterWhisperRunner(this);
+    
+    connect(m_micBtn, &StyledButton::clicked, this, &ChatDialog::onMicClicked);
+    
+    connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
+    connect(m_whisperRunner, &FasterWhisperRunner::errorOccurred, this, &ChatDialog::onAsrError);
+    connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg){
+        if (m_chat) {
+            m_chat->setVisible(true); // Ensure chat is visible
+            m_chat->append("<i>" + msg + "</i>");
+        }
+    });
+}
+
+void ChatDialog::onMicClicked() {
+    if (m_isRecording) {
+        m_whisperRunner->stopRecording();
+        
+        m_micBtn->setText("...");
+        m_micBtn->setEnabled(false);
+        m_isRecording = false;
+        
+        // Hide chat log if it was only showing status
+        if (m_chat && m_chat->toPlainText().contains("Faster Whisper")) {
+            m_chat->setVisible(false);
+            m_chat->clear();
+        }
+    } else {
+        // Use Faster Whisper by default for streaming experience
+        m_whisperRunner->startRecording();
+        
+        m_micBtn->setText("⏹");
+        m_micBtn->setStyleSheet("background-color: red; color: white;");
+        m_isRecording = true;
+    }
+}
+
+void ChatDialog::onAsrFinished(const QString& text) {
+    // Keep button active for streaming
+    // m_micBtn->setText("🎤");
+    // m_micBtn->setEnabled(true);
+    // m_micBtn->setStyleSheet(""); // Reset style
+    // m_isRecording = false;
+    
+    if (!text.isEmpty()) {
+        setInputText(text);
+    }
+}
+
+void ChatDialog::onAsrError(const QString& msg) {
+    m_micBtn->setText("🎤");
+    m_micBtn->setEnabled(true);
+    m_micBtn->setStyleSheet(""); // Reset style
+    m_isRecording = false;
+    // Show error in chat or log
+    m_chat->append("ASR Error: " + msg);
 }
 
 void ChatDialog::onStop(){
@@ -272,8 +331,16 @@ void ChatDialog::sendMessageToChat(const QString &text)
     emit sendMessage(text);
 }
 
+void ChatDialog::setInputText(const QString &text)
+{
+    if (m_input) {
+        // Insert text at cursor position instead of replacing
+        m_input->insertPlainText(text + " ");
+        m_input->setFocus();
+    }
+}
+
 void ChatDialog::setMainWindow(class MainWindow* mainWnd)
 {
     m_mainWnd = mainWnd;
 }
-

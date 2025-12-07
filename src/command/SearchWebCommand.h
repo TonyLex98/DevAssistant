@@ -18,7 +18,7 @@ public:
 
     const QStringList& results() const { return m_results; }
     const QStringList& rawResults() const { return m_rawResults; }
-    const QString& query() const { return m_params.value("query").toString(); }
+    QString query() const { return m_params.value("query").toString(); }
 
     // Переопределение метода для работы с LLM
     bool applyWithLLM(DevAssManager* devAss,
