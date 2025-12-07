@@ -97,6 +97,11 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 
     m_whisperRunner = new FasterWhisperRunner(this);
     
+    // Auto-send timer setup
+    m_autoSendTimer = new QTimer(this);
+    m_autoSendTimer->setSingleShot(true);
+    connect(m_autoSendTimer, &QTimer::timeout, this, &ChatDialog::onAutoSendTimeout);
+    
     connect(m_micBtn, &StyledButton::clicked, this, &ChatDialog::onMicClicked);
     
     connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
@@ -160,24 +165,77 @@ void ChatDialog::onMicClicked() {
 }
 
 void ChatDialog::onAsrFinished(const QString& text) {
-    // Keep button active for streaming
-    // m_micBtn->setText("🎤");
-    // m_micBtn->setEnabled(true);
-    // m_micBtn->setStyleSheet(""); // Reset style
-    // m_isRecording = false;
+    if (text.isEmpty()) {
+        return;
+    }
     
-    if (!text.isEmpty()) {
-        setInputText(text);
+    // Add text to input
+    setInputText(text);
+    
+    // Check for trigger phrases - send immediately
+    if (checkTriggerPhrase(text)) {
+        m_autoSendTimer->stop();
+        // Remove trigger phrase from the end
+        QString inputText = m_input->toPlainText().trimmed();
+        QStringList triggers = {"отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай"};
+        for (const QString& trigger : triggers) {
+            if (inputText.toLower().endsWith(trigger)) {
+                inputText = inputText.left(inputText.length() - trigger.length()).trimmed();
+                m_input->setPlainText(inputText);
+                break;
+            }
+        }
+        onSend();
+        // Don't stop recording - keep mic active for continuous conversation
+        return;
+    }
+    
+    // Start/restart the auto-send timer
+    m_lastAsrText = m_input->toPlainText();
+    m_autoSendTimer->start(AUTO_SEND_DELAY_MS);
+}
+
+bool ChatDialog::checkTriggerPhrase(const QString& text) {
+    QString lower = text.toLower().trimmed();
+    QStringList triggers = {"отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай"};
+    for (const QString& trigger : triggers) {
+        if (lower.endsWith(trigger) || lower == trigger) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ChatDialog::onAutoSendTimeout() {
+    // Check if we have text to send and it hasn't changed
+    QString currentText = m_input->toPlainText().trimmed();
+    if (!currentText.isEmpty()) {
+        // Send the message
+        onSend();
+        // Don't stop recording - keep mic active for continuous conversation
     }
 }
 
 void ChatDialog::onAsrError(const QString& msg) {
+    m_autoSendTimer->stop();
     m_micBtn->setText("🎤");
     m_micBtn->setEnabled(true);
     m_micBtn->setStyleSheet(""); // Reset style
     m_isRecording = false;
     // Show error in chat or log
     m_chat->append("ASR Error: " + msg);
+}
+
+void ChatDialog::resumeRecordingAfterResponse() {
+    // If recording was active, ensure it continues
+    // This is called after TTS finishes speaking the response
+    if (m_isRecording) {
+        // Recording is still active, nothing to do
+        return;
+    }
+    // If user had mic active before, we could auto-resume here
+    // For now, just ensure the button is ready
+    m_micBtn->setEnabled(true);
 }
 
 void ChatDialog::onStop(){

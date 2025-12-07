@@ -7,6 +7,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QKeyEvent>
+#include <QTimer>
 #include <InputTextEdit.h>
 #include <MemoryComboBox.h>
 #include <StyleTextEdit.h>
@@ -26,6 +27,9 @@ public:
     void setMainWindow(class MainWindow* mainWnd);
     void setChatLogVisible(bool visible);
     bool isChatLogVisible() const;
+    bool isRecording() const { return m_isRecording; }
+    void resumeRecordingAfterResponse();
+
 
 signals:
     void sendMessage(const QString& text);
@@ -41,10 +45,13 @@ private slots:
     void onMicClicked();
     void onAsrFinished(const QString& text);
     void onAsrError(const QString& msg);
+    void onAutoSendTimeout();
 
 private:
     void populateTemplates();
     void notifyTemplateSelectionChanged();
+    bool checkTriggerPhrase(const QString& text);
+    
     StyleTextEdit* m_chat = nullptr;
     InputTextEdit* m_input = nullptr;
     StyledButton* m_send = nullptr;
@@ -57,4 +64,9 @@ private:
     StyledButton* m_micBtn = nullptr;
     FasterWhisperRunner* m_whisperRunner = nullptr;
     bool m_isRecording = false;
+    
+    // Auto-send after silence
+    QTimer* m_autoSendTimer = nullptr;
+    QString m_lastAsrText;
+    static constexpr int AUTO_SEND_DELAY_MS = 3000; // 3 seconds
 };

@@ -456,6 +456,12 @@ MainWindow::MainWindow(QWidget *parent)
         connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
             log("TTS Error: " + err);
         });
+        connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this]() {
+            // Resume recording after TTS finishes speaking
+            if (m_chat && m_chat->isRecording()) {
+                m_chat->resumeRecordingAfterResponse();
+            }
+        });
     }
     
     connect(m_ttsToggleBtn, &StyledButton::clicked, this, [this]() {
@@ -473,6 +479,12 @@ MainWindow::MainWindow(QWidget *parent)
             });
             connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
                 log("TTS Error: " + err);
+            });
+            connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this]() {
+                // Resume recording after TTS finishes speaking
+                if (m_chat && m_chat->isRecording()) {
+                    m_chat->resumeRecordingAfterResponse();
+                }
             });
         }
     });
