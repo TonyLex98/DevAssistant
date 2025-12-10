@@ -45,7 +45,7 @@ private slots:
     void onMicClicked();
     void onAsrFinished(const QString& text);
     void onAsrError(const QString& msg);
-    void onAutoSendTimeout();
+    void onSilenceDetected();
 
 private:
     void populateTemplates();
@@ -64,9 +64,4 @@ private:
     StyledButton* m_micBtn = nullptr;
     FasterWhisperRunner* m_whisperRunner = nullptr;
     bool m_isRecording = false;
-    
-    // Auto-send after silence
-    QTimer* m_autoSendTimer = nullptr;
-    QString m_lastAsrText;
-    static constexpr int AUTO_SEND_DELAY_MS = 3000; // 3 seconds
 };

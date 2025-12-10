@@ -97,15 +97,11 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 
     m_whisperRunner = new FasterWhisperRunner(this);
     
-    // Auto-send timer setup
-    m_autoSendTimer = new QTimer(this);
-    m_autoSendTimer->setSingleShot(true);
-    connect(m_autoSendTimer, &QTimer::timeout, this, &ChatDialog::onAutoSendTimeout);
-    
     connect(m_micBtn, &StyledButton::clicked, this, &ChatDialog::onMicClicked);
     
     connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
     connect(m_whisperRunner, &FasterWhisperRunner::errorOccurred, this, &ChatDialog::onAsrError);
+    connect(m_whisperRunner, &FasterWhisperRunner::silenceDetected, this, &ChatDialog::onSilenceDetected);
     connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg){
         if (m_chat) {
             m_chat->setVisible(true); // Ensure chat is visible
@@ -174,7 +170,6 @@ void ChatDialog::onAsrFinished(const QString& text) {
     
     // Check for trigger phrases - send immediately
     if (checkTriggerPhrase(text)) {
-        m_autoSendTimer->stop();
         // Remove trigger phrase from the end
         QString inputText = m_input->toPlainText().trimmed();
         QStringList triggers = {"отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай"};
@@ -189,10 +184,14 @@ void ChatDialog::onAsrFinished(const QString& text) {
         // Don't stop recording - keep mic active for continuous conversation
         return;
     }
-    
-    // Start/restart the auto-send timer
-    m_lastAsrText = m_input->toPlainText();
-    m_autoSendTimer->start(AUTO_SEND_DELAY_MS);
+}
+
+void ChatDialog::onSilenceDetected() {
+    // After 3 seconds of silence, send the message
+    QString currentText = m_input->toPlainText().trimmed();
+    if (!currentText.isEmpty()) {
+        onSend();
+    }
 }
 
 bool ChatDialog::checkTriggerPhrase(const QString& text) {
@@ -206,18 +205,9 @@ bool ChatDialog::checkTriggerPhrase(const QString& text) {
     return false;
 }
 
-void ChatDialog::onAutoSendTimeout() {
-    // Check if we have text to send and it hasn't changed
-    QString currentText = m_input->toPlainText().trimmed();
-    if (!currentText.isEmpty()) {
-        // Send the message
-        onSend();
-        // Don't stop recording - keep mic active for continuous conversation
-    }
-}
+
 
 void ChatDialog::onAsrError(const QString& msg) {
-    m_autoSendTimer->stop();
     m_micBtn->setText("🎤");
     m_micBtn->setEnabled(true);
     m_micBtn->setStyleSheet(""); // Reset style

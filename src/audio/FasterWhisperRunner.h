@@ -26,12 +26,14 @@ signals:
     void recordingStopped();
     void serverReady();
     void statusMessage(const QString& msg);
+    void silenceDetected(); // New signal for silence detection
 
 private slots:
     void onAudioReady();
     void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
     void onProcessReadyRead();
     void processAudioChunk();
+    void onSilenceTimeout();
 
 private:
     void startServer();
@@ -56,4 +58,8 @@ private:
     
     QTimer* m_processTimer;
     int m_currentSilenceDuration;
+    
+    // For auto-send after silence
+    QTimer* m_silenceTimer;
+    bool m_hasRecognizedSpeech;
 };

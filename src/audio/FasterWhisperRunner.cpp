@@ -18,6 +18,7 @@ FasterWhisperRunner::FasterWhisperRunner(QObject* parent)
     , m_maxChunkDurationMs(5000) // Maximum 5 seconds
     , m_silenceDurationMs(300) // 300ms silence to trigger cut
     , m_currentSilenceDuration(0)
+    , m_hasRecognizedSpeech(false)
 {
     m_format.setSampleRate(16000);
     m_format.setChannelCount(1);
@@ -33,6 +34,12 @@ FasterWhisperRunner::FasterWhisperRunner(QObject* parent)
 
     m_processTimer = new QTimer(this);
     connect(m_processTimer, &QTimer::timeout, this, &FasterWhisperRunner::processAudioChunk);
+    
+    // Timer for silence detection (3 seconds)
+    m_silenceTimer = new QTimer(this);
+    m_silenceTimer->setSingleShot(true);
+    m_silenceTimer->setInterval(3000); // 3 seconds
+    connect(m_silenceTimer, &QTimer::timeout, this, &FasterWhisperRunner::onSilenceTimeout);
     
     // Defer dependency check to allow signals to be connected
     QTimer::singleShot(0, this, &FasterWhisperRunner::checkAndInstallDependencies);
@@ -164,6 +171,10 @@ void FasterWhisperRunner::stopRecording() {
         }
     }
     
+    // Reset silence timer and speech flag
+    m_silenceTimer->stop();
+    m_hasRecognizedSpeech = false;
+    
     m_isRecording = false;
     emit recordingStopped();
 }
@@ -172,6 +183,12 @@ void FasterWhisperRunner::onAudioReady() {
     if (!m_audioDevice) return;
     QByteArray data = m_audioDevice->readAll();
     m_audioBuffer.append(data);
+}
+
+void FasterWhisperRunner::onSilenceTimeout() {
+    // After 3 seconds of silence, emit signal to send the message
+    emit silenceDetected();
+    m_hasRecognizedSpeech = false;
 }
 
 double FasterWhisperRunner::calculateRMS(const QByteArray& data) {
@@ -204,8 +221,17 @@ void FasterWhisperRunner::processAudioChunk() {
     
     if (rms < m_silenceThreshold) {
         m_currentSilenceDuration += 100;
+        
+        // If we have recognized speech and silence is detected, start the silence timer
+        if (m_hasRecognizedSpeech && !m_silenceTimer->isActive()) {
+            m_silenceTimer->start();
+        }
     } else {
         m_currentSilenceDuration = 0;
+        
+        // Reset silence timer when speech is detected
+        m_silenceTimer->stop();
+        m_hasRecognizedSpeech = true;
     }
     
     bool shouldCut = false;
@@ -258,7 +284,7 @@ void FasterWhisperRunner::onProcessReadyRead() {
     }
 }
 
-void FasterWhisperRunner::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
+void FasterWhisperRunner::onProcessFinished(int exitCode, QProcess::ExitStatus) {
     qDebug() << "Faster Whisper Server exited code:" << exitCode;
     m_serverReady = false;
     // Auto restart if recording?
