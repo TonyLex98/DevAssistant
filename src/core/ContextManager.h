@@ -9,6 +9,8 @@
 #include <QTimer>
 #include <QJsonObject>
 #include <QStringList>
+#include <QJsonArray>
+#include <QStandardPaths>
 
 // Forward declarations
 class Command;
@@ -49,6 +51,17 @@ struct CommandSequenceInfo {
     CommandSequenceInfo() {}
 };
 
+// Archived context chunk (for topic changes / context compaction).
+struct ArchivedContextChunk {
+    QString id;
+    QDateTime timestamp;
+    QString title;
+    QString reason;
+    QString triggerQuery;
+    QStringList keywords;
+    QString contextText;
+};
+
 class ContextManager : public QObject
 {
     Q_OBJECT
@@ -80,7 +93,10 @@ public:
     
     // Get context as text based on valid commands
     QString generateContextText() const;
-    
+
+    // Observe a user query to manage topic switching / archive & restore.
+    void observeUserQuery(const QString& text);
+
     // Clear all context
     void clearAll();
     
@@ -122,6 +138,12 @@ private:
     MainWindow* m_mainWindow;
     int m_commandCounter; // To generate unique IDs
     int m_sequenceCounter; // To generate unique sequence IDs
+
+    QList<ArchivedContextChunk> m_archive;
+    QStringList m_exhumedArchiveIds;
+    QSet<QString> m_currentTopicKeywords;
+    QString m_currentTopicTitle;
+    QString m_archiveFilePath;
     
     QString generateUniqueId(const QString& commandName);
     void rebuildFileWatcher();
@@ -131,6 +153,22 @@ private:
     
     // Get file modification time
     QDateTime getFileModificationTime(const QString& path) const;
+
+    QString generateContextTextInternal(bool includeArchived, int maxChars) const;
+    QString formatCommandForContext(const CommandContextInfo& cmdInfo, int maxChars) const;
+    QString formatSequenceForContext(const CommandSequenceInfo& seqInfo, int maxCharsPerCommand) const;
+
+    void loadArchive();
+    void saveArchive() const;
+    void pruneArchive();
+    void archiveAllActiveContext(const QString& reason, const QString& triggerQuery);
+    void archiveOldestUntilFit(int maxActiveChars);
+    void clearActiveContextOnly();
+    void updateExhumedArchivesForQuery(const QString& queryText);
+
+    static QSet<QString> extractKeywords(const QString& text);
+    static double jaccardSimilarity(const QSet<QString>& a, const QSet<QString>& b);
+    static QString makeTopicTitle(const QString& text);
 };
 
 #endif // CONTEXTMANAGER_H

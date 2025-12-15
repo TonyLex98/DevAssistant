@@ -1165,6 +1165,9 @@ void MainWindow::undoLast(){
 }
 
 void MainWindow::sendUserMessage(const QString& text){
+    if (m_contextManager)
+        m_contextManager->observeUserQuery(text);
+
     m_lastUserMessage = text;
     qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
     appendUserQuestionToResultDisplay(text);
@@ -3704,6 +3707,8 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
     onChatTemplateSelectionChanged(templatePath);
+    if (m_contextManager)
+        m_contextManager->observeUserQuery(text);
     appendUserQuestionToResultDisplay(text);
 
     // First, refresh to ensure we have the latest templates and sequences
@@ -3800,6 +3805,9 @@ void MainWindow::runSimpleChat(const QString &text)
     // Send the message directly to the model in streaming mode without templates/sequences
 
     qDebug() << "[runSimpleChat] Text:" << text;
+
+    if (m_contextManager)
+        m_contextManager->observeUserQuery(text);
 
     // Display user message in chat
     m_chat->appendUserMessage(text);
@@ -3927,6 +3935,9 @@ void MainWindow::runSimpleChatWithImages(const QString &text,
 
     const QString note = buildImagesNoteText(imagePaths, imageSummaries);
     const QString historyText = note.isEmpty() ? text : (text + note);
+
+    if (m_contextManager)
+        m_contextManager->observeUserQuery(historyText);
 
     m_chat->appendUserMessage(note.isEmpty() ? text : (text + QString("\n[Images attached: %1]").arg(imagePaths.size())));
     appendUserQuestionToResultDisplay(historyText);
