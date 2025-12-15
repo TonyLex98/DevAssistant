@@ -17,10 +17,13 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QTextDocumentFragment>
+#include <QXmlStreamReader>
 #include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QHash>
+#include <QDateTime>
+#include <QTextCodec>
 #include <functional>
 #include <algorithm>
 #include <QDebug>
@@ -58,6 +61,8 @@ static void applyCommonHeaders(QNetworkRequest& req, const QString& referer = QS
     req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     req.setRawHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
     req.setRawHeader("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.7");
+    // Avoid compressed bodies unless we're prepared to decompress them.
+    req.setRawHeader("Accept-Encoding", "identity");
     req.setRawHeader("Cache-Control", "no-cache");
     req.setRawHeader("Pragma", "no-cache");
     req.setRawHeader("Connection", "keep-alive");
@@ -81,37 +86,57 @@ static bool httpGet(const QUrl& url,
                     QByteArray* body,
                     int* status,
                     QString* err,
-                    const QString& referer);
+                    const QString& referer = QString(),
+                    int timeoutMs = 15000);
 
-static void warmupDuckDuckGo(const QString& query)
+static bool httpPost(const QUrl& url,
+                     const QByteArray& payload,
+                     QByteArray* body,
+                     int* status,
+                     QString* err,
+                     const QString& referer = QString(),
+                     int timeoutMs = 15000);
+
+static qint64 nowMs()
 {
-    static QSet<QString> warmedQueries;
-    const QString key = query.left(64);
-    if (warmedQueries.contains(key))
-        return;
-    warmedQueries.insert(key);
+    return QDateTime::currentMSecsSinceEpoch();
+}
 
-    QUrl warmUrl(QStringLiteral("https://duckduckgo.com/"));
-    QUrlQuery q;
-    q.addQueryItem(QStringLiteral("q"), query);
-    warmUrl.setQuery(q);
-    QByteArray body;
-    int status = 0;
-    QString err;
-    httpGet(warmUrl, &body, &status, &err, QString());
+template <typename T>
+struct TimedCacheEntry {
+    T value;
+    qint64 expiresAtMs = 0;
+};
+
+template <typename T>
+static void trimCache(QHash<QString, TimedCacheEntry<T>>& cache, int maxEntries)
+{
+    if (cache.size() <= maxEntries)
+        return;
+
+    QVector<QPair<QString, qint64>> keys;
+    keys.reserve(cache.size());
+    for (auto it = cache.cbegin(); it != cache.cend(); ++it)
+        keys.push_back({it.key(), it.value().expiresAtMs});
+
+    std::sort(keys.begin(), keys.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+    const int toRemove = cache.size() - maxEntries;
+    for (int i = 0; i < toRemove && i < keys.size(); ++i)
+        cache.remove(keys[i].first);
 }
 
 static bool executeRequest(QNetworkReply* reply,
                            QByteArray* body,
                            int* status,
-                           QString* err)
+                           QString* err,
+                           int timeoutMs = 15000)
 {
     QEventLoop loop;
     bool timedOut = false;
 
     QTimer timer;
     timer.setSingleShot(true);
-    timer.start(15000);
+    timer.start(timeoutMs);
     QObject::connect(&timer, &QTimer::timeout, [&]() {
         timedOut = true;
         loop.quit();
@@ -152,14 +177,15 @@ static bool httpGet(const QUrl& url,
                     QByteArray* body,
                     int* status,
                     QString* err,
-                    const QString& referer = QString())
+                    const QString& referer,
+                    int timeoutMs)
 {
     QNetworkRequest req(url);
     applyCommonHeaders(req, referer);
 
     auto& nam = sharedManager();
     QNetworkReply* reply = nam.get(req);
-    return executeRequest(reply, body, status, err);
+    return executeRequest(reply, body, status, err, timeoutMs);
 }
 
 static bool httpPost(const QUrl& url,
@@ -167,7 +193,8 @@ static bool httpPost(const QUrl& url,
                      QByteArray* body,
                      int* status,
                      QString* err,
-                     const QString& referer = QString())
+                     const QString& referer,
+                     int timeoutMs)
 {
     QNetworkRequest req(url);
     applyCommonHeaders(req, referer);
@@ -175,7 +202,7 @@ static bool httpPost(const QUrl& url,
 
     auto& nam = sharedManager();
     QNetworkReply* reply = nam.post(req, payload);
-    return executeRequest(reply, body, status, err);
+    return executeRequest(reply, body, status, err, timeoutMs);
 }
 
 static QString normalizeDuckUrl(const QString& rawUrl)
@@ -273,6 +300,326 @@ static QVector<SearchHit> parseDuckJson(const QByteArray& body,
     return hits;
 }
 
+static QVector<SearchHit> parseDuckLiteHtml(const QString& html,
+                                            int maxResults,
+                                            QSet<QString>* seen)
+{
+    QVector<SearchHit> hits;
+    if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive))
+        return hits;
+
+    const QRegularExpression linkRe(
+        QStringLiteral("<a[^>]*class=\"[^\"]*result-link[^\"]*\"[^>]*href=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</a>"),
+        QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression snippetRe(
+        QStringLiteral("<td[^>]*class=\"[^\"]*result-snippet[^\"]*\"[^>]*>([\\s\\S]*?)</td>"),
+        QRegularExpression::DotMatchesEverythingOption | QRegularExpression::CaseInsensitiveOption);
+
+    auto matchIt = linkRe.globalMatch(html);
+    while (matchIt.hasNext() && hits.size() < maxResults) {
+        const QRegularExpressionMatch match = matchIt.next();
+        QString url = normalizeDuckUrl(match.captured(1));
+        QString title = decodeHtml(match.captured(2));
+        if (title.isEmpty() || url.isEmpty())
+            continue;
+        if (seen->contains(url))
+            continue;
+
+        QString snippet;
+        const int rowEnd = html.indexOf(QStringLiteral("</tr>"), match.capturedEnd(), Qt::CaseInsensitive);
+        if (rowEnd > 0) {
+            const QString rowChunk = html.mid(match.capturedEnd(), rowEnd - match.capturedEnd());
+            const QRegularExpressionMatch s = snippetRe.match(rowChunk);
+            if (s.hasMatch())
+                snippet = decodeHtml(s.captured(1));
+        }
+
+        seen->insert(url);
+        hits.push_back({title, url, snippet});
+    }
+
+    return hits;
+}
+
+static QVector<SearchHit> searchWikipedia(const QString& query,
+                                         int maxResults,
+                                         QSet<QString>* seen,
+                                         QString* err,
+                                         int timeoutMs,
+                                         const QString& lang)
+{
+    QVector<SearchHit> hits;
+    if (query.trimmed().isEmpty() || maxResults <= 0)
+        return hits;
+
+    QUrl url(QStringLiteral("https://%1.wikipedia.org/w/api.php").arg(lang));
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("action"), QStringLiteral("query"));
+    q.addQueryItem(QStringLiteral("list"), QStringLiteral("search"));
+    q.addQueryItem(QStringLiteral("srsearch"), query);
+    q.addQueryItem(QStringLiteral("format"), QStringLiteral("json"));
+    q.addQueryItem(QStringLiteral("utf8"), QStringLiteral("1"));
+    q.addQueryItem(QStringLiteral("srlimit"), QString::number(maxResults));
+    url.setQuery(q);
+
+    QByteArray body;
+    int status = 0;
+    QString localErr;
+    if (!httpGet(url, &body, &status, &localErr, QStringLiteral("https://%1.wikipedia.org/").arg(lang), timeoutMs)) {
+        if (err && !localErr.isEmpty())
+            *err = localErr;
+        return hits;
+    }
+    if (status < 200 || status >= 300) {
+        if (err)
+            *err = QStringLiteral("SEARCH_WEB: Wikipedia returned %1").arg(status);
+        return hits;
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject())
+        return hits;
+
+    const QJsonObject root = doc.object();
+    const QJsonObject queryObj = root.value(QStringLiteral("query")).toObject();
+    const QJsonArray results = queryObj.value(QStringLiteral("search")).toArray();
+    for (const QJsonValue& v : results) {
+        if (hits.size() >= maxResults)
+            break;
+        if (!v.isObject())
+            continue;
+        const QJsonObject obj = v.toObject();
+        const QString title = obj.value(QStringLiteral("title")).toString().trimmed();
+        const QString snippetHtml = obj.value(QStringLiteral("snippet")).toString();
+        const qint64 pageId = obj.value(QStringLiteral("pageid")).toVariant().toLongLong();
+        if (title.isEmpty() || pageId <= 0)
+            continue;
+
+        const QString pageUrl = QStringLiteral("https://%1.wikipedia.org/?curid=%2").arg(lang, QString::number(pageId));
+        if (seen && seen->contains(pageUrl))
+            continue;
+        if (seen)
+            seen->insert(pageUrl);
+        hits.push_back({title, pageUrl, decodeHtml(snippetHtml)});
+    }
+
+    return hits;
+}
+
+static QVector<SearchHit> searchStackOverflow(const QString& query,
+                                              int maxResults,
+                                              QSet<QString>* seen,
+                                              QString* err,
+                                              int timeoutMs)
+{
+    QVector<SearchHit> hits;
+    if (query.trimmed().isEmpty() || maxResults <= 0)
+        return hits;
+
+    QUrl url(QStringLiteral("https://api.stackexchange.com/2.3/search/advanced"));
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("order"), QStringLiteral("desc"));
+    q.addQueryItem(QStringLiteral("sort"), QStringLiteral("relevance"));
+    q.addQueryItem(QStringLiteral("q"), query);
+    q.addQueryItem(QStringLiteral("site"), QStringLiteral("stackoverflow"));
+    q.addQueryItem(QStringLiteral("pagesize"), QString::number(maxResults));
+    url.setQuery(q);
+
+    QByteArray body;
+    int status = 0;
+    QString localErr;
+    if (!httpGet(url, &body, &status, &localErr, QStringLiteral("https://stackoverflow.com/"), timeoutMs)) {
+        if (err && !localErr.isEmpty())
+            *err = localErr;
+        return hits;
+    }
+    if (status < 200 || status >= 300) {
+        if (err)
+            *err = QStringLiteral("SEARCH_WEB: StackOverflow returned %1").arg(status);
+        return hits;
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject())
+        return hits;
+
+    const QJsonObject root = doc.object();
+    const QJsonArray items = root.value(QStringLiteral("items")).toArray();
+    for (const QJsonValue& v : items) {
+        if (hits.size() >= maxResults)
+            break;
+        if (!v.isObject())
+            continue;
+        const QJsonObject obj = v.toObject();
+        const QString title = obj.value(QStringLiteral("title")).toString().trimmed();
+        const QString link = obj.value(QStringLiteral("link")).toString().trimmed();
+        if (title.isEmpty() || link.isEmpty())
+            continue;
+        if (seen && seen->contains(link))
+            continue;
+        if (seen)
+            seen->insert(link);
+
+        QString snippet;
+        const QJsonArray tags = obj.value(QStringLiteral("tags")).toArray();
+        if (!tags.isEmpty()) {
+            QStringList tagList;
+            for (const QJsonValue& tv : tags) {
+                const QString t = tv.toString().trimmed();
+                if (!t.isEmpty())
+                    tagList << t;
+            }
+            if (!tagList.isEmpty())
+                snippet = QStringLiteral("tags: %1").arg(tagList.join(QStringLiteral(", ")));
+        }
+        hits.push_back({title, link, snippet});
+    }
+
+    return hits;
+}
+
+static QVector<SearchHit> searchHackerNews(const QString& query,
+                                           int maxResults,
+                                           QSet<QString>* seen,
+                                           QString* err,
+                                           int timeoutMs)
+{
+    QVector<SearchHit> hits;
+    if (query.trimmed().isEmpty() || maxResults <= 0)
+        return hits;
+
+    QUrl url(QStringLiteral("https://hn.algolia.com/api/v1/search"));
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("query"), query);
+    q.addQueryItem(QStringLiteral("tags"), QStringLiteral("story"));
+    q.addQueryItem(QStringLiteral("hitsPerPage"), QString::number(maxResults));
+    url.setQuery(q);
+
+    QByteArray body;
+    int status = 0;
+    QString localErr;
+    if (!httpGet(url, &body, &status, &localErr, QStringLiteral("https://hn.algolia.com/"), timeoutMs)) {
+        if (err && !localErr.isEmpty())
+            *err = localErr;
+        return hits;
+    }
+    if (status < 200 || status >= 300) {
+        if (err)
+            *err = QStringLiteral("SEARCH_WEB: HN Algolia returned %1").arg(status);
+        return hits;
+    }
+
+    QJsonParseError parseError;
+    QJsonDocument doc = QJsonDocument::fromJson(body, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject())
+        return hits;
+
+    const QJsonObject root = doc.object();
+    const QJsonArray items = root.value(QStringLiteral("hits")).toArray();
+    for (const QJsonValue& v : items) {
+        if (hits.size() >= maxResults)
+            break;
+        if (!v.isObject())
+            continue;
+        const QJsonObject obj = v.toObject();
+        const QString title = obj.value(QStringLiteral("title")).toString().trimmed();
+        QString link = obj.value(QStringLiteral("url")).toString().trimmed();
+        const QString objectId = obj.value(QStringLiteral("objectID")).toString().trimmed();
+        if (link.isEmpty() && !objectId.isEmpty())
+            link = QStringLiteral("https://news.ycombinator.com/item?id=%1").arg(objectId);
+        if (title.isEmpty() || link.isEmpty())
+            continue;
+        if (seen && seen->contains(link))
+            continue;
+        if (seen)
+            seen->insert(link);
+
+        const QString points = QString::number(obj.value(QStringLiteral("points")).toInt());
+        const QString comments = QString::number(obj.value(QStringLiteral("num_comments")).toInt());
+        const QString snippet = QStringLiteral("HN: %1 points, %2 comments").arg(points, comments);
+        hits.push_back({title, link, snippet});
+    }
+
+    return hits;
+}
+
+static QVector<SearchHit> searchGoogleNewsRss(const QString& query,
+                                              int maxResults,
+                                              QSet<QString>* seen,
+                                              QString* err,
+                                              int timeoutMs,
+                                              const QString& hl,
+                                              const QString& gl,
+                                              const QString& ceid)
+{
+    QVector<SearchHit> hits;
+    if (query.trimmed().isEmpty() || maxResults <= 0)
+        return hits;
+
+    QUrl url(QStringLiteral("https://news.google.com/rss/search"));
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("q"), query);
+    q.addQueryItem(QStringLiteral("hl"), hl);
+    q.addQueryItem(QStringLiteral("gl"), gl);
+    q.addQueryItem(QStringLiteral("ceid"), ceid);
+    url.setQuery(q);
+
+    QByteArray body;
+    int status = 0;
+    QString localErr;
+    if (!httpGet(url, &body, &status, &localErr, QStringLiteral("https://news.google.com/"), timeoutMs)) {
+        if (err && !localErr.isEmpty())
+            *err = localErr;
+        return hits;
+    }
+    if (status < 200 || status >= 300) {
+        if (err)
+            *err = QStringLiteral("SEARCH_WEB: Google News RSS returned %1").arg(status);
+        return hits;
+    }
+
+    QXmlStreamReader xml(body);
+    while (!xml.atEnd() && hits.size() < maxResults) {
+        xml.readNext();
+        if (!xml.isStartElement())
+            continue;
+        if (xml.name() != QLatin1String("item"))
+            continue;
+
+        QString title, link, description;
+        while (!(xml.isEndElement() && xml.name() == QLatin1String("item")) && !xml.atEnd()) {
+            xml.readNext();
+            if (!xml.isStartElement())
+                continue;
+            const QStringRef name = xml.name();
+            if (name == QLatin1String("title")) {
+                title = xml.readElementText(QXmlStreamReader::IncludeChildElements).trimmed();
+            } else if (name == QLatin1String("link")) {
+                link = xml.readElementText(QXmlStreamReader::IncludeChildElements).trimmed();
+            } else if (name == QLatin1String("description")) {
+                description = xml.readElementText(QXmlStreamReader::IncludeChildElements).trimmed();
+            }
+        }
+
+        if (title.isEmpty() || link.isEmpty())
+            continue;
+        if (seen && seen->contains(link))
+            continue;
+        if (seen)
+            seen->insert(link);
+        hits.push_back({title, link, decodeHtml(description)});
+    }
+
+    if (xml.hasError()) {
+        if (err)
+            *err = QStringLiteral("SEARCH_WEB: Google News RSS parse error");
+    }
+
+    return hits;
+}
+
 static QVector<SearchHit> parseDuckHtml(const QString& html,
                                         int maxResults,
                                         QSet<QString>* seen)
@@ -327,26 +674,154 @@ static QString extractTextFromHtml(const QString& html)
     return text.trimmed();
 }
 
-static QString fetchPageText(const QString& url, int maxChars)
+static QString decodeHtmlBytes(const QByteArray& body, const QByteArray& contentTypeHeader)
 {
-    QUrl qurl(url);
-    if (!qurl.isValid() || qurl.scheme().isEmpty())
-        return QString();
+    auto extractCharset = [](const QByteArray& s) -> QByteArray {
+        const QByteArray lower = s.toLower();
+        const int idx = lower.indexOf("charset=");
+        if (idx < 0)
+            return QByteArray();
+        int start = idx + 8;
+        int end = start;
+        while (end < lower.size()) {
+            const char c = lower[end];
+            if (c == ';' || c == '"' || c == '\'' || c == ' ' || c == '\r' || c == '\n' || c == '\t')
+                break;
+            ++end;
+        }
+        return lower.mid(start, end - start).trimmed();
+    };
 
-    QByteArray body;
-    int status = 0;
-    QString err;
-    if (!httpGet(qurl, &body, &status, &err, url))
-        return QString();
-    if (status < 200 || status >= 300)
-        return QString();
+    QByteArray charset = extractCharset(contentTypeHeader);
+    if (charset.isEmpty())
+        charset = extractCharset(body.left(4096));
 
-    QString text = extractTextFromHtml(QString::fromUtf8(body));
-    if (text.isEmpty())
-        return QString();
-    if (text.size() > maxChars)
-        text = text.left(maxChars);
-    return text;
+    if (!charset.isEmpty()) {
+        QTextCodec* codec = QTextCodec::codecForName(charset);
+        if (codec)
+            return codec->toUnicode(body);
+    }
+    return QString::fromUtf8(body);
+}
+
+static QHash<QString, TimedCacheEntry<QString>> g_pageTextCache;
+static constexpr int kMaxPageCacheEntries = 96;
+
+static bool looksLikeNonHtml(const QString& url)
+{
+    const QString lower = url.toLower();
+    return lower.endsWith(".pdf") || lower.endsWith(".zip") || lower.endsWith(".rar") ||
+           lower.endsWith(".7z") || lower.endsWith(".exe") || lower.endsWith(".msi") ||
+           lower.endsWith(".dmg") || lower.endsWith(".iso") || lower.endsWith(".apk");
+}
+
+static QStringList fetchManyPageTexts(const QStringList& urls,
+                                      int maxCharsPerPage,
+                                      int perRequestTimeoutMs,
+                                      int overallTimeoutMs,
+                                      int concurrency,
+                                      int cacheTtlMs)
+{
+    QHash<QString, QString> byUrl;
+    byUrl.reserve(urls.size());
+
+    const qint64 t = nowMs();
+    QStringList pending;
+    pending.reserve(urls.size());
+
+    for (const QString& url : urls) {
+        const auto cached = g_pageTextCache.constFind(url);
+        if (cached != g_pageTextCache.cend() && cached->expiresAtMs > t) {
+            byUrl.insert(url, cached->value);
+            continue;
+        }
+        if (!looksLikeNonHtml(url))
+            pending << url;
+    }
+
+    if (!pending.isEmpty()) {
+        QEventLoop loop;
+        QTimer overallTimer;
+        overallTimer.setSingleShot(true);
+        overallTimer.start(overallTimeoutMs);
+        QObject guard;
+
+        QHash<QNetworkReply*, QString> replyToUrl;
+        int nextIndex = 0;
+        int finishedCount = 0;
+
+        auto processDone = [&]() {
+            if (finishedCount >= pending.size())
+                loop.quit();
+        };
+
+        QObject::connect(&overallTimer, &QTimer::timeout, &guard, [&]() {
+            for (auto it = replyToUrl.begin(); it != replyToUrl.end(); ++it) {
+                if (it.key() && it.key()->isRunning())
+                    it.key()->abort();
+            }
+            loop.quit();
+        });
+
+        std::function<void()> startNext = [&]() {
+            while (nextIndex < pending.size() && replyToUrl.size() < qMax(1, concurrency)) {
+                const QString url = pending[nextIndex++];
+                QUrl qurl(url);
+                if (!qurl.isValid() || qurl.scheme().isEmpty()) {
+                    ++finishedCount;
+                    processDone();
+                    continue;
+                }
+
+                QNetworkRequest req(qurl);
+                applyCommonHeaders(req, url);
+                QNetworkReply* reply = sharedManager().get(req);
+                replyToUrl.insert(reply, url);
+
+                QTimer* perTimer = new QTimer(reply);
+                perTimer->setSingleShot(true);
+                perTimer->start(perRequestTimeoutMs);
+                QObject::connect(perTimer, &QTimer::timeout, reply, &QNetworkReply::abort);
+
+                QObject::connect(reply, &QNetworkReply::finished, &guard, [&, reply]() {
+                    const QString u = replyToUrl.take(reply);
+                    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                    if (reply->error() == QNetworkReply::NoError && httpStatus >= 200 && httpStatus < 300) {
+                        const QByteArray bytes = reply->readAll();
+                        const QString html = decodeHtmlBytes(bytes, reply->header(QNetworkRequest::ContentTypeHeader).toByteArray());
+                        QString text = extractTextFromHtml(html);
+                        if (text.size() > maxCharsPerPage)
+                            text = text.left(maxCharsPerPage);
+                        text = text.trimmed();
+                        if (!text.isEmpty()) {
+                            byUrl.insert(u, text);
+                            if (cacheTtlMs > 0) {
+                                g_pageTextCache.insert(u, TimedCacheEntry<QString>{text, nowMs() + cacheTtlMs});
+                                trimCache(g_pageTextCache, kMaxPageCacheEntries);
+                            }
+                        }
+                    }
+
+                    ++finishedCount;
+                    reply->deleteLater();
+                    startNext();
+                    processDone();
+                });
+            }
+        };
+
+        startNext();
+        loop.exec();
+    }
+
+    QStringList out;
+    out.reserve(urls.size());
+    for (const QString& url : urls) {
+        const QString text = byUrl.value(url).trimmed();
+        if (!text.isEmpty())
+            out << text;
+    }
+    return out;
 }
 
 static QStringList tokenizeWords(const QString& source)
@@ -405,6 +880,7 @@ bool SearchWebCommand::apply(DevAssManager* devAss, QString* err)
 
 bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QString* errorOut)
 {
+    (void)devAss;
     // Вызываем основную логику, но с возможностью использовать LLM для суммаризации
     m_results.clear();
     const QString query = m_params.value("query").toString().trimmed();
@@ -417,15 +893,234 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
     }
 
     const int maxResults = qMax(1, m_params.value("maxResults").toInt(5));
+    // Fast-by-default: search should return something quickly; deeper content extraction is separate.
+    const int searchTimeoutMs = qBound(1500, m_params.value("searchTimeoutMs").toInt(4000), 20000);
+    const int overallSearchTimeoutMs = qBound(2000, m_params.value("overallSearchTimeoutMs").toInt(6000), 30000);
+    const int pageTimeoutMs = qBound(1500, m_params.value("pageTimeoutMs").toInt(5000), 20000);
+    const int overallPageTimeoutMs = qBound(3000, m_params.value("overallPageTimeoutMs").toInt(9000), 60000);
+    const int pageConcurrency = qBound(1, m_params.value("pageConcurrency").toInt(3), 8);
+    const int maxContentChars = qBound(500, m_params.value("maxContentChars").toInt(2500), 20000);
+    const int cacheTtlMs = qBound(0, m_params.value("cacheTtlMs").toInt(10 * 60 * 1000), 60 * 60 * 1000);
+    const int negativeCacheTtlMs = qBound(0, m_params.value("negativeCacheTtlMs").toInt(30 * 1000), 10 * 60 * 1000);
+    const int maxPagesToExtractParam = m_params.value("maxPagesToExtract").toInt(3);
+    const int maxPagesToExtractConfigured = qBound(0, maxPagesToExtractParam, qMin(8, maxResults));
+    const bool useInstantAnswer = m_params.value("useInstantAnswer").toBool(false);
+    const bool preferNoCaptchaSources = m_params.value("preferNoCaptchaSources").toBool(true);
     QString lastError;
+    bool captchaEncountered = false;
     QSet<QString> seen;
     QVector<SearchHit> hits;
 
     try {
-        qDebug() << "[SearchWebCommand] Starting warmup for query:" << query;
-        warmupDuckDuckGo(query);
-
         // 1. Попытка через JSON API DuckDuckGo
+        static QHash<QString, TimedCacheEntry<QVector<SearchHit>>> queryCache;
+        static constexpr int kMaxQueryCacheEntries = 48;
+
+        const QString normalizedQuery = query.simplified();
+        const QString cacheKey = QStringLiteral("%1|%2").arg(normalizedQuery, QString::number(maxResults));
+        const qint64 t = nowMs();
+        const auto cached = queryCache.constFind(cacheKey);
+        if (cached != queryCache.cend() && cached->expiresAtMs > t) {
+            hits = cached->value;
+            for (const auto& h : hits)
+                seen.insert(h.url);
+        } else {
+            const qint64 deadlineMs = t + overallSearchTimeoutMs;
+            auto remainingTimeoutMs = [&]() -> int {
+                const qint64 remaining = deadlineMs - nowMs();
+                if (remaining <= 0)
+                    return 0;
+                return qMax(500, qMin(searchTimeoutMs, static_cast<int>(remaining)));
+            };
+
+            auto appendHits = [&](const QVector<SearchHit>& more) {
+                for (const auto& h : more) {
+                    if (hits.size() >= maxResults)
+                        break;
+                    if (h.url.trimmed().isEmpty() || h.title.trimmed().isEmpty())
+                        continue;
+                    hits.push_back(h);
+                }
+            };
+
+            const QString lowerQuery = normalizedQuery.toLower();
+            const bool looksLikeNews =
+                lowerQuery.contains(QStringLiteral("новост")) ||
+                lowerQuery.contains(QStringLiteral("сегодня")) ||
+                lowerQuery.contains(QStringLiteral("latest")) ||
+                lowerQuery.contains(QStringLiteral("breaking")) ||
+                lowerQuery.contains(QStringLiteral("news"));
+            const bool looksLikeProgramming =
+                lowerQuery.contains(QStringLiteral("qt")) ||
+                lowerQuery.contains(QStringLiteral("c++")) ||
+                lowerQuery.contains(QStringLiteral("cpp")) ||
+                lowerQuery.contains(QStringLiteral("python")) ||
+                lowerQuery.contains(QStringLiteral("java")) ||
+                lowerQuery.contains(QStringLiteral("javascript")) ||
+                lowerQuery.contains(QStringLiteral("ошибка")) ||
+                lowerQuery.contains(QStringLiteral("error")) ||
+                lowerQuery.contains(QStringLiteral("exception")) ||
+                lowerQuery.contains(QStringLiteral("stack")) ||
+                lowerQuery.contains(QStringLiteral("debug"));
+
+            auto tryNoCaptcha = [&]() {
+                if (hits.size() >= maxResults)
+                    return;
+                QString err;
+                int timeout = remainingTimeoutMs();
+                if (timeout <= 0)
+                    return;
+                appendHits(searchGoogleNewsRss(normalizedQuery,
+                                             maxResults - hits.size(),
+                                             &seen,
+                                             &err,
+                                             timeout,
+                                             QStringLiteral("ru"),
+                                             QStringLiteral("RU"),
+                                             QStringLiteral("RU:ru")));
+                if (hits.size() >= maxResults)
+                    return;
+                timeout = remainingTimeoutMs();
+                if (timeout <= 0)
+                    return;
+                appendHits(searchWikipedia(normalizedQuery, maxResults - hits.size(), &seen, &err, timeout, QStringLiteral("ru")));
+                if (hits.size() >= maxResults)
+                    return;
+
+                if (looksLikeNews)
+                    return;
+
+                timeout = remainingTimeoutMs();
+                if (timeout <= 0)
+                    return;
+                appendHits(searchWikipedia(normalizedQuery, maxResults - hits.size(), &seen, &err, timeout, QStringLiteral("en")));
+                if (hits.size() >= maxResults)
+                    return;
+                timeout = remainingTimeoutMs();
+                if (timeout <= 0)
+                    return;
+                if (looksLikeProgramming) {
+                    appendHits(searchStackOverflow(normalizedQuery, maxResults - hits.size(), &seen, &err, timeout));
+                }
+                if (hits.size() >= maxResults)
+                    return;
+                timeout = remainingTimeoutMs();
+                if (timeout <= 0)
+                    return;
+                if (!looksLikeProgramming) {
+                    appendHits(searchHackerNews(normalizedQuery, maxResults - hits.size(), &seen, &err, timeout));
+                }
+            };
+
+            auto tryDuck = [&]() {
+                if (hits.size() >= maxResults)
+                    return;
+
+                if (useInstantAnswer && hits.size() < maxResults) {
+                    const int timeout = remainingTimeoutMs();
+                    if (timeout <= 0)
+                        return;
+                    QUrl apiUrl(QStringLiteral("https://api.duckduckgo.com/"));
+                    QUrlQuery q;
+                    q.addQueryItem(QStringLiteral("q"), normalizedQuery);
+                    q.addQueryItem(QStringLiteral("format"), QStringLiteral("json"));
+                    q.addQueryItem(QStringLiteral("no_redirect"), QStringLiteral("1"));
+                    q.addQueryItem(QStringLiteral("no_html"), QStringLiteral("1"));
+                    q.addQueryItem(QStringLiteral("no_language"), QStringLiteral("1"));
+                    apiUrl.setQuery(q);
+
+                    QByteArray body;
+                    int status = 0;
+                    QString apiErr;
+                    if (httpGet(apiUrl, &body, &status, &apiErr, QStringLiteral("https://duckduckgo.com/"), timeout) &&
+                        status >= 200 && status < 300) {
+                        appendHits(parseDuckJson(body, maxResults - hits.size(), &seen));
+                    } else if (!apiErr.isEmpty()) {
+                        lastError = apiErr;
+                    }
+                }
+
+                if (hits.size() < maxResults) {
+                    const int timeout = remainingTimeoutMs();
+                    if (timeout <= 0)
+                        return;
+                    QUrl liteUrl(QStringLiteral("https://lite.duckduckgo.com/lite/"));
+                    QUrlQuery liteForm;
+                    liteForm.addQueryItem(QStringLiteral("q"), normalizedQuery);
+                    QByteArray litePayload = liteForm.toString(QUrl::FullyEncoded).toUtf8();
+
+                    QByteArray liteBody;
+                    int liteStatus = 0;
+                    QString liteErr;
+                    if (httpPost(liteUrl,
+                                 litePayload,
+                                 &liteBody,
+                                 &liteStatus,
+                                 &liteErr,
+                                 QStringLiteral("https://lite.duckduckgo.com/lite/"),
+                                 timeout) &&
+                        liteStatus >= 200 && liteStatus < 300) {
+                        const QString liteHtml = decodeHtmlBytes(liteBody, QByteArray());
+                        if (liteHtml.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
+                            captchaEncountered = true;
+                        } else {
+                            appendHits(parseDuckLiteHtml(liteHtml, maxResults - hits.size(), &seen));
+                        }
+                    } else if (!liteErr.isEmpty()) {
+                        lastError = liteErr;
+                    }
+                }
+
+                if (hits.size() < maxResults) {
+                    const int timeout = remainingTimeoutMs();
+                    if (timeout <= 0)
+                        return;
+                    QUrl htmlUrl(QStringLiteral("https://html.duckduckgo.com/html/"));
+                    QUrlQuery form;
+                    form.addQueryItem(QStringLiteral("q"), normalizedQuery);
+                    form.addQueryItem(QStringLiteral("b"), QString());
+                    form.addQueryItem(QStringLiteral("kl"), QStringLiteral("ru-ru"));
+                    QByteArray payload = form.toString(QUrl::FullyEncoded).toUtf8();
+
+                    QByteArray body;
+                    int status = 0;
+                    QString htmlErr;
+                    if (httpPost(htmlUrl,
+                                 payload,
+                                 &body,
+                                 &status,
+                                 &htmlErr,
+                                 QStringLiteral("https://html.duckduckgo.com/"),
+                                 timeout) &&
+                        status >= 200 && status < 300) {
+                        const QString html = decodeHtmlBytes(body, QByteArray());
+                        if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
+                            captchaEncountered = true;
+                        } else {
+                            appendHits(parseDuckHtml(html, maxResults - hits.size(), &seen));
+                        }
+                    } else if (!htmlErr.isEmpty()) {
+                        lastError = htmlErr;
+                    }
+                }
+            };
+
+            if (preferNoCaptchaSources) {
+                tryNoCaptcha();
+                tryDuck();
+            } else {
+                tryDuck();
+                tryNoCaptcha();
+            }
+
+            const int effectiveTtl = (!hits.isEmpty() ? cacheTtlMs : negativeCacheTtlMs);
+            if (effectiveTtl > 0) {
+                queryCache.insert(cacheKey, TimedCacheEntry<QVector<SearchHit>>{hits, t + effectiveTtl});
+                trimCache(queryCache, kMaxQueryCacheEntries);
+            }
+        }
+
+#if 0
         qDebug() << "[SearchWebCommand] Attempting JSON API request";
         {
             QUrl apiUrl(QStringLiteral("https://api.duckduckgo.com/"));
@@ -503,9 +1198,20 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
             }
         }
 
+#endif
+
         qDebug() << "[SearchWebCommand] Final hits count before processing:" << hits.size();
         if (hits.isEmpty()) {
             qDebug() << "[SearchWebCommand] No hits found, lastError:" << lastError;
+            const bool returnDiagnostics = m_params.value("returnDiagnostics").toBool(false);
+            if (!returnDiagnostics) {
+                QStringList msg;
+                msg << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                msg << QStringLiteral("Не удалось получить результаты из доступных источников.");
+                msg << QStringLiteral("Попробуйте уточнить запрос или указать источник (например: \"site:ria.ru\", \"site:bbc.com\").");
+                m_results = msg;
+                return true;
+            }
             // Если была TLS ошибка, таймаут или другая ошибка сети, всё равно сохранить информацию
             if (!lastError.isEmpty() &&
                 (lastError.contains("TLS", Qt::CaseInsensitive) ||
@@ -541,30 +1247,33 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
                     *errorOut = lastError.isEmpty()
                         ? QStringLiteral("SEARCH_WEB: совпадения не найдены")
                         : lastError;
-                qDebug() << "[SearchWebCommand] No results and no network error, returning false";
-                return false;
+                QStringList noResults;
+                noResults << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                noResults << QStringLiteral("Совпадения не найдены.");
+                noResults << QStringLiteral("Попробуйте уточнить запрос или указать источник (например: \"site:github.com\", \"site:stackoverflow.com\").");
+                m_results = noResults;
+                qDebug() << "[SearchWebCommand] No results (non-network), returning informational result";
+                return true;
             }
         }
 
-        const int maxContentChars = 2000;
         qDebug() << "[SearchWebCommand] Processing" << hits.size() << "hits into final results";
 
         QStringList articleContents;
-        const int maxPagesToExtract = qMin(3, maxResults); // Только первые 3 страницы для извлечения контента
+        const int maxPagesToExtract = qMin(maxPagesToExtractConfigured, maxResults);
 
-        for (int i = 0; i < hits.size(); ++i) {
-            if (i >= maxResults)
-                break;
+        if (maxPagesToExtract > 0) {
+            QStringList urlsToExtract;
+            urlsToExtract.reserve(maxPagesToExtract);
+            for (int i = 0; i < hits.size() && i < maxPagesToExtract; ++i)
+                urlsToExtract << hits[i].url;
 
-            const SearchHit& hit = hits[i];
-            qDebug() << "[SearchWebCommand] Processing hit" << i + 1 << ":" << hit.title << hit.url;
-            if (i < maxPagesToExtract) {
-                const QString article = fetchPageText(hit.url, maxContentChars);
-                if (!article.isEmpty()) {
-                    articleContents << article;
-                    qDebug() << "[SearchWebCommand] Extracted article content for hit" << hit.title.left(40);
-                }
-            }
+            articleContents = fetchManyPageTexts(urlsToExtract,
+                                                 maxContentChars,
+                                                 pageTimeoutMs,
+                                                 overallPageTimeoutMs,
+                                                 pageConcurrency,
+                                                 cacheTtlMs);
         }
 
         // Подготовка результата - если доступен LLM, используем его для суммаризации
