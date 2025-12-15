@@ -65,6 +65,10 @@ public:
     QString generateWithSystem(const QString& userPrompt,
                                const QString& systemPrompt,
                                const QVariantMap& options = QVariantMap());
+    QString generateWithSystemAndImages(const QString& userPrompt,
+                                        const QString& systemPrompt,
+                                        const QStringList& imagesBase64,
+                                        const QVariantMap& options = QVariantMap());
     int estimateTokens(const QString& text) const override;
     bool isAvailable(QString* errorOut = nullptr) override;
     QStringList listModels();
@@ -89,6 +93,10 @@ public slots:
     void startStreamWithSystem(const QString& userPrompt,
                                const QString& systemPrompt,
                                const QVariantMap& options = QVariantMap());
+    void startStreamWithSystemAndImages(const QString& userPrompt,
+                                        const QString& systemPrompt,
+                                        const QStringList& imagesBase64,
+                                        const QVariantMap& options = QVariantMap());
     void stopStream();
 
 private slots:

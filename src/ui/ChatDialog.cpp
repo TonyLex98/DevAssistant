@@ -7,6 +7,11 @@
 #include <QStandardPaths>
 #include <QFileInfo>
 #include <QFile>
+#include <QFileDialog>
+#include <QToolButton>
+#include <QBuffer>
+#include <QImageReader>
+#include <QRegularExpression>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/SolutionTemplate.h"
 #include "MainWindow.h"
@@ -42,9 +47,33 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
             background-color: #1f6693;
         }
     )");
+
+    m_attachBtn = new StyledButton("IMG", this);
+    m_attachBtn->setFixedSize(44, 36);
+    m_attachBtn->setToolTip("Attach image (png/jpg/webp)");
     
-    // Add only the input field to the main horizontal layout
-    mainLayout->addWidget(m_input, 1);
+    // Left column: input + image attachments bar
+    auto leftColumnLayout = new QVBoxLayout();
+    leftColumnLayout->setContentsMargins(0, 0, 0, 0);
+    leftColumnLayout->setSpacing(6);
+    leftColumnLayout->addWidget(m_input, 1);
+
+    m_imagesScroll = new QScrollArea(this);
+    m_imagesScroll->setWidgetResizable(true);
+    m_imagesScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_imagesScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_imagesScroll->setFixedHeight(92);
+    m_imagesScroll->setVisible(false);
+
+    m_imagesBar = new QWidget(m_imagesScroll);
+    m_imagesLayout = new QHBoxLayout(m_imagesBar);
+    m_imagesLayout->setContentsMargins(6, 6, 6, 6);
+    m_imagesLayout->setSpacing(8);
+    m_imagesLayout->addStretch(1);
+    m_imagesScroll->setWidget(m_imagesBar);
+
+    leftColumnLayout->addWidget(m_imagesScroll, 0);
+    mainLayout->addLayout(leftColumnLayout, 1);
     
     // Create a vertical layout for ALL controls to the right of input
     auto rightColumnLayout = new QVBoxLayout();
@@ -53,6 +82,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     auto buttonsLayout = new QHBoxLayout();
     buttonsLayout->addWidget(m_send);
     buttonsLayout->addWidget(m_stop);
+    buttonsLayout->addWidget(m_attachBtn);
     buttonsLayout->addWidget(m_micBtn);
     rightColumnLayout->addLayout(buttonsLayout);
     
@@ -83,6 +113,8 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     connect(m_send, &StyledButton::clicked, this, &ChatDialog::onSend);
     connect(m_stop, &StyledButton::clicked, this, &ChatDialog::onStop);
     connect(m_input, &InputTextEdit::sendMessage, this, &ChatDialog::onSend);
+    connect(m_attachBtn, &StyledButton::clicked, this, &ChatDialog::onAttachImages);
+    connect(m_input, &InputTextEdit::imagesInserted, this, &ChatDialog::onImagesInserted);
 
     connect(m_cb_model, &MemoryComboBox::currentTextChanged, this, [this](const QString &text){
         m_model->configure(text, QVariantMap());
@@ -102,12 +134,298 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
     connect(m_whisperRunner, &FasterWhisperRunner::errorOccurred, this, &ChatDialog::onAsrError);
     connect(m_whisperRunner, &FasterWhisperRunner::silenceDetected, this, &ChatDialog::onSilenceDetected);
-    connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg){
+      connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg){
         if (m_chat) {
             m_chat->setVisible(true); // Ensure chat is visible
             m_chat->append("<i>" + msg + "</i>");
         }
     });
+}
+
+bool ChatDialog::modelSupportsVision() const
+{
+    if (!m_model)
+        return false;
+
+    const QString model = m_model->selectedModel().toLower().trimmed();
+    if (model.isEmpty())
+        return false;
+
+    static const QStringList needles = {
+        "llava",
+        "vision",
+        "minicpm-v",
+        "qwen2-vl",
+        "qwen2.5-vl",
+        "qwen3-vl",
+        "pixtral",
+        "moondream",
+        "bakllava",
+        "-vl",
+        ":vl",
+        "vl-"
+    };
+
+    for (const QString& n : needles) {
+        if (model.contains(n))
+            return true;
+    }
+    return false;
+}
+
+void ChatDialog::onAttachImages()
+{
+    const QStringList files = QFileDialog::getOpenFileNames(
+        this,
+        tr("Select images"),
+        QString(),
+        tr("Images (*.png *.jpg *.jpeg *.webp *.bmp);;All files (*.*)"));
+
+    if (files.isEmpty())
+        return;
+
+    addImageAttachmentsFromFiles(files);
+}
+
+void ChatDialog::onImagesInserted(const QStringList &filePaths,
+                                 const QStringList &imagesBase64Png,
+                                 const QStringList &imageNames)
+{
+    if (!filePaths.isEmpty()) {
+        addImageAttachmentsFromFiles(filePaths);
+    }
+    if (!imagesBase64Png.isEmpty()) {
+        addImageAttachmentsFromBase64(imageNames, imagesBase64Png);
+    }
+}
+
+void ChatDialog::addImageAttachmentsFromFiles(const QStringList &files)
+{
+    for (const QString& path : files) {
+        QFileInfo fi(path);
+        if (!fi.exists() || !fi.isFile())
+            continue;
+
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly))
+            continue;
+
+        const QByteArray bytes = f.readAll();
+        f.close();
+        if (bytes.isEmpty())
+            continue;
+
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        QImage img = reader.read();
+        if (img.isNull()) {
+            img = QImage::fromData(bytes);
+        }
+        if (img.isNull())
+            continue;
+
+        ImageAttachment att;
+        att.filePath = QDir::toNativeSeparators(path);
+        att.fileName = fi.fileName();
+        att.base64 = QString::fromLatin1(bytes.toBase64());
+        att.thumb = QPixmap::fromImage(img.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        m_imageAttachments.push_back(att);
+    }
+
+    rebuildImagesBar();
+}
+
+void ChatDialog::addImageAttachmentsFromBase64(const QStringList &imageNames, const QStringList &imagesBase64)
+{
+    const int n = imagesBase64.size();
+    for (int i = 0; i < n; ++i) {
+        const QString b64 = imagesBase64[i].trimmed();
+        if (b64.isEmpty())
+            continue;
+
+        const QByteArray bytes = QByteArray::fromBase64(b64.toLatin1());
+        if (bytes.isEmpty())
+            continue;
+
+        QImage img = QImage::fromData(bytes);
+        if (img.isNull())
+            continue;
+
+        const QString name = (i < imageNames.size() && !imageNames[i].trimmed().isEmpty())
+                                 ? imageNames[i].trimmed()
+                                 : QString("clipboard_image_%1.png").arg(i + 1);
+
+        ImageAttachment att;
+        att.fileName = name;
+        att.filePath = QString("clipboard:%1").arg(name);
+        att.base64 = b64;
+        att.thumb = QPixmap::fromImage(img.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        m_imageAttachments.push_back(att);
+    }
+
+    rebuildImagesBar();
+}
+
+void ChatDialog::rebuildImagesBar()
+{
+    if (!m_imagesLayout || !m_imagesBar || !m_imagesScroll)
+        return;
+
+    while (m_imagesLayout->count() > 0) {
+        QLayoutItem* item = m_imagesLayout->takeAt(0);
+        if (!item)
+            break;
+        if (QWidget* w = item->widget()) {
+            w->deleteLater();
+        }
+        delete item;
+    }
+
+    for (int i = 0; i < m_imageAttachments.size(); ++i) {
+        const ImageAttachment& att = m_imageAttachments[i];
+
+        QWidget* itemWidget = new QWidget(m_imagesBar);
+        itemWidget->setFixedSize(86, 86);
+
+        auto grid = new QGridLayout(itemWidget);
+        grid->setContentsMargins(0, 0, 0, 0);
+        grid->setSpacing(0);
+
+        QLabel* pic = new QLabel(itemWidget);
+        pic->setPixmap(att.thumb);
+        pic->setAlignment(Qt::AlignCenter);
+        pic->setToolTip(att.filePath);
+        pic->setFixedSize(86, 86);
+        pic->setStyleSheet("border: 1px solid #4a4a4a; border-radius: 6px; background: #222;");
+        grid->addWidget(pic, 0, 0, Qt::AlignCenter);
+
+        QToolButton* removeBtn = new QToolButton(itemWidget);
+        removeBtn->setText("x");
+        removeBtn->setToolTip(tr("Remove"));
+        removeBtn->setFixedSize(18, 18);
+        removeBtn->setStyleSheet(
+            "QToolButton { background: rgba(0,0,0,180); color: white; border: 1px solid #666; border-radius: 9px; }"
+            "QToolButton:hover { border-color: #aaa; }");
+        grid->addWidget(removeBtn, 0, 0, Qt::AlignTop | Qt::AlignRight);
+
+        connect(removeBtn, &QToolButton::clicked, this, [this, i]() {
+            if (i < 0 || i >= m_imageAttachments.size())
+                return;
+            m_imageAttachments.removeAt(i);
+            rebuildImagesBar();
+        });
+
+        m_imagesLayout->addWidget(itemWidget);
+    }
+
+    m_imagesLayout->addStretch(1);
+    m_imagesScroll->setVisible(!m_imageAttachments.isEmpty());
+}
+
+void ChatDialog::clearImageAttachments()
+{
+    m_imageAttachments.clear();
+    rebuildImagesBar();
+}
+
+QStringList ChatDialog::ensureImageSummaries(QString* combinedOut)
+{
+    QStringList summaries;
+    if (m_imageAttachments.isEmpty())
+        return summaries;
+
+    bool allHave = true;
+    for (const auto& a : m_imageAttachments) {
+        if (a.summary.trimmed().isEmpty()) {
+            allHave = false;
+            break;
+        }
+    }
+    if (allHave) {
+        for (const auto& a : m_imageAttachments)
+            summaries << a.summary;
+        return summaries;
+    }
+
+    if (!modelSupportsVision() || !m_model)
+        return summaries;
+
+    QStringList imagesBase64;
+    for (const auto& a : m_imageAttachments)
+        imagesBase64 << a.base64;
+
+    const int n = imagesBase64.size();
+    QString prompt =
+        "Describe each image. Give 1-2 sentences per image.\n"
+        "Strict format:\n";
+    for (int i = 1; i <= n; ++i)
+        prompt += QString("%1) ...\n").arg(i);
+
+    QVariantMap options;
+    options.insert("temperature", 0.2);
+    options.insert("num_predict", 256);
+    options.insert("timeoutMs", 9000);
+
+    const QString resp = m_model->generateWithSystemAndImages(prompt, QString(), imagesBase64, options).trimmed();
+    if (combinedOut)
+        *combinedOut = resp;
+
+    if (resp.isEmpty())
+        return summaries;
+
+    QMap<int, QString> parsed;
+    const auto lines = resp.split('\n', QString::SkipEmptyParts);
+    QRegularExpression re("^\\s*(\\d+)\\s*[\\).:-]\\s*(.+)\\s*$");
+    for (const QString& line : lines) {
+        QRegularExpressionMatch m = re.match(line);
+        if (!m.hasMatch())
+            continue;
+        const int idx = m.captured(1).toInt();
+        const QString text = m.captured(2).trimmed();
+        if (idx > 0 && !text.isEmpty())
+            parsed[idx] = text;
+    }
+
+    summaries.reserve(n);
+    for (int i = 1; i <= n; ++i) {
+        const QString s = parsed.value(i).trimmed();
+        summaries << (s.isEmpty() ? QString() : s);
+    }
+
+    bool anyNonEmpty = false;
+    for (const QString& s : summaries) {
+        if (!s.isEmpty()) {
+            anyNonEmpty = true;
+            break;
+        }
+    }
+    if (!anyNonEmpty) {
+        summaries.clear();
+        for (int i = 0; i < n; ++i)
+            summaries << resp;
+    }
+
+    for (int i = 0; i < m_imageAttachments.size() && i < summaries.size(); ++i)
+        m_imageAttachments[i].summary = summaries[i];
+
+    return summaries;
+}
+
+QString ChatDialog::buildAugmentedTextWithImages(const QString& text, const QVector<ImageAttachment>& attachments) const
+{
+    if (attachments.isEmpty())
+        return text;
+
+    QString out = text;
+    out += "\n\n[Images]\n";
+    for (const auto& a : attachments) {
+        if (!a.summary.trimmed().isEmpty()) {
+            out += QString("- %1: %2\n").arg(a.fileName, a.summary.trimmed());
+        } else {
+            out += QString("- %1\n").arg(a.fileName);
+        }
+    }
+    return out.trimmed();
 }
 
 void ChatDialog::onMicClicked() {
@@ -339,25 +657,53 @@ void ChatDialog::populateTemplates()
 void ChatDialog::onSend(){
     QString t = m_input->toPlainText().trimmed();
     if (t.isEmpty()) return;
-    
+
+    const bool hasImages = !m_imageAttachments.isEmpty();
+    QStringList imagesBase64;
+    QStringList imagePaths;
+    if (hasImages) {
+        for (const auto& a : m_imageAttachments) {
+            imagePaths << a.filePath;
+            imagesBase64 << a.base64;
+        }
+    }
+
+    QStringList imageSummaries;
+    if (hasImages) {
+        imageSummaries = ensureImageSummaries(nullptr);
+    }
+      
     // Get the current selection from the template combobox
     QString selectedTemplateData = m_templateCombo->currentData().toString();
     QString selectedTemplateName = m_templateCombo->currentText();
-    
+    Q_UNUSED(selectedTemplateName);
+
+    const QString augmented = hasImages ? buildAugmentedTextWithImages(t, m_imageAttachments) : t;
+      
     if (selectedTemplateData == "simple_chat") {
         // Direct chat mode - send directly to model in streaming mode
         // We'll let MainWindow handle displaying the message in the chat
         m_input->clear();
-        
-        // Emit signal for simple chat mode
-        emit runSimpleChat(t);
+
+        if (hasImages) {
+            emit runSimpleChatWithImages(t, imagePaths, imagesBase64, imageSummaries);
+            clearImageAttachments();
+        } else {
+            // Emit signal for simple chat mode
+            emit runSimpleChat(t);
+        }
         return;
     }
     else if (selectedTemplateData.isEmpty()) {
         // Default behavior - open template/sequence selection dialog
         // We'll let MainWindow handle displaying the message in the chat
         m_input->clear();
-        emit sendMessage(t);
+        if (hasImages) {
+            emit sendMessageWithImages(augmented, imagePaths, imagesBase64, imageSummaries);
+            clearImageAttachments();
+        } else {
+            emit sendMessage(t);
+        }
         return;
     }
     else {
@@ -366,7 +712,12 @@ void ChatDialog::onSend(){
         m_input->clear();
         
         // Emit signal to run the selected template
-        emit runTemplateRequested(selectedTemplateData, t);
+        if (hasImages) {
+            emit runTemplateRequestedWithImages(selectedTemplateData, augmented, imagePaths, imagesBase64, imageSummaries);
+            clearImageAttachments();
+        } else {
+            emit runTemplateRequested(selectedTemplateData, t);
+        }
         return;
     }
 }

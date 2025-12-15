@@ -25,10 +25,24 @@ QString OllamaAdapter::generate(const QString& prompt, const QVariantMap& option
 QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
                                           const QString& systemPrompt,
                                           const QVariantMap& options){
-    QUrl url = m_endpoint; url.setPath("/api/chat");
+    return generateWithSystemAndImages(userPrompt, systemPrompt, QStringList(), options);
+}
+
+QString OllamaAdapter::generateWithSystemAndImages(const QString& userPrompt,
+                                                   const QString& systemPrompt,
+                                                   const QStringList& imagesBase64,
+                                                   const QVariantMap& options)
+{
+    QUrl url = m_endpoint;
+    url.setPath("/api/chat");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QJsonObject body = buildRequestBody(userPrompt, options, false, systemPrompt);
+
+    QVariantMap requestOptions = options;
+    const int timeoutMs = requestOptions.contains("timeoutMs") ? requestOptions.value("timeoutMs").toInt() : 30000;
+    requestOptions.remove("timeoutMs");
+
+    QJsonObject body = buildRequestBody(userPrompt, requestOptions, false, systemPrompt);
 
     QJsonArray messages;
     if (!systemPrompt.isEmpty()) {
@@ -40,19 +54,34 @@ QString OllamaAdapter::generateWithSystem(const QString& userPrompt,
     QJsonObject userMsg;
     userMsg["role"] = "user";
     userMsg["content"] = userPrompt;
+    if (!imagesBase64.isEmpty()) {
+        QJsonArray imgs;
+        for (const QString& b64 : imagesBase64) {
+            if (!b64.trimmed().isEmpty())
+                imgs.append(b64);
+        }
+        if (!imgs.isEmpty())
+            userMsg["images"] = imgs;
+    }
     messages.append(userMsg);
     body.insert("messages", messages);
 
     QEventLoop loop;
     QNetworkReply* r = m_nam.post(req, QJsonDocument(body).toJson());
     QObject::connect(r, SIGNAL(finished()), &loop, SLOT(quit()));
-    QTimer t; t.setSingleShot(true); QObject::connect(&t, SIGNAL(timeout()), &loop, SLOT(quit())); t.start(30000);
+    QTimer t;
+    t.setSingleShot(true);
+    QObject::connect(&t, SIGNAL(timeout()), &loop, SLOT(quit()));
+    t.start(qMax(1000, timeoutMs));
     loop.exec();
 
     if (r->error()!=QNetworkReply::NoError) {
-        QString err = r->errorString(); r->deleteLater(); return QString("[Ollama error] %1").arg(err);
+        QString err = r->errorString();
+        r->deleteLater();
+        return QString("[Ollama error] %1").arg(err);
     }
-    QByteArray data = r->readAll(); r->deleteLater();
+    QByteArray data = r->readAll();
+    r->deleteLater();
     QJsonObject json = QJsonDocument::fromJson(data).object();
     return json.value("message").toObject().value("content").toString();
 }
@@ -104,13 +133,25 @@ void OllamaAdapter::startStream(const QString& prompt, const QVariantMap& option
 void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
                                           const QString& systemPrompt,
                                           const QVariantMap& options) {
+    startStreamWithSystemAndImages(userPrompt, systemPrompt, QStringList(), options);
+}
+
+void OllamaAdapter::startStreamWithSystemAndImages(const QString& userPrompt,
+                                                   const QString& systemPrompt,
+                                                   const QStringList& imagesBase64,
+                                                   const QVariantMap& options)
+{
     if (m_streamReply) { m_streamReply->abort(); m_streamReply->deleteLater(); }
     m_buffer.clear();
 
     QUrl url = m_endpoint; url.setPath("/api/chat");
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    QJsonObject body = buildRequestBody(userPrompt, options, true, systemPrompt);
+
+    QVariantMap requestOptions = options;
+    requestOptions.remove("timeoutMs");
+
+    QJsonObject body = buildRequestBody(userPrompt, requestOptions, true, systemPrompt);
     QJsonArray messages;
     if (!systemPrompt.isEmpty()) {
         QJsonObject systemMsg;
@@ -121,6 +162,15 @@ void OllamaAdapter::startStreamWithSystem(const QString& userPrompt,
     QJsonObject userMsg;
     userMsg["role"] = "user";
     userMsg["content"] = userPrompt;
+    if (!imagesBase64.isEmpty()) {
+        QJsonArray imgs;
+        for (const QString& b64 : imagesBase64) {
+            if (!b64.trimmed().isEmpty())
+                imgs.append(b64);
+        }
+        if (!imgs.isEmpty())
+            userMsg["images"] = imgs;
+    }
     messages.append(userMsg);
     body.insert("messages", messages);
     m_lastBody = body;

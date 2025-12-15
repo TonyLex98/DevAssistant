@@ -34,6 +34,7 @@
 #include "../command/SearchWebCommand.h"
 #include "../command/SearchProjectCommand.h"
 #include "../command/ShowResultCommand.h"
+#include "../command/Command.h"
 #include "SolutionTemplateViewer.h"
 #include "../core/SolutionTemplateManager.h"
 
@@ -635,8 +636,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Chat + модель
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
+    connect(m_chat, &ChatDialog::sendMessageWithImages, this, &MainWindow::sendUserMessageWithImages);
     connect(m_chat, &ChatDialog::runTemplateRequested, this, &MainWindow::runTemplateRequested);
+    connect(m_chat, &ChatDialog::runTemplateRequestedWithImages, this, &MainWindow::runTemplateRequestedWithImages);
     connect(m_chat, &ChatDialog::runSimpleChat, this, &MainWindow::runSimpleChat);
+    connect(m_chat, &ChatDialog::runSimpleChatWithImages, this, &MainWindow::runSimpleChatWithImages);
     connect(m_chat, &ChatDialog::templateSelectionChanged, this, &MainWindow::onChatTemplateSelectionChanged);
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
     connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
@@ -3818,6 +3822,126 @@ void MainWindow::runSimpleChat(const QString &text)
     // Log the request
     int tokens = m_promptMgr.tokenCount(text);
     log(QString("Sending simple chat request (%1 tokens) → %2").arg(tokens).arg(text));
+}
+
+static QString buildImagesNoteText(const QStringList &imagePaths, const QStringList &imageSummaries)
+{
+    if (imagePaths.isEmpty())
+        return QString();
+
+    QString out = "\n\n[Images]\n";
+    for (int i = 0; i < imagePaths.size(); ++i) {
+        const QString fileName = QFileInfo(imagePaths[i]).fileName();
+        const QString summary = (i < imageSummaries.size()) ? imageSummaries[i].trimmed() : QString();
+        if (!summary.isEmpty()) {
+            out += QString("- %1: %2\n").arg(fileName, summary);
+        } else {
+            out += QString("- %1\n").arg(fileName);
+        }
+    }
+    return out.trimmed();
+}
+
+static void addImagesToContextManager(ContextManager *ctx,
+                                     const QStringList &imagePaths,
+                                     const QStringList &imageSummaries)
+{
+    if (!ctx || imagePaths.isEmpty())
+        return;
+
+    class InlineImageContextCommand final : public Command {
+    public:
+        InlineImageContextCommand(const QString &name,
+                                  const QJsonObject &params,
+                                  const QString &desc,
+                                  const QString &result)
+            : m_name(name), m_params(params), m_desc(desc), m_result(result) {}
+
+        QString name() const override { return m_name; }
+        QJsonObject params() const override { return m_params; }
+        QString description() const override { return m_desc; }
+        bool apply(DevAssManager*, QString*) override { return true; }
+        QJsonObject toJson() const override {
+            QJsonObject o;
+            o["command"] = m_name;
+            o["params"] = m_params;
+            o["description"] = m_desc;
+            return o;
+        }
+        QString getResult() const override { return m_result; }
+
+    private:
+        QString m_name;
+        QJsonObject m_params;
+        QString m_desc;
+        QString m_result;
+    };
+
+    for (int i = 0; i < imagePaths.size(); ++i) {
+        const QString path = imagePaths[i];
+        const QString fileName = QFileInfo(path).fileName();
+        const QString summary = (i < imageSummaries.size()) ? imageSummaries[i].trimmed() : QString();
+
+        QJsonObject params;
+        params["path"] = path;
+        if (!summary.isEmpty())
+            params["summary"] = summary;
+
+        const QString result = summary.isEmpty()
+                                   ? QString("=== IMAGE: %1 ===\n%2").arg(fileName, path)
+                                   : QString("=== IMAGE: %1 ===\n%2").arg(fileName, summary);
+        InlineImageContextCommand cmd("USER_IMAGE", params, "User attached an image", result);
+        ctx->addCommand(&cmd, result);
+    }
+}
+
+void MainWindow::sendUserMessageWithImages(const QString &text,
+                                          const QStringList &imagePaths,
+                                          const QStringList &imagesBase64,
+                                          const QStringList &imageSummaries)
+{
+    Q_UNUSED(imagesBase64);
+    addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
+    sendUserMessage(text);
+}
+
+void MainWindow::runTemplateRequestedWithImages(const QString &templatePath,
+                                               const QString &text,
+                                               const QStringList &imagePaths,
+                                               const QStringList &imagesBase64,
+                                               const QStringList &imageSummaries)
+{
+    Q_UNUSED(imagesBase64);
+    addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
+    runTemplateRequested(templatePath, text);
+}
+
+void MainWindow::runSimpleChatWithImages(const QString &text,
+                                        const QStringList &imagePaths,
+                                        const QStringList &imagesBase64,
+                                        const QStringList &imageSummaries)
+{
+    qDebug() << "[runSimpleChatWithImages] Text:" << text << "images:" << imagePaths.size();
+
+    addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
+
+    const QString note = buildImagesNoteText(imagePaths, imageSummaries);
+    const QString historyText = note.isEmpty() ? text : (text + note);
+
+    m_chat->appendUserMessage(note.isEmpty() ? text : (text + QString("\n[Images attached: %1]").arg(imagePaths.size())));
+    appendUserQuestionToResultDisplay(historyText);
+
+    m_streamBuf.clear();
+    m_model.startStreamWithSystemAndImages(text, QString(), imagesBase64, QVariantMap());
+
+    m_history.push_back(qMakePair(QString("user"), historyText));
+    m_lastUserMessages.append(historyText);
+    while (m_lastUserMessages.size() > MAX_USER_MESSAGES) {
+        m_lastUserMessages.removeFirst();
+    }
+
+    int tokens = m_promptMgr.tokenCount(historyText);
+    log(QString("Sending simple chat request (%1 tokens) -> %2").arg(tokens).arg(historyText));
 }
 
 void MainWindow::appendUserQuestionToResultDisplay(const QString& question)

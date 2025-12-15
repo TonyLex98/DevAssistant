@@ -123,6 +123,19 @@ private slots:
     // New slots for template selection combobox in ChatDialog
     void runTemplateRequested(const QString &templatePath, const QString &text);
     void runSimpleChat(const QString &text);
+    void runTemplateRequestedWithImages(const QString &templatePath,
+                                        const QString &text,
+                                        const QStringList &imagePaths,
+                                        const QStringList &imagesBase64,
+                                        const QStringList &imageSummaries);
+    void runSimpleChatWithImages(const QString &text,
+                                 const QStringList &imagePaths,
+                                 const QStringList &imagesBase64,
+                                 const QStringList &imageSummaries);
+    void sendUserMessageWithImages(const QString &text,
+                                   const QStringList &imagePaths,
+                                   const QStringList &imagesBase64,
+                                   const QStringList &imageSummaries);
     void openLightRag();
 
 
