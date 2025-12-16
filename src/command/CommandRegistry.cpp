@@ -55,6 +55,52 @@ static QJsonObject paramsObject(const QJsonValue& value)
     return QJsonObject();
 }
 
+static QJsonObject normalizedParams(const QJsonObject& obj)
+{
+    QJsonObject p = paramsObject(obj.value("params"));
+    if (!p.isEmpty())
+        return p;
+
+    // Fallback: treat any extra top-level fields as params.
+    QJsonObject out;
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        const QString key = it.key();
+        if (key == "command" || key == "action" || key == "description")
+            continue;
+        out.insert(key, it.value());
+    }
+    return out;
+}
+
+static QJsonObject objectFromValue(const QJsonValue& value)
+{
+    if (value.isObject())
+        return value.toObject();
+    if (!value.isString())
+        return QJsonObject();
+    return parseJsonObject(value.toString().trimmed().toUtf8());
+}
+
+static QString firstNonEmptyString(const QJsonObject& obj, const QStringList& keys)
+{
+    for (const QString& key : keys) {
+        const QString v = obj.value(key).toString().trimmed();
+        if (!v.isEmpty())
+            return v;
+    }
+    return QString();
+}
+
+static int firstNonZeroInt(const QJsonObject& obj, const QStringList& keys, int fallback = 0)
+{
+    for (const QString& key : keys) {
+        const int v = obj.value(key).toInt();
+        if (v != 0)
+            return v;
+    }
+    return fallback;
+}
+
 
 QVector<Command*> CommandRegistry::all()
 {
@@ -91,7 +137,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "CREATE_FILE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         QByteArray content = p["content"].toString().toUtf8();
         QString description = obj["description"].toString();
@@ -114,7 +160,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "REPLACE_IN_FILE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         QByteArray content = p["content"].toString().toUtf8();
         QString description = obj["description"].toString();
@@ -137,7 +183,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "DELETE_FILE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         QString description = obj["description"].toString();
         
@@ -153,7 +199,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "RENAME_FILE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString oldPath = p["oldPath"].toString();
         QString newPath = p["newPath"].toString();
         QString description = obj["description"].toString();
@@ -176,7 +222,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "EDIT_IN_RANGE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         int startLine = p["startLine"].toInt();
         int endLine = p["endLine"].toInt();
@@ -217,7 +263,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "WRITE_DESCRIPTION") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString sourceFilePath = p["sourceFilePath"].toString();
         QString description = p["description"].toString();
         
@@ -241,7 +287,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
 
     // +++ в CommandRegistry::create()
     if (cmd == "OPEN_FILE_REGION") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         QString region = p.value("region").toString();
         int startLine = p.value("startLine").toInt(-1);
@@ -266,7 +312,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "OPEN_FILE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
+        const QJsonObject p = normalizedParams(obj);
         QString path = p["path"].toString();
         QString description = obj["description"].toString();
         
@@ -282,8 +328,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "ASK_USER") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString question = p.value("question").toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString question = firstNonEmptyString(p, {"question", "question_text"});
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -299,12 +345,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
 
     // +++ в CommandRegistry::create()
     if (cmd == "RUN_PYTHON") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString scriptPath = p.value("scriptPath").toString();
-        if (scriptPath.isEmpty())
-            scriptPath = p.value("script_path").toString();
-        if (scriptPath.isEmpty())
-            scriptPath = p.value("path").toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString scriptPath = firstNonEmptyString(p, {"scriptPath", "script_path", "path", "file_path"});
         
         // Поддержка альтернативного формата
         if (scriptPath.isEmpty()) {
@@ -314,13 +356,7 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             scriptPath = obj["file_path"].toString();
         }
 
-        QString codeStr = p.value("code").toString();
-        if (codeStr.isEmpty())
-            codeStr = p.value("inlineCode").toString();
-        if (codeStr.isEmpty())
-            codeStr = p.value("inline_code").toString();
-        if (codeStr.isEmpty())
-            codeStr = p.value("python").toString();
+        QString codeStr = firstNonEmptyString(p, {"code", "inlineCode", "inline_code", "python", "python_code", "content"});
             
         // Поддержка альтернативного формата
         if (codeStr.isEmpty()) {
@@ -330,12 +366,14 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             codeStr = p["python_code"].toString();
         }
 
-        return new RunPythonCommand(scriptPath, codeStr.toUtf8(), obj["description"].toString());
+        const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
+        return new RunPythonCommand(scriptPath, codeStr.toUtf8(), cwd, obj["description"].toString());
     }
 
     if (cmd == "RUN_SHELL") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString command = p.value("command").toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString command = firstNonEmptyString(p, {"command", "cmd", "command_text"});
+        QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -346,13 +384,13 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             command = p["command_text"].toString();
         }
         
-        return new RunShellCommand(command, description);
+        return new RunShellCommand(command, cwd, description);
     }
 
     if (cmd == "SEARCH_WEB") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString query = p.value("query").toString();
-        int maxResults = p.value("maxResults").toInt(5);
+        const QJsonObject p = normalizedParams(obj);
+        QString query = firstNonEmptyString(p, {"query", "search_query"});
+        int maxResults = firstNonZeroInt(p, {"maxResults", "max_results"}, 5);
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -367,14 +405,16 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "SEARCH_PROJECT") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString query = p.value("query").toString();
-        int maxMatches = p.value("maxMatches").toInt(10);
-        bool caseSensitive = p.value("caseSensitive").toBool(false);
+        const QJsonObject p = normalizedParams(obj);
+        QString query = firstNonEmptyString(p, {"query", "search_query"});
+        int maxMatches = firstNonZeroInt(p, {"maxMatches", "max_matches"}, 10);
+        bool caseSensitive = p.value("caseSensitive").toBool(p.value("case_sensitive").toBool(false));
         QString description = obj["description"].toString();
         
         QStringList includes;
         QJsonArray arr = p.value("include").toArray();
+        if (arr.isEmpty())
+            arr = p.value("includeGlobs").toArray();
         if (arr.isEmpty()) {
             // Поддержка альтернативного формата для include
             arr = obj.value("include").toArray();
@@ -390,8 +430,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             query = p["search_query"].toString();
         }
         
-        bool useRegex = p.value("useRegex").toBool(false);
-        int contextLines = p.value("contextLines").toInt(0);
+        bool useRegex = p.value("useRegex").toBool(p.value("use_regex").toBool(false));
+        int contextLines = p.value("contextLines").toInt(p.value("context_lines").toInt(0));
         QStringList includePaths = QStringList();
         QStringList excludePaths = QStringList();
 
@@ -411,8 +451,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "SEARCH_PROJECT_CASE_INSENSITIVE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString query = p.value("query").toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString query = firstNonEmptyString(p, {"query", "search_query"});
         int maxMatches = p.value("maxMatches").toInt(10);
         QString description = obj["description"].toString();
         
@@ -437,9 +477,9 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "SHOW_RESULT") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString content = p.value("content").toString();
-        QString title = p.value("title").toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString content = firstNonEmptyString(p, {"content", "text", "result", "message"});
+        QString title = firstNonEmptyString(p, {"title", "result_title"});
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -460,8 +500,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "CALL_SEQUENCE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString sequenceName = p["sequenceName"].toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
         QString description = obj["description"].toString();
         bool needSummary = true;
         
@@ -483,8 +523,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "OPEN_SEQUENCE") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString sequenceName = p["sequenceName"].toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -499,8 +539,9 @@ Command* CommandRegistry::create(const QJsonObject& obj)
     }
 
     if (cmd == "LIST_FILES_IN_FOLDER") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString folderPath = p["folderPath"].toString();
+        const QJsonObject p = normalizedParams(obj);
+        QString folderPath = firstNonEmptyString(p, {"folderPath", "path", "folder_path"});
+        const QString pattern = firstNonEmptyString(p, {"pattern", "filter", "glob"});
         QString description = obj["description"].toString();
         
         // Поддержка альтернативного формата
@@ -511,14 +552,14 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             folderPath = p["folder_path"].toString();
         }
         
-        return new ListFilesInFolderCommand(folderPath, description);
+        return new ListFilesInFolderCommand(folderPath, pattern, description);
     }
 
     if (cmd == "REASONING") {
-        const QJsonObject p = paramsObject(obj.value("params"));
-        QString reasoning = p.value("reasoning").toString();
-        QString nextCommand = p.value("nextCommand").toString();
-        QJsonObject nextCommandParams = p.value("nextCommandParams").toObject();
+        const QJsonObject p = normalizedParams(obj);
+        QString reasoning = firstNonEmptyString(p, {"reasoning", "thoughts"});
+        QString nextCommand = firstNonEmptyString(p, {"nextCommand", "next_command"});
+        QJsonObject nextCommandParams = objectFromValue(p.value("nextCommandParams"));
         QString description = obj["description"].toString();
 
         // Поддержка альтернативного формата

@@ -11,6 +11,7 @@ public:
     */
     RunPythonCommand(const QString& scriptPath = QString(),
                      const QByteArray& inlineCode = QByteArray(),
+                     const QString& cwd = QString(),
                      const QString& descr = QString());
 
     QString name() const override { return "RUN_PYTHON"; }

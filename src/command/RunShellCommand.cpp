@@ -2,6 +2,7 @@
 #include "RunShellCommand.h"
 #include <QProcess>
 #include <QDebug>
+#include <QFileInfo>
 
 static QString decodeProcessOutput(const QByteArray& data)
 {
@@ -13,9 +14,12 @@ static QString decodeProcessOutput(const QByteArray& data)
 }
 
 RunShellCommand::RunShellCommand(const QString& command,
+                                 const QString& cwd,
                                  const QString& descr)
 {
     m_params["command"] = command;
+    if (!cwd.trimmed().isEmpty())
+        m_params["cwd"] = cwd;
     m_description = descr.isEmpty()
         ? QString("Executes a shell command. "
                   "Example: { \"command\": \"RUN_SHELL\", \"params\": { \"command\": \"ls -la\" } }")
@@ -33,12 +37,20 @@ bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
     QString cmd = m_params["command"].toString();
 
     // Установить рабочую директорию из devAssManager, если возможно
+    QString cwd = m_params.value("cwd").toString().trimmed();
     if (devAss) {
         QDir projectRoot = devAss->projectRoot();
         if (!projectRoot.isEmpty() && projectRoot.exists()) {
-            proc.setWorkingDirectory(projectRoot.absolutePath());
+            if (!cwd.isEmpty() && !QFileInfo(cwd).isAbsolute()) {
+                cwd = projectRoot.filePath(cwd);
+                m_params["cwd"] = cwd;
+            }
+            if (cwd.isEmpty())
+                cwd = projectRoot.absolutePath();
         }
     }
+    if (!cwd.isEmpty())
+        proc.setWorkingDirectory(cwd);
 
     // Для *nix будем использовать /bin/sh -c
 #ifdef Q_OS_WIN

@@ -52,6 +52,7 @@ SOURCES += \
     src/command/CommandFactory.cpp \
     src/command/CommandParser.cpp \
     src/command/CommandRegistry.cpp \
+    src/command/CommandDocs.cpp \
     src/command/CreateFileCommand.cpp \
     src/command/DeleteFileCommand.cpp \
     src/command/EditInRangeCommand.cpp \
@@ -161,6 +162,7 @@ HEADERS += \
     src/command/CommandFactory.h \
     src/command/CommandParser.h \
     src/command/CommandRegistry.h \
+    src/command/CommandDocs.h \
     src/command/CreateFileCommand.h \
     src/command/DeleteFileCommand.h \
     src/command/EditInRangeCommand.h \

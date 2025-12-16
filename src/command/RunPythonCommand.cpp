@@ -15,6 +15,7 @@ static QString decodeProcessOutput(const QByteArray& data)
 
 RunPythonCommand::RunPythonCommand(const QString& scriptPath,
                                    const QByteArray& inlineCode,
+                                   const QString& cwd,
                                    const QString& descr)
 {
     if (!scriptPath.isEmpty()) {
@@ -22,6 +23,9 @@ RunPythonCommand::RunPythonCommand(const QString& scriptPath,
     }
     if (!inlineCode.isEmpty()) {
         m_params["code"] = QString::fromUtf8(inlineCode);
+    }
+    if (!cwd.trimmed().isEmpty()) {
+        m_params["cwd"] = cwd;
     }
     m_description = descr.isEmpty()
         ? QString("Runs a Python script or inline Python code. "
@@ -57,6 +61,21 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
         if (err) *err = "Ни скрипта, ни кода не указано";
         return false;
     }
+
+    QString cwd = m_params.value("cwd").toString().trimmed();
+    if (devAss) {
+        QDir projectRoot = devAss->projectRoot();
+        if (!projectRoot.isEmpty() && projectRoot.exists()) {
+            if (!cwd.isEmpty() && !QFileInfo(cwd).isAbsolute()) {
+                cwd = projectRoot.filePath(cwd);
+                m_params["cwd"] = cwd;
+            }
+            if (cwd.isEmpty())
+                cwd = projectRoot.absolutePath();
+        }
+    }
+    if (!cwd.isEmpty())
+        proc.setWorkingDirectory(cwd);
 
     proc.start(program, args);
 

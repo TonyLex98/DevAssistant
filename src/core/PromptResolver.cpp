@@ -4,11 +4,13 @@
 #include "PromptManager.h"
 #include "../core/ContextChainResolver.h"
 #include "../core/ProjectStructureResolver.h"
+#include "../command/CommandDocs.h"
 #include <QMap>
 #include <QRegularExpression>
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
+#include <QJsonDocument>
 
 // Static members initialization
 QString PromptResolver::m_nextSequenceName;
@@ -72,10 +74,17 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     QSet<QString> allowedSet = QSet<QString>::fromList(step.allowedCommands());
 
     for (Command *c : all) {
-        if (!allowedSet.contains(c->name()))
+        if (!allowedSet.contains(c->name())) {
+            delete c;
             continue;
+        }
+
+        const CommandDoc doc = CommandDocs::doc(c->name());
+        allowedList += CommandDocs::renderForLLM(doc) + "\n\n";
+        delete c;
         // Формат как в PromptManager::supportedCommandsText()
 
+        continue;
         QJsonObject example = c->toJson();
         QString json = QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString());
         allowedList += "- " + c->name() + ": " + c->description() + "\n  Формат: " + json + "\n\n";

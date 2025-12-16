@@ -8,6 +8,7 @@ class RunShellCommand : public Command
 public:
     /* command – произвольная консольная команда. */
     RunShellCommand(const QString& command = QString(),
+                    const QString& cwd = QString(),
                     const QString& descr = QString());
 
     QString name() const override { return "RUN_SHELL"; }

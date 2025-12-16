@@ -7,9 +7,12 @@
 #include <QDebug>
 
 ListFilesInFolderCommand::ListFilesInFolderCommand(const QString& folderPath,
+                                                   const QString& pattern,
                                                    const QString& descr)
 {
     m_params["folderPath"] = folderPath;
+    if (!pattern.trimmed().isEmpty())
+        m_params["pattern"] = pattern;
     m_description = descr.isEmpty()
         ? QString("Lists files in a directory with line counts. "
                   "Example: { \"command\": \"LIST_FILES_IN_FOLDER\", \"params\": { \"folderPath\": \"src/ui\" } }")
@@ -38,6 +41,10 @@ bool ListFilesInFolderCommand::apply(DevAssManager* devAss, QString* err)
     }
 
     // Get list of files (non-recursive)
+    const QString pattern = m_params.value("pattern").toString().trimmed();
+    if (!pattern.isEmpty()) {
+        dir.setNameFilters(QStringList{pattern});
+    }
     QFileInfoList fileInfoList = dir.entryInfoList(QDir::Files, QDir::Name);
     
     if (fileInfoList.isEmpty()) {

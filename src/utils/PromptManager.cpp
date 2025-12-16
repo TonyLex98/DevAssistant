@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include "../command/CommandDocs.h"
 
 PromptManager::PromptManager()
 {
@@ -104,6 +105,11 @@ QString PromptManager::supportedCommandsText() const
     QString result;
 
     for (Command* cmd : CommandRegistry::all()) {
+        const CommandDoc doc = CommandDocs::doc(cmd->name());
+        result += CommandDocs::renderForLLM(doc) + "\n\n";
+        delete cmd;
+        continue;
+
         QString name = cmd->name();
         QString description = cmd->description();
 
@@ -119,4 +125,3 @@ QString PromptManager::supportedCommandsText() const
 
     return result;
 }
-

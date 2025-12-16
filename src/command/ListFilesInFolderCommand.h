@@ -5,6 +5,7 @@ class ListFilesInFolderCommand : public Command
 {
 public:
     ListFilesInFolderCommand(const QString& folderPath,
+                             const QString& pattern = QString(),
                              const QString& descr = QString());
 
     QString name() const override { return "LIST_FILES_IN_FOLDER"; }
@@ -14,6 +15,7 @@ public:
     QJsonObject toJson() const override;
 
     QString folderPath() const { return m_params["folderPath"].toString(); }
+    QString pattern() const { return m_params.value("pattern").toString(); }
     
     QString getResult() const override;
 
