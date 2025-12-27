@@ -5,9 +5,9 @@
 #include <QDialogButtonBox>
 #include "PromptSequenceManager.h"  // Include the header for sequence manager
 #include <StyledButton.h>
-#include "customWidgets/MemoryComboBox.h"
 #include <QCheckBox>
 #include <QListWidget>  // Include the header that also defines QListWidgetItem
+#include "customWidgets/MemoryLineEdit.h"
 
 class StyleTextEdit;
 class StyledButton;
@@ -35,13 +35,15 @@ private slots:
 private:
     StyleTextEdit   *m_templateEdit = nullptr;
     QListWidget *m_cmdList      = nullptr;
+    MemoryLineEdit *m_cmdFilter = nullptr;
     PromptStep   m_step;
     PromptSequenceManager *m_seqMgr = nullptr;  // Reference to sequence manager
     QString m_templateDir; // Directory of the current template for filtering
     QString m_currentSequenceName; // Name of the current sequence being edited
 
     /* --- UI для резолверов --- */
-    MemoryComboBox   *m_resolverCombo = nullptr;
+    QListWidget *m_insertList = nullptr;
+    MemoryLineEdit *m_insertFilter = nullptr;
     StyledButton *m_insertBtn      = nullptr;
 
     /* --- UI для зацикливания --- */
@@ -53,4 +55,5 @@ private:
     /* --- UI для резолвера информации о последовательностях --- */
     StyledButton *m_addSequenceInfoBtn = nullptr;
     QListWidget *m_sequenceListWidget = nullptr;
+    MemoryLineEdit *m_seqFilter = nullptr;
 };
