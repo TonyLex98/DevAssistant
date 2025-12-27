@@ -170,6 +170,7 @@ private:
     ProjectIndex m_index;
     ChangeApplier m_applier;
     OllamaAdapter m_model;
+    OllamaAdapter m_agentModel;
     PromptManager m_promptMgr;
 
     // Variables for tracking task execution time and context usage
@@ -201,6 +202,17 @@ private:
 
     QList<QPair<QString,QString>> m_history;
     QString m_streamBuf;
+    QStringList m_activeImagesBase64;
+    QStringList m_activeImagePaths;
+    QStringList m_activeImageSummaries;
+    bool m_preserveActiveImagesForNextRun = false;
+
+    bool m_useAgentPipeline = true;
+    int m_agentRepairCountThisStep = 0;
+    int m_agentMaxRepairsPerStep = 2;
+    bool m_inAgentAutoRepair = false;
+    int m_agentRepairStepIdx = -1;
+    QString m_agentRepairSeqId;
 
     StyledButton* rescanBtn;
     StyledButton* settingsBtn;
@@ -307,6 +319,16 @@ private:
     void handleSearchResults(Command* cmd);
 
     void retryCurrentSequenceStep();
+    bool ensureAgentModelConfigured();
+    QStringList buildAllowedCommandsDocsCompact(const PromptStep& step) const;
+    QByteArray repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step);
+    bool maybeAutoRepairAfterExecution(const PromptStep& step,
+                                       const QDateTime& execStartedAt,
+                                       const QList<Command*>& executedCommands,
+                                       bool applyFailed,
+                                       const QString& lastError);
+    static bool isImplementationIntentText(const QString& text);
+    bool didAnyAffectedPathChangeSince(const QDateTime& since, const QList<Command*>& executedCommands) const;
     void appendUserQuestionToResultDisplay(const QString& question);
     ResultDisplayWidget::ResultEntryMetadata collectContextMetadataSince(const QDateTime &since) const;
 

@@ -291,24 +291,42 @@ CommandDoc CommandDocs::doc(const QString& commandName)
 
 QString CommandDocs::renderForLLM(const CommandDoc& doc)
 {
+    return renderForLLM(doc, false);
+}
+
+QString CommandDocs::renderForLLM(const CommandDoc& doc, bool compact)
+{
     QString out;
-    out += "- " + doc.name + ": " + doc.summary + "\n";
+    out += "- " + doc.name + ": " + doc.summary.trimmed() + "\n";
 
     if (!doc.params.isEmpty()) {
         out += "  Params:\n";
-        for (const auto& p : doc.params) {
-            out += QString("    - %1 (%2%3): %4\n")
-                       .arg(p.name, p.type, p.required ? ", required" : ", optional", p.description);
+        const int maxParams = compact ? 6 : 1000;
+        for (int i = 0; i < doc.params.size() && i < maxParams; ++i) {
+            const auto& p = doc.params[i];
+            if (compact) {
+                out += QString("    - %1 (%2%3)\n")
+                           .arg(p.name, p.type, p.required ? ", required" : ", optional");
+            } else {
+                out += QString("    - %1 (%2%3): %4\n")
+                           .arg(p.name, p.type, p.required ? ", required" : ", optional", p.description);
+            }
+        }
+        if (compact && doc.params.size() > maxParams) {
+            out += QString("    - ... (%1 more)\n").arg(doc.params.size() - maxParams);
         }
     }
 
     out += "  JSON: " + compactJson(doc.example) + "\n";
 
-    if (!doc.notes.isEmpty()) {
+    if (!doc.notes.isEmpty() && !compact) {
         out += "  Notes:\n";
         for (const auto& note : doc.notes) {
             out += "    - " + note + "\n";
         }
+    } else if (compact && !doc.notes.isEmpty()) {
+        // Keep a single critical note if present.
+        out += "  Notes: " + doc.notes.first().trimmed() + "\n";
     }
 
     return out.trimmed();

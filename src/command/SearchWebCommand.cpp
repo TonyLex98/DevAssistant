@@ -894,10 +894,11 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
 
     const int maxResults = qMax(1, m_params.value("maxResults").toInt(5));
     // Fast-by-default: search should return something quickly; deeper content extraction is separate.
-    const int searchTimeoutMs = qBound(1500, m_params.value("searchTimeoutMs").toInt(4000), 20000);
-    const int overallSearchTimeoutMs = qBound(2000, m_params.value("overallSearchTimeoutMs").toInt(6000), 30000);
-    const int pageTimeoutMs = qBound(1500, m_params.value("pageTimeoutMs").toInt(5000), 20000);
-    const int overallPageTimeoutMs = qBound(3000, m_params.value("overallPageTimeoutMs").toInt(9000), 60000);
+    // Keep SEARCH_WEB fast and predictable even if the LLM suggests huge timeouts.
+    const int searchTimeoutMs = qBound(1200, m_params.value("searchTimeoutMs").toInt(3500), 8000);
+    const int overallSearchTimeoutMs = qBound(2000, m_params.value("overallSearchTimeoutMs").toInt(8000), 12000);
+    const int pageTimeoutMs = qBound(1200, m_params.value("pageTimeoutMs").toInt(4500), 9000);
+    const int overallPageTimeoutMs = qBound(2500, m_params.value("overallPageTimeoutMs").toInt(9000), 15000);
     const int pageConcurrency = qBound(1, m_params.value("pageConcurrency").toInt(3), 8);
     const int maxContentChars = qBound(500, m_params.value("maxContentChars").toInt(2500), 20000);
     const int cacheTtlMs = qBound(0, m_params.value("cacheTtlMs").toInt(10 * 60 * 1000), 60 * 60 * 1000);

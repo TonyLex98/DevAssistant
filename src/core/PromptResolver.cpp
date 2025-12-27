@@ -34,6 +34,23 @@ static QString absoluteFileList(const QString& list, const QString& root)
     return abs.join('\n');
 }
 
+static QString truncateLinesForPrompt(const QString& text, int maxLines, int maxChars)
+{
+    QStringList lines = text.split('\n', QString::KeepEmptyParts);
+    if (maxLines > 0 && lines.size() > maxLines) {
+        const int head = qMax(1, maxLines - 50);
+        const int tail = qMin(50, maxLines / 4);
+        const QStringList kept = lines.mid(0, head) + QStringList{QStringLiteral("...")} + lines.mid(lines.size() - tail);
+        lines = kept;
+    }
+    QString out = lines.join("\n");
+    if (maxChars > 0 && out.size() > maxChars) {
+        out = out.left(maxChars);
+        out += QStringLiteral("\n...");
+    }
+    return out;
+}
+
 PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
                                                        const PromptStep &step,
                                                        MainWindow *ctx)
@@ -46,16 +63,20 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     result.replace("{{PROJECT_ROOT}}", ctx->projectRootPath());
 
     // 2) {{FILE_LIST}}
-    result.replace("{{FILE_LIST}}", absoluteFileList(ctx->promptManager()->fileListText(),
-                                                     ctx->projectRootPath()));
+    const QString fileListAbs = absoluteFileList(ctx->promptManager()->fileListText(),
+                                                 ctx->projectRootPath());
+    result.replace("{{FILE_LIST}}", truncateLinesForPrompt(fileListAbs, 600, 18000));
 
     // 3) {{HISTORY}} – берём последние N сообщений из MainWindow
     QString hist;
-    const int maxHist = 20;
+    const int maxHist = 12;
     const auto &history = ctx->history();
     int start = qMax(0, history.size() - maxHist);
     for (int i = start; i < history.size(); ++i) {
-        hist += history[i].first + ": " + history[i].second + "\n";
+        QString msg = history[i].second;
+        if (msg.size() > 800)
+            msg = msg.left(800) + QStringLiteral("...");
+        hist += history[i].first + ": " + msg + "\n";
     }
     result.replace("{{HISTORY}}", hist.trimmed());
 
@@ -80,7 +101,8 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         }
 
         const CommandDoc doc = CommandDocs::doc(c->name());
-        allowedList += CommandDocs::renderForLLM(doc) + "\n\n";
+        // Small-model friendly: keep command docs compact to reduce token pressure.
+        allowedList += CommandDocs::renderForLLM(doc, true) + "\n\n";
         delete c;
         // Формат как в PromptManager::supportedCommandsText()
 

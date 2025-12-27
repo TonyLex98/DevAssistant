@@ -20,6 +20,15 @@ constexpr int kMaxExhumedChunks = 2;
 constexpr double kTopicShiftThreshold = 0.12;
 constexpr double kExhumeThreshold = 0.18;
 
+static int extractTrailingNumber(const QString& id)
+{
+    QRegularExpression re(QStringLiteral("(\\d+)$"));
+    const QRegularExpressionMatch m = re.match(id);
+    if (!m.hasMatch())
+        return -1;
+    return m.captured(1).toInt();
+}
+
 static QString ensureDirAndJoin(const QString& dirPath, const QString& fileName)
 {
     QDir dir(dirPath);
@@ -128,7 +137,6 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
     if (!existingActiveId.isEmpty()) {
         // Update existing active command
         CommandContextInfo& info = m_commandHistory[existingActiveId];
-        info.timestamp = QDateTime::currentDateTime();
         info.result = result;
         info.state = CommandState::Active; // Reset to active
         info.reason.clear(); // Clear any previous reason
@@ -149,7 +157,6 @@ void ContextManager::addCommand(Command* cmd, const QString& result)
                     break; // Will create a new command below
                 } else {
                     // This shouldn't happen due to findExistingCommandId check above, but just in case
-                    info.timestamp = QDateTime::currentDateTime();
                     info.result = result;
                     info.state = CommandState::Active; // Reset to active
                     info.reason.clear(); // Clear any previous reason
@@ -220,6 +227,15 @@ QList<CommandContextInfo> ContextManager::getValidCommands() const
             validCommands.append(it.value());
         }
     }
+    std::sort(validCommands.begin(), validCommands.end(), [](const CommandContextInfo& a, const CommandContextInfo& b) {
+        const int an = extractTrailingNumber(a.id);
+        const int bn = extractTrailingNumber(b.id);
+        if (an != -1 && bn != -1 && an != bn)
+            return an < bn;
+        if (a.timestamp.isValid() && b.timestamp.isValid() && a.timestamp != b.timestamp)
+            return a.timestamp < b.timestamp;
+        return a.id < b.id;
+    });
     return validCommands;
 }
 
@@ -229,6 +245,15 @@ QList<CommandContextInfo> ContextManager::getAllCommands() const
     for (auto it = m_commandHistory.constBegin(); it != m_commandHistory.constEnd(); ++it) {
         allCommands.append(it.value());
     }
+    std::sort(allCommands.begin(), allCommands.end(), [](const CommandContextInfo& a, const CommandContextInfo& b) {
+        const int an = extractTrailingNumber(a.id);
+        const int bn = extractTrailingNumber(b.id);
+        if (an != -1 && bn != -1 && an != bn)
+            return an < bn;
+        if (a.timestamp.isValid() && b.timestamp.isValid() && a.timestamp != b.timestamp)
+            return a.timestamp < b.timestamp;
+        return a.id < b.id;
+    });
     return allCommands;
 }
 
@@ -776,11 +801,12 @@ void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceI
     if (!existingActiveId.isEmpty()) {
         // Update existing active command with sequence info
         CommandContextInfo& info = m_commandHistory[existingActiveId];
-        info.timestamp = QDateTime::currentDateTime();
         info.result = result;
         info.sequenceId = sequenceId; // Link to the sequence
         info.state = CommandState::Active; // Reset to active
         info.reason.clear(); // Clear any previous reason
+        info.affectedPaths = collectPathsFromParams(info.params);
+        addPathsToWatcher(info.affectedPaths);
         
         // Also add to the sequence if not already there
         CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
@@ -803,11 +829,12 @@ void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceI
                     break; // Will create a new command below
                 } else {
                     // This shouldn't happen due to findExistingCommandId check above, but just in case
-                    info.timestamp = QDateTime::currentDateTime();
                     info.result = result;
                     info.sequenceId = sequenceId; // Link to the sequence
                     info.state = CommandState::Active; // Reset to active
                     info.reason.clear(); // Clear any previous reason
+                    info.affectedPaths = collectPathsFromParams(info.params);
+                    addPathsToWatcher(info.affectedPaths);
                     
                     // Also add to the sequence if not already there
                     CommandSequenceInfo& seqInfo = m_sequenceHistory[sequenceId];
@@ -835,6 +862,7 @@ void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceI
     info.result = result;
     info.state = CommandState::Active;
     info.sequenceId = sequenceId; // Link to the sequence
+    info.affectedPaths = collectPathsFromParams(info.params);
 
     m_commandHistory.insert(commandId, info);
     
@@ -857,6 +885,15 @@ QList<CommandSequenceInfo> ContextManager::getCommandSequences() const
     for (auto it = m_sequenceHistory.constBegin(); it != m_sequenceHistory.constEnd(); ++it) {
         sequences.append(it.value());
     }
+    std::sort(sequences.begin(), sequences.end(), [](const CommandSequenceInfo& a, const CommandSequenceInfo& b) {
+        const int an = extractTrailingNumber(a.id);
+        const int bn = extractTrailingNumber(b.id);
+        if (an != -1 && bn != -1 && an != bn)
+            return an < bn;
+        if (a.timestamp.isValid() && b.timestamp.isValid() && a.timestamp != b.timestamp)
+            return a.timestamp < b.timestamp;
+        return a.id < b.id;
+    });
     return sequences;
 }
 

@@ -27,6 +27,7 @@ class CommandDocs
 public:
     static CommandDoc doc(const QString& commandName);
     static QString renderForLLM(const CommandDoc& doc);
+    static QString renderForLLM(const CommandDoc& doc, bool compact);
 
 private:
     static QString compactJson(const QJsonObject& obj);

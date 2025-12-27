@@ -35,6 +35,7 @@
 #include "../command/SearchProjectCommand.h"
 #include "../command/ShowResultCommand.h"
 #include "../command/Command.h"
+#include "../command/CommandDocs.h"
 #include "SolutionTemplateViewer.h"
 #include "../core/SolutionTemplateManager.h"
 
@@ -1024,10 +1025,13 @@ void MainWindow::rescan(){
 void MainWindow::openSettings(){
     OllamaSettingsDialog d(this);
     if (d.exec()==QDialog::Accepted) {
-        m_model.setEndpoint(QUrl(d.endpoint()));
+        const QUrl endpoint(d.endpoint());
+        m_model.setEndpoint(endpoint);
+        m_agentModel.setEndpoint(endpoint);
         QVariantMap opts = d.params();
         // Используем параметры из диалога (которые включают как базовые, так и параметры генерации)
         if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
+        if (!m_agentModel.selectedModel().isEmpty()) m_agentModel.configure(m_agentModel.selectedModel(), opts);
 
         // Сохраняем параметры в конфигурацию
         AppConfig cfg;
@@ -1463,7 +1467,56 @@ void MainWindow::runNextStep()
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
 
     m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;  // Store the current prompt
-    m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+
+    // Reset per-step repair counter when step/sequence changes.
+    if (m_agentRepairStepIdx != m_currentStepIdx || m_agentRepairSeqId != m_currentSeqId) {
+        m_agentRepairCountThisStep = 0;
+        m_agentRepairStepIdx = m_currentStepIdx;
+        m_agentRepairSeqId = m_currentSeqId;
+    }
+
+    if (m_useAgentPipeline && ensureAgentModelConfigured()) {
+        // Multi-pass: RAW draft (logged) -> compiled JSON commands.
+        QVariantMap draftOpts;
+        draftOpts.insert("temperature", 0.5);
+        draftOpts.insert("num_predict", 600);
+        draftOpts.insert("timeoutMs", 60000);
+
+        const QString draftSystem =
+            QStringLiteral(
+                "You are a senior planner.\n"
+                "Return a short plan (5-10 bullets) and, if needed, 1-3 clarifying questions.\n"
+                "Do NOT output JSON commands in this step.\n");
+
+        const QString rawDraft = m_agentModel.generateWithSystem(resolved.userPrompt, draftSystem, draftOpts).trimmed();
+        if (!rawDraft.isEmpty())
+            appendConsoleContext(QStringLiteral("AGENT_RAW_DRAFT"), rawDraft, QString(), 0);
+
+        QVariantMap compileOpts;
+        compileOpts.insert("temperature", 0.1);
+        compileOpts.insert("num_predict", 1400);
+        compileOpts.insert("timeoutMs", 90000);
+
+        QString compileSystem = resolved.systemPrompt;
+        if (!rawDraft.isEmpty()) {
+            compileSystem += QStringLiteral("\n\n[RAW_DRAFT]\n") + rawDraft + QStringLiteral("\n\n");
+        }
+        compileSystem += QStringLiteral("\n\nIMPORTANT: Output ONLY a JSON array of commands. No extra text.\n");
+
+        const QString compiled = m_agentModel.generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
+        QTimer::singleShot(0, this, [this, compiled]() {
+            m_streamBuf = compiled;
+            handleAssistantFinished();
+        });
+        return;
+    }
+
+    // Fallback: stream from the currently selected model.
+    if (!m_activeImagesBase64.isEmpty()) {
+        m_model.startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_activeImagesBase64, QVariantMap());
+    } else {
+        m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+    }
     // В истории сохраняем только запрос (не пользовательский текст)
     //m_history.push_back(qMakePair(QString("system"), resolved));
 }
@@ -1569,7 +1622,7 @@ void MainWindow::handleAssistantFinished()
     QString err;
     for (Command* c : toRun) {
         // Для команд, требующих LLM, используем applyWithLLM
-        if (!c->applyWithLLM(&m_dev_manager, &m_model, &err)) {
+        if (!c->applyWithLLM(&m_dev_manager, execModel, &err)) {
             QMessageBox::warning(this, "Ошибка выполнения", err);
             break;
         }
@@ -1613,6 +1666,17 @@ void MainWindow::handleAssistantFinished()
 
     QByteArray fullResp = m_streamBuf.toUtf8();
     QByteArray jsonResp = extractJsonPart(fullResp);
+
+    // If the model failed to output JSON, attempt a strict repair pass (sequence mode only).
+    if (jsonResp.isEmpty() && m_sequenceMode &&
+        m_currentStepIdx >= 0 && m_currentStepIdx < m_currentSeq.steps().size()) {
+        const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
+        const QByteArray repaired = repairToJsonArrayIfNeeded(fullResp, step);
+        if (!repaired.isEmpty()) {
+            jsonResp = repaired;
+        }
+    }
+
     const bool usedRaw = jsonResp.isEmpty();
     const QByteArray payload = usedRaw ? fullResp : jsonResp;
     if (usedRaw) {
@@ -2359,6 +2423,10 @@ void MainWindow::handleAssistantFinished()
 
     QList<Command*> pendingEdits;
     bool applyFailed = false;
+    const QDateTime execStartedAt = QDateTime::currentDateTime();
+    OllamaAdapter* execModel = &m_model;
+    if (m_useAgentPipeline && ensureAgentModelConfigured())
+        execModel = &m_agentModel;
     for (Command* c : toRun) {
         const QString name = c->name();
         if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT" || name == "REASONING")
@@ -2367,7 +2435,7 @@ void MainWindow::handleAssistantFinished()
             pendingEdits << c;
             continue;
         }
-        if (!c->applyWithLLM(&m_dev_manager, &m_model, &err)) {
+        if (!c->applyWithLLM(&m_dev_manager, execModel, &err)) {
             c->setExecutionResult(false, err);  // Set execution result before getting output
             logConsoleResult(c, err);  // Pass the error message
             QMessageBox::warning(this, tr("Ошибка выполнения"), err);
@@ -2412,6 +2480,10 @@ void MainWindow::handleAssistantFinished()
         }
 
         const PromptStep &step = m_currentSeq.steps()[m_currentStepIdx];
+        if (maybeAutoRepairAfterExecution(step, execStartedAt, toRun, applyFailed, err)) {
+            qDeleteAll(toRun);
+            return;
+        }
         if (step.loop()) {
             // Если установлен флаг зацикливания, повторяем текущий шаг
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
@@ -2868,6 +2940,215 @@ void MainWindow::retryCurrentSequenceStep()
     QTimer::singleShot(200, this, &MainWindow::runNextStep);
 }
 
+bool MainWindow::ensureAgentModelConfigured()
+{
+    if (!m_useAgentPipeline)
+        return false;
+
+    if (m_agentModel.selectedModel().isEmpty()) {
+        // Default agent model. If not installed, we'll fall back to the currently selected model.
+        m_agentModel.configure(QStringLiteral("gpt-oss:20b"), QVariantMap());
+    }
+
+    QString err;
+    if (!m_agentModel.isAvailable(&err)) {
+        log(QString("Agent model unavailable (%1). Falling back to selected model.").arg(err));
+        return false;
+    }
+    return true;
+}
+
+QStringList MainWindow::buildAllowedCommandsDocsCompact(const PromptStep& step) const
+{
+    QStringList out;
+    const QSet<QString> allowed = QSet<QString>::fromList(step.allowedCommands());
+    for (Command* c : CommandRegistry::all()) {
+        const QString name = c->name();
+        if (!allowed.contains(name)) {
+            delete c;
+            continue;
+        }
+        const CommandDoc doc = CommandDocs::doc(name);
+        out << CommandDocs::renderForLLM(doc, true);
+        delete c;
+    }
+    return out;
+}
+
+QByteArray MainWindow::repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step)
+{
+    const QByteArray extracted = extractJsonPart(rawText);
+    if (!extracted.isEmpty())
+        return extracted;
+
+    if (!ensureAgentModelConfigured())
+        return QByteArray();
+
+    const QStringList allowedDocs = buildAllowedCommandsDocsCompact(step);
+    const QString systemPrompt =
+        QStringLiteral(
+            "You are a strict JSON repair tool.\n"
+            "Task: Convert the INPUT into a valid JSON array of commands.\n"
+            "Rules:\n"
+            "- Output ONLY a JSON array. No markdown, no comments.\n"
+            "- Each element is an object with keys: command, params.\n"
+            "- params MUST be a JSON object (not a string).\n"
+            "- Only use commands from the allowed list below.\n"
+            "- If there is not enough info to act, output exactly one ASK_USER command.\n"
+            "- If no actions are needed, output [].\n\n"
+            "Allowed commands:\n%1\n")
+            .arg(allowedDocs.join(QStringLiteral("\n")));
+
+    QVariantMap opts;
+    opts.insert("temperature", 0.05);
+    opts.insert("num_predict", 800);
+    opts.insert("timeoutMs", 45000);
+
+    const QString repaired = m_agentModel.generateWithSystem(QString::fromUtf8(rawText), systemPrompt, opts);
+    const QByteArray repairedUtf8 = repaired.toUtf8();
+    const QByteArray repairedJson = extractJsonPart(repairedUtf8);
+    return repairedJson.isEmpty() ? QByteArray() : repairedJson;
+}
+
+bool MainWindow::isImplementationIntentText(const QString& text)
+{
+    const QString t = text.toLower();
+    static const QStringList needles = {
+        // RU
+        "реализ", "сделай", "создай", "добав", "исправ", "почин", "внедр", "напис",
+        "сгенер", "передел", "улучш", "доработ", "перепиш",
+        // EN
+        "implement", "create", "add", "fix", "repair", "refactor", "rewrite", "build", "generate"
+    };
+    for (const QString& n : needles) {
+        if (t.contains(n))
+            return true;
+    }
+    return false;
+}
+
+static QString normalizePathForProject(const QString& raw, const QString& projectRoot)
+{
+    if (raw.trimmed().isEmpty())
+        return QString();
+    QFileInfo info(raw);
+    if (info.isAbsolute())
+        return QDir::cleanPath(info.absoluteFilePath());
+    return QDir::cleanPath(QDir(projectRoot).absoluteFilePath(raw));
+}
+
+bool MainWindow::didAnyAffectedPathChangeSince(const QDateTime& since, const QList<Command*>& executedCommands) const
+{
+    if (!since.isValid())
+        return false;
+
+    static const QStringList keys = {
+        "path",
+        "oldPath",
+        "newPath",
+        "folderPath",
+        "scriptPath",
+        "sourceFilePath"
+    };
+
+    QSet<QString> touched;
+    for (const Command* c : executedCommands) {
+        if (!c)
+            continue;
+        const QJsonObject params = c->params();
+        for (const QString& k : keys) {
+            const QString raw = params.value(k).toString();
+            const QString p = normalizePathForProject(raw, m_projectRoot);
+            if (!p.isEmpty())
+                touched.insert(p);
+        }
+    }
+
+    for (const QString& p : touched) {
+        QFileInfo fi(p);
+        if (fi.exists() && fi.lastModified() >= since)
+            return true;
+    }
+    return false;
+}
+
+bool MainWindow::maybeAutoRepairAfterExecution(const PromptStep& step,
+                                              const QDateTime& execStartedAt,
+                                              const QList<Command*>& executedCommands,
+                                              bool applyFailed,
+                                              const QString& lastError)
+{
+    if (!m_sequenceMode)
+        return false;
+    if (!m_useAgentPipeline)
+        return false;
+    if (m_inAgentAutoRepair)
+        return false;
+
+    // Reset per-step counter when step/sequence changes.
+    if (m_agentRepairStepIdx != m_currentStepIdx || m_agentRepairSeqId != m_currentSeqId) {
+        m_agentRepairCountThisStep = 0;
+        m_agentRepairStepIdx = m_currentStepIdx;
+        m_agentRepairSeqId = m_currentSeqId;
+    }
+
+    if (m_agentRepairCountThisStep >= m_agentMaxRepairsPerStep)
+        return false;
+
+    const bool implIntent = isImplementationIntentText(m_lastUserMessage);
+    const bool changed = didAnyAffectedPathChangeSince(execStartedAt, executedCommands);
+    const bool needRepair = applyFailed || (implIntent && !changed);
+    if (!needRepair)
+        return false;
+
+    if (!ensureAgentModelConfigured())
+        return false;
+
+    const QStringList allowedDocs = buildAllowedCommandsDocsCompact(step);
+    const QString ctx = m_contextManager ? m_contextManager->generateContextText() : QString();
+    const QString systemPrompt =
+        QStringLiteral(
+            "You are an expert developer agent that must output ONLY a JSON array of commands.\n"
+            "Goal: make real progress towards the USER REQUEST using the allowed commands.\n"
+            "Rules:\n"
+            "- Output ONLY JSON array, no extra text.\n"
+            "- Use as few commands as possible (1-5).\n"
+            "- Prefer file-editing commands when implementation is requested.\n"
+            "- If missing critical info, output exactly one ASK_USER.\n"
+            "- Do NOT loop on CALL_SEQUENCE.\n\n"
+            "Allowed commands:\n%1\n")
+            .arg(allowedDocs.join(QStringLiteral("\n")));
+
+    QString userPrompt = QStringLiteral("USER REQUEST:\n%1\n").arg(m_lastUserMessage);
+    if (applyFailed && !lastError.trimmed().isEmpty()) {
+        userPrompt += QStringLiteral("\nLAST ERROR:\n%1\n").arg(lastError);
+    }
+    if (!ctx.trimmed().isEmpty()) {
+        userPrompt += QStringLiteral("\nRECENT CONTEXT (executed commands/results):\n%1\n").arg(ctx.left(12000));
+    }
+
+    QVariantMap opts;
+    opts.insert("temperature", 0.1);
+    opts.insert("num_predict", 1200);
+    opts.insert("timeoutMs", 60000);
+
+    const QString repair = m_agentModel.generateWithSystem(userPrompt, systemPrompt, opts);
+    const QByteArray repairedJson = extractJsonPart(repair.toUtf8());
+    if (repairedJson.isEmpty())
+        return false;
+
+    m_agentRepairCountThisStep++;
+    m_inAgentAutoRepair = true;
+    appendConsoleContext(QStringLiteral("AGENT_REPAIR_DRAFT"), repair, QString(), 0);
+
+    QTimer::singleShot(0, this, [this, repairedJson]() {
+        m_streamBuf = QString::fromUtf8(repairedJson);
+        handleAssistantFinished();
+        m_inAgentAutoRepair = false;
+    });
+    return true;
+}
+
 void MainWindow::runNextSequence()
 {
     // This method is called when transitioning to a new sequence
@@ -2914,7 +3195,27 @@ void MainWindow::runNextSequence()
     qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
 
     m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;  // Store the current prompt
-    m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+
+    if (m_useAgentPipeline && ensureAgentModelConfigured()) {
+        QVariantMap compileOpts;
+        compileOpts.insert("temperature", 0.1);
+        compileOpts.insert("num_predict", 1400);
+        compileOpts.insert("timeoutMs", 90000);
+
+        const QString compileSystem = resolved.systemPrompt + QStringLiteral("\n\nIMPORTANT: Output ONLY a JSON array of commands. No extra text.\n");
+        const QString compiled = m_agentModel.generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
+        QTimer::singleShot(0, this, [this, compiled]() {
+            m_streamBuf = compiled;
+            handleAssistantFinished();
+        });
+        return;
+    }
+
+    if (!m_activeImagesBase64.isEmpty()) {
+        m_model.startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_activeImagesBase64, QVariantMap());
+    } else {
+        m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+    }
 }
 
 void MainWindow::addSequenceTransitionToHistory(const QString& sequenceName)
@@ -3706,6 +4007,12 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
+    if (!m_preserveActiveImagesForNextRun) {
+        m_activeImagesBase64.clear();
+        m_activeImagePaths.clear();
+        m_activeImageSummaries.clear();
+    }
+    m_preserveActiveImagesForNextRun = false;
     onChatTemplateSelectionChanged(templatePath);
     if (m_contextManager)
         m_contextManager->observeUserQuery(text);
@@ -3790,6 +4097,9 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_sequenceMode = true;
     m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
     m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
+    m_agentRepairCountThisStep = 0;
+    m_agentRepairStepIdx = -1;
+    m_agentRepairSeqId.clear();
     m_lastUserMessage = text; // Save the user's query for resolution in prompts
 
     updateSequenceGraphHighlight();  // Update the graph highlighting
@@ -3908,7 +4218,9 @@ void MainWindow::sendUserMessageWithImages(const QString &text,
                                           const QStringList &imagesBase64,
                                           const QStringList &imageSummaries)
 {
-    Q_UNUSED(imagesBase64);
+    m_activeImagesBase64 = imagesBase64;
+    m_activeImagePaths = imagePaths;
+    m_activeImageSummaries = imageSummaries;
     addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
     sendUserMessage(text);
 }
@@ -3919,7 +4231,10 @@ void MainWindow::runTemplateRequestedWithImages(const QString &templatePath,
                                                const QStringList &imagesBase64,
                                                const QStringList &imageSummaries)
 {
-    Q_UNUSED(imagesBase64);
+    m_activeImagesBase64 = imagesBase64;
+    m_activeImagePaths = imagePaths;
+    m_activeImageSummaries = imageSummaries;
+    m_preserveActiveImagesForNextRun = true;
     addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
     runTemplateRequested(templatePath, text);
 }

@@ -106,7 +106,7 @@ QString PromptManager::supportedCommandsText() const
 
     for (Command* cmd : CommandRegistry::all()) {
         const CommandDoc doc = CommandDocs::doc(cmd->name());
-        result += CommandDocs::renderForLLM(doc) + "\n\n";
+        result += CommandDocs::renderForLLM(doc, true) + "\n\n";
         delete cmd;
         continue;
 
