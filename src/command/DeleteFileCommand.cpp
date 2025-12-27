@@ -35,15 +35,15 @@ bool DeleteFileCommand::apply(DevAssManager* devAss, QString* err)
         return false;
     }
 
+    if (devAss) {
+        QList<Change> changes;
+        changes << Change::deleteFile(path);
+        return devAss->applyChanges(changes, err);
+    }
+
     if (!QFile::remove(path)) {
         if (err) *err = QString("Failed to delete file %1").arg(path);
         return false;
-    }
-
-    /* remove entry in .dapro if present */
-    if (devAss) {
-        devAss->findFileDescription(path);   // no direct remove; keep behaviour
-        devAss->save();
     }
     return true;
 }

@@ -42,34 +42,19 @@ bool ReplaceInFileCommand::apply(DevAssManager* devAss, QString* err)
 
     QByteArray cont = m_params["content"].toString().toUtf8();
 
-    // Create parent directories if needed
-    QDir dir = QFileInfo(path).absoluteDir();
-    if (!dir.exists() && !dir.mkpath(".")) {
-        if (err) *err = QString("Failed to create directory for file: %1").arg(dir.path());
-        return false;
+    if (devAss) {
+        QList<Change> changes;
+        changes << Change::replaceInFile(path, cont);
+        return devAss->applyChanges(changes, err);
     }
 
     QFile f(path);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (err) *err = QString("Failed to open file for writing: %1").arg(path);
         return false;
     }
-    qint64 bytesWritten = f.write(cont);
+    f.write(cont);
     f.close();
-
-    if (bytesWritten != cont.size()) {
-        if (err) *err = QString("Write error for file: %1 (wrote %2 of %3 bytes)")
-                       .arg(path).arg(bytesWritten).arg(cont.size());
-        return false;
-    }
-
-    /* update descriptor entry */
-    if (devAss) {
-        devAss->updateFileDescription(path,
-                                      QDateTime::currentDateTime(),
-                                      true);
-        devAss->save();
-    }
     return true;
 }
 

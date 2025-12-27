@@ -1991,6 +1991,59 @@ void MainWindow::handleAssistantFinished()
             if (m_contextManager) {
                 addCommandToContext(c, c->getResult());
             }
+        } else if (c->name() == "CONTEXT_SHOW") {
+            rebuildContextCache();
+            int maxChars = c->params().value("maxChars").toInt(8000);
+            if (maxChars <= 0) maxChars = 0;
+            QString ctx = m_contextContent;
+            if (maxChars > 0 && ctx.size() > maxChars) {
+                ctx = ctx.left(maxChars) + "\n[...truncated...]";
+            }
+
+            const QString result = QString("CONTEXT_SHOW\n[context]\n%1").arg(ctx.trimmed());
+
+            if (m_resultDisplayWidget) {
+                ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
+                m_resultDisplayWidget->appendResult(tr("Context"), result,
+                                                    ResultDisplayWidget::EntryType::Default,
+                                                    metadata);
+            } else {
+                appendExternalContext(QString("==== CONTEXT_SHOW ====\n%1").arg(ctx));
+            }
+
+            m_history.push_back(qMakePair(QString("system"), result));
+            if (m_contextManager) {
+                addCommandToContext(c, result);
+            }
+        } else if (c->name() == "CONTEXT_CLEAR") {
+            const QString scope = c->params().value("scope").toString().trimmed().toLower();
+
+            // Clear file-based context cache
+            m_contextSlices.clear();
+            m_fileToContextCommands.clear();
+            if (m_fileWatcher)
+                m_fileWatcher->removePaths(m_fileWatcher->files());
+
+            // Clear console/external context caches
+            m_consoleLogs.clear();
+            m_externalSources.clear();
+            m_shellCommandOutputs.clear();
+            m_pythonScriptOutputs.clear();
+
+            if (m_contextManager) {
+                if (scope == "all")
+                    m_contextManager->clearAll();
+                else
+                    m_contextManager->clearActiveContextOnly();
+            }
+
+            rebuildContextCache();
+
+            const QString result = QString("CONTEXT_CLEAR\n[scope]\n%1\n[status]\nOK").arg(scope.isEmpty() ? "active" : scope);
+            m_history.push_back(qMakePair(QString("system"), result));
+            if (m_contextManager) {
+                addCommandToContext(c, result);
+            }
         } else if (c->name() == "CALL_SEQUENCE") {
             // Mark that we have a sequence call command and store the name
             sequenceToCall = c->params().value("sequenceName").toString();
@@ -2429,7 +2482,8 @@ void MainWindow::handleAssistantFinished()
         execModel = &m_agentModel;
     for (Command* c : toRun) {
         const QString name = c->name();
-        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT" || name == "REASONING")
+        if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT" || name == "REASONING"
+            || name == "CONTEXT_SHOW" || name == "CONTEXT_CLEAR")
             continue;
         if (name == "EDIT_IN_RANGE") {
             pendingEdits << c;
@@ -2750,7 +2804,8 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     };
 
     if (name == "EDIT_IN_RANGE" || name == "REPLACE_IN_FILE"
-        || name == "DELETE_FILE" || name == "CREATE_FILE") {
+        || name == "DELETE_FILE" || name == "CREATE_FILE"
+        || name == "APPEND_TO_FILE" || name == "INSERT_AT_LINE") {
         clear(p.value("path").toString());
         return;
     }
@@ -2758,6 +2813,35 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     if (name == "RENAME_FILE") {
         clear(p.value("oldPath").toString());
         clear(p.value("newPath").toString());
+        return;
+    }
+
+    if (name == "COPY_FILE") {
+        clear(p.value("to").toString());
+        return;
+    }
+
+    if (name == "GIT_RESTORE_FILE") {
+        clear(p.value("path").toString());
+        return;
+    }
+
+    if (name == "APPLY_PATCH") {
+        const auto keys = m_contextSlices.keys();
+        for (const QString& k : keys) {
+            clearContextForPath(k);
+        }
+        rebuildContextCache();
+        return;
+    }
+
+    if (name == "UNDO_LAST_CHANGE") {
+        // We don't know which files changed; clear all file-context slices.
+        const auto keys = m_contextSlices.keys();
+        for (const QString& k : keys) {
+            clearContextForPath(k);
+        }
+        rebuildContextCache();
         return;
     }
 

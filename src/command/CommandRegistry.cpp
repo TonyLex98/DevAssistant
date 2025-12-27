@@ -19,6 +19,18 @@
 #include "SearchProjectCaseInsensitiveCommand.h"
 #include "ListFilesInFolderCommand.h"
 #include "ReasoningCommand.h"
+#include "CopyFileCommand.h"
+#include "CreateDirCommand.h"
+#include "DeleteDirCommand.h"
+#include "AppendToFileCommand.h"
+#include "InsertAtLineCommand.h"
+#include "ApplyPatchCommand.h"
+#include "GitStatusCommand.h"
+#include "GitDiffCommand.h"
+#include "GitRestoreFileCommand.h"
+#include "UndoLastChangeCommand.h"
+#include "ContextShowCommand.h"
+#include "ContextClearCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -123,7 +135,19 @@ QVector<Command*> CommandRegistry::all()
         new CallSequenceCommand(QString()),
         new OpenSequenceCommand(QString()),
         new ListFilesInFolderCommand(QString()),
-        new ReasoningCommand(QString(), QString(), QJsonObject())
+        new ReasoningCommand(QString(), QString(), QJsonObject()),
+        new CopyFileCommand(QString(), QString(), false),
+        new CreateDirCommand(QString()),
+        new DeleteDirCommand(QString(), false),
+        new AppendToFileCommand(QString(), QByteArray(), true, false),
+        new InsertAtLineCommand(QString(), 1, QByteArray()),
+        new ApplyPatchCommand(QByteArray(), 0),
+        new GitStatusCommand(true),
+        new GitDiffCommand(false),
+        new GitRestoreFileCommand(QString(), false),
+        new UndoLastChangeCommand(),
+        new ContextShowCommand(8000),
+        new ContextClearCommand(QStringLiteral("active"))
     };
 }
 
@@ -580,6 +604,102 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
 
         return new ReasoningCommand(reasoning, nextCommand, nextCommandParams, description);
+    }
+
+    if (cmd == "COPY_FILE") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString from = firstNonEmptyString(p, {"from", "src", "source", "sourcePath", "source_path"});
+        const QString to = firstNonEmptyString(p, {"to", "dst", "dest", "destination", "destinationPath", "dest_path"});
+        const bool overwrite = p.value("overwrite").toBool(obj.value("overwrite").toBool(false));
+        const QString description = obj["description"].toString();
+        return new CopyFileCommand(from, to, overwrite, description);
+    }
+
+    if (cmd == "CREATE_DIR") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
+        const QString description = obj["description"].toString();
+        return new CreateDirCommand(path, description);
+    }
+
+    if (cmd == "DELETE_DIR") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
+        const bool recursive = p.value("recursive").toBool(obj.value("recursive").toBool(false));
+        const QString description = obj["description"].toString();
+        return new DeleteDirCommand(path, recursive, description);
+    }
+
+    if (cmd == "APPEND_TO_FILE") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
+        const QString content = firstNonEmptyString(p, {"content", "text", "data"});
+        const bool createIfMissing = p.value("createIfMissing").toBool(obj.value("createIfMissing").toBool(true));
+        const bool ensureNewline = p.value("ensureNewline").toBool(obj.value("ensureNewline").toBool(false));
+        const QString description = obj["description"].toString();
+        return new AppendToFileCommand(path, content.toUtf8(), createIfMissing, ensureNewline, description);
+    }
+
+    if (cmd == "INSERT_AT_LINE") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
+        const int line = firstNonZeroInt(p, {"line", "lineNumber", "line_number"}, obj.value("line").toInt());
+        const QString content = firstNonEmptyString(p, {"content", "text"});
+        const QString description = obj["description"].toString();
+        return new InsertAtLineCommand(path, line, content.toUtf8(), description);
+    }
+
+    if (cmd == "APPLY_PATCH") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString patch = firstNonEmptyString(p, {"patch", "diff"});
+        const int strip = p.value("strip").toInt(obj.value("strip").toInt(0));
+        const QString description = obj["description"].toString();
+        return new ApplyPatchCommand(patch.toUtf8(), strip, description);
+    }
+
+    if (cmd == "GIT_STATUS") {
+        const QJsonObject p = normalizedParams(obj);
+        const bool porcelain = p.value("porcelain").toBool(obj.value("porcelain").toBool(true));
+        const QString path = firstNonEmptyString(p, {"path", "file"});
+        const QString description = obj["description"].toString();
+        return new GitStatusCommand(porcelain, path, description);
+    }
+
+    if (cmd == "GIT_DIFF") {
+        const QJsonObject p = normalizedParams(obj);
+        const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
+        const int contextLines = p.value("contextLines").toInt(obj.value("contextLines").toInt(-1));
+        const QString path = firstNonEmptyString(p, {"path", "file"});
+        const QString description = obj["description"].toString();
+        return new GitDiffCommand(staged, contextLines, path, description);
+    }
+
+    if (cmd == "GIT_RESTORE_FILE") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString path = firstNonEmptyString(p, {"path", "file"});
+        const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
+        const bool worktree = p.value("worktree").toBool(obj.value("worktree").toBool(true));
+        const QString description = obj["description"].toString();
+        return new GitRestoreFileCommand(path, staged, worktree, description);
+    }
+
+    if (cmd == "UNDO_LAST_CHANGE") {
+        const QString description = obj["description"].toString();
+        return new UndoLastChangeCommand(description);
+    }
+
+    if (cmd == "CONTEXT_SHOW") {
+        const QJsonObject p = normalizedParams(obj);
+        const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(8000));
+        const QString description = obj["description"].toString();
+        return new ContextShowCommand(maxChars, description);
+    }
+
+    if (cmd == "CONTEXT_CLEAR") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString scope = firstNonEmptyString(p, {"scope"});
+        const QString description = obj["description"].toString();
+        return new ContextClearCommand(scope, description);
     }
 
     /* Неизвестная команда */

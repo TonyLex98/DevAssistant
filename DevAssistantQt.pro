@@ -69,6 +69,18 @@ SOURCES += \
     src/command/WriteDescriptionCommand.cpp \
     src/command/ListFilesInFolderCommand.cpp \
     src/command/ReasoningCommand.cpp \
+    src/command/CopyFileCommand.cpp \
+    src/command/CreateDirCommand.cpp \
+    src/command/DeleteDirCommand.cpp \
+    src/command/AppendToFileCommand.cpp \
+    src/command/InsertAtLineCommand.cpp \
+    src/command/ApplyPatchCommand.cpp \
+    src/command/GitStatusCommand.cpp \
+    src/command/GitDiffCommand.cpp \
+    src/command/GitRestoreFileCommand.cpp \
+    src/command/UndoLastChangeCommand.cpp \
+    src/command/ContextShowCommand.cpp \
+    src/command/ContextClearCommand.cpp \
     src/core/DevAssManager.cpp \
     src/core/PromptResolver.cpp \
     src/core/PromptSequence.cpp \
@@ -179,6 +191,18 @@ HEADERS += \
     src/command/WriteDescriptionCommand.h \
     src/command/ListFilesInFolderCommand.h \
     src/command/ReasoningCommand.h \
+    src/command/CopyFileCommand.h \
+    src/command/CreateDirCommand.h \
+    src/command/DeleteDirCommand.h \
+    src/command/AppendToFileCommand.h \
+    src/command/InsertAtLineCommand.h \
+    src/command/ApplyPatchCommand.h \
+    src/command/GitStatusCommand.h \
+    src/command/GitDiffCommand.h \
+    src/command/GitRestoreFileCommand.h \
+    src/command/UndoLastChangeCommand.h \
+    src/command/ContextShowCommand.h \
+    src/command/ContextClearCommand.h \
     src/core/DevAssManager.h \
     src/core/ProjectIndex.h \
     src/core/ProjectStructureResolver.h \

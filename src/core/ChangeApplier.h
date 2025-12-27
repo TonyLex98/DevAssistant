@@ -4,11 +4,13 @@
 #include <QList>
 
 struct Change {
-    enum Type { CreateFile, ReplaceInFile, DeleteFile, RenameFile } type;
+    enum Type { CreateFile, ReplaceInFile, DeleteFile, RenameFile, CreateDir, DeleteDir } type;
     QString targetPath;         // absolute
     QByteArray newContent;      // for create/replace
     QString aux;                // old path for rename
     QByteArray prevContent;     // for undo
+    bool recursive = false;     // for DeleteDir
+    bool wasNoop = false;       // for cases where apply does nothing
 
     static Change createFile(const QString& abs, const QByteArray& content) {
         Change c; c.type=CreateFile; c.targetPath=abs; c.newContent=content; return c;
@@ -21,6 +23,12 @@ struct Change {
     }
     static Change renameFile(const QString& fromAbs, const QString& toAbs){
         Change c; c.type=RenameFile; c.targetPath=toAbs; c.aux=fromAbs; return c;
+    }
+    static Change createDir(const QString& abs) {
+        Change c; c.type=CreateDir; c.targetPath=abs; return c;
+    }
+    static Change deleteDir(const QString& abs, bool recursive=false) {
+        Change c; c.type=DeleteDir; c.targetPath=abs; c.recursive = recursive; return c;
     }
 };
 

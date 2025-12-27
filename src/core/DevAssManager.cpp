@@ -9,6 +9,46 @@ DevAssManager::DevAssManager(const QString &projectRoot,
 {
 }
 
+bool DevAssManager::applyChanges(QList<Change> changes, QString* errorOut)
+{
+    if (changes.isEmpty())
+        return true;
+
+    // Normalize paths to absolute project paths when possible.
+    for (Change& c : changes) {
+        if (!QFileInfo(c.targetPath).isAbsolute())
+            c.targetPath = m_projectRoot.filePath(c.targetPath);
+        if (!c.aux.isEmpty() && !QFileInfo(c.aux).isAbsolute())
+            c.aux = m_projectRoot.filePath(c.aux);
+    }
+
+    QList<Change> copy = changes;
+    if (!m_changeApplier.apply(copy, errorOut))
+        return false;
+
+    // Update file descriptions for touched files.
+    for (const Change& c : copy) {
+        if (c.type == Change::CreateFile || c.type == Change::ReplaceInFile) {
+            updateFileDescription(c.targetPath, QDateTime::currentDateTime(), true);
+        } else if (c.type == Change::DeleteFile) {
+            findFileDescription(c.targetPath); // keep existing behavior (no remove)
+        } else if (c.type == Change::RenameFile) {
+            updateFileDescription(c.targetPath, QDateTime::currentDateTime(), true);
+        }
+    }
+
+    save();
+    return true;
+}
+
+bool DevAssManager::undoLastChange(QString* errorOut)
+{
+    const bool ok = m_changeApplier.undo(errorOut);
+    if (ok)
+        save();
+    return ok;
+}
+
 void DevAssManager::setProjectRoot(const QString &projectRoot)
 {
     m_projectRoot = QDir(projectRoot);

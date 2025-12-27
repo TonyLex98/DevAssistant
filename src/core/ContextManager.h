@@ -117,6 +117,8 @@ public:
     // Remove commands tied to a specific path (e.g. when the file was changed externally)
     void cleanupForPath(const QString& path, const QString& reason = QString());
 
+    void clearActiveContextOnly();
+
 signals:
     // Signal emitted when command context changes
     void contextChanged();
@@ -163,7 +165,6 @@ private:
     void pruneArchive();
     void archiveAllActiveContext(const QString& reason, const QString& triggerQuery);
     void archiveOldestUntilFit(int maxActiveChars);
-    void clearActiveContextOnly();
     void updateExhumedArchivesForQuery(const QString& queryText);
 
     static QSet<QString> extractKeywords(const QString& text);

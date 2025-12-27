@@ -28,6 +28,8 @@ void ChangesDialog::setChanges(const QList<Change>& ch){
             case Change::ReplaceInFile: t = "REPLACE " + c.targetPath; break;
             case Change::DeleteFile: t = "DELETE " + c.targetPath; break;
             case Change::RenameFile: t = "RENAME " + c.aux + " -> " + c.targetPath; break;
+            case Change::CreateDir: t = "MKDIR " + c.targetPath; break;
+            case Change::DeleteDir: t = QString("RMDIR %1%2").arg(c.targetPath, c.recursive ? " (recursive)" : ""); break;
         }
         m_list->addItem(t);
     }
@@ -47,6 +49,10 @@ void ChangesDialog::onItemChanged(int row){
     } else if (c.type==Change::RenameFile) {
         QFile f(c.aux); if (f.open(QIODevice::ReadOnly)) { prev = QString::fromUtf8(f.readAll()); f.close(); }
         QFile f2(c.targetPath); if (f2.open(QIODevice::ReadOnly)) { nxt = QString::fromUtf8(f2.readAll()); f2.close(); }
+    } else if (c.type==Change::CreateDir) {
+        nxt = QString("Created directory: %1").arg(c.targetPath);
+    } else if (c.type==Change::DeleteDir) {
+        prev = QString("Deleted directory: %1").arg(c.targetPath);
     }
     QString html = "<b>Before:</b><pre style='background:#300; color:#fff; padding:8px;'>"+prev.toHtmlEscaped()+"</pre>";
     html += "<b>After:</b><pre style='background:#030; color:#fff; padding:8px;'>"+nxt.toHtmlEscaped()+"</pre>";

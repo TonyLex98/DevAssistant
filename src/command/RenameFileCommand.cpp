@@ -51,6 +51,12 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
         return false;
     }
 
+    if (devAss) {
+        QList<Change> changes;
+        changes << Change::renameFile(oldPath, newPath);
+        return devAss->applyChanges(changes, err);
+    }
+
     // Создаем родительские директории для нового пути, если они не существуют
     QDir newDir = QFileInfo(newPath).absoluteDir();
     if (!newDir.exists() && !newDir.mkpath(".")) {
@@ -62,14 +68,6 @@ bool RenameFileCommand::apply(DevAssManager* devAss, QString* err)
         if (err) *err = QString("Не удалось переименовать %1 в %2")
                         .arg(oldPath).arg(newPath);
         return false;
-    }
-
-    /* обновляем запись в .dapro, если есть */
-    if (devAss) {
-        devAss->updateFileDescription(newPath,
-                                      QDateTime::currentDateTime(),
-                                      true);
-        devAss->save();
     }
     return true;
 }

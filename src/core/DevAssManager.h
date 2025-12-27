@@ -78,6 +78,10 @@ public:
 
     void setProjectRoot(const QString &projectRoot);
 
+    // Apply and undo a batch of filesystem changes with a single-level undo stack.
+    bool applyChanges(QList<Change> changes, QString* errorOut = nullptr);
+    bool undoLastChange(QString* errorOut = nullptr);
+
 
 private:
     QDir m_projectRoot;   // Корень выбранного проекта
@@ -89,6 +93,7 @@ private:
     QString m_historyFilePath;
 
     QList<FileDescription> m_fileDescriptions;
+    ChangeApplier m_changeApplier;
 };
 
 #endif // DEVASSMANAGER_H

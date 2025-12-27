@@ -173,23 +173,26 @@ bool EditInRangeCommand::saveFileLines(const QString& path,
         return false;
     }
 
+    QByteArray outBytes;
+    outBytes.reserve(1024);
+    for (int i = 0; i < lines.size(); ++i) {
+        outBytes += lines.at(i).toUtf8();
+        outBytes += '\n';
+    }
+
+    if (devAss) {
+        QList<Change> changes;
+        changes << Change::replaceInFile(normalizedPath, outBytes);
+        return devAss->applyChanges(changes, err);
+    }
+
     QFile f(normalizedPath);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
         if (err) *err = QString("Cannot open %1 for writing").arg(normalizedPath);
         return false;
     }
-
-    QTextStream out(&f);
-    for (int i = 0; i < lines.size(); ++i)
-        out << lines.at(i) << '\n';
+    f.write(outBytes);
     f.close();
-
-    if (devAss) {
-        devAss->updateFileDescription(normalizedPath,
-                                      QDateTime::currentDateTime(),
-                                      true);
-        devAss->save();
-    }
     return true;
 }
 

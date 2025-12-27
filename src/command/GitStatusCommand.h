@@ -1,0 +1,26 @@
+// GitStatusCommand.h
+#pragma once
+#include "Command.h"
+
+class GitStatusCommand : public Command
+{
+public:
+    GitStatusCommand(bool porcelain = true,
+                     const QString& path = QString(),
+                     const QString& descr = QString());
+
+    QString name() const override { return "GIT_STATUS"; }
+    QJsonObject params() const override { return m_params; }
+    QString description() const override { return m_description; }
+    bool apply(DevAssManager* devAss, QString* err) override;
+    QJsonObject toJson() const override;
+    QString getResult() const override;
+
+private:
+    QJsonObject m_params;
+    QString m_description;
+    QString m_stdout;
+    QString m_stderr;
+    int m_exitCode = 0;
+};
+

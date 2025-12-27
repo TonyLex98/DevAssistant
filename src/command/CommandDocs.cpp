@@ -284,6 +284,121 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         return d;
     }
 
+    if (commandName == "COPY_FILE") {
+        d.summary = QStringLiteral("Copies a file (optionally overwriting the destination).");
+        d.params = {
+            req("from", "string", QStringLiteral("Source file path (relative to project root or absolute).")),
+            req("to", "string", QStringLiteral("Destination file path (relative to project root or absolute).")),
+            opt("overwrite", "bool", QStringLiteral("If true, overwrites destination if it exists."))
+        };
+        d.example = baseExample(QJsonObject{{"from", "src/a.txt"}, {"to", "src/b.txt"}, {"overwrite", false}});
+        return d;
+    }
+
+    if (commandName == "CREATE_DIR") {
+        d.summary = QStringLiteral("Creates a directory (recursively).");
+        d.params = { req("path", "string", QStringLiteral("Directory path (relative to project root or absolute).")) };
+        d.example = baseExample(QJsonObject{{"path", "src/new_folder"}});
+        return d;
+    }
+
+    if (commandName == "DELETE_DIR") {
+        d.summary = QStringLiteral("Deletes a directory (empty by default).");
+        d.params = {
+            req("path", "string", QStringLiteral("Directory path (relative to project root or absolute).")),
+            opt("recursive", "bool", QStringLiteral("If true, deletes directory contents (UNDO may fail)."))
+        };
+        d.example = baseExample(QJsonObject{{"path", "build/tmp"}, {"recursive", false}});
+        return d;
+    }
+
+    if (commandName == "APPEND_TO_FILE") {
+        d.summary = QStringLiteral("Appends text to a file (optionally creating it).");
+        d.params = {
+            req("path", "string", QStringLiteral("File path.")),
+            req("content", "string", QStringLiteral("Text to append.")),
+            opt("createIfMissing", "bool", QStringLiteral("If true, creates file if missing (default true).")),
+            opt("ensureNewline", "bool", QStringLiteral("If true, inserts a newline between old content and appended content when needed."))
+        };
+        d.example = baseExample(QJsonObject{{"path", "README.md"}, {"content", "\\nMore..."}, {"createIfMissing", true}});
+        return d;
+    }
+
+    if (commandName == "INSERT_AT_LINE") {
+        d.summary = QStringLiteral("Inserts text before the given 1-based line number.");
+        d.params = {
+            req("path", "string", QStringLiteral("File path.")),
+            req("line", "int", QStringLiteral("1-based line number to insert before. Use OPEN_FILE first.")),
+            req("content", "string", QStringLiteral("Text to insert (may be multi-line)."))
+        };
+        d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}, {"line", 10}, {"content", "// inserted\\n"}});
+        return d;
+    }
+
+    if (commandName == "APPLY_PATCH") {
+        d.summary = QStringLiteral("Applies a unified diff (like git diff) to files.");
+        d.params = {
+            req("patch", "string", QStringLiteral("Unified diff text.")),
+            opt("strip", "int", QStringLiteral("Strip N leading path components (like patch -p). Default 0."))
+        };
+        d.example = baseExample(QJsonObject{{"patch", "diff --git a/a.txt b/a.txt\\n--- a/a.txt\\n+++ b/a.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n"}, {"strip", 0}});
+        return d;
+    }
+
+    if (commandName == "GIT_STATUS") {
+        d.summary = QStringLiteral("Runs 'git status' in the project root.");
+        d.params = {
+            opt("porcelain", "bool", QStringLiteral("If true, uses --porcelain=v1 -b (default true).")),
+            opt("path", "string", QStringLiteral("Optional path filter."))
+        };
+        d.example = baseExample(QJsonObject{{"porcelain", true}});
+        return d;
+    }
+
+    if (commandName == "GIT_DIFF") {
+        d.summary = QStringLiteral("Runs 'git diff' in the project root.");
+        d.params = {
+            opt("staged", "bool", QStringLiteral("If true, uses --staged.")),
+            opt("contextLines", "int", QStringLiteral("If set, uses -U<contextLines>.")),
+            opt("path", "string", QStringLiteral("Optional path filter."))
+        };
+        d.example = baseExample(QJsonObject{{"staged", false}});
+        return d;
+    }
+
+    if (commandName == "GIT_RESTORE_FILE") {
+        d.summary = QStringLiteral("Restores a file from git (like 'git restore').");
+        d.params = {
+            req("path", "string", QStringLiteral("File path.")),
+            opt("staged", "bool", QStringLiteral("If true, restores staged state.")),
+            opt("worktree", "bool", QStringLiteral("If false, attempts staged-only restore."))
+        };
+        d.notes = QStringList() << QStringLiteral("This change is performed by git; UNDO_LAST_CHANGE may not revert it.");
+        d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}, {"staged", false}});
+        return d;
+    }
+
+    if (commandName == "UNDO_LAST_CHANGE") {
+        d.summary = QStringLiteral("Undoes the last applied filesystem change batch (single level).");
+        d.params = {};
+        d.example = baseExample(QJsonObject());
+        return d;
+    }
+
+    if (commandName == "CONTEXT_SHOW") {
+        d.summary = QStringLiteral("Shows current context buffer (UI-level).");
+        d.params = { opt("maxChars", "int", QStringLiteral("Max characters to show (default 8000).")) };
+        d.example = baseExample(QJsonObject{{"maxChars", 8000}});
+        return d;
+    }
+
+    if (commandName == "CONTEXT_CLEAR") {
+        d.summary = QStringLiteral("Clears context caches (UI-level).");
+        d.params = { opt("scope", "string", QStringLiteral("active|all (default active).")) };
+        d.example = baseExample(QJsonObject{{"scope", "active"}});
+        return d;
+    }
+
     d.summary = QStringLiteral("Команда проекта.");
     d.example = baseExample(QJsonObject());
     return d;

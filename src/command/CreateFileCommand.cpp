@@ -34,43 +34,31 @@ bool CreateFileCommand::apply(DevAssManager* devAss, QString* err)
         m_params["path"] = path;
     }
 
-    // Create parent directory if needed
+    QByteArray content = m_params["content"].toString().toUtf8();
+
+    if (devAss) {
+        QList<Change> changes;
+        changes << Change::createFile(path, content);
+        return devAss->applyChanges(changes, err);
+    }
+
+    // Fallback: direct write if DevAssManager not available.
     QDir dir = QFileInfo(path).absoluteDir();
     if (!dir.exists() && !dir.mkpath(".")) {
         if (err) *err = QString("Failed to create directory for file: %1").arg(dir.path());
         return false;
     }
-
-    // Prevent overwriting existing files
     QFile f(path);
     if (f.exists()) {
         if (err) *err = QString("File already exists: %1").arg(path);
         return false;
     }
-
-    // Write file content
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (err) *err = QString("Failed to create file: %1").arg(path);
         return false;
     }
-
-    QByteArray content = m_params["content"].toString().toUtf8();
-    qint64 bytesWritten = f.write(content);
+    f.write(content);
     f.close();
-
-    if (bytesWritten != content.size()) {
-        if (err) *err = QString("Write error for file: %1 (wrote %2 of %3 bytes)")
-                       .arg(path).arg(bytesWritten).arg(content.size());
-        return false;
-    }
-
-    /* update descriptor entry */
-    if (devAss) {
-        devAss->updateFileDescription(path,
-                                      QDateTime::currentDateTime(),
-                                      true);
-        devAss->save();
-    }
     return true;
 }
 
