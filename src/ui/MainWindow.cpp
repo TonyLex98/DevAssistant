@@ -910,51 +910,70 @@ void MainWindow::openSequenceEditorForName(const QString &sequenceName)
         log("DEBUG: Successfully found sequence '" + sequenceName + "' at path: " + filePath);
     }
 
-    // Open the sequence editor for the selected sequence
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Редактор последовательности") + ": " + sequenceName);
-    dlg.resize(720, 540);
+    openSequenceEditorWindow(tr("Редактор последовательности") + ": " + sequenceName, filePath, seq);
+}
 
-    QVBoxLayout *lay = new QVBoxLayout(&dlg);
-    PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
+void MainWindow::openSequenceEditorWindow(const QString& title, const QString& filePath, const PromptSequence& seq)
+{
+    auto *win = new QWidget(this);
+    win->setWindowFlag(Qt::Window, true);
+    win->setAttribute(Qt::WA_DeleteOnClose, true);
+    win->setWindowTitle(title);
+    win->resize(1280, 820);
+    win->setMinimumSize(1024, 700);
+
+    auto *lay = new QVBoxLayout(win);
+    lay->setContentsMargins(12, 12, 12, 12);
+    lay->setSpacing(10);
+
+    auto *editor = new PromptSequenceEditor(win);
     editor->setSequenceManager(&m_seqMgr);
     editor->setSequence(seq);
-    // Set the path of the current sequence so the editor knows which directory to look in for related sequences
     editor->setCurrentSequencePath(filePath);
+    lay->addWidget(editor, 1);
 
-    lay->addWidget(editor);
+    auto *btnRow = new QHBoxLayout();
+    auto *saveBtn = new StyledButton(tr("Сохранить"), win);
+    auto *closeBtn = new StyledButton(tr("Закрыть"), win);
+    saveBtn->setEnabled(false);
+    btnRow->addStretch(1);
+    btnRow->addWidget(saveBtn);
+    btnRow->addWidget(closeBtn);
+    lay->addLayout(btnRow);
 
-    QDialogButtonBox *bb = new QDialogButtonBox(
-                QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
-    lay->addWidget(bb);
-
-    // Save changes
-    connect(bb, &QDialogButtonBox::accepted, &dlg, [=, &dlg]{
-        PromptSequence edited = editor->sequence();
-        if (m_seqMgr.save(edited, filePath)) {
-            QMessageBox::information(&dlg, tr("Сохранено"),
-                                     tr("Последовательность сохранена."));
-        } else {
-            QMessageBox::warning(&dlg, tr("Ошибка"),
-                                 tr("Не удалось сохранить файл."));
+    auto refreshAfterSave = [this]() {
+        refreshAllSequences();
+        ensureDefaultSequence();
+        if (m_seqGraphWindow) {
+            if (m_currentTemplatePath.isEmpty()) {
+                m_seqGraphWindow->rebuildGraph();
+            } else {
+                m_seqGraphWindow->rebuildGraphForTemplate(m_currentTemplatePath);
+                m_seqGraphWindow->setTemplateSelectionByPath(m_currentTemplatePath);
+            }
         }
-        dlg.accept();
+    };
+
+    connect(editor, &PromptSequenceEditor::sequenceChanged, win, [win, saveBtn](const PromptSequence& edited) {
+        saveBtn->setEnabled(true);
+        win->setWindowTitle(QObject::tr("Редактор последовательности") + ": " + edited.name());
     });
 
-    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-    dlg.exec();
-
-    // Refresh after editing
-    refreshAllSequences();
-    if (m_seqGraphWindow) {
-        if (m_currentTemplatePath.isEmpty()) {
-            m_seqGraphWindow->rebuildGraph(); // Update the graph if it's open
+    connect(saveBtn, &QPushButton::clicked, win, [this, editor, filePath, saveBtn, refreshAfterSave, win]() {
+        const PromptSequence edited = editor->sequence();
+        if (m_seqMgr.save(edited, filePath)) {
+            QMessageBox::information(win, tr("Сохранено"), tr("Последовательность сохранена."));
+            saveBtn->setEnabled(false);
+            refreshAfterSave();
         } else {
-            m_seqGraphWindow->rebuildGraphForTemplate(m_currentTemplatePath);
-            m_seqGraphWindow->setTemplateSelectionByPath(m_currentTemplatePath);
+            QMessageBox::warning(win, tr("Ошибка"), tr("Не удалось сохранить файл."));
         }
-    }
+    });
+
+    connect(closeBtn, &QPushButton::clicked, win, &QWidget::close);
+    win->show();
+    win->raise();
+    win->activateWindow();
 }
 
 void MainWindow::browse(){
@@ -1261,44 +1280,7 @@ void MainWindow::editSequences()
     // 4. Загружаем выбранную последовательность
     PromptSequence seq = m_seqMgr.sequences().value(filePath);
 
-    // 5. Откроем диалог‑редактор
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Редактор последовательности") + ": " + selectedName);
-    dlg.resize(720, 540);
-
-    QVBoxLayout *lay = new QVBoxLayout(&dlg);
-    PromptSequenceEditor *editor = new PromptSequenceEditor(&dlg);
-    editor->setSequenceManager(&m_seqMgr);
-    editor->setSequence(seq);
-    // Set the path of the current sequence so the editor knows which directory to look in for related sequences
-    editor->setCurrentSequencePath(filePath);
-
-    lay->addWidget(editor);
-
-    QDialogButtonBox *bb = new QDialogButtonBox(
-                QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dlg);
-    lay->addWidget(bb);
-
-    // 6. Сохранение
-    connect(bb, &QDialogButtonBox::accepted, &dlg, [=, &dlg]{
-        PromptSequence edited = editor->sequence();
-        if (m_seqMgr.save(edited, filePath)) {
-            QMessageBox::information(&dlg, tr("Сохранено"),
-                                     tr("Последовательность сохранена."));
-        } else {
-            QMessageBox::warning(&dlg, tr("Ошибка"),
-                                 tr("Не удалось сохранить файл."));
-        }
-        dlg.accept();
-    });
-
-    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
-
-    dlg.exec();
-
-    // 7. Обновляем кеш после редактирования
-    refreshAllSequences();
-    ensureDefaultSequence();
+    openSequenceEditorWindow(tr("Редактор последовательности") + ": " + selectedName, filePath, seq);
 }
 
 void MainWindow::runSequenceDialog()

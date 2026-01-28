@@ -157,6 +157,7 @@ private slots:
 private:
     QString buildProjectContext() const;
     void log(const QString& m);
+    void openSequenceEditorWindow(const QString& title, const QString& filePath, const PromptSequence& seq);
 
     void sendUserMessage(const QString& text);
     void onModelChunk(const QString& s);

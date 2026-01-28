@@ -1,8 +1,7 @@
 #pragma once
-#include <QDialog>
+#include <QWidget>
 #include "PromptStep.h"
 #include <StyleTextEdit.h>
-#include <QDialogButtonBox>
 #include "PromptSequenceManager.h"  // Include the header for sequence manager
 #include <StyledButton.h>
 #include <QCheckBox>
@@ -12,7 +11,7 @@
 class StyleTextEdit;
 class StyledButton;
 
-class PromptStepDialog : public QDialog
+class PromptStepDialog : public QWidget
 {
     Q_OBJECT
 public:
@@ -21,18 +20,23 @@ public:
     void setSequenceManager(PromptSequenceManager* seqMgr);  // Add sequence manager
     void setCurrentSequencePath(const QString& sequencePath); // Add path of current sequence for filtering
     void setCurrentSequenceName(const QString& sequenceName); // Set name of current sequence being edited
-    PromptStep step() const { return m_step; }
+    PromptStep step() const;
+    void focusTemplate();
+
+signals:
+    void stepEdited(const PromptStep& step);
 
 
 
 private slots:
-    void onOk();
     void onInsertClicked();    // слот «Вставить»
     void onAddSequenceInfo();  // New slot for adding sequence info resolver
     void loadAvailableSequences(); // Load and display available sequences
     void onSequenceItemChanged(QListWidgetItem *item); // Handle sequence item state changes
 
 private:
+    PromptStep buildStepFromUi() const;
+    void emitEdited();
     StyleTextEdit   *m_templateEdit = nullptr;
     QListWidget *m_cmdList      = nullptr;
     MemoryLineEdit *m_cmdFilter = nullptr;

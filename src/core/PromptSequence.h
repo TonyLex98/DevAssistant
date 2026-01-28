@@ -19,6 +19,11 @@ public:
     void insertStep(int idx, const PromptStep& step) { m_steps.insert(idx, step); }
     void removeStep(int idx) { m_steps.removeAt(idx); }
     void moveStep(int from, int to) { m_steps.move(from, to); }
+    void setStep(int idx, const PromptStep& step) {
+        if (idx < 0 || idx >= m_steps.size())
+            return;
+        m_steps[idx] = step;
+    }
 
     /*--- геттеры --------------------------------------------------------*/
     const QString&               name() const { return m_name; }

@@ -7,6 +7,8 @@
 class QListWidget;
 class StyledButton;
 class StyleTextEdit;
+class QLineEdit;
+class PromptStepDialog;
 
 class PromptSequenceEditor : public QWidget
 {
@@ -38,6 +40,8 @@ private slots:
 
 private:
     void refreshList();
+    void loadStepToEditor(int idx);
+    void updateCurrentStepTitle();
 
     PromptSequence m_seq;                     // объект‑заглушка
     QListWidget     *m_list   = nullptr;
@@ -48,9 +52,11 @@ private:
                     *m_downBtn = nullptr;
 
     /* Новые виджеты */
-    StyleTextEdit      *m_nameEdit  = nullptr;
+    QLineEdit          *m_nameEdit  = nullptr;
     StyleTextEdit      *m_descEdit  = nullptr;
+    PromptStepDialog   *m_stepEditor = nullptr;
     
     PromptSequenceManager *m_seqMgr = nullptr; // To access all available sequences
     QString m_currentSequencePath; // Path to the currently edited sequence for filtering
+    int m_currentStepIdx = -1;
 };

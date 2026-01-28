@@ -12,6 +12,7 @@
 #include <QTabBar>
 #include <QTimer>
 #include <QSplitterHandle>
+#include <QSignalBlocker>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -25,12 +26,13 @@
 
 
 PromptStepDialog::PromptStepDialog(QWidget *parent)
-    : QDialog(parent)
+    : QWidget(parent)
 {
-    setWindowTitle(QStringLiteral("Редактирование шага"));
-    resize(1280, 820);
-    setMinimumSize(1024, 700);
-    setSizeGripEnabled(true);
+    if (!parent) {
+        setWindowTitle(QStringLiteral("Редактирование шага"));
+        resize(1280, 820);
+        setMinimumSize(1024, 700);
+    }
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(12, 12, 12, 12);
@@ -296,11 +298,9 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 
     root->addWidget(options);
 
-    // ---------- OK / Cancel ----------
-    auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
-    root->addWidget(bb);
-    connect(bb, &QDialogButtonBox::accepted, this, &PromptStepDialog::onOk);
-    connect(bb, &QDialogButtonBox::rejected, this, &PromptStepDialog::reject);
+    connect(m_templateEdit, &QTextEdit::textChanged, this, &PromptStepDialog::emitEdited);
+    connect(m_loopCheck, &QCheckBox::toggled, this, &PromptStepDialog::emitEdited);
+    connect(m_cmdList, &QListWidget::itemChanged, this, [this](QListWidgetItem*) { emitEdited(); });
 
 #if 0
     setWindowTitle("Редактирование шага");
@@ -377,8 +377,24 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 #endif
 }
 
+PromptStep PromptStepDialog::step() const
+{
+    return buildStepFromUi();
+}
+
+void PromptStepDialog::focusTemplate()
+{
+    if (m_templateEdit)
+        m_templateEdit->setFocus();
+}
+
 void PromptStepDialog::setStep(const PromptStep &step)
 {
+    const QSignalBlocker b1(m_templateEdit);
+    const QSignalBlocker b2(m_cmdList);
+    const QSignalBlocker b3(m_loopCheck);
+    const QSignalBlocker b4(m_summarizeCheck);
+
     m_step = step;
     m_templateEdit->setPlainText(step.tmpl());
 
@@ -446,22 +462,32 @@ void PromptStepDialog::setCurrentSequenceName(const QString& sequenceName)
     loadAvailableSequences();
 }
 
-void PromptStepDialog::onOk()
+PromptStep PromptStepDialog::buildStepFromUi() const
 {
-    m_step.setTemplate(m_templateEdit->toPlainText());
+    PromptStep out = m_step;
+    if (m_templateEdit)
+        out.setTemplate(m_templateEdit->toPlainText());
 
     QStringList allowed;
-    for (int i = 0; i < m_cmdList->count(); ++i) {
-        QListWidgetItem *it = m_cmdList->item(i);
-        if (it->checkState() == Qt::Checked)
-            allowed << it->data(Qt::UserRole).toString();
+    if (m_cmdList) {
+        for (int i = 0; i < m_cmdList->count(); ++i) {
+            QListWidgetItem *it = m_cmdList->item(i);
+            if (it->checkState() == Qt::Checked)
+                allowed << it->data(Qt::UserRole).toString();
+        }
     }
-    m_step.setAllowedCommands(allowed);
+    out.setAllowedCommands(allowed);
 
-    /* сохраняем флаг зацикливания */
-    m_step.setLoop(m_loopCheck->isChecked());
+    if (m_loopCheck)
+        out.setLoop(m_loopCheck->isChecked());
 
-    accept();
+    return out;
+}
+
+void PromptStepDialog::emitEdited()
+{
+    m_step = buildStepFromUi();
+    emit stepEdited(m_step);
 }
 
 
@@ -604,7 +630,8 @@ void PromptStepDialog::loadAvailableSequences()
         qDebug() << "[loadAvailableSequences] m_sequenceListWidget is null, returning";
         return;
     }
-    
+
+    const QSignalBlocker blockList(m_sequenceListWidget);
     m_sequenceListWidget->clear();
     
     // Get the current template content to check for existing references
