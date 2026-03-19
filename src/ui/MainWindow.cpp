@@ -27,6 +27,7 @@
 #include <QRegularExpression>
 #include <QFileInfo>
 #include <QTimer>
+#include <QScrollArea>
 #include <algorithm>
 #include "../command/EditInRangeCommand.h"
 #include "../command/RunShellCommand.h"
@@ -119,37 +120,64 @@ MainWindow::MainWindow(QWidget *parent)
     // 3.2   Список файлов
     m_files = new QListWidget(this);
 
-    QWidget *buttons_widget = new QWidget();
-    // 3.3   Кнопки
-    auto btns = new QHBoxLayout(buttons_widget);
-    m_settingsPanel = new QWidget(this, Qt::Tool);
-    m_settingsPanel->setWindowTitle(tr("Настройки действий"));
+    // 3.3   Settings tab content
+    m_settingsPanel = new QWidget(this);
+    m_settingsPanel->setWindowTitle(tr("Settings"));
     m_settingsPanel->setAttribute(Qt::WA_DeleteOnClose, false);
+    m_settingsPanel->setAttribute(Qt::WA_StyledBackground, true);
+    m_settingsPanel->setObjectName("settingsPanel");
+    m_settingsPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_settingsPanel->setStyleSheet(
+        "QWidget#settingsPanel {"
+        "  background: #f8fffd;"
+        "  border: 1px solid #86d8cc;"
+        "  border-radius: 10px;"
+        "}"
+        "QWidget#settingsPanel QLabel[sectionTitle=\"true\"] {"
+        "  color: #0f766e;"
+        "  font: 600 9pt \"Segoe UI Variable\";"
+        "  padding: 2px 0px;"
+        "}"
+        "QWidget#settingsPanel QFrame[sectionDivider=\"true\"] {"
+        "  background: #bdebe4;"
+        "  min-height: 1px;"
+        "  max-height: 1px;"
+        "  border: none;"
+        "}"
+    );
     QVBoxLayout *settingsLayout = new QVBoxLayout(m_settingsPanel);
-    settingsLayout->setSpacing(6);
-    settingsLayout->setContentsMargins(8, 8, 8, 8);
-    m_settingsPanel->hide();
-    settingsPanelBtn = new StyledButton(tr("Открыть настройки"), this);
-    btns->addWidget(settingsPanelBtn);
-    connect(settingsPanelBtn, &StyledButton::clicked, this, [this]() {
-        if (!m_settingsPanel)
-            return;
-        const bool currentlyVisible = m_settingsPanel->isVisible();
-        if (!currentlyVisible) {
-            QPoint btnPos = settingsPanelBtn->mapToGlobal(QPoint(0, settingsPanelBtn->height()));
-            m_settingsPanel->move(btnPos);
-        }
-        m_settingsPanel->setVisible(!currentlyVisible);
-    });
+    settingsLayout->setSpacing(7);
+    settingsLayout->setContentsMargins(10, 10, 10, 10);
+    settingsLayout->setSizeConstraint(QLayout::SetDefaultConstraint);
+
+    auto addSettingsSection = [this, settingsLayout](const QString &title) {
+        auto *section = new QLabel(title, m_settingsPanel);
+        section->setProperty("sectionTitle", true);
+        settingsLayout->addWidget(section);
+    };
+    auto addSettingsDivider = [this, settingsLayout]() {
+        auto *line = new QFrame(m_settingsPanel);
+        line->setFrameShape(QFrame::HLine);
+        line->setProperty("sectionDivider", true);
+        settingsLayout->addWidget(line);
+    };
+
+    addSettingsSection(tr("Project Path"));
+    settingsLayout->addWidget(top_widget);
+    addSettingsDivider();
+
     rescanBtn   = new StyledButton("Rescan", this);
     settingsBtn = new StyledButton("Ollama Settings", this);
     promptBtn   = new StyledButton("Edit Base Prompt", this);
     applyBtn    = new StyledButton("Apply changes", this);
     undoBtn     = new StyledButton("Undo", this);
     descBtn     = new StyledButton("Generate Descriptions", this);
+    addSettingsSection(tr("Project"));
     settingsLayout->addWidget(rescanBtn);
     settingsLayout->addWidget(settingsBtn);
     settingsLayout->addWidget(descBtn);
+    addSettingsDivider();
+    addSettingsSection(tr("Sequences"));
 
     runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"));
     //btns->addWidget(runSeqBtn);
@@ -158,8 +186,8 @@ MainWindow::MainWindow(QWidget *parent)
     runTemplateBtn->hide();
     // settings panel layout placeholder to be added later
 
-    editSeqBtn = new StyledButton(tr("Редактировать последовательности"), this);
-    newSeqBtn = new StyledButton("New sequence…", this);
+    editSeqBtn = new StyledButton(tr("Edit Sequences"), this);
+    newSeqBtn = new StyledButton("New sequence...", this);
     settingsLayout->addWidget(editSeqBtn);
     settingsLayout->addWidget(newSeqBtn);
 
@@ -420,6 +448,8 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     // buttons already added to settings panel above
+    addSettingsDivider();
+    addSettingsSection(tr("Tools"));
 
 
     // ---------- Добавляем кнопку «Show Graph» ----------
@@ -446,7 +476,7 @@ MainWindow::MainWindow(QWidget *parent)
     QSettings ttsSettings;
     m_ttsEnabled = ttsSettings.value("tts/enabled", true).toBool();
     
-    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? "🔊 Озвучка: Вкл" : "🔊 Озвучка: Выкл", this);
+    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), this);
     settingsLayout->addWidget(m_ttsToggleBtn);
     
     // Initialize TTS if enabled
@@ -468,7 +498,7 @@ MainWindow::MainWindow(QWidget *parent)
     
     connect(m_ttsToggleBtn, &StyledButton::clicked, this, [this]() {
         m_ttsEnabled = !m_ttsEnabled;
-        m_ttsToggleBtn->setText(m_ttsEnabled ? "🔊 Озвучка: Вкл" : "🔊 Озвучка: Выкл");
+        m_ttsToggleBtn->setText(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"));
         
         // Save state to settings
         QSettings settings;
@@ -492,6 +522,9 @@ MainWindow::MainWindow(QWidget *parent)
     });
     // -------------------------------------------------
 
+
+    addSettingsDivider();
+    addSettingsSection(tr("Safety"));
 
     // Add confirmation mode combo box
     confirmModeCombo = new MemoryComboBox("confirmMode", this);
@@ -528,20 +561,26 @@ MainWindow::MainWindow(QWidget *parent)
             });
 
     // Toggle button to show/hide chat
-    chatToggleBtn = new StyledButton(tr("Показать чат"), this);
+    chatToggleBtn = new StyledButton(tr("Show chat"), this);
     settingsLayout->addWidget(chatToggleBtn);
     connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_chat->isChatLogVisible();
         m_chat->setChatLogVisible(shouldShow);
-        chatToggleBtn->setText(shouldShow ? tr("Скрыть чат") : tr("Показать чат"));
+        chatToggleBtn->setText(shouldShow ? tr("Hide chat") : tr("Show chat"));
     });
-    logToggleBtn = new StyledButton(tr("Показать лог"), this);
+    logToggleBtn = new StyledButton(tr("Show log"), this);
     settingsLayout->addWidget(logToggleBtn);
     connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_log->isVisible();
         m_log->setVisible(shouldShow);
-        logToggleBtn->setText(shouldShow ? tr("Скрыть лог") : tr("Показать лог"));
+        logToggleBtn->setText(shouldShow ? tr("Hide log") : tr("Show log"));
     });
+
+    for (StyledButton *btn : m_settingsPanel->findChildren<StyledButton*>()) {
+        btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        btn->setMinimumHeight(32);
+    }
+    settingsLayout->addStretch(1);
 
     // 3.5 Result display widget
     m_resultDisplayWidget = new ResultDisplayWidget(this);
@@ -595,23 +634,37 @@ MainWindow::MainWindow(QWidget *parent)
     rightLayout->addWidget(m_chat, 1);*/
 
 
+    QWidget *assistantTab = new QWidget(this);
+    auto *assistantTabLayout = new QVBoxLayout(assistantTab);
+    assistantTabLayout->setContentsMargins(0, 0, 0, 0);
+    assistantTabLayout->setSpacing(6);
+    assistantTabLayout->addWidget(ide_widget, 1);
+
+    auto *settingsScroll = new QScrollArea(this);
+    settingsScroll->setWidgetResizable(true);
+    settingsScroll->setFrameShape(QFrame::NoFrame);
+    settingsScroll->setWidget(m_settingsPanel);
+
+    QTabWidget *workspaceTabs = new QTabWidget(this);
+    workspaceTabs->addTab(assistantTab, tr("Assistant"));
+    workspaceTabs->addTab(settingsScroll, tr("Settings"));
+
     // --------  5. Формируем layout: слева context, по центру основной контент, справа graph ----------
     m_centerSplitter = new MemorySplitter("MainWindowsCenterSplitter", Qt::Vertical, this);
-    m_centerSplitter->addWidget(top_widget);
-    m_centerSplitter->addWidget(ide_widget);   // верхняя часть
-    //m_centerSplitter->addWidget(m_files);
+    m_centerSplitter->addWidget(workspaceTabs);
     m_centerSplitter->addWidget(m_log);
     m_centerSplitter->addWidget(m_resultDisplayWidget);
     m_centerSplitter->addWidget(m_chat);
-    m_centerSplitter->addWidget(buttons_widget);
 
     mainSplitter = new MemorySplitter("MainWindowsMainSplitter", Qt::Horizontal, this);
     mainSplitter->addWidget(m_contextStatusWidget);
     mainSplitter->addWidget(m_centerSplitter);
     mainSplitter->addWidget(m_seqGraphWindow);
 
-    m_centerSplitter->setStretchFactor(0, 2);
+    m_centerSplitter->setStretchFactor(0, 5);
     m_centerSplitter->setStretchFactor(1, 1);
+    m_centerSplitter->setStretchFactor(2, 3);
+    m_centerSplitter->setStretchFactor(3, 2);
     mainSplitter->setStretchFactor(0, 1);
     mainSplitter->setStretchFactor(1, 3);
     mainSplitter->setStretchFactor(2, 2);
@@ -1412,13 +1465,13 @@ void MainWindow::runNextStep()
     qDebug() << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt;
     qDebug() << "[runNextStep] userPrompt:" << resolved.userPrompt;
 
-    // РћС†РµРЅРєР° С‚РѕРєРµРЅРѕРІ РґР»СЏ РєРѕРЅС‚РµРєСЃС‚Р° С€Р°РіР°
+    // Оценка токенов для контекста шага
     {
         int tokens = m_model.estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
-        log(QString("[РЁР°Рі %1] РљРѕРЅС‚РµРєСЃС‚ в‰€ %2 С‚РѕРєРµРЅРѕРІ").arg(m_currentStepIdx+1).arg(tokens));
+        log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_currentStepIdx+1).arg(tokens));
     }
-    // Р›РѕРіРёСЂСѓРµРј, РїРѕРєР°Р·С‹РІР°РµРј РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
-    log(QString("\n--- РЁР°Рі %1 ------------------------------------------------")
+    // Логируем, показываем полъзователъ
+    log(QString("\n--- Шаг %1 ------------------------------------------------")
         .arg(m_currentStepIdx+1));
     log(resolved.systemPrompt);
     if (!resolved.userPrompt.isEmpty())
@@ -1440,7 +1493,7 @@ void MainWindow::runNextStep()
         }
     }
 
-    // РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ С‚Р°Рє Р¶Рµ, РєР°Рє РѕР±С‹С‡РЅС‹Р№ РІРІРѕРґ РїРѕР»СЉР·РѕРІР°С‚РµР»СЉ
+    // Отправляем запрос так же, как обычный ввод полъзователъ
     m_streamBuf.clear();
 
     // Добавляем отладочный вывод, чтобы понять, что отправляем в LLM
@@ -4584,6 +4637,7 @@ void MainWindow::onOmniAsrText(const QString& text)
 void MainWindow::updateChatToggleButton(bool visible)
 {
     if (chatToggleBtn) {
-        chatToggleBtn->setText(visible ? tr("РЎРєСЂС‹С‚СЊ С‡Р°С‚") : tr("РџРѕРєР°Р·Р°С‚СЊ С‡Р°С‚"));
+        chatToggleBtn->setText(visible ? tr("Hide chat") : tr("Show chat"));
     }
 }
+

@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QDir>
 #include <QDebug>
+#include <QSettings>
 #include <CommandRegistry.h>
 
 class PromptManager
@@ -33,6 +34,9 @@ public:
     int historySize(){
         return m_historySize;
     }
+    void setHistorySize(int value);
+    void setBasePromptOverride(const QString& text);
+    QString basePromptOverride() const { return m_basePromptOverride; }
 
     /** @brief Оценка количества токенов строки.
      *
@@ -51,4 +55,5 @@ private:
     QDir m_projectRoot;   // корень проекта
     QDir m_devAssDir;     // путь к <project>/DevAss
     int m_historySize = 20;
+    QString m_basePromptOverride;
 };

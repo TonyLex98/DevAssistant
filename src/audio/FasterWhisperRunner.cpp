@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QtMath>
 #include <QDateTime>
+#include <QSettings>
 
 FasterWhisperRunner::FasterWhisperRunner(QObject* parent) 
     : QObject(parent)
@@ -20,6 +21,12 @@ FasterWhisperRunner::FasterWhisperRunner(QObject* parent)
     , m_currentSilenceDuration(0)
     , m_hasRecognizedSpeech(false)
 {
+    QSettings s;
+    m_silenceThreshold = s.value("asr/silenceThreshold", m_silenceThreshold).toDouble();
+    m_minChunkDurationMs = s.value("asr/minChunkMs", m_minChunkDurationMs).toInt();
+    m_maxChunkDurationMs = s.value("asr/maxChunkMs", m_maxChunkDurationMs).toInt();
+    m_silenceDurationMs = s.value("asr/cutSilenceMs", m_silenceDurationMs).toInt();
+
     m_format.setSampleRate(16000);
     m_format.setChannelCount(1);
     m_format.setSampleSize(16);
@@ -51,49 +58,19 @@ FasterWhisperRunner::~FasterWhisperRunner() {
 }
 
 void FasterWhisperRunner::checkAndInstallDependencies() {
-    emit statusMessage("Проверка зависимостей Faster Whisper...");
-    
-    QProcess* checkProcess = new QProcess(this);
-    connect(checkProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, checkProcess](int exitCode){
-        checkProcess->deleteLater();
-        if (exitCode != 0) {
-            emit statusMessage("Faster Whisper отсутствует. Установка... (это может занять минуту)");
-            
-            QProcess* installProcess = new QProcess(this);
-            
-            // Capture output to show progress
-            connect(installProcess, &QProcess::readyReadStandardOutput, this, [this, installProcess](){
-                 QString s = QString::fromLocal8Bit(installProcess->readAllStandardOutput()).trimmed();
-                 if(!s.isEmpty()) emit statusMessage(s);
-            });
-            connect(installProcess, &QProcess::readyReadStandardError, this, [this, installProcess](){
-                 QString s = QString::fromLocal8Bit(installProcess->readAllStandardError()).trimmed();
-                 if(!s.isEmpty()) emit statusMessage(s);
-            });
+    emit statusMessage("ASR: checking Python runtime...");
 
-            connect(installProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, installProcess](int exitCode){
-                installProcess->deleteLater();
-                if (exitCode == 0) {
-                    emit statusMessage("Faster Whisper успешно установлен.");
-                    startServer();
-                } else {
-                    emit errorOccurred("Не удалось установить Faster Whisper. Проверьте логи.");
-                    emit statusMessage("Установка не удалась.");
-                }
-            });
-            
-            QStringList args;
-            args << "-m" << "pip" << "install" << "faster-whisper";
-            installProcess->start("python", args);
-        } else {
-             emit statusMessage("Зависимости Faster Whisper найдены.");
-             startServer();
-        }
-    });
-    
-    checkProcess->start("python", QStringList() << "-c" << "import faster_whisper; print('ok')");
+    QProcess checkProcess;
+    checkProcess.start("python", QStringList() << "--version");
+    checkProcess.waitForFinished(5000);
+
+    if (checkProcess.exitCode() != 0) {
+        emit errorOccurred("ASR: Python is not available. Install Python and restart.");
+        return;
+    }
+
+    startServer();
 }
-
 void FasterWhisperRunner::startServer() {
     if (m_process && m_process->state() != QProcess::NotRunning) return;
 
@@ -118,7 +95,7 @@ void FasterWhisperRunner::startServer() {
     }
 
     qDebug() << "Starting Faster Whisper Server: " << scriptPath;
-    m_process->start("python", QStringList() << scriptPath);
+    m_process->start("python", QStringList() << "-u" << scriptPath);
 }
 
 void FasterWhisperRunner::stopServer() {
@@ -131,6 +108,10 @@ void FasterWhisperRunner::stopServer() {
 
 void FasterWhisperRunner::startRecording() {
     if (m_isRecording) return;
+
+    if (!m_process || m_process->state() != QProcess::Running) {
+        startServer();
+    }
 
     m_audioBuffer.clear();
     m_currentSilenceDuration = 0;
@@ -183,6 +164,12 @@ void FasterWhisperRunner::onAudioReady() {
     if (!m_audioDevice) return;
     QByteArray data = m_audioDevice->readAll();
     m_audioBuffer.append(data);
+
+    // Keep at most ~30 seconds of pending raw audio in memory.
+    const int maxBufferedBytes = 16000 * 2 * 30;
+    if (m_audioBuffer.size() > maxBufferedBytes) {
+        m_audioBuffer = m_audioBuffer.right(maxBufferedBytes);
+    }
 }
 
 void FasterWhisperRunner::onSilenceTimeout() {
@@ -260,8 +247,8 @@ void FasterWhisperRunner::processAudioChunk() {
             if (m_process && m_process->state() == QProcess::Running) {
                 m_process->write((tempPath + "\n").toUtf8());
             } else {
-                qDebug() << "Server not running!";
-                startServer(); // Try to restart
+                qDebug() << "Server not running, restarting...";
+                startServer();
             }
         }
         
@@ -278,6 +265,10 @@ void FasterWhisperRunner::onProcessReadyRead() {
             m_serverReady = true;
             emit serverReady();
             qDebug() << "Faster Whisper Server Ready";
+        } else if (line.startsWith("STATUS:")) {
+            emit statusMessage(line.mid(QString("STATUS:").size()).trimmed());
+        } else if (line.startsWith("ERROR:")) {
+            emit errorOccurred(line.mid(QString("ERROR:").size()).trimmed());
         } else if (!line.isEmpty()) {
             emit recognitionFinished(line);
         }

@@ -10,17 +10,24 @@ public:
     explicit StyledButton(const QString &text = {}, QWidget *parent = nullptr)
         : QPushButton(text, parent)
     {
-        // ──  Стиль, одинаковый с MemoryComboBox/MemoryLineEdit ──
         setStyleSheet(
             "QPushButton {"
-            "  border: 2px solid #5A9;"            // светло‑синий контур
-            "  border-radius: 12px;"              // округлые углы
-            "  padding: 6px 12px;"                // внутренние отступы
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  background-color: #e8f0ff;"        // мягкий голубой фон
+            "  border: 1px solid #0f766e;"
+            "  border-radius: 8px;"
+            "  padding: 5px 10px;"
+            "  min-height: 30px;"
+            "  font: 10pt \"Segoe UI Variable\";"
+            "  font-weight: 600;"
+            "  background-color: #14b8a6;"
+            "  color: #083b36;"
             "}"
-            "QPushButton:hover { background-color: #c8def8; }"  // подсветка при наведении
-            "QPushButton:pressed { background-color: #a8c0f8; }" // при клике
+            "QPushButton:hover { background-color: #2dd4bf; }"
+            "QPushButton:pressed { background-color: #0f766e; color: #ecfeff; }"
+            "QPushButton:disabled {"
+            "  background-color: #99f6e4;"
+            "  color: #0f766e;"
+            "  border-color: #5eead4;"
+            "}"
         );
     }
 };

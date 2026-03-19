@@ -31,8 +31,14 @@
 #include "UndoLastChangeCommand.h"
 #include "ContextShowCommand.h"
 #include "ContextClearCommand.h"
+#include "OpenAppCommand.h"
+#include "OpenUrlCommand.h"
+#include "ClipboardSetCommand.h"
+#include "ClipboardGetCommand.h"
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QHash>
+#include <QRegularExpression>
 
 static QJsonObject parseJsonObject(const QByteArray& bytes)
 {
@@ -43,6 +49,177 @@ static QJsonObject parseJsonObject(const QByteArray& bytes)
     if (err.error == QJsonParseError::NoError && doc.isObject())
         return doc.object();
     return QJsonObject();
+}
+
+static QString normalizeKeyToken(const QString& in)
+{
+    QString out = in.trimmed().toLower();
+    out.replace(QRegularExpression("[^a-z0-9]+"), "_");
+    out.replace(QRegularExpression("_+"), "_");
+    if (out.startsWith('_'))
+        out.remove(0, 1);
+    if (out.endsWith('_'))
+        out.chop(1);
+    return out;
+}
+
+static QString canonicalCommandName(const QString& raw)
+{
+    const QString token = normalizeKeyToken(raw);
+    if (token.isEmpty())
+        return QString();
+
+    static const QHash<QString, QString> kAliases = {
+        {"create_file", "CREATE_FILE"},
+        {"new_file", "CREATE_FILE"},
+        {"write_file", "CREATE_FILE"},
+        {"make_file", "CREATE_FILE"},
+        {"replace_in_file", "REPLACE_IN_FILE"},
+        {"overwrite_file", "REPLACE_IN_FILE"},
+        {"replace_file", "REPLACE_IN_FILE"},
+        {"edit_in_range", "EDIT_IN_RANGE"},
+        {"edit_range", "EDIT_IN_RANGE"},
+        {"patch_range", "EDIT_IN_RANGE"},
+        {"delete_file", "DELETE_FILE"},
+        {"remove_file", "DELETE_FILE"},
+        {"rename_file", "RENAME_FILE"},
+        {"move_file", "RENAME_FILE"},
+        {"open_file", "OPEN_FILE"},
+        {"read_file", "OPEN_FILE"},
+        {"show_file", "OPEN_FILE"},
+        {"open", "OPEN_FILE"},
+        {"open_file_region", "OPEN_FILE_REGION"},
+        {"read_region", "OPEN_FILE_REGION"},
+        {"show_region", "OPEN_FILE_REGION"},
+        {"ask_user", "ASK_USER"},
+        {"ask", "ASK_USER"},
+        {"question", "ASK_USER"},
+        {"run_python", "RUN_PYTHON"},
+        {"python", "RUN_PYTHON"},
+        {"run_py", "RUN_PYTHON"},
+        {"run_shell", "RUN_SHELL"},
+        {"shell", "RUN_SHELL"},
+        {"cmd", "RUN_SHELL"},
+        {"terminal", "RUN_SHELL"},
+        {"search_web", "SEARCH_WEB"},
+        {"web_search", "SEARCH_WEB"},
+        {"internet_search", "SEARCH_WEB"},
+        {"search_project", "SEARCH_PROJECT"},
+        {"grep_project", "SEARCH_PROJECT"},
+        {"grep", "SEARCH_PROJECT"},
+        {"search_code", "SEARCH_PROJECT"},
+        {"search_project_case_insensitive", "SEARCH_PROJECT_CASE_INSENSITIVE"},
+        {"show_result", "SHOW_RESULT"},
+        {"result", "SHOW_RESULT"},
+        {"final_answer", "SHOW_RESULT"},
+        {"call_sequence", "CALL_SEQUENCE"},
+        {"run_sequence", "CALL_SEQUENCE"},
+        {"next_sequence", "CALL_SEQUENCE"},
+        {"open_sequence", "OPEN_SEQUENCE"},
+        {"list_files_in_folder", "LIST_FILES_IN_FOLDER"},
+        {"list_files", "LIST_FILES_IN_FOLDER"},
+        {"list_dir", "LIST_FILES_IN_FOLDER"},
+        {"ls", "LIST_FILES_IN_FOLDER"},
+        {"reasoning", "REASONING"},
+        {"think", "REASONING"},
+        {"copy_file", "COPY_FILE"},
+        {"cp_file", "COPY_FILE"},
+        {"create_dir", "CREATE_DIR"},
+        {"mkdir", "CREATE_DIR"},
+        {"delete_dir", "DELETE_DIR"},
+        {"remove_dir", "DELETE_DIR"},
+        {"rmdir", "DELETE_DIR"},
+        {"append_to_file", "APPEND_TO_FILE"},
+        {"append_file", "APPEND_TO_FILE"},
+        {"insert_at_line", "INSERT_AT_LINE"},
+        {"insert_line", "INSERT_AT_LINE"},
+        {"apply_patch", "APPLY_PATCH"},
+        {"patch", "APPLY_PATCH"},
+        {"git_status", "GIT_STATUS"},
+        {"status", "GIT_STATUS"},
+        {"git_diff", "GIT_DIFF"},
+        {"diff", "GIT_DIFF"},
+        {"git_restore_file", "GIT_RESTORE_FILE"},
+        {"restore_file", "GIT_RESTORE_FILE"},
+        {"undo_last_change", "UNDO_LAST_CHANGE"},
+        {"undo", "UNDO_LAST_CHANGE"},
+        {"context_show", "CONTEXT_SHOW"},
+        {"show_context", "CONTEXT_SHOW"},
+        {"context_clear", "CONTEXT_CLEAR"},
+        {"clear_context", "CONTEXT_CLEAR"},
+        {"write_description", "WRITE_DESCRIPTION"},
+        {"describe_file", "WRITE_DESCRIPTION"},
+        {"open_app", "OPEN_APP"},
+        {"launch_app", "OPEN_APP"},
+        {"start_app", "OPEN_APP"},
+        {"open_url", "OPEN_URL"},
+        {"open_link", "OPEN_URL"},
+        {"browser_open", "OPEN_URL"},
+        {"clipboard_set", "CLIPBOARD_SET"},
+        {"set_clipboard", "CLIPBOARD_SET"},
+        {"copy_to_clipboard", "CLIPBOARD_SET"},
+        {"clipboard_get", "CLIPBOARD_GET"},
+        {"get_clipboard", "CLIPBOARD_GET"},
+        {"read_clipboard", "CLIPBOARD_GET"}
+    };
+
+    auto it = kAliases.find(token);
+    if (it != kAliases.end())
+        return it.value();
+
+    return token.toUpper();
+}
+
+static void mapAliasValue(QJsonObject& p, const QString& canonical, const QStringList& aliases)
+{
+    if (p.contains(canonical) && !p.value(canonical).isNull())
+        return;
+
+    for (const QString& alias : aliases) {
+        for (auto it = p.constBegin(); it != p.constEnd(); ++it) {
+            if (normalizeKeyToken(it.key()) == normalizeKeyToken(alias)) {
+                p.insert(canonical, it.value());
+                return;
+            }
+        }
+    }
+}
+
+static QJsonObject normalizeParamAliases(QJsonObject p)
+{
+    mapAliasValue(p, "path", {"file_path", "file", "filepath", "filePath", "target_path", "target"});
+    mapAliasValue(p, "content", {"text", "data", "file_content", "value", "body"});
+    mapAliasValue(p, "query", {"search_query", "search", "pattern", "needle", "keyword"});
+    mapAliasValue(p, "command", {"cmd", "shell", "shell_command", "command_text"});
+    mapAliasValue(p, "cwd", {"workdir", "working_directory", "workingDirectory", "dir"});
+    mapAliasValue(p, "sequenceName", {"sequence_name", "sequence", "name"});
+    mapAliasValue(p, "startLine", {"start_line", "start", "line_start", "from_line"});
+    mapAliasValue(p, "endLine", {"end_line", "end", "line_end", "to_line"});
+    mapAliasValue(p, "oldPath", {"old_path", "source_path", "source", "from_path", "src", "from"});
+    mapAliasValue(p, "newPath", {"new_path", "destination_path", "destination", "dest", "dst", "to_path"});
+    mapAliasValue(p, "line", {"line_number", "lineNumber", "row"});
+    mapAliasValue(p, "folderPath", {"folder_path", "folder", "directory", "dir", "path"});
+    mapAliasValue(p, "scriptPath", {"script_path", "script", "py", "python_file"});
+    mapAliasValue(p, "question", {"question_text", "prompt", "ask"});
+    mapAliasValue(p, "title", {"result_title", "heading"});
+    mapAliasValue(p, "app", {"application", "program", "exe", "path"});
+    mapAliasValue(p, "url", {"link", "uri", "address"});
+    mapAliasValue(p, "text", {"content", "value", "clipboard_text"});
+    mapAliasValue(p, "maxChars", {"max_chars", "limit", "count"});
+    mapAliasValue(p, "maxResults", {"max_results", "limit", "count"});
+    mapAliasValue(p, "maxMatches", {"max_matches", "limit", "count"});
+    mapAliasValue(p, "waitMs", {"wait_ms", "timeoutMs", "timeout_ms", "timeout", "max_wait_ms"});
+    mapAliasValue(p, "caseSensitive", {"case_sensitive"});
+    mapAliasValue(p, "useRegex", {"use_regex", "regex"});
+    mapAliasValue(p, "contextLines", {"context_lines", "context"});
+    mapAliasValue(p, "from", {"source", "src", "source_path"});
+    mapAliasValue(p, "to", {"destination", "dest", "dst", "target_path"});
+    mapAliasValue(p, "filePath", {"file_path", "path"});
+
+    if (p.contains("include_globs") && !p.contains("include"))
+        p.insert("include", p.value("include_globs"));
+
+    return p;
 }
 
 static QJsonObject paramsObject(const QJsonValue& value)
@@ -70,18 +247,23 @@ static QJsonObject paramsObject(const QJsonValue& value)
 static QJsonObject normalizedParams(const QJsonObject& obj)
 {
     QJsonObject p = paramsObject(obj.value("params"));
+    if (p.isEmpty())
+        p = paramsObject(obj.value("arguments"));
+    if (p.isEmpty())
+        p = paramsObject(obj.value("args"));
     if (!p.isEmpty())
-        return p;
+        return normalizeParamAliases(p);
 
     // Fallback: treat any extra top-level fields as params.
     QJsonObject out;
     for (auto it = obj.begin(); it != obj.end(); ++it) {
-        const QString key = it.key();
-        if (key == "command" || key == "action" || key == "description")
+        const QString keyNorm = normalizeKeyToken(it.key());
+        if (keyNorm == "command" || keyNorm == "action" || keyNorm == "description" ||
+            keyNorm == "type" || keyNorm == "tool")
             continue;
-        out.insert(key, it.value());
+        out.insert(it.key(), it.value());
     }
-    return out;
+    return normalizeParamAliases(out);
 }
 
 static QJsonObject objectFromValue(const QJsonValue& value)
@@ -96,7 +278,17 @@ static QJsonObject objectFromValue(const QJsonValue& value)
 static QString firstNonEmptyString(const QJsonObject& obj, const QStringList& keys)
 {
     for (const QString& key : keys) {
-        const QString v = obj.value(key).toString().trimmed();
+        QString v = obj.value(key).toString().trimmed();
+        if (v.isEmpty()) {
+            const QString normalizedWanted = normalizeKeyToken(key);
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                if (normalizeKeyToken(it.key()) == normalizedWanted) {
+                    v = it.value().toString().trimmed();
+                    if (!v.isEmpty())
+                        break;
+                }
+            }
+        }
         if (!v.isEmpty())
             return v;
     }
@@ -106,7 +298,17 @@ static QString firstNonEmptyString(const QJsonObject& obj, const QStringList& ke
 static int firstNonZeroInt(const QJsonObject& obj, const QStringList& keys, int fallback = 0)
 {
     for (const QString& key : keys) {
-        const int v = obj.value(key).toInt();
+        int v = obj.value(key).toInt();
+        if (v == 0) {
+            const QString normalizedWanted = normalizeKeyToken(key);
+            for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+                if (normalizeKeyToken(it.key()) == normalizedWanted) {
+                    v = it.value().toInt();
+                    if (v != 0)
+                        break;
+                }
+            }
+        }
         if (v != 0)
             return v;
     }
@@ -147,18 +349,19 @@ QVector<Command*> CommandRegistry::all()
         new GitRestoreFileCommand(QString(), false),
         new UndoLastChangeCommand(),
         new ContextShowCommand(8000),
-        new ContextClearCommand(QStringLiteral("active"))
+        new ContextClearCommand(QStringLiteral("active")),
+        new OpenAppCommand(QString()),
+        new OpenUrlCommand(QString()),
+        new ClipboardSetCommand(QString()),
+        new ClipboardGetCommand(4000)
     };
 }
 
 /* ---------- Реализация create() ---------- */
 Command* CommandRegistry::create(const QJsonObject& obj)
 {
-    QString cmd = obj.value("command").toString();
-    // Поддержка альтернативного формата, где используется "action" вместо "command"
-    if (cmd.isEmpty()) {
-        cmd = obj.value("action").toString();
-    }
+    QString cmd = firstNonEmptyString(obj, {"command", "action", "name", "tool", "type"});
+    cmd = canonicalCommandName(cmd);
 
     if (cmd == "CREATE_FILE") {
         const QJsonObject p = normalizedParams(obj);
@@ -391,7 +594,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         }
 
         const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
-        return new RunPythonCommand(scriptPath, codeStr.toUtf8(), cwd, obj["description"].toString());
+        const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
+        return new RunPythonCommand(scriptPath, codeStr.toUtf8(), cwd, timeoutMs, obj["description"].toString());
     }
 
     if (cmd == "RUN_SHELL") {
@@ -408,7 +612,8 @@ Command* CommandRegistry::create(const QJsonObject& obj)
             command = p["command_text"].toString();
         }
         
-        return new RunShellCommand(command, cwd, description);
+        const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
+        return new RunShellCommand(command, cwd, timeoutMs, description);
     }
 
     if (cmd == "SEARCH_WEB") {
@@ -700,6 +905,40 @@ Command* CommandRegistry::create(const QJsonObject& obj)
         const QString scope = firstNonEmptyString(p, {"scope"});
         const QString description = obj["description"].toString();
         return new ContextClearCommand(scope, description);
+    }
+
+    if (cmd == "OPEN_APP") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString app = firstNonEmptyString(p, {"app", "path", "program", "application", "exe"});
+        QJsonValue args = p.value("args");
+        if (args.isUndefined() || args.isNull())
+            args = p.value("arguments");
+        const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
+        const bool detached = p.value("detached").toBool(obj.value("detached").toBool(true));
+        const int waitMs = p.value("waitMs").toInt(obj.value("waitMs").toInt(15000));
+        const QString description = obj["description"].toString();
+        return new OpenAppCommand(app, args, cwd, detached, waitMs, description);
+    }
+
+    if (cmd == "OPEN_URL") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString url = firstNonEmptyString(p, {"url", "link", "uri", "address"});
+        const QString description = obj["description"].toString();
+        return new OpenUrlCommand(url, description);
+    }
+
+    if (cmd == "CLIPBOARD_SET") {
+        const QJsonObject p = normalizedParams(obj);
+        const QString text = firstNonEmptyString(p, {"text", "content", "value"});
+        const QString description = obj["description"].toString();
+        return new ClipboardSetCommand(text, description);
+    }
+
+    if (cmd == "CLIPBOARD_GET") {
+        const QJsonObject p = normalizedParams(obj);
+        const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(4000));
+        const QString description = obj["description"].toString();
+        return new ClipboardGetCommand(maxChars, description);
     }
 
     /* Неизвестная команда */

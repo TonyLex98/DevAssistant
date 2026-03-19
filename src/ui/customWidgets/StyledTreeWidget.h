@@ -9,37 +9,32 @@ public:
     explicit StyledTreeWidget(QWidget *parent = nullptr)
         : QTreeWidget(parent)
     {
-        // Consistent styling with other custom widgets
         setStyleSheet(
             "QTreeWidget {"
-            "  border: 2px solid #5A9;"              // светло-синий контур
-            "  border-radius: 12px;"                 // округлые углы
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  color: #000000;"                      // черный текст
-            "  background-color: #ffffff;"           // белый фон
-            "  padding: 4px;"                        // внутренние отступы
+            "  border: 1px solid #8ed9cf;"
+            "  border-radius: 6px;"
+            "  font: 10pt \"Segoe UI Variable\";"
+            "  color: #0f172a;"
+            "  background-color: #ffffff;"
+            "  padding: 2px;"
             "}"
             "QTreeWidget::item {"
-            "  padding: 6px 12px;"                   // отступы для элементов
-            "  border-bottom: 1px solid #e0e0e0;"    // разделитель между элементами
+            "  padding: 4px 8px;"
+            "  border-bottom: 1px solid #e6f7f3;"
             "}"
             "QTreeWidget::item:selected {"
-            "  background-color: #c8def8;"           // подсветка выбранного элемента
-            "  color: #000000;"                      // черный текст
+            "  background-color: #ccfbf1;"
+            "  color: #0f172a;"
             "}"
             "QTreeWidget::item:hover {"
-            "  background-color: #d8e4f8;"           // подсветка при наведении
+            "  background-color: #e6fffa;"
             "}"
-            "QTreeWidget::branch {"
-            "  background-color: #ffffff;"
-            "}"
-            "QTreeWidget::branch:selected {"
-            "  background-color: #c8def8;"
-            "}"
-            "QTreeWidget::branch:has-children:!has-siblings:closed,"
-            "QTreeWidget::branch:has-children:open {"
-            "  border-image: none;"
-            "  image: none;"
+            "QHeaderView::section {"
+            "  background: #e6fffa;"
+            "  border: none;"
+            "  border-bottom: 1px solid #bfeee6;"
+            "  padding: 4px 8px;"
+            "  font: 600 9pt \"Segoe UI Variable\";"
             "}"
         );
     }

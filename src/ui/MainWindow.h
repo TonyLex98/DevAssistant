@@ -278,7 +278,6 @@ private:
     StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
-    StyledButton *settingsPanelBtn{nullptr};
     StyledButton *lightRagBtn{nullptr}; // кнопка «LightRAG»
     QWidget *m_settingsPanel{nullptr};
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа

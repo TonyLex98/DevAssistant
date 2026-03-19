@@ -47,10 +47,10 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     m_nameEdit->setPlaceholderText(tr("Название последовательности"));
     m_nameEdit->setStyleSheet(
         "QLineEdit {"
-        "  border: 2px solid #5A9;"
-        "  border-radius: 12px;"
-        "  padding: 6px 12px;"
-        "  font: 18px \"Arial\", sans-serif;"
+        "  border: 1px solid #0f766e;"
+        "  border-radius: 6px;"
+        "  padding: 6px 10px;"
+        "  font: 10pt \"Segoe UI Variable\";"
         "}"
     );
 

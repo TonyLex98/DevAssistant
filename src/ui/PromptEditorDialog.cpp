@@ -10,7 +10,10 @@ PromptEditorDialog::PromptEditorDialog(PromptManager* mgr, QWidget* parent):QDia
     resize(720,520);
     auto v = new QVBoxLayout(this);
     m_text = new QPlainTextEdit(this);
-    m_text->setPlainText(m_mgr->current_all_prompt);
+    const QString initialPrompt = !m_mgr->basePromptOverride().isEmpty()
+                                      ? m_mgr->basePromptOverride()
+                                      : m_mgr->current_all_prompt;
+    m_text->setPlainText(initialPrompt);
     v->addWidget(new QLabel("Base prompt text (stored on disk):", this));
     v->addWidget(m_text,1);
     auto f = new QFormLayout();
@@ -24,7 +27,9 @@ PromptEditorDialog::PromptEditorDialog(PromptManager* mgr, QWidget* parent):QDia
 }
 
 void PromptEditorDialog::onSave(){
-    //m_mgr->saveBasePrompt(m_text->toPlainText());
-    //m_mgr->setHistorySize(m_hist->value());
+    if (m_mgr) {
+        m_mgr->setBasePromptOverride(m_text->toPlainText());
+        m_mgr->setHistorySize(m_hist->value());
+    }
     accept();
 }

@@ -14,6 +14,9 @@ PromptManager::PromptManager()
     // по‑умолчанию можно задать текущий каталог
     m_projectRoot = QDir::current();
     m_devAssDir   = QDir(m_projectRoot.absoluteFilePath("DevelopersAssistant"));
+    QSettings s;
+    m_historySize = s.value("prompt/historySize", m_historySize).toInt();
+    m_basePromptOverride = s.value("prompt/basePromptOverride", "").toString();
 }
 
 void PromptManager::setProjectRoot(const QString& path)
@@ -53,6 +56,14 @@ QString PromptManager::buildPrompt(const QString& userText,
                                   const QList<QPair<QString,QString>>& history)
 {
     QString p;
+    Q_UNUSED(capabilities)
+
+    if (!m_basePromptOverride.trimmed().isEmpty()) {
+        p += m_basePromptOverride.trimmed();
+        if (!p.endsWith('\n'))
+            p += "\n";
+        p += "\n";
+    }
 
     /* 1. Роль ассистента */
     p += "Ты – AI‑ассистент, который может выполнять только команды DSL, перечисленные ниже и ничего больше!!!!\n";
@@ -96,6 +107,20 @@ int PromptManager::tokenCount(const QString& text) const
 {
     // 1 токен ≈ 4 символа → округляем вверх
     return text.size() / 4 + 1;
+}
+
+void PromptManager::setHistorySize(int value)
+{
+    m_historySize = qBound(0, value, 200);
+    QSettings s;
+    s.setValue("prompt/historySize", m_historySize);
+}
+
+void PromptManager::setBasePromptOverride(const QString& text)
+{
+    m_basePromptOverride = text;
+    QSettings s;
+    s.setValue("prompt/basePromptOverride", m_basePromptOverride);
 }
 
 

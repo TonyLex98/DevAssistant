@@ -3,7 +3,6 @@
 
 #include <QLineEdit>
 #include <QSettings>
-#include <QDebug>
 
 class MemoryLineEdit : public QLineEdit
 {
@@ -12,65 +11,49 @@ public:
     explicit MemoryLineEdit(const QString &key, QWidget *parent = nullptr)
         : QLineEdit(parent), m_key(key)
     {
-        qDebug() << "[MemoryLineEdit] ctor, key =" << m_key;
-
-        /* ---------- Стилизация (округлые углы, крупный шрифт) ---------- */
         setStyleSheet(
             "QLineEdit {"
-            "  border: 2px solid #5A9;"
-            "  border-radius: 12px;"
-            "  padding: 6px 12px;"
-            "  font: 18px \"Arial\", sans-serif;"
+            "  border: 1px solid #0f766e;"
+            "  border-radius: 6px;"
+            "  padding: 6px 10px;"
+            "  font: 10pt \"Segoe UI Variable\";"
+            "  background: #ffffff;"
+            "  color: #0f172a;"
             "}"
+            "QLineEdit:focus { border-color: #14b8a6; background: #ecfeff; }"
         );
 
-        /* ---------- Автосохранение при каждом изменении текста ---------- */
-        connect(this, &QLineEdit::textChanged,
-                this, &MemoryLineEdit::store);
-
-        /* ---------- Загрузка сохранённого значения при создании ---------- */
+        connect(this, &QLineEdit::editingFinished, this, &MemoryLineEdit::store);
         load();
     }
 
-    /* Позволяет поменять ключ позже (если нужно) */
     void setKey(const QString &key) { m_key = key; }
-
-    /* Вручную вызвать загрузку (если список виджетов уже существует) */
     void loadState() { load(); }
 
     ~MemoryLineEdit() override
     {
-        qDebug() << "[MemoryLineEdit] dtor, key =" << m_key;
-        store();           // финальное сохранение
+        store();
     }
 
 private:
-    /* Сохраняем текст в QSettings */
     void store()
     {
-        qDebug() << "[MemoryLineEdit] store, text =" << text();
         QSettings s;
         s.setValue(keyPath(), text());
     }
 
-    /* Загружаем сохранённый текст (не генерируем сигнал) */
     void load()
     {
         QSettings s;
-        if (!s.contains(keyPath())) {
-            qDebug() << "[MemoryLineEdit] load: no value for" << keyPath();
+        if (!s.contains(keyPath()))
             return;
-        }
 
         const QString txt = s.value(keyPath()).toString();
-        qDebug() << "[MemoryLineEdit] load, value =" << txt;
-
-        blockSignals(true);   // чтобы не вызвать store() повторно
+        blockSignals(true);
         setText(txt);
         blockSignals(false);
     }
 
-    /* Путь в QSettings: widgets/lineedit/<key> */
     QString keyPath() const
     {
         return QString("widgets/lineedit/%1").arg(m_key);

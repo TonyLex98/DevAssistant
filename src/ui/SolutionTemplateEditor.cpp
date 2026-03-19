@@ -15,7 +15,7 @@
 SolutionTemplateEditor::SolutionTemplateEditor(SolutionTemplateManager *templateManager, PromptSequenceManager *sequenceManager, QWidget *parent)
     : QWidget(parent), m_templateManager(templateManager), m_sequenceManager(sequenceManager)
 {
-    qDebug() << "[SolutionTemplateEditor] Constructor called with templateManager:" << templateManager << "and sequenceManager:" << sequenceManager;
+    if (false) qDebug() << "[SolutionTemplateEditor] Constructor called with templateManager:" << templateManager << "and sequenceManager:" << sequenceManager;
     setupUI();
     updateAvailableSequences();
 }
@@ -79,8 +79,8 @@ void SolutionTemplateEditor::setupUI()
 
     // Кнопки управления
     auto *btnLayout = new QVBoxLayout();
-    m_addSequenceBtn = new StyledButton(tr("→ Add to Template"), this);
-    m_removeSequenceBtn = new StyledButton(tr("Remove from Template ←"), this);
+    m_addSequenceBtn = new StyledButton(tr("-> Add to Template"), this);
+    m_removeSequenceBtn = new StyledButton(tr("Remove from Template <-"), this);
     m_setMainSequenceBtn = new StyledButton(tr("Set as Main"), this);
     btnLayout->addWidget(m_addSequenceBtn);
     btnLayout->addWidget(m_removeSequenceBtn);
@@ -105,21 +105,21 @@ void SolutionTemplateEditor::setupUI()
     m_tabWidget->addTab(basicInfoWidget, tr("Basic Info"));
 
     // Create and configure the graph widget
-    qDebug() << "[SolutionTemplateEditor] Creating TemplateSequenceGraphWidget";
+    if (false) qDebug() << "[SolutionTemplateEditor] Creating TemplateSequenceGraphWidget";
     m_graphWidget = new TemplateSequenceGraphWidget(this);
-    qDebug() << "[SolutionTemplateEditor] Created graph widget:" << m_graphWidget;
+    if (false) qDebug() << "[SolutionTemplateEditor] Created graph widget:" << m_graphWidget;
     m_graphWidget->setTemplateManager(m_templateManager);
-    qDebug() << "[SolutionTemplateEditor] Template manager set for graph widget";
+    if (false) qDebug() << "[SolutionTemplateEditor] Template manager set for graph widget";
     if (m_sequenceManager) {
-        qDebug() << "[SolutionTemplateEditor] Setting sequence manager for graph widget";
+        if (false) qDebug() << "[SolutionTemplateEditor] Setting sequence manager for graph widget";
         m_graphWidget->setSequenceManager(m_sequenceManager);
-        qDebug() << "[SolutionTemplateEditor] Sequence manager set for graph widget";
+        if (false) qDebug() << "[SolutionTemplateEditor] Sequence manager set for graph widget";
     } else {
-        qDebug() << "[SolutionTemplateEditor] Sequence manager is null, skipping setSequenceManager call";
+        if (false) qDebug() << "[SolutionTemplateEditor] Sequence manager is null, skipping setSequenceManager call";
     }
-    qDebug() << "[SolutionTemplateEditor] Adding graph widget tab";
+    if (false) qDebug() << "[SolutionTemplateEditor] Adding graph widget tab";
     m_tabWidget->addTab(m_graphWidget, tr("Sequence Graph"));
-    qDebug() << "[SolutionTemplateEditor] Graph widget tab added";
+    if (false) qDebug() << "[SolutionTemplateEditor] Graph widget tab added";
 
     layout->addWidget(m_tabWidget);
 
@@ -135,25 +135,25 @@ void SolutionTemplateEditor::setupUI()
 
 void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
 {
-    qDebug() << "[SolutionTemplateEditor] setTemplate called with template name:" << templateValue.name();
+    if (false) qDebug() << "[SolutionTemplateEditor] setTemplate called with template name:" << templateValue.name();
     m_currentTemplate = templateValue;
 
     // Update UI elements
-    qDebug() << "[SolutionTemplateEditor] Updating UI elements";
-    qDebug() << "[SolutionTemplateEditor] Setting template name:" << m_currentTemplate.name();
+    if (false) qDebug() << "[SolutionTemplateEditor] Updating UI elements";
+    if (false) qDebug() << "[SolutionTemplateEditor] Setting template name:" << m_currentTemplate.name();
     // Block signals temporarily to prevent auto-saving during initial setup
     m_nameEdit->blockSignals(true);
     m_nameEdit->setText(m_currentTemplate.name());
     m_nameEdit->blockSignals(false);
-    qDebug() << "[SolutionTemplateEditor] Name set successfully";
+    if (false) qDebug() << "[SolutionTemplateEditor] Name set successfully";
     m_descriptionEdit->setText(m_currentTemplate.description());
-    qDebug() << "[SolutionTemplateEditor] Description set successfully";
+    if (false) qDebug() << "[SolutionTemplateEditor] Description set successfully";
 
     // Load image if exists
-    qDebug() << "[SolutionTemplateEditor] Checking image path:" << m_currentTemplate.imagePath();
+    if (false) qDebug() << "[SolutionTemplateEditor] Checking image path:" << m_currentTemplate.imagePath();
     if (!m_currentTemplate.imagePath().isEmpty()) {
         QString imagePath = m_currentTemplate.imagePath();
-        qDebug() << "[SolutionTemplateEditor] Image path is not empty:" << imagePath;
+        if (false) qDebug() << "[SolutionTemplateEditor] Image path is not empty:" << imagePath;
         
         // If the path is relative (contains "images/"), make it absolute relative to the template directory
         QString absoluteImagePath;
@@ -166,72 +166,72 @@ void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
             absoluteImagePath = imagePath; // Already absolute path
         }
         
-        qDebug() << "[SolutionTemplateEditor] Final image path to check:" << absoluteImagePath;
+        if (false) qDebug() << "[SolutionTemplateEditor] Final image path to check:" << absoluteImagePath;
         if (QFileInfo::exists(absoluteImagePath)) {
-            qDebug() << "[SolutionTemplateEditor] Image file exists, loading pixmap";
+            if (false) qDebug() << "[SolutionTemplateEditor] Image file exists, loading pixmap";
             QPixmap pixmap(absoluteImagePath);
             if (!pixmap.isNull()) {
-                qDebug() << "[SolutionTemplateEditor] Pixmap loaded successfully, setting to label";
+                if (false) qDebug() << "[SolutionTemplateEditor] Pixmap loaded successfully, setting to label";
                 m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                qDebug() << "[SolutionTemplateEditor] Pixmap set to label";
+                if (false) qDebug() << "[SolutionTemplateEditor] Pixmap set to label";
                 m_imagePathLabel->setText(QFileInfo(absoluteImagePath).fileName());
                 m_imagePath = imagePath; // Keep the original relative path
             } else {
-                qDebug() << "[SolutionTemplateEditor] Failed to load pixmap, clearing image";
+                if (false) qDebug() << "[SolutionTemplateEditor] Failed to load pixmap, clearing image";
                 m_imageLabel->clear();
                 m_imagePathLabel->setText(tr("Image not found"));
                 m_imagePath.clear();
             }
         } else {
-            qDebug() << "[SolutionTemplateEditor] Image file does not exist";
+            if (false) qDebug() << "[SolutionTemplateEditor] Image file does not exist";
             m_imageLabel->clear();
             m_imagePathLabel->setText(tr("Image not found"));
             m_imagePath.clear();
         }
     } else {
-        qDebug() << "[SolutionTemplateEditor] No image path provided";
+        if (false) qDebug() << "[SolutionTemplateEditor] No image path provided";
         m_imageLabel->clear();
         m_imagePathLabel->setText(tr("No image selected"));
         m_imagePath.clear();
     }
 
     // Populate template sequences list
-    qDebug() << "[SolutionTemplateEditor] Populating template sequences list";
+    if (false) qDebug() << "[SolutionTemplateEditor] Populating template sequences list";
     m_templateSequencesList->clear();
-    qDebug() << "[SolutionTemplateEditor] Cleared template sequences list";
+    if (false) qDebug() << "[SolutionTemplateEditor] Cleared template sequences list";
     for (const QString &seqPath : m_currentTemplate.sequences()) {
-        qDebug() << "[SolutionTemplateEditor] Processing sequence:" << seqPath;
+        if (false) qDebug() << "[SolutionTemplateEditor] Processing sequence:" << seqPath;
         QFileInfo info(seqPath);
         QString displayName = info.fileName();
-        qDebug() << "[SolutionTemplateEditor] Creating list item for:" << displayName;
+        if (false) qDebug() << "[SolutionTemplateEditor] Creating list item for:" << displayName;
         auto *item = new QListWidgetItem(displayName, m_templateSequencesList);
         item->setData(Qt::UserRole, seqPath);
         
         // Mark main sequence
         if (seqPath == m_currentTemplate.mainSequencePath()) {
-            qDebug() << "[SolutionTemplateEditor] Marking as main sequence";
+            if (false) qDebug() << "[SolutionTemplateEditor] Marking as main sequence";
             item->setCheckState(Qt::Checked);
         } else {
-            qDebug() << "[SolutionTemplateEditor] Marking as regular sequence";
+            if (false) qDebug() << "[SolutionTemplateEditor] Marking as regular sequence";
             item->setCheckState(Qt::Unchecked);
         }
     }
-    qDebug() << "[SolutionTemplateEditor] Finished populating template sequences list";
+    if (false) qDebug() << "[SolutionTemplateEditor] Finished populating template sequences list";
     
-    qDebug() << "[SolutionTemplateEditor] Calling updateAvailableSequences";
+    if (false) qDebug() << "[SolutionTemplateEditor] Calling updateAvailableSequences";
     updateAvailableSequences();
-    qDebug() << "[SolutionTemplateEditor] updateAvailableSequences completed";
+    if (false) qDebug() << "[SolutionTemplateEditor] updateAvailableSequences completed";
     
     // Update the graph widget with the current template
-    qDebug() << "[SolutionTemplateEditor] Checking if graph widget exists";
+    if (false) qDebug() << "[SolutionTemplateEditor] Checking if graph widget exists";
     if (m_graphWidget) {
-        qDebug() << "[SolutionTemplateEditor] Graph widget exists, setting template";
+        if (false) qDebug() << "[SolutionTemplateEditor] Graph widget exists, setting template";
         m_graphWidget->setTemplate(m_currentTemplate);
-        qDebug() << "[SolutionTemplateEditor] Graph widget template set";
+        if (false) qDebug() << "[SolutionTemplateEditor] Graph widget template set";
     } else {
-        qDebug() << "[SolutionTemplateEditor] Graph widget is null";
+        if (false) qDebug() << "[SolutionTemplateEditor] Graph widget is null";
     }
-    qDebug() << "[SolutionTemplateEditor] setTemplate method completed";
+    if (false) qDebug() << "[SolutionTemplateEditor] setTemplate method completed";
 }
 
 SolutionTemplate SolutionTemplateEditor::templateValue() const
@@ -263,9 +263,9 @@ SolutionTemplate SolutionTemplateEditor::templateValue() const
 
 void SolutionTemplateEditor::updateAvailableSequences()
 {
-    qDebug() << "[SolutionTemplateEditor] updateAvailableSequences called, templateManager:" << m_templateManager << "sequenceManager:" << m_sequenceManager;
+    if (false) qDebug() << "[SolutionTemplateEditor] updateAvailableSequences called, templateManager:" << m_templateManager << "sequenceManager:" << m_sequenceManager;
     if (!m_templateManager || !m_sequenceManager) {
-        qDebug() << "[SolutionTemplateEditor] Either templateManager or sequenceManager is null, returning early";
+        if (false) qDebug() << "[SolutionTemplateEditor] Either templateManager or sequenceManager is null, returning early";
         return;
     }
 

@@ -22,7 +22,7 @@ CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent) {
 }
 
 int CodeEditor::lineNumberAreaWidth() const {
-	//хуй
+    // Calculate width based on max visible line number.
     int digits = 1;
     int max = qMax(1, blockCount());
     while (max >= 10) {
@@ -196,12 +196,12 @@ void CodeEditor::keyPressEvent(QKeyEvent *e) {
 
 void CodeEditor::keyPressEvent(QKeyEvent *e) {
     if (e->key() == Qt::Key_Tab) {
-        textCursor().insertText("\t"); // вместо 4 пробелов
+        textCursor().insertText("\t"); // Use tab character.
         return;
     }
     if (e->modifiers() & Qt::ControlModifier && e->key() == Qt::Key_S) {
-        emit requestSave();   // пользователь нажал Ctrl+S
-        return;               // не обрабатываем дальше
+        emit requestSave();   // Ctrl+S trigger.
+        return;               // Stop default handling.
     }
     QPlainTextEdit::keyPressEvent(e);
 }

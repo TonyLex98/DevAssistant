@@ -16,6 +16,7 @@ static QString decodeProcessOutput(const QByteArray& data)
 RunPythonCommand::RunPythonCommand(const QString& scriptPath,
                                    const QByteArray& inlineCode,
                                    const QString& cwd,
+                                   int timeoutMs,
                                    const QString& descr)
 {
     if (!scriptPath.isEmpty()) {
@@ -27,6 +28,7 @@ RunPythonCommand::RunPythonCommand(const QString& scriptPath,
     if (!cwd.trimmed().isEmpty()) {
         m_params["cwd"] = cwd;
     }
+    m_params["timeoutMs"] = timeoutMs;
     m_description = descr.isEmpty()
         ? QString("Runs a Python script or inline Python code. "
                   "Example: { \"command\": \"RUN_PYTHON\", \"params\": { \"code\": \"print(1+1)\" } }")
@@ -83,7 +85,15 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
         if (err) *err = "Не удалось запустить Python";
         return false;
     }
-    proc.waitForFinished(-1);
+    const int timeoutMs = m_params.value("timeoutMs").toInt(120000);
+    if (!proc.waitForFinished(timeoutMs)) {
+        proc.kill();
+        if (err) *err = QString("Python превысил лимит времени (%1 ms)").arg(timeoutMs);
+        m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
+        m_stderr = decodeProcessOutput(proc.readAllStandardError());
+        m_exitCode = -1;
+        return false;
+    }
     m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
     m_stderr = decodeProcessOutput(proc.readAllStandardError());
     m_exitCode = proc.exitCode();

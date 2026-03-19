@@ -4,6 +4,8 @@ TARGET = DevAssistantQt
 CONFIG += qt warn_on release
 QT += widgets network multimedia core gui widgets
 QMAKE_CXXFLAGS += -std=gnu++1z
+QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+QMAKE_CFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
 
 CONFIG += c++17 object_parallel_to_source
 
@@ -269,6 +271,10 @@ HEADERS += \
 SOURCES += $$PWD/src/utils/AppConfig.cpp
 SOURCES += $$PWD/src/command/OpenFileRegionCommand.cpp
 SOURCES += $$PWD/src/command/AskUserCommand.cpp
+SOURCES += $$PWD/src/command/OpenAppCommand.cpp
+SOURCES += $$PWD/src/command/OpenUrlCommand.cpp
+SOURCES += $$PWD/src/command/ClipboardSetCommand.cpp
+SOURCES += $$PWD/src/command/ClipboardGetCommand.cpp
 SOURCES += $$PWD/src/core/SolutionTemplate.cpp
 SOURCES += $$PWD/src/core/SolutionTemplateManager.cpp
 SOURCES += $$PWD/src/ui/RunTemplateOrSequenceDialog.cpp
@@ -276,6 +282,10 @@ SOURCES += $$PWD/src/ui/SolutionTemplateViewer.cpp
 HEADERS += $$PWD/src/utils/AppConfig.h
 HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
 HEADERS += $$PWD/src/command/AskUserCommand.h
+HEADERS += $$PWD/src/command/OpenAppCommand.h
+HEADERS += $$PWD/src/command/OpenUrlCommand.h
+HEADERS += $$PWD/src/command/ClipboardSetCommand.h
+HEADERS += $$PWD/src/command/ClipboardGetCommand.h
 
 FORMS += \
     src/uiide/IDEWidget.ui

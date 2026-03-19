@@ -1,10 +1,9 @@
-#pragma once
+﻿#pragma once
 
-#include <QSplitter>
-#include <QSettings>
-#include <QDebug>
-#include <QDataStream>   // для сериализации
 #include <QByteArray>
+#include <QDataStream>
+#include <QSettings>
+#include <QSplitter>
 
 class MemorySplitter : public QSplitter
 {
@@ -15,72 +14,63 @@ public:
                             QWidget *parent = nullptr)
         : QSplitter(orientation, parent), m_key(key)
     {
-        qDebug() << "[MemorySplitter] ctor, key =" << m_key;
-
-        /* ---------- Стили ---------- */
+        setHandleWidth(4);
         setStyleSheet(
             "QSplitter {"
-            "  border: 2px solid #5A9;"
-            "  border-radius: 12px;"
+            "  border: none;"
+            "  background: transparent;"
             "}"
             "QSplitter::handle {"
-            "  background: #5A9;"
-            "  width: 8px;"
-            "  height: 8px;"
+            "  border: none;"
+            "  margin: 0px;"
+            "  background: #33b5a6;"
+            "}"
+            "QSplitter::handle:horizontal {"
+            "  height: 4px;"
+            "}"
+            "QSplitter::handle:vertical {"
+            "  width: 4px;"
+            "}"
+            "QSplitter::handle:hover {"
+            "  background: #1f9f90;"
             "}"
         );
 
-        /* Сохраняем при перемещении слайдера */
-        connect(this, &QSplitter::splitterMoved,
-                this, &MemorySplitter::store);
+        connect(this, &QSplitter::splitterMoved, this, &MemorySplitter::store);
     }
 
-    /* Позволяет сменить ключ позднее, если понадобится */
     void setKey(const QString &key) { m_key = key; }
-
-    /* Восстановить пропорции вручную */
     void loadState() { load(); }
-
     ~MemorySplitter() override { store(); }
 
 private:
-    /* ---------- Сохраняем в QSettings ---------------- */
     void store()
     {
-        QList<int> sz = sizes();          // размеры в пикселях
-        qDebug() << "[MemorySplitter] store, sizes =" << sz;
+        const QList<int> sz = sizes();
 
-        // сериализуем список в QByteArray
         QByteArray ba;
         QDataStream out(&ba, QIODevice::WriteOnly);
-        out << sz;                       // запишем QList<int> в поток
+        out << sz;
 
         QSettings s;
-        s.setValue(keyPath(), ba);        // сохраняем в настройках
+        s.setValue(keyPath(), ba);
         s.sync();
     }
 
-    /* ---------- Загружаем из QSettings ---------------- */
     void load()
     {
         QSettings s;
-        if (!s.contains(keyPath())) {
-            qDebug() << "[MemorySplitter] load: no value for" << keyPath();
+        if (!s.contains(keyPath()))
             return;
-        }
 
         const QByteArray ba = s.value(keyPath()).toByteArray();
-        if (ba.isEmpty()) {
-            qDebug() << "[MemorySplitter] load: empty QByteArray";
+        if (ba.isEmpty())
             return;
-        }
 
-        // десериализуем QByteArray обратно в QList<int>
         QDataStream in(ba);
         QList<int> sz;
         in >> sz;
 
-        qDebug() << "[MemorySplitter] load: sizes =" << sz;
         if (!sz.isEmpty())
             setSizes(sz);
     }

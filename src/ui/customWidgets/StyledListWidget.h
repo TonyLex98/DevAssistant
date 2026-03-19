@@ -9,26 +9,25 @@ public:
     explicit StyledListWidget(QWidget *parent = nullptr)
         : QListWidget(parent)
     {
-        // Consistent styling with other custom widgets
         setStyleSheet(
             "QListWidget {"
-            "  border: 2px solid #5A9;"              // светло-синий контур
-            "  border-radius: 12px;"                 // округлые углы
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  color: #000000;"                      // черный текст
-            "  background-color: #ffffff;"           // белый фон
-            "  padding: 4px;"                        // внутренние отступы
+            "  border: 1px solid #8ed9cf;"
+            "  border-radius: 6px;"
+            "  font: 10pt \"Segoe UI Variable\";"
+            "  color: #0f172a;"
+            "  background-color: #ffffff;"
+            "  padding: 2px;"
             "}"
             "QListWidget::item {"
-            "  padding: 6px 12px;"                   // отступы для элементов
-            "  border-bottom: 1px solid #e0e0e0;"    // разделитель между элементами
+            "  padding: 4px 8px;"
+            "  border-bottom: 1px solid #e6f7f3;"
             "}"
             "QListWidget::item:selected {"
-            "  background-color: #c8def8;"           // подсветка выбранного элемента
-            "  color: #000000;"                      // черный текст
+            "  background-color: #ccfbf1;"
+            "  color: #0f172a;"
             "}"
             "QListWidget::item:hover {"
-            "  background-color: #d8e4f8;"           // подсветка при наведении
+            "  background-color: #e6fffa;"
             "}"
         );
     }

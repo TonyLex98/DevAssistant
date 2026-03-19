@@ -160,7 +160,8 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         d.params = {
             opt("scriptPath", "string", QStringLiteral("Путь к .py файлу (абсолютный или относительно корня проекта).")),
             opt("code", "string", QStringLiteral("Inline Python-код (будет выполнен через `python -c`).")),
-            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта)."))
+            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта).")),
+            opt("timeoutMs", "int", QStringLiteral("Лимит выполнения в миллисекундах (по умолчанию 120000)."))
         };
         d.notes = QStringList()
                   << QStringLiteral("Нужно указать либо scriptPath, либо code.")
@@ -176,7 +177,8 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         d.summary = QStringLiteral("Запускает команду в shell и возвращает stdout/stderr/exitCode (рабочая папка: корень проекта).");
         d.params = {
             req("command", "string", QStringLiteral("Команда для выполнения (одной строкой).")),
-            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта)."))
+            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта).")),
+            opt("timeoutMs", "int", QStringLiteral("Лимит выполнения в миллисекундах (по умолчанию 120000)."))
         };
         d.notes = QStringList()
                   << QStringLiteral("Для поиска по проекту предпочитай SEARCH_PROJECT.")
@@ -396,6 +398,40 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         d.summary = QStringLiteral("Clears context caches (UI-level).");
         d.params = { opt("scope", "string", QStringLiteral("active|all (default active).")) };
         d.example = baseExample(QJsonObject{{"scope", "active"}});
+        return d;
+    }
+
+    if (commandName == "OPEN_APP") {
+        d.summary = QStringLiteral("Launches a desktop application.");
+        d.params = {
+            req("app", "string", QStringLiteral("Executable name or absolute path.")),
+            opt("args", "array|string", QStringLiteral("Command line arguments.")),
+            opt("cwd", "string", QStringLiteral("Working directory.")),
+            opt("detached", "bool", QStringLiteral("Launch detached (default true).")),
+            opt("waitMs", "int", QStringLiteral("When detached=false, max wait time for process finish (default 15000)."))
+        };
+        d.example = baseExample(QJsonObject{{"app", "notepad.exe"}, {"args", QJsonArray{"README.md"}}, {"detached", true}});
+        return d;
+    }
+
+    if (commandName == "OPEN_URL") {
+        d.summary = QStringLiteral("Opens a URL in the default system browser.");
+        d.params = { req("url", "string", QStringLiteral("URL to open.")) };
+        d.example = baseExample(QJsonObject{{"url", "https://example.com"}});
+        return d;
+    }
+
+    if (commandName == "CLIPBOARD_SET") {
+        d.summary = QStringLiteral("Writes text to the system clipboard.");
+        d.params = { req("text", "string", QStringLiteral("Text to copy.")) };
+        d.example = baseExample(QJsonObject{{"text", "Build command copied"}});
+        return d;
+    }
+
+    if (commandName == "CLIPBOARD_GET") {
+        d.summary = QStringLiteral("Reads text from the system clipboard.");
+        d.params = { opt("maxChars", "int", QStringLiteral("Limit returned text size (default 4000).")) };
+        d.example = baseExample(QJsonObject{{"maxChars", 2000}});
         return d;
     }
 

@@ -12,6 +12,7 @@ public:
     RunPythonCommand(const QString& scriptPath = QString(),
                      const QByteArray& inlineCode = QByteArray(),
                      const QString& cwd = QString(),
+                     int timeoutMs = 120000,
                      const QString& descr = QString());
 
     QString name() const override { return "RUN_PYTHON"; }

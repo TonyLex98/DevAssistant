@@ -16,6 +16,21 @@
 #include "../core/SolutionTemplate.h"
 #include "MainWindow.h"
 
+static QStringList asrSendTriggers()
+{
+    return QStringList{
+        "отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай",
+        "send", "submit", "done", "go", "execute"
+    };
+}
+
+static QString normalizeAsrText(QString text)
+{
+    text = text.trimmed();
+    text.replace(QRegularExpression("[\\s\\t\\n\\r]+"), " ");
+    return text;
+}
+
 ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_model(model){
     setWindowTitle(tr("Chat / Instruction"));
     resize(680,480);
@@ -34,21 +49,21 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
     m_micBtn->setStyleSheet(R"(
         QPushButton {
-            background-color: #3498db;
-            color: white;
-            border: none;
+            background-color: #0f766e;
+            color: #ecfeff;
+            border: 1px solid #14b8a6;
             border-radius: 18px;
-            font-size: 16px;
+            font-size: 15px;
         }
         QPushButton:hover {
-            background-color: #2980b9;
+            background-color: #115e59;
         }
         QPushButton:pressed {
-            background-color: #1f6693;
+            background-color: #134e4a;
         }
     )");
 
-    m_attachBtn = new StyledButton("IMG", this);
+    m_attachBtn = new StyledButton("Image", this);
     m_attachBtn->setFixedSize(44, 36);
     m_attachBtn->setToolTip("Attach image (png/jpg/webp)");
     
@@ -95,6 +110,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 
     // Populate the combobox with all available templates
     populateTemplates();
+    m_templateCombo->loadState();
     notifyTemplateSelectionChanged();
 
     rightColumnLayout->addWidget(m_templateCombo);
@@ -437,14 +453,14 @@ void ChatDialog::onMicClicked() {
         m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
         m_micBtn->setStyleSheet(R"(
             QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
+                background-color: #0f766e;
+                color: #ecfeff;
+                border: 1px solid #14b8a6;
                 border-radius: 18px;
-                font-size: 16px;
+                font-size: 15px;
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                background-color: #115e59;
             }
         )");
         m_isRecording = false;
@@ -463,15 +479,14 @@ void ChatDialog::onMicClicked() {
         m_micBtn->setToolTip("Идёт запись... (нажмите для остановки)");
         m_micBtn->setStyleSheet(R"(
             QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                border: none;
+                background-color: #b91c1c;
+                color: #fef2f2;
+                border: 1px solid #ef4444;
                 border-radius: 18px;
-                font-size: 16px;
-                animation: pulse 1s infinite;
+                font-size: 15px;
             }
             QPushButton:hover {
-                background-color: #c0392b;
+                background-color: #991b1b;
             }
         )");
         m_isRecording = true;
@@ -479,20 +494,22 @@ void ChatDialog::onMicClicked() {
 }
 
 void ChatDialog::onAsrFinished(const QString& text) {
-    if (text.isEmpty()) {
+    const QString normalizedText = normalizeAsrText(text);
+    if (normalizedText.isEmpty()) {
         return;
     }
     
     // Add text to input
-    setInputText(text);
+    setInputText(normalizedText);
     
     // Check for trigger phrases - send immediately
-    if (checkTriggerPhrase(text)) {
+    if (checkTriggerPhrase(normalizedText)) {
         // Remove trigger phrase from the end
         QString inputText = m_input->toPlainText().trimmed();
-        QStringList triggers = {"отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай"};
+        const QString lowerInput = inputText.toLower();
+        const QStringList triggers = asrSendTriggers();
         for (const QString& trigger : triggers) {
-            if (inputText.toLower().endsWith(trigger)) {
+            if (lowerInput.endsWith(trigger)) {
                 inputText = inputText.left(inputText.length() - trigger.length()).trimmed();
                 m_input->setPlainText(inputText);
                 break;
@@ -513,8 +530,9 @@ void ChatDialog::onSilenceDetected() {
 }
 
 bool ChatDialog::checkTriggerPhrase(const QString& text) {
-    QString lower = text.toLower().trimmed();
-    QStringList triggers = {"отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай"};
+    QString lower = normalizeAsrText(text).toLower();
+    lower.remove(QRegularExpression(R"([.!?,;:]+$)"));
+    const QStringList triggers = asrSendTriggers();
     for (const QString& trigger : triggers) {
         if (lower.endsWith(trigger) || lower == trigger) {
             return true;
@@ -741,9 +759,12 @@ void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManag
     m_templateCombo->addItem("Простой чат", "simple_chat");
     m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
     populateTemplates();
-    
+
+    // Restore persisted selection first (cross-session stable behavior).
+    m_templateCombo->loadState();
+
     // Restore the previous selection if it still exists, otherwise keep default
-    if (!currentSelection.isEmpty()) {
+    if (!currentSelection.isEmpty() && m_templateCombo->currentData().toString().isEmpty()) {
         int index = m_templateCombo->findData(currentSelection);
         if (index != -1) {
             m_templateCombo->setCurrentIndex(index);

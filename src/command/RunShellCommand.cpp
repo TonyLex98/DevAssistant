@@ -15,11 +15,13 @@ static QString decodeProcessOutput(const QByteArray& data)
 
 RunShellCommand::RunShellCommand(const QString& command,
                                  const QString& cwd,
+                                 int timeoutMs,
                                  const QString& descr)
 {
     m_params["command"] = command;
     if (!cwd.trimmed().isEmpty())
         m_params["cwd"] = cwd;
+    m_params["timeoutMs"] = timeoutMs;
     m_description = descr.isEmpty()
         ? QString("Executes a shell command. "
                   "Example: { \"command\": \"RUN_SHELL\", \"params\": { \"command\": \"ls -la\" } }")
@@ -63,7 +65,15 @@ bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
         if (err) *err = "Не удалось запустить команду";
         return false;
     }
-    proc.waitForFinished(-1);
+    const int timeoutMs = m_params.value("timeoutMs").toInt(120000);
+    if (!proc.waitForFinished(timeoutMs)) {
+        proc.kill();
+        if (err) *err = QString("Команда превысила лимит времени (%1 ms)").arg(timeoutMs);
+        m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
+        m_stderr = decodeProcessOutput(proc.readAllStandardError());
+        m_exitCode = -1;
+        return false;
+    }
     m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
     m_stderr = decodeProcessOutput(proc.readAllStandardError());
     m_exitCode = proc.exitCode();
