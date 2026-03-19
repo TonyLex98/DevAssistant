@@ -10,6 +10,7 @@
 
 #include <QStatusBar>
 #include <QMessageBox>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QDebug>
 #include <QTime>
@@ -89,6 +90,38 @@ static QString displayContextPath(const QString& normalizedPath, const QString& 
     return QDir::toNativeSeparators(normalizedPath);
 }
 
+static QVariantMap generationParamsFromConfig(const AppConfig& cfg)
+{
+    if (!cfg.params.isEmpty())
+        return cfg.params;
+
+    QVariantMap genParams;
+    genParams["temperature"] = cfg.temperature;
+    genParams["top_p"] = cfg.topP;
+    genParams["top_k"] = cfg.topK;
+    genParams["repeat_penalty"] = cfg.repeatPenalty;
+    genParams["presence_penalty"] = cfg.presencePenalty;
+    genParams["frequency_penalty"] = cfg.frequencyPenalty;
+    genParams["num_predict"] = cfg.numPredict;
+    genParams["num_ctx"] = cfg.numCtx;
+    genParams["mirostat"] = cfg.mirostat;
+    genParams["mirostat_tau"] = cfg.mirostatTau;
+    genParams["mirostat_eta"] = cfg.mirostatEta;
+    genParams["seed"] = cfg.seed;
+
+    if (!cfg.stopWords.isEmpty()) {
+        QJsonArray stopArray;
+        for (const QString& word : cfg.stopWords)
+            stopArray.append(word);
+        genParams["stop"] = stopArray;
+    }
+
+    genParams["reasoning_effort"] = cfg.reasoningEffort;
+    genParams["temperature_decay"] = cfg.temperatureDecay;
+    genParams["repeat_last_n"] = cfg.repeatLastN;
+    return genParams;
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
@@ -97,6 +130,24 @@ MainWindow::MainWindow(QWidget *parent)
     m_timerActive = false;
     m_taskRunning = false;
     m_totalElapsedTime = 0;
+
+    AppConfig startupCfg;
+    startupCfg.load();
+    const OllamaAdapter::Provider startupProvider =
+        OllamaAdapter::providerFromString(startupCfg.provider);
+    m_model.setProvider(startupProvider);
+    m_agentModel.setProvider(startupProvider);
+
+    QUrl startupEndpoint = startupCfg.endpoint;
+    if (!startupEndpoint.isValid() || startupEndpoint.toString().trimmed().isEmpty())
+        startupEndpoint = OllamaAdapter::defaultEndpointForProvider(startupProvider);
+    m_model.setEndpoint(startupEndpoint);
+    m_agentModel.setEndpoint(startupEndpoint);
+
+    const QVariantMap startupParams = generationParamsFromConfig(startupCfg);
+    const QString startupModel = startupCfg.selectedModel.trimmed();
+    m_model.configure(startupModel, startupParams);
+    m_agentModel.configure(startupModel, startupParams);
 
     // --------  1. Заголовок и корневой виджет ----------
     setWindowTitle("DevAssistantQt");
@@ -167,7 +218,7 @@ MainWindow::MainWindow(QWidget *parent)
     addSettingsDivider();
 
     rescanBtn   = new StyledButton("Rescan", this);
-    settingsBtn = new StyledButton("Ollama Settings", this);
+    settingsBtn = new StyledButton("LLM Settings", this);
     promptBtn   = new StyledButton("Edit Base Prompt", this);
     applyBtn    = new StyledButton("Apply changes", this);
     undoBtn     = new StyledButton("Undo", this);
@@ -707,7 +758,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(descBtn, &StyledButton::clicked, this, &MainWindow::generateDescriptions);
 
     // Состояния
-    statusBar()->showMessage(QString("Model: %1").arg(m_model.selectedModel()));
+    statusBar()->showMessage(QString("Provider: %1 | Model: %2")
+                                 .arg(m_model.providerName(),
+                                      m_model.selectedModel().trimmed().isEmpty()
+                                          ? tr("<not selected>")
+                                          : m_model.selectedModel().trimmed()));
 
     m_projectRoot = m_rootEdit->text();
 
@@ -1095,50 +1150,94 @@ void MainWindow::rescan(){
 }
 
 void MainWindow::openSettings(){
-    OllamaSettingsDialog d(this);
-    if (d.exec()==QDialog::Accepted) {
-        const QUrl endpoint(d.endpoint());
-        m_model.setEndpoint(endpoint);
-        m_agentModel.setEndpoint(endpoint);
-        QVariantMap opts = d.params();
-        // Используем параметры из диалога (которые включают как базовые, так и параметры генерации)
-        if (!m_model.selectedModel().isEmpty()) m_model.configure(m_model.selectedModel(), opts);
-        if (!m_agentModel.selectedModel().isEmpty()) m_agentModel.configure(m_agentModel.selectedModel(), opts);
+    if (!m_llmSettingsWindow) {
+        m_llmSettingsWindow = new OllamaSettingsDialog(this);
+        m_llmSettingsWindow->setModal(false);
+        m_llmSettingsWindow->setWindowModality(Qt::NonModal);
+        m_llmSettingsWindow->setAttribute(Qt::WA_DeleteOnClose, true);
 
-        // Сохраняем параметры в конфигурацию
-        AppConfig cfg;
-        cfg.load();
-        cfg.temperature = opts.value("temperature", 1).toDouble();
-        cfg.topP = opts.value("top_p", 0.9).toDouble();
-        cfg.topK = opts.value("top_k", 40).toInt();
-        cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();
-        cfg.presencePenalty = opts.value("presence_penalty", 0.0).toDouble();
-        cfg.frequencyPenalty = opts.value("frequency_penalty", 0.0).toDouble();
-        cfg.numPredict = opts.value("num_predict", -1).toInt();
-        cfg.numCtx = opts.value("num_ctx", 4096).toInt();
-        cfg.mirostat = opts.value("mirostat", 0).toInt();
-        cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
-        cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
-        cfg.seed = opts.value("seed", 0).toULongLong();
+        connect(m_llmSettingsWindow, &QObject::destroyed, this, [this]() {
+            m_llmSettingsWindow = nullptr;
+        });
 
-        // Обработка stop-слов
-        if (opts.contains("stop")) {
-            QJsonArray stopArray = opts.value("stop").toJsonArray();
+        connect(m_llmSettingsWindow, &QDialog::accepted, this, [this]() {
+            if (!m_llmSettingsWindow)
+                return;
+
+            const OllamaAdapter::Provider provider =
+                OllamaAdapter::providerFromString(m_llmSettingsWindow->provider());
+            const bool providerChanged = (m_model.provider() != provider);
+
+            m_model.setProvider(provider);
+            m_agentModel.setProvider(provider);
+
+            QUrl endpoint(m_llmSettingsWindow->endpoint().trimmed());
+            if (!endpoint.isValid() || endpoint.toString().trimmed().isEmpty())
+                endpoint = OllamaAdapter::defaultEndpointForProvider(provider);
+            m_model.setEndpoint(endpoint);
+            m_agentModel.setEndpoint(endpoint);
+
+            const QVariantMap opts = m_llmSettingsWindow->params();
+            const QString selectedModel = m_model.selectedModel().trimmed();
+            const QString selectedAgentModel = m_agentModel.selectedModel().trimmed();
+            if (!selectedModel.isEmpty())
+                m_model.configure(selectedModel, opts);
+            if (!selectedAgentModel.isEmpty())
+                m_agentModel.configure(selectedAgentModel, opts);
+
+            AppConfig cfg;
+            cfg.load();
+            cfg.provider = OllamaAdapter::providerToString(provider);
+            cfg.endpoint = endpoint;
+            cfg.params = opts;
+            if (providerChanged)
+                cfg.selectedModel.clear();
+
+            cfg.temperature = opts.value("temperature", 1).toDouble();
+            cfg.topP = opts.value("top_p", 0.9).toDouble();
+            cfg.topK = opts.value("top_k", 40).toInt();
+            cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();
+            cfg.presencePenalty = opts.value("presence_penalty", 0.0).toDouble();
+            cfg.frequencyPenalty = opts.value("frequency_penalty", 0.0).toDouble();
+            cfg.numPredict = opts.value("num_predict", -1).toInt();
+            cfg.numCtx = opts.value("num_ctx", 4096).toInt();
+            cfg.mirostat = opts.value("mirostat", 0).toInt();
+            cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
+            cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
+            cfg.seed = opts.value("seed", 0).toULongLong();
+
             QStringList stopWords;
-            for (const QJsonValue& val : stopArray) {
-                stopWords << val.toString();
+            if (opts.contains("stop")) {
+                const QJsonArray stopArray = opts.value("stop").toJsonArray();
+                for (const QJsonValue& val : stopArray) {
+                    const QString word = val.toString().trimmed();
+                    if (!word.isEmpty())
+                        stopWords << word;
+                }
             }
             cfg.stopWords = stopWords;
-        }
 
-        cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
-        cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
-        cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
+            cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
+            cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
+            cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
+            cfg.save();
 
-        cfg.save();
+            if (m_chat)
+                m_chat->refreshModelList();
 
-        log("Settings applied.");
+            statusBar()->showMessage(QString("Provider: %1 | Model: %2")
+                                         .arg(m_model.providerName(),
+                                              m_model.selectedModel().trimmed().isEmpty()
+                                                  ? tr("<not selected>")
+                                                  : m_model.selectedModel().trimmed()));
+            log(QString("LLM settings applied: provider=%1 endpoint=%2")
+                    .arg(m_model.providerName(), endpoint.toString()));
+        });
     }
+
+    m_llmSettingsWindow->show();
+    m_llmSettingsWindow->raise();
+    m_llmSettingsWindow->activateWindow();
 }
 
 void MainWindow::editBasePrompt(){

@@ -217,6 +217,7 @@ private:
 
     StyledButton* rescanBtn;
     StyledButton* settingsBtn;
+    OllamaSettingsDialog* m_llmSettingsWindow = nullptr;
     StyledButton* promptBtn;
     StyledButton* applyBtn;
     StyledButton* undoBtn;

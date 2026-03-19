@@ -20,6 +20,7 @@ class ChatDialog : public QWidget {
     Q_OBJECT
 public:
     explicit ChatDialog(OllamaAdapter* model, QWidget* parent = nullptr);
+    void refreshModelList();
 
     void appendAssistantChunk(const QString& s);
     void appendUserMessage(const QString& s);

@@ -15,8 +15,14 @@ void AppConfig::setParams(const QVariantMap &newParams)
 void AppConfig::load(){
     QSettings s;
     lastProjectPath = s.value("ui/lastProjectPath").toString();
+    provider        = s.value("model/provider","ollama").toString().trimmed();
+    if (provider.isEmpty())
+        provider = QStringLiteral("ollama");
     selectedModel   = s.value("model/selected","").toString();
-    endpoint        = QUrl(s.value("model/endpoint","http://127.0.0.1:11434").toString());
+    const QString endpointDefault = (provider == QStringLiteral("llama.cpp"))
+                                        ? QStringLiteral("http://127.0.0.1:8080")
+                                        : QStringLiteral("http://127.0.0.1:11434");
+    endpoint        = QUrl(s.value("model/endpoint", endpointDefault).toString());
     params          = s.value("model/params").toMap();
     
     // Загрузка параметров генерации
@@ -47,6 +53,7 @@ void AppConfig::load(){
 void AppConfig::save() const{
     QSettings s;
     s.setValue("ui/lastProjectPath", lastProjectPath);
+    s.setValue("model/provider", provider);
     s.setValue("model/selected", selectedModel);
     s.setValue("model/endpoint", endpoint.toString());
     s.setValue("model/params", params);

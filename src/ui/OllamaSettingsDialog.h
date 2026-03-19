@@ -13,6 +13,7 @@ class OllamaSettingsDialog : public QDialog
     Q_OBJECT
 public:
     explicit OllamaSettingsDialog(QWidget* parent = nullptr);
+    QString provider() const { return m_provider ? m_provider->currentData().toString() : QStringLiteral("ollama"); }
     QString endpoint() const { return m_endpoint->text(); }
     QVariantMap params() const;
 
@@ -20,6 +21,7 @@ private:
     void applyDefaults();
     void loadFromConfig();
 
+    QComboBox* m_provider = nullptr;
     MemoryLineEdit* m_endpoint = nullptr;
 
     QDoubleSpinBox* m_temperature = nullptr;

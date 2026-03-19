@@ -12,8 +12,10 @@
 #include <QBuffer>
 #include <QImageReader>
 #include <QRegularExpression>
+#include <QJsonArray>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/SolutionTemplate.h"
+#include "../utils/AppConfig.h"
 #include "MainWindow.h"
 
 static QStringList asrSendTriggers()
@@ -133,7 +135,43 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     connect(m_input, &InputTextEdit::imagesInserted, this, &ChatDialog::onImagesInserted);
 
     connect(m_cb_model, &MemoryComboBox::currentTextChanged, this, [this](const QString &text){
-        m_model->configure(text, QVariantMap());
+        if (!m_model)
+            return;
+
+        AppConfig cfg;
+        cfg.load();
+        QVariantMap params = cfg.params;
+        if (params.isEmpty()) {
+            params["temperature"] = cfg.temperature;
+            params["top_p"] = cfg.topP;
+            params["top_k"] = cfg.topK;
+            params["repeat_penalty"] = cfg.repeatPenalty;
+            params["presence_penalty"] = cfg.presencePenalty;
+            params["frequency_penalty"] = cfg.frequencyPenalty;
+            params["num_predict"] = cfg.numPredict;
+            params["num_ctx"] = cfg.numCtx;
+            params["mirostat"] = cfg.mirostat;
+            params["mirostat_tau"] = cfg.mirostatTau;
+            params["mirostat_eta"] = cfg.mirostatEta;
+            params["seed"] = cfg.seed;
+            params["reasoning_effort"] = cfg.reasoningEffort;
+            params["temperature_decay"] = cfg.temperatureDecay;
+            params["repeat_last_n"] = cfg.repeatLastN;
+
+            if (!cfg.stopWords.isEmpty()) {
+                QJsonArray stopArray;
+                for (const QString& word : cfg.stopWords)
+                    stopArray.append(word);
+                params["stop"] = stopArray;
+            }
+        }
+
+        m_model->configure(text, params);
+        cfg.params = params;
+
+        cfg.selectedModel = text;
+        cfg.provider = m_model->providerName();
+        cfg.save();
     });
 
     pslot_updateModelsList();
@@ -573,11 +611,75 @@ void ChatDialog::onStop(){
 }
 
 void ChatDialog::pslot_updateModelsList(){
-    //QString current_text = m_cb_model->currentText();
-    //qDebug()<<"current_text = "<<current_text;
-    m_cb_model->setItems(m_model->listModels());
+    if (!m_model || !m_cb_model)
+        return;
 
+    AppConfig cfg;
+    cfg.load();
+    QVariantMap params = cfg.params;
+    if (params.isEmpty()) {
+        params["temperature"] = cfg.temperature;
+        params["top_p"] = cfg.topP;
+        params["top_k"] = cfg.topK;
+        params["repeat_penalty"] = cfg.repeatPenalty;
+        params["presence_penalty"] = cfg.presencePenalty;
+        params["frequency_penalty"] = cfg.frequencyPenalty;
+        params["num_predict"] = cfg.numPredict;
+        params["num_ctx"] = cfg.numCtx;
+        params["mirostat"] = cfg.mirostat;
+        params["mirostat_tau"] = cfg.mirostatTau;
+        params["mirostat_eta"] = cfg.mirostatEta;
+        params["seed"] = cfg.seed;
+        params["reasoning_effort"] = cfg.reasoningEffort;
+        params["temperature_decay"] = cfg.temperatureDecay;
+        params["repeat_last_n"] = cfg.repeatLastN;
+        if (!cfg.stopWords.isEmpty()) {
+            QJsonArray stopArray;
+            for (const QString& word : cfg.stopWords)
+                stopArray.append(word);
+            params["stop"] = stopArray;
+        }
+    }
 
+    QString preferredModel;
+    if (cfg.provider.trimmed().isEmpty() || cfg.provider == m_model->providerName())
+        preferredModel = cfg.selectedModel.trimmed();
+    if (preferredModel.isEmpty())
+        preferredModel = m_model->selectedModel().trimmed();
+
+    QStringList models = m_model->listModels();
+    m_cb_model->setItems(models);
+
+    int selectedIdx = -1;
+    if (!preferredModel.isEmpty())
+        selectedIdx = m_cb_model->findText(preferredModel, Qt::MatchExactly);
+    if (selectedIdx < 0 && m_cb_model->count() > 0)
+        selectedIdx = 0;
+
+    if (selectedIdx >= 0) {
+        m_cb_model->setCurrentIndex(selectedIdx);
+        const QString selected = m_cb_model->currentText().trimmed();
+        if (!selected.isEmpty()) {
+            m_model->configure(selected, params);
+            cfg.selectedModel = selected;
+            cfg.provider = m_model->providerName();
+            cfg.params = params;
+            cfg.save();
+        }
+    } else {
+        m_model->configure(QString(), params);
+        if (cfg.provider == m_model->providerName()) {
+            cfg.selectedModel.clear();
+            cfg.params = params;
+            cfg.save();
+        }
+    }
+
+}
+
+void ChatDialog::refreshModelList()
+{
+    pslot_updateModelsList();
 }
 
 void ChatDialog::appendAssistantChunk(const QString& s){

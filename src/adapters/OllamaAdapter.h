@@ -57,9 +57,22 @@ struct OllamaGenerationParams {
 class OllamaAdapter : public QObject, public ModelAdapter {
     Q_OBJECT
 public:
+    enum class Provider {
+        Ollama,
+        LlamaCpp
+    };
+
     explicit OllamaAdapter(QObject* parent=nullptr);
 
     void setEndpoint(const QUrl& url);
+    void setProvider(Provider provider);
+    void setProvider(const QString& providerName);
+    Provider provider() const { return m_provider; }
+    QString providerName() const;
+    static Provider providerFromString(const QString& providerName);
+    static QString providerToString(Provider provider);
+    static QUrl defaultEndpointForProvider(Provider provider);
+
     void configure(const QString& model, const QVariantMap& options) override;
     QString generate(const QString& prompt, const QVariantMap& options = QVariantMap()) override;
     QString generateWithSystem(const QString& userPrompt,
@@ -108,7 +121,16 @@ private:
                                  const QVariantMap& options,
                                  bool stream,
                                  const QString& systemPrompt) const;
+    QJsonObject buildLlamaCppRequestBody(const QString& userPrompt,
+                                         const QString& systemPrompt,
+                                         const QStringList& imagesBase64,
+                                         const QVariantMap& options,
+                                         bool stream) const;
+    QJsonArray buildMessages(const QString& userPrompt,
+                             const QString& systemPrompt,
+                             const QStringList& imagesBase64) const;
     QUrl m_endpoint;
+    Provider m_provider = Provider::Ollama;
     QString m_model;
     QVariantMap m_params;
     QNetworkAccessManager m_nam;

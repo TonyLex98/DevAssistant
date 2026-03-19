@@ -6,6 +6,7 @@
 class AppConfig {
 public:
     QString lastProjectPath;
+    QString provider = "ollama";
     QString selectedModel;
     QUrl    endpoint;
     QVariantMap params;

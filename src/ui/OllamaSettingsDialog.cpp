@@ -1,5 +1,6 @@
-﻿#include "OllamaSettingsDialog.h"
+#include "OllamaSettingsDialog.h"
 
+#include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -10,12 +11,13 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
+#include "adapters/OllamaAdapter.h"
 #include "utils/AppConfig.h"
 
 OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("Настройки модели"));
+    setWindowTitle(QStringLiteral("LLM Settings"));
     resize(860, 660);
     setMinimumSize(780, 560);
 
@@ -71,13 +73,13 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     root->setContentsMargins(16, 14, 16, 14);
     root->setSpacing(10);
 
-    auto* title = new QLabel(QStringLiteral("Параметры генерации и подключения"), this);
+    auto* title = new QLabel(QStringLiteral("Generation and Connection"), this);
     title->setObjectName("title");
     root->addWidget(title);
 
     auto* subtitle = new QLabel(
-        QStringLiteral("Настройте Ollama endpoint, поведение генерации и лимиты контекста. "
-                       "Все изменения применяются после нажатия «Сохранить»."),
+        QStringLiteral("Select provider (ollama/llama.cpp), endpoint and generation parameters. "
+                       "Changes are applied after pressing Save."),
         this);
     subtitle->setObjectName("subtitle");
     subtitle->setWordWrap(true);
@@ -85,6 +87,10 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
 
     auto* tabs = new QTabWidget(this);
     root->addWidget(tabs, 1);
+
+    m_provider = new QComboBox(this);
+    m_provider->addItem(QStringLiteral("ollama"), QStringLiteral("ollama"));
+    m_provider->addItem(QStringLiteral("llama.cpp"), QStringLiteral("llama.cpp"));
 
     m_endpoint = new MemoryLineEdit("ollama_endpoint", this);
 
@@ -118,7 +124,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
 
     m_numPredict = new QSpinBox(this);
     m_numPredict->setRange(-1, 10000);
-    m_numPredict->setSpecialValueText(QStringLiteral("Без лимита (-1)"));
+    m_numPredict->setSpecialValueText(QStringLiteral("No limit (-1)"));
 
     m_numCtx = new QSpinBox(this);
     m_numCtx->setRange(256, 128000);
@@ -140,7 +146,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     m_seed->setRange(0, 1000000000);
 
     m_stopWords = new QTextEdit(this);
-    m_stopWords->setPlaceholderText(QStringLiteral("По одному стоп-слову на строку"));
+    m_stopWords->setPlaceholderText(QStringLiteral("One stop word per line"));
     m_stopWords->setMinimumHeight(110);
 
     m_reasoningEffort = new QComboBox(this);
@@ -161,14 +167,14 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* conn = new QGroupBox(QStringLiteral("Подключение"), page);
+        auto* conn = new QGroupBox(QStringLiteral("Connection"), page);
         auto* f = new QFormLayout(conn);
         f->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        f->addRow(QStringLiteral("Provider"), m_provider);
         f->addRow(QStringLiteral("Endpoint"), m_endpoint);
 
         auto* hint = new QLabel(
-            QStringLiteral("Пример: http://127.0.0.1:11434. "
-                           "Для удаленного сервера укажите полный URL."),
+            QStringLiteral("Defaults: ollama -> http://127.0.0.1:11434, llama.cpp -> http://127.0.0.1:8080"),
             page);
         hint->setWordWrap(true);
         hint->setObjectName("subtitle");
@@ -176,7 +182,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->addWidget(conn);
         lay->addWidget(hint);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Подключение"));
+        tabs->addTab(page, QStringLiteral("Connection"));
     }
 
     {
@@ -185,13 +191,13 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* sampling = new QGroupBox(QStringLiteral("Сэмплирование"), page);
+        auto* sampling = new QGroupBox(QStringLiteral("Sampling"), page);
         auto* fs = new QFormLayout(sampling);
         fs->addRow(QStringLiteral("Temperature"), m_temperature);
         fs->addRow(QStringLiteral("Top P"), m_topP);
         fs->addRow(QStringLiteral("Top K"), m_topK);
 
-        auto* penalties = new QGroupBox(QStringLiteral("Штрафы и повторения"), page);
+        auto* penalties = new QGroupBox(QStringLiteral("Penalties and repetition"), page);
         auto* fp = new QFormLayout(penalties);
         fp->addRow(QStringLiteral("Repeat penalty"), m_repeatPenalty);
         fp->addRow(QStringLiteral("Presence penalty"), m_presencePenalty);
@@ -209,7 +215,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->addWidget(penalties);
         lay->addWidget(miro);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Генерация"));
+        tabs->addTab(page, QStringLiteral("Generation"));
     }
 
     {
@@ -218,29 +224,41 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* limits = new QGroupBox(QStringLiteral("Лимиты"), page);
+        auto* limits = new QGroupBox(QStringLiteral("Limits"), page);
         auto* fl = new QFormLayout(limits);
         fl->addRow(QStringLiteral("Num context (num_ctx)"), m_numCtx);
         fl->addRow(QStringLiteral("Num predict (num_predict)"), m_numPredict);
         fl->addRow(QStringLiteral("Seed"), m_seed);
         fl->addRow(QStringLiteral("Reasoning effort"), m_reasoningEffort);
 
-        auto* stop = new QGroupBox(QStringLiteral("Стоп-слова"), page);
+        auto* stop = new QGroupBox(QStringLiteral("Stop words"), page);
         auto* stopLay = new QVBoxLayout(stop);
         stopLay->addWidget(m_stopWords);
 
         lay->addWidget(limits);
         lay->addWidget(stop);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Контекст и вывод"));
+        tabs->addTab(page, QStringLiteral("Context and output"));
     }
 
     auto* bb = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
-    QPushButton* resetBtn = bb->addButton(QStringLiteral("Сбросить"), QDialogButtonBox::ResetRole);
+    QPushButton* resetBtn = bb->addButton(QStringLiteral("Reset"), QDialogButtonBox::ResetRole);
     connect(resetBtn, &QPushButton::clicked, this, &OllamaSettingsDialog::applyDefaults);
     connect(bb, &QDialogButtonBox::accepted, this, &OllamaSettingsDialog::accept);
     connect(bb, &QDialogButtonBox::rejected, this, &OllamaSettingsDialog::reject);
     root->addWidget(bb);
+
+    connect(m_provider, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+        const QString endpointText = m_endpoint->text().trimmed();
+        if (endpointText.isEmpty() ||
+            endpointText == QStringLiteral("http://127.0.0.1:11434") ||
+            endpointText == QStringLiteral("http://127.0.0.1:8080")) {
+            if (m_provider->currentData().toString() == QStringLiteral("llama.cpp"))
+                m_endpoint->setText(QStringLiteral("http://127.0.0.1:8080"));
+            else
+                m_endpoint->setText(QStringLiteral("http://127.0.0.1:11434"));
+        }
+    });
 
     applyDefaults();
     loadFromConfig();
@@ -248,6 +266,10 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
 
 void OllamaSettingsDialog::applyDefaults()
 {
+    const int providerIdx = m_provider->findData(QStringLiteral("ollama"));
+    if (providerIdx >= 0)
+        m_provider->setCurrentIndex(providerIdx);
+
     m_endpoint->setText(QStringLiteral("http://127.0.0.1:11434"));
     m_temperature->setValue(0.10);
     m_topP->setValue(0.90);
@@ -272,8 +294,19 @@ void OllamaSettingsDialog::loadFromConfig()
     AppConfig cfg;
     cfg.load();
 
-    if (cfg.endpoint.isValid() && !cfg.endpoint.toString().trimmed().isEmpty())
+    const QString provider = cfg.provider.trimmed().isEmpty() ? QStringLiteral("ollama") : cfg.provider.trimmed();
+    int providerIdx = m_provider->findData(provider);
+    if (providerIdx < 0)
+        providerIdx = m_provider->findData(QStringLiteral("ollama"));
+    if (providerIdx >= 0)
+        m_provider->setCurrentIndex(providerIdx);
+
+    if (cfg.endpoint.isValid() && !cfg.endpoint.toString().trimmed().isEmpty()) {
         m_endpoint->setText(cfg.endpoint.toString());
+    } else {
+        m_endpoint->setText(OllamaAdapter::defaultEndpointForProvider(
+                                OllamaAdapter::providerFromString(provider)).toString());
+    }
 
     m_temperature->setValue(cfg.temperature);
     m_topP->setValue(cfg.topP);
