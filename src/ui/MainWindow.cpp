@@ -24,6 +24,7 @@
 #include "../ui/ChangesDialog.h"
 #include "../ui/RunTemplateOrSequenceDialog.h"
 #include <QDir>
+#include <QFile>
 #include <QInputDialog>
 #include <QRegularExpression>
 #include <QFileInfo>
@@ -226,6 +227,9 @@ MainWindow::MainWindow(QWidget *parent)
     addSettingsSection(tr("Project"));
     settingsLayout->addWidget(rescanBtn);
     settingsLayout->addWidget(settingsBtn);
+    m_llmSettingsWindow = new OllamaSettingsDialog(m_settingsPanel);
+    m_llmSettingsWindow->setVisible(false);
+    settingsLayout->addWidget(m_llmSettingsWindow);
     settingsLayout->addWidget(descBtn);
     addSettingsDivider();
     addSettingsSection(tr("Sequences"));
@@ -683,26 +687,14 @@ MainWindow::MainWindow(QWidget *parent)
     rightLayout->addLayout(btns);
     rightLayout->addWidget(m_log, 1);
     rightLayout->addWidget(m_chat, 1);*/
-
-
-    QWidget *assistantTab = new QWidget(this);
-    auto *assistantTabLayout = new QVBoxLayout(assistantTab);
-    assistantTabLayout->setContentsMargins(0, 0, 0, 0);
-    assistantTabLayout->setSpacing(6);
-    assistantTabLayout->addWidget(ide_widget, 1);
-
     auto *settingsScroll = new QScrollArea(this);
     settingsScroll->setWidgetResizable(true);
     settingsScroll->setFrameShape(QFrame::NoFrame);
     settingsScroll->setWidget(m_settingsPanel);
 
-    QTabWidget *workspaceTabs = new QTabWidget(this);
-    workspaceTabs->addTab(assistantTab, tr("Assistant"));
-    workspaceTabs->addTab(settingsScroll, tr("Settings"));
-
     // --------  5. Формируем layout: слева context, по центру основной контент, справа graph ----------
     m_centerSplitter = new MemorySplitter("MainWindowsCenterSplitter", Qt::Vertical, this);
-    m_centerSplitter->addWidget(workspaceTabs);
+    m_centerSplitter->addWidget(ide_widget);
     m_centerSplitter->addWidget(m_log);
     m_centerSplitter->addWidget(m_resultDisplayWidget);
     m_centerSplitter->addWidget(m_chat);
@@ -728,8 +720,12 @@ MainWindow::MainWindow(QWidget *parent)
     //rightPanel->setLayout(rightLayout);    // нижняя часть
     //mainSplitter->addWidget(rightPanel);
 
+    QTabWidget *rootTabs = new QTabWidget(this);
+    rootTabs->addTab(mainSplitter, tr("Assistant"));
+    rootTabs->addTab(settingsScroll, tr("Settings"));
+
     // Задаём начальные размеры (опционально)
-    setCentralWidget(mainSplitter);
+    setCentralWidget(rootTabs);
 
     // --------  6. Соединяем сигналы / слоты ----------
     connect(browseBtn,   &StyledButton::clicked, this, &MainWindow::browse);
@@ -738,6 +734,79 @@ MainWindow::MainWindow(QWidget *parent)
     connect(promptBtn,   &StyledButton::clicked, this, &MainWindow::editBasePrompt);
     connect(applyBtn,    &StyledButton::clicked, this, &MainWindow::applyChanges);
     connect(undoBtn,     &StyledButton::clicked, this, &MainWindow::undoLast);
+    connect(m_llmSettingsWindow, &OllamaSettingsDialog::saveRequested, this, [this]() {
+        if (!m_llmSettingsWindow)
+            return;
+
+        const OllamaAdapter::Provider provider =
+            OllamaAdapter::providerFromString(m_llmSettingsWindow->provider());
+        const bool providerChanged = (m_model.provider() != provider);
+
+        m_model.setProvider(provider);
+        m_agentModel.setProvider(provider);
+
+        QUrl endpoint(m_llmSettingsWindow->endpoint().trimmed());
+        if (!endpoint.isValid() || endpoint.toString().trimmed().isEmpty())
+            endpoint = OllamaAdapter::defaultEndpointForProvider(provider);
+        m_model.setEndpoint(endpoint);
+        m_agentModel.setEndpoint(endpoint);
+
+        const QVariantMap opts = m_llmSettingsWindow->params();
+        const QString selectedModel = m_model.selectedModel().trimmed();
+        const QString selectedAgentModel = m_agentModel.selectedModel().trimmed();
+        if (!selectedModel.isEmpty())
+            m_model.configure(selectedModel, opts);
+        if (!selectedAgentModel.isEmpty())
+            m_agentModel.configure(selectedAgentModel, opts);
+
+        AppConfig cfg;
+        cfg.load();
+        cfg.provider = OllamaAdapter::providerToString(provider);
+        cfg.endpoint = endpoint;
+        cfg.params = opts;
+        if (providerChanged)
+            cfg.selectedModel.clear();
+
+        cfg.temperature = opts.value("temperature", 1).toDouble();
+        cfg.topP = opts.value("top_p", 0.9).toDouble();
+        cfg.topK = opts.value("top_k", 40).toInt();
+        cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();
+        cfg.presencePenalty = opts.value("presence_penalty", 0.0).toDouble();
+        cfg.frequencyPenalty = opts.value("frequency_penalty", 0.0).toDouble();
+        cfg.numPredict = opts.value("num_predict", -1).toInt();
+        cfg.numCtx = opts.value("num_ctx", 4096).toInt();
+        cfg.mirostat = opts.value("mirostat", 0).toInt();
+        cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
+        cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
+        cfg.seed = opts.value("seed", 0).toULongLong();
+
+        QStringList stopWords;
+        if (opts.contains("stop")) {
+            const QJsonArray stopArray = opts.value("stop").toJsonArray();
+            for (const QJsonValue& val : stopArray) {
+                const QString word = val.toString().trimmed();
+                if (!word.isEmpty())
+                    stopWords << word;
+            }
+        }
+        cfg.stopWords = stopWords;
+
+        cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
+        cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
+        cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
+        cfg.save();
+
+        if (m_chat)
+            m_chat->refreshModelList();
+
+        statusBar()->showMessage(QString("Provider: %1 | Model: %2")
+                                     .arg(m_model.providerName(),
+                                          m_model.selectedModel().trimmed().isEmpty()
+                                              ? tr("<not selected>")
+                                              : m_model.selectedModel().trimmed()));
+        log(QString("LLM settings applied: provider=%1 endpoint=%2")
+                .arg(m_model.providerName(), endpoint.toString()));
+    });
 
     // Chat + модель
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
@@ -792,6 +861,222 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_templateMgr.setRoot(tmplRoot);
     m_templateMgr.setSequenceManager(&m_seqMgr);  // Connect sequence manager to template manager
+    m_templateMgr.refresh();
+
+    auto ensureUniversalAgentTemplate = [this]() {
+        const QString templateDir = QDir(m_templateMgr.root()).filePath("UniversalAgent");
+        const QString versionFilePath = QDir(templateDir).filePath(".universal_agent.version");
+        const QString desiredVersion = QStringLiteral("3");
+
+        if (!QDir().mkpath(templateDir)) {
+            qWarning() << "[MainWindow] Could not create template directory:" << templateDir;
+            return;
+        }
+
+        bool needsRewrite = true;
+        {
+            QFile versionFile(versionFilePath);
+            if (versionFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                const QString currentVersion = QString::fromUtf8(versionFile.readAll()).trimmed();
+                versionFile.close();
+                if (currentVersion == desiredVersion)
+                    needsRewrite = false;
+            }
+        }
+        if (!needsRewrite)
+            return;
+
+        const auto writeSequence = [&](const QString& fileName, const PromptSequence& seq) -> bool {
+            const QString path = QDir(templateDir).filePath(fileName);
+            QFile file(path);
+            if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                qWarning() << "[MainWindow] Could not write universal template sequence file:" << path;
+                return false;
+            }
+            file.write(QJsonDocument(seq.toJson()).toJson(QJsonDocument::Indented));
+            file.close();
+            return true;
+        };
+
+        const QStringList allCommands = {
+            "ASK_USER", "OPEN_FILE", "OPEN_FILE_REGION",
+            "SEARCH_PROJECT", "SEARCH_PROJECT_CASE_INSENSITIVE", "SEARCH_WEB",
+            "LIST_FILES_IN_FOLDER", "CONTEXT_SHOW", "CONTEXT_CLEAR",
+            "CREATE_FILE", "REPLACE_IN_FILE", "EDIT_IN_RANGE", "INSERT_AT_LINE", "APPEND_TO_FILE",
+            "RENAME_FILE", "COPY_FILE", "DELETE_FILE",
+            "CREATE_DIR", "DELETE_DIR", "APPLY_PATCH",
+            "RUN_SHELL", "RUN_PYTHON",
+            "GIT_STATUS", "GIT_DIFF", "GIT_RESTORE_FILE", "UNDO_LAST_CHANGE",
+            "WRITE_DESCRIPTION", "OPEN_SEQUENCE", "CALL_SEQUENCE", "REASONING",
+            "SHOW_RESULT", "OPEN_APP", "OPEN_URL", "CLIPBOARD_SET", "CLIPBOARD_GET"
+        };
+
+        PromptSequence mainSeq(QStringLiteral("Universal Agent Main"));
+        mainSeq.setDescription(QStringLiteral("Universal multi-stage flow: analysis -> context -> implementation -> verification."));
+        {
+            PromptStep s1;
+            s1.setTemplate(
+                "Current date: {{CURRENT_DATE}}\n"
+                "Current datetime: {{CURRENT_DATETIME}}\n\n"
+                "User request:\n{{USER_QUERY}}\n\n"
+                "Context:\n{{HISTORY}}\n{{CONTEXT_CHAIN}}\n\n"
+                "First, produce a short plan and identify missing context.\n"
+                "If context is missing, call SEARCH_PROJECT/OPEN_FILE_REGION/SEARCH_WEB.\n"
+                "If this is mostly informational/search task, produce SHOW_RESULT after collecting enough evidence.\n"
+                "If full implementation is needed, use OPEN_SEQUENCE with sequenceName from {{OPEN_SEQUENCE_INFO}}.\n"
+                "Do not repeat the same SEARCH_WEB query in a loop.\n"
+                "Return JSON commands only.\n\n"
+                "Allowed commands:\n{{SUPPORTED_COMMANDS}}"
+            );
+            s1.setAllowedCommands(allCommands);
+            mainSeq.addStep(s1);
+        }
+        {
+            PromptStep s2;
+            s2.setTemplate(
+                "Build an execution plan based on gathered context.\n"
+                "Project structure:\n{{PROJECT_STRUCTURE}}\n\n"
+                "Open files:\n{{OPEN_FILES}}\n\n"
+                "If the user request is already answerable, emit SHOW_RESULT now.\n"
+                "Otherwise decide the next focused sequence using OPEN_SEQUENCE when useful (analysis/coding/testing).\n"
+                "Never end this step with only repeated search commands.\n"
+                "Return JSON commands only."
+            );
+            s2.setAllowedCommands(allCommands);
+            mainSeq.addStep(s2);
+        }
+
+        PromptSequence fileAnalysisSeq(QStringLiteral("Universal Agent File Analysis"));
+        fileAnalysisSeq.setDescription(QStringLiteral("Deep file-level and architecture analysis for the task."));
+        {
+            PromptStep s;
+            s.setTemplate(
+                "Analyze project files deeply for this request:\n{{USER_QUERY}}\n\n"
+                "Use FILE_LIST, PROJECT_STRUCTURE, OPEN_FILE_REGION and SEARCH_PROJECT to find exact implementation points.\n"
+                "Summarize hotspots and then OPEN_SEQUENCE to context-chain or code-generation.\n"
+                "If this request is informational and no code edits are needed, emit SHOW_RESULT.\n"
+                "Return JSON commands only.\n\n"
+                "{{FILE_LIST}}\n{{PROJECT_STRUCTURE}}\n{{OPEN_SEQUENCE_INFO}}"
+            );
+            s.setAllowedCommands(allCommands);
+            fileAnalysisSeq.addStep(s);
+        }
+
+        PromptSequence contextChainSeq(QStringLiteral("Universal Agent Context Chain"));
+        contextChainSeq.setDescription(QStringLiteral("Use executed command context to guide the next actions."));
+        {
+            PromptStep s;
+            s.setTemplate(
+                "Analyze context chain and previous results:\n{{CONTEXT_CHAIN}}\n\n"
+                "Detect outdated assumptions, missing checks, and next best action.\n"
+                "If enough evidence is collected and no more actions are needed, emit SHOW_RESULT.\n"
+                "If code changes are ready, OPEN_SEQUENCE to code-generation.\n"
+                "If verification is needed, OPEN_SEQUENCE to testing.\n"
+                "Return JSON commands only."
+            );
+            s.setAllowedCommands(allCommands);
+            contextChainSeq.addStep(s);
+        }
+
+        PromptSequence codeGenSeq(QStringLiteral("Universal Agent Code Generation"));
+        codeGenSeq.setDescription(QStringLiteral("Generate and refine code changes with minimal risk."));
+        {
+            PromptStep s1;
+            s1.setTemplate(
+                "Implement the requested change.\n"
+                "Request: {{USER_QUERY}}\n"
+                "Context files:\n{{OPEN_FILES}}\n\n"
+                "Prefer minimal diffs, preserve architecture, and avoid unrelated edits.\n"
+                "Create/edit files and run local checks as needed.\n"
+                "Return JSON commands only."
+            );
+            s1.setAllowedCommands(allCommands);
+            codeGenSeq.addStep(s1);
+        }
+        {
+            PromptStep s2;
+            s2.setTemplate(
+                "Review your produced changes for regressions and obvious defects.\n"
+                "Use GIT_DIFF/GIT_STATUS and targeted checks.\n"
+                "Then OPEN_SEQUENCE to testing if validation is needed.\n"
+                "If validation is already sufficient, emit SHOW_RESULT.\n"
+                "Return JSON commands only."
+            );
+            s2.setAllowedCommands(allCommands);
+            codeGenSeq.addStep(s2);
+        }
+
+        PromptSequence testingSeq(QStringLiteral("Universal Agent Testing"));
+        testingSeq.setDescription(QStringLiteral("Validate implementation and provide final status."));
+        {
+            PromptStep s1;
+            s1.setTemplate(
+                "Run verification for the implemented change.\n"
+                "Use available test/build/lint commands and summarize failures.\n"
+                "If failures require fixes, OPEN_SEQUENCE to code-generation.\n"
+                "If no runnable tests exist, still produce a concise SHOW_RESULT with manual verification notes.\n"
+                "Return JSON commands only."
+            );
+            s1.setAllowedCommands(allCommands);
+            testingSeq.addStep(s1);
+        }
+        {
+            PromptStep s2;
+            s2.setTemplate(
+                "Prepare final concise result for the user.\n"
+                "Include what changed, how validated, and residual risks.\n"
+                "Use SHOW_RESULT for final message (mandatory).\n"
+                "Return JSON commands only."
+            );
+            s2.setAllowedCommands(allCommands);
+            testingSeq.addStep(s2);
+        }
+
+        if (!writeSequence(QStringLiteral("main.seq.json"), mainSeq) ||
+            !writeSequence(QStringLiteral("file-analysis.seq.json"), fileAnalysisSeq) ||
+            !writeSequence(QStringLiteral("context-chain.seq.json"), contextChainSeq) ||
+            !writeSequence(QStringLiteral("code-generation.seq.json"), codeGenSeq) ||
+            !writeSequence(QStringLiteral("testing.seq.json"), testingSeq)) {
+            return;
+        }
+
+        SolutionTemplate tmpl(QStringLiteral("Universal Agent"));
+        tmpl.setDescription(QStringLiteral("Universal multi-sequence agent for coding, search, editing and verification."));
+        tmpl.setMainSequencePath(QStringLiteral("main.seq.json"));
+        tmpl.addSequence(QStringLiteral("main.seq.json"));
+        tmpl.addSequence(QStringLiteral("file-analysis.seq.json"));
+        tmpl.addSequence(QStringLiteral("context-chain.seq.json"));
+        tmpl.addSequence(QStringLiteral("code-generation.seq.json"));
+        tmpl.addSequence(QStringLiteral("testing.seq.json"));
+
+        tmpl.setTargetsForSequence(QStringLiteral("main"),
+                                   QJsonArray{QStringLiteral("file-analysis"), QStringLiteral("context-chain"),
+                                              QStringLiteral("code-generation"), QStringLiteral("testing")});
+        tmpl.setTargetsForSequence(QStringLiteral("file-analysis"),
+                                   QJsonArray{QStringLiteral("context-chain"), QStringLiteral("code-generation")});
+        tmpl.setTargetsForSequence(QStringLiteral("context-chain"),
+                                   QJsonArray{QStringLiteral("code-generation"), QStringLiteral("testing"), QStringLiteral("main")});
+        tmpl.setTargetsForSequence(QStringLiteral("code-generation"),
+                                   QJsonArray{QStringLiteral("testing"), QStringLiteral("main")});
+        tmpl.setTargetsForSequence(QStringLiteral("testing"),
+                                   QJsonArray{QStringLiteral("code-generation"), QStringLiteral("main")});
+
+        if (!m_templateMgr.save(tmpl, templateDir)) {
+            qWarning() << "[MainWindow] Could not save universal template metadata:" << templateDir;
+            return;
+        }
+
+        QFile versionFile(versionFilePath);
+        if (!versionFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qWarning() << "[MainWindow] Could not write universal template version file:" << versionFilePath;
+        } else {
+            versionFile.write(desiredVersion.toUtf8());
+            versionFile.close();
+        }
+
+        qDebug() << "[MainWindow] UniversalAgent template upgraded to version" << desiredVersion;
+    };
+    ensureUniversalAgentTemplate();
     m_templateMgr.refresh();
 
     // Update templates in ChatDialog after templates have been loaded
@@ -1150,94 +1435,18 @@ void MainWindow::rescan(){
 }
 
 void MainWindow::openSettings(){
-    if (!m_llmSettingsWindow) {
-        m_llmSettingsWindow = new OllamaSettingsDialog(this);
-        m_llmSettingsWindow->setModal(false);
-        m_llmSettingsWindow->setWindowModality(Qt::NonModal);
-        m_llmSettingsWindow->setAttribute(Qt::WA_DeleteOnClose, true);
+    if (!m_llmSettingsWindow)
+        return;
 
-        connect(m_llmSettingsWindow, &QObject::destroyed, this, [this]() {
-            m_llmSettingsWindow = nullptr;
-        });
-
-        connect(m_llmSettingsWindow, &QDialog::accepted, this, [this]() {
-            if (!m_llmSettingsWindow)
-                return;
-
-            const OllamaAdapter::Provider provider =
-                OllamaAdapter::providerFromString(m_llmSettingsWindow->provider());
-            const bool providerChanged = (m_model.provider() != provider);
-
-            m_model.setProvider(provider);
-            m_agentModel.setProvider(provider);
-
-            QUrl endpoint(m_llmSettingsWindow->endpoint().trimmed());
-            if (!endpoint.isValid() || endpoint.toString().trimmed().isEmpty())
-                endpoint = OllamaAdapter::defaultEndpointForProvider(provider);
-            m_model.setEndpoint(endpoint);
-            m_agentModel.setEndpoint(endpoint);
-
-            const QVariantMap opts = m_llmSettingsWindow->params();
-            const QString selectedModel = m_model.selectedModel().trimmed();
-            const QString selectedAgentModel = m_agentModel.selectedModel().trimmed();
-            if (!selectedModel.isEmpty())
-                m_model.configure(selectedModel, opts);
-            if (!selectedAgentModel.isEmpty())
-                m_agentModel.configure(selectedAgentModel, opts);
-
-            AppConfig cfg;
-            cfg.load();
-            cfg.provider = OllamaAdapter::providerToString(provider);
-            cfg.endpoint = endpoint;
-            cfg.params = opts;
-            if (providerChanged)
-                cfg.selectedModel.clear();
-
-            cfg.temperature = opts.value("temperature", 1).toDouble();
-            cfg.topP = opts.value("top_p", 0.9).toDouble();
-            cfg.topK = opts.value("top_k", 40).toInt();
-            cfg.repeatPenalty = opts.value("repeat_penalty", 1.1).toDouble();
-            cfg.presencePenalty = opts.value("presence_penalty", 0.0).toDouble();
-            cfg.frequencyPenalty = opts.value("frequency_penalty", 0.0).toDouble();
-            cfg.numPredict = opts.value("num_predict", -1).toInt();
-            cfg.numCtx = opts.value("num_ctx", 4096).toInt();
-            cfg.mirostat = opts.value("mirostat", 0).toInt();
-            cfg.mirostatTau = opts.value("mirostat_tau", 5.0).toDouble();
-            cfg.mirostatEta = opts.value("mirostat_eta", 0.1).toDouble();
-            cfg.seed = opts.value("seed", 0).toULongLong();
-
-            QStringList stopWords;
-            if (opts.contains("stop")) {
-                const QJsonArray stopArray = opts.value("stop").toJsonArray();
-                for (const QJsonValue& val : stopArray) {
-                    const QString word = val.toString().trimmed();
-                    if (!word.isEmpty())
-                        stopWords << word;
-                }
-            }
-            cfg.stopWords = stopWords;
-
-            cfg.reasoningEffort = opts.value("reasoning_effort", "medium").toString();
-            cfg.temperatureDecay = opts.value("temperature_decay", 0.0).toDouble();
-            cfg.repeatLastN = opts.value("repeat_last_n", 64).toInt();
-            cfg.save();
-
-            if (m_chat)
-                m_chat->refreshModelList();
-
-            statusBar()->showMessage(QString("Provider: %1 | Model: %2")
-                                         .arg(m_model.providerName(),
-                                              m_model.selectedModel().trimmed().isEmpty()
-                                                  ? tr("<not selected>")
-                                                  : m_model.selectedModel().trimmed()));
-            log(QString("LLM settings applied: provider=%1 endpoint=%2")
-                    .arg(m_model.providerName(), endpoint.toString()));
-        });
+    if (m_llmSettingsWindow->isVisible()) {
+        m_llmSettingsWindow->hide();
+        settingsBtn->setText("LLM Settings");
+        return;
     }
 
+    m_llmSettingsWindow->reloadFromConfig();
     m_llmSettingsWindow->show();
-    m_llmSettingsWindow->raise();
-    m_llmSettingsWindow->activateWindow();
+    settingsBtn->setText("Hide LLM Settings");
 }
 
 void MainWindow::editBasePrompt(){
@@ -1344,6 +1553,7 @@ void MainWindow::sendUserMessage(const QString& text){
         m_contextManager->observeUserQuery(text);
 
     m_lastUserMessage = text;
+    resetSequenceStabilityState();
     qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
     appendUserQuestionToResultDisplay(text);
 
@@ -1482,6 +1692,7 @@ void MainWindow::runSequenceDialog()
         m_sequenceMode = true;
         m_currentSeqPath = path; // Track the sequence path for related sequence lookup
         m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
+        resetSequenceStabilityState();
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] About to start task timer for sequence execution";
         startTaskTimer(); // Start the task timer when sequence begins
@@ -1517,6 +1728,13 @@ void MainWindow::runSequenceDialog()
         m_currentSeq = seq;
         m_currentStepIdx = 0;
         m_sequenceMode = true;
+        m_currentSeqPath = sequencePath;
+        if (m_contextManager)
+            m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description());
+        else
+            m_currentSeqId.clear();
+        m_currentTemplatePath = templatePath;
+        resetSequenceStabilityState();
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] About to start task timer for template execution";
         startTaskTimer(); // Start the task timer when sequence begins
@@ -1545,6 +1763,10 @@ void MainWindow::runNextStep()
 
     if (m_currentStepIdx < 0 ||
             m_currentStepIdx >= m_currentSeq.steps().size()) {
+        if (!m_resultShownInCurrentRun) {
+            autoFinalizeSequenceWithResult(tr("последовательность завершилась без SHOW_RESULT"), QList<Command*>());
+            return;
+        }
         // конец последовательности
         QMessageBox::information(this, "Готово",
                                  "Последовательность выполнена полностью.");
@@ -1994,6 +2216,11 @@ void MainWindow::handleAssistantFinished()
 
         // В режиме последовательности - переходим к следующему шагу, даже если команд нет
         if (m_sequenceMode) {
+            ++m_batchesWithoutResult;
+            if (m_batchesWithoutResult >= 7 && !m_resultShownInCurrentRun) {
+                autoFinalizeSequenceWithResult(tr("LLM несколько шагов подряд не возвращает команды"), QList<Command*>());
+                return;
+            }
             // Check if stop was requested before advancing to next step
             if (m_stopRequested) {
                 m_stopRequested = false;
@@ -2033,6 +2260,38 @@ void MainWindow::handleAssistantFinished()
         toRun = dlg.confirmed();
     }
 
+    const bool hasShowResultCommand = std::any_of(toRun.begin(), toRun.end(), [](Command* c) {
+        return c && c->name() == QStringLiteral("SHOW_RESULT");
+    });
+    const bool readOnlyBatch = isReadOnlyCommandBatch(toRun);
+    const QString batchSignature = commandBatchSignature(toRun);
+
+    bool shouldAutoFinalizeBeforeTransition = false;
+    QString autoFinalizeReason;
+    if (m_sequenceMode) {
+        if (hasShowResultCommand) {
+            m_batchesWithoutResult = 0;
+            m_sameBatchRepeatCount = 0;
+            m_lastBatchSignature.clear();
+        } else {
+            ++m_batchesWithoutResult;
+            if (!batchSignature.isEmpty() && batchSignature == m_lastBatchSignature) {
+                ++m_sameBatchRepeatCount;
+            } else {
+                m_lastBatchSignature = batchSignature;
+                m_sameBatchRepeatCount = 1;
+            }
+
+            if (readOnlyBatch && m_batchesWithoutResult >= 8) {
+                shouldAutoFinalizeBeforeTransition = true;
+                autoFinalizeReason = tr("слишком много шагов без финального ответа");
+            } else if (readOnlyBatch && m_sameBatchRepeatCount >= 3) {
+                shouldAutoFinalizeBeforeTransition = true;
+                autoFinalizeReason = tr("повторяющиеся команды без прогресса");
+            }
+        }
+    }
+
     bool hasCallSequenceCommand = false;
     bool hasOpenSequenceCommand = false;
     QString sequenceToCall;
@@ -2066,18 +2325,11 @@ void MainWindow::handleAssistantFinished()
             QString content = c->params().value("content").toString() + "\n\n\n";
             if (content.isEmpty())
                 content = tr("SHOW_RESULT вызван без текста.\n\n\n");
-
-            // Add the result to the new result display widget
-            if (m_resultDisplayWidget) {
-                const QString displayTitle = tr("Ответ нейросети");
-                ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
-                m_resultDisplayWidget->appendResult(displayTitle, content,
-                                                    ResultDisplayWidget::EntryType::Default,
-                                                    metadata);
-            } else {
-                // Fallback: show in external context as before
-                appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
-            }
+            appendResultToUi(title, content);
+            m_resultShownInCurrentRun = true;
+            m_batchesWithoutResult = 0;
+            m_sameBatchRepeatCount = 0;
+            m_lastBatchSignature.clear();
 
             // Speak the SHOW_RESULT content if TTS is enabled
             if (m_ttsEnabled && m_ttsRunner && m_ttsRunner->isReady()) {
@@ -2187,6 +2439,12 @@ void MainWindow::handleAssistantFinished()
             openSequenceName = c->params().value("sequenceName").toString();
             hasOpenSequenceCommand = true;
         }
+    }
+
+    if (shouldAutoFinalizeBeforeTransition) {
+        autoFinalizeSequenceWithResult(autoFinalizeReason, toRun);
+        qDeleteAll(toRun);
+        return;
     }
 
     // If we have a CALL_SEQUENCE command, switch to that sequence
@@ -2672,6 +2930,12 @@ void MainWindow::handleAssistantFinished()
             qDeleteAll(toRun);
             return;
         }
+        const bool finishingCurrentStep = !step.loop() && (m_currentStepIdx + 1 >= m_currentSeq.steps().size());
+        if (finishingCurrentStep && !hasShowResultCommand && !m_resultShownInCurrentRun) {
+            autoFinalizeSequenceWithResult(tr("финальный шаг не вернул SHOW_RESULT"), toRun);
+            qDeleteAll(toRun);
+            return;
+        }
         if (step.loop()) {
             // Если установлен флаг зацикливания, повторяем текущий шаг
             QTimer::singleShot(200, this, &MainWindow::runNextStep);
@@ -3137,6 +3401,132 @@ void MainWindow::appendExternalContext(const QString& block)
     rebuildContextCache();
 }
 
+void MainWindow::resetSequenceStabilityState()
+{
+    m_resultShownInCurrentRun = false;
+    m_batchesWithoutResult = 0;
+    m_sameBatchRepeatCount = 0;
+    m_lastBatchSignature.clear();
+}
+
+QString MainWindow::commandBatchSignature(const QList<Command*>& commands) const
+{
+    QStringList parts;
+    for (Command* cmd : commands) {
+        if (!cmd)
+            continue;
+        const QJsonObject p = cmd->params();
+        QString marker;
+        if (p.contains("query"))
+            marker = p.value("query").toString().trimmed();
+        else if (p.contains("sequenceName"))
+            marker = p.value("sequenceName").toString().trimmed();
+        else if (p.contains("path"))
+            marker = p.value("path").toString().trimmed();
+        else if (p.contains("command"))
+            marker = p.value("command").toString().trimmed();
+        else if (p.contains("script"))
+            marker = p.value("script").toString().trimmed();
+
+        if (marker.size() > 120)
+            marker = marker.left(120);
+        parts << QString("%1:%2").arg(cmd->name(), marker);
+    }
+    return parts.join("|");
+}
+
+bool MainWindow::isReadOnlyCommandBatch(const QList<Command*>& commands) const
+{
+    if (commands.isEmpty())
+        return false;
+
+    static const QSet<QString> readOnlyCommands = {
+        QStringLiteral("SEARCH_WEB"),
+        QStringLiteral("SEARCH_PROJECT"),
+        QStringLiteral("SEARCH_PROJECT_CASE_INSENSITIVE"),
+        QStringLiteral("OPEN_FILE"),
+        QStringLiteral("OPEN_FILE_REGION"),
+        QStringLiteral("OPEN_SEQUENCE"),
+        QStringLiteral("CALL_SEQUENCE"),
+        QStringLiteral("LIST_FILES_IN_FOLDER"),
+        QStringLiteral("CONTEXT_SHOW"),
+        QStringLiteral("REASONING"),
+        QStringLiteral("WRITE_DESCRIPTION"),
+        QStringLiteral("CLIPBOARD_GET")
+    };
+
+    for (Command* cmd : commands) {
+        if (!cmd)
+            continue;
+        if (!readOnlyCommands.contains(cmd->name()))
+            return false;
+    }
+    return true;
+}
+
+void MainWindow::appendResultToUi(const QString& title, const QString& content)
+{
+    if (m_resultDisplayWidget) {
+        ResultDisplayWidget::ResultEntryMetadata metadata = collectContextMetadataSince(m_lastQuestionTimestamp);
+        m_resultDisplayWidget->appendResult(title, content,
+                                            ResultDisplayWidget::EntryType::Default,
+                                            metadata);
+    } else {
+        appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+    }
+}
+
+void MainWindow::autoFinalizeSequenceWithResult(const QString& reason, const QList<Command*>& recentCommands)
+{
+    QStringList lines;
+    Q_UNUSED(reason);
+    lines << tr("Я завершил выполнение автоматически, чтобы не допустить зацикливания.");
+    if (!m_lastUserMessage.trimmed().isEmpty())
+        lines << tr("Запрос: %1").arg(m_lastUserMessage.trimmed());
+
+    QStringList sourceLines;
+    QStringList commandNames;
+    for (Command* cmd : recentCommands) {
+        if (!cmd)
+            continue;
+        commandNames << cmd->name();
+
+        if (auto* web = dynamic_cast<SearchWebCommand*>(cmd)) {
+            for (const QString& block : web->results()) {
+                if (sourceLines.size() >= 5)
+                    break;
+                const QStringList parts = block.split('\n', QString::SkipEmptyParts);
+                if (parts.size() < 2)
+                    continue;
+                const QString title = parts.at(0).trimmed();
+                const QString link = parts.at(1).trimmed();
+                if (title.isEmpty() || link.isEmpty() || !link.startsWith(QStringLiteral("http")))
+                    continue;
+                sourceLines << QString("%1 - %2").arg(title, link);
+            }
+        }
+    }
+    if (!sourceLines.isEmpty()) {
+        lines << tr("Найденные источники:");
+        for (const QString& s : sourceLines)
+            lines << QString("- %1").arg(s);
+    } else if (!commandNames.isEmpty()) {
+        lines << tr("Последние выполненные команды: %1").arg(commandNames.join(", "));
+    }
+
+    lines << tr("Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.");
+    const QString content = lines.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n\n");
+    appendResultToUi(tr("Ответ нейросети"), content);
+    m_resultShownInCurrentRun = true;
+
+    if (!m_currentSeqId.isEmpty() && m_contextManager)
+        m_contextManager->endCommandSequence(m_currentSeqId);
+    m_currentSeqId.clear();
+    m_sequenceMode = false;
+    updateSequenceGraphHighlight();
+    stopTaskTimer();
+}
+
 void MainWindow::retryCurrentSequenceStep()
 {
     if (!m_sequenceMode)
@@ -3157,7 +3547,6 @@ void MainWindow::retryCurrentSequenceStep()
 
     QTimer::singleShot(200, this, &MainWindow::runNextStep);
 }
-
 bool MainWindow::ensureAgentModelConfigured()
 {
     if (!m_useAgentPipeline)
@@ -4225,6 +4614,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
     qDebug() << "[runTemplateRequested] Template path:" << templatePath;
     qDebug() << "[runTemplateRequested] Text:" << text;
+    resetSequenceStabilityState();
     if (!m_preserveActiveImagesForNextRun) {
         m_activeImagesBase64.clear();
         m_activeImagePaths.clear();
@@ -4333,6 +4723,7 @@ void MainWindow::runSimpleChat(const QString &text)
     // Send the message directly to the model in streaming mode without templates/sequences
 
     qDebug() << "[runSimpleChat] Text:" << text;
+    resetSequenceStabilityState();
 
     if (m_contextManager)
         m_contextManager->observeUserQuery(text);

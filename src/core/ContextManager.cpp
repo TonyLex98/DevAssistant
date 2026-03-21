@@ -41,6 +41,27 @@ static QString jsonCompact(const QJsonObject& obj)
 {
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
+
+static bool isTimeSensitiveNewsQuery(const QString& text)
+{
+    const QString lower = text.toLower();
+    const bool looksLikeNews =
+        lower.contains(QStringLiteral("\u043d\u043e\u0432\u043e\u0441\u0442")) ||
+        lower.contains(QStringLiteral("\u0443\u043a\u0440\u0430\u0438\u043d")) ||
+        lower.contains(QStringLiteral("\u0440\u043e\u0441\u0441\u0438")) ||
+        lower.contains(QStringLiteral("news")) ||
+        lower.contains(QStringLiteral("war"));
+    if (!looksLikeNews)
+        return false;
+
+    return lower.contains(QStringLiteral("\u0441\u0435\u0433\u043e\u0434\u043d\u044f")) ||
+           lower.contains(QStringLiteral("\u0441\u0435\u0439\u0447\u0430\u0441")) ||
+           lower.contains(QStringLiteral("\u043f\u043e\u0441\u043b\u0435\u0434\u043d")) ||
+           lower.contains(QStringLiteral("latest")) ||
+           lower.contains(QStringLiteral("breaking")) ||
+           lower.contains(QStringLiteral("current")) ||
+           lower.contains(QStringLiteral("now"));
+}
 } // namespace
 
 ContextManager::ContextManager(QObject *parent)
@@ -416,6 +437,7 @@ void ContextManager::observeUserQuery(const QString& text)
     const QString trimmed = text.trimmed();
     if (trimmed.isEmpty())
         return;
+    const bool timeSensitive = isTimeSensitiveNewsQuery(trimmed);
 
     const QSet<QString> newKeywords = extractKeywords(trimmed);
     if (newKeywords.isEmpty())
@@ -424,6 +446,8 @@ void ContextManager::observeUserQuery(const QString& text)
     if (m_currentTopicKeywords.isEmpty()) {
         m_currentTopicKeywords = newKeywords;
         m_currentTopicTitle = makeTopicTitle(trimmed);
+        if (timeSensitive)
+            m_exhumedArchiveIds.clear();
         updateExhumedArchivesForQuery(trimmed);
         return;
     }
@@ -455,6 +479,8 @@ void ContextManager::observeUserQuery(const QString& text)
         m_currentTopicKeywords = merged;
     }
 
+    if (timeSensitive)
+        m_exhumedArchiveIds.clear();
     updateExhumedArchivesForQuery(trimmed);
 }
 
@@ -646,6 +672,11 @@ void ContextManager::archiveOldestUntilFit(int maxActiveChars)
 
 void ContextManager::updateExhumedArchivesForQuery(const QString& queryText)
 {
+    if (isTimeSensitiveNewsQuery(queryText)) {
+        m_exhumedArchiveIds.clear();
+        return;
+    }
+
     if (m_archive.isEmpty()) {
         m_exhumedArchiveIds.clear();
         return;

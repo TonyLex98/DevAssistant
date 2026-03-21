@@ -214,6 +214,10 @@ private:
     bool m_inAgentAutoRepair = false;
     int m_agentRepairStepIdx = -1;
     QString m_agentRepairSeqId;
+    bool m_resultShownInCurrentRun = false;
+    int m_batchesWithoutResult = 0;
+    int m_sameBatchRepeatCount = 0;
+    QString m_lastBatchSignature;
 
     StyledButton* rescanBtn;
     StyledButton* settingsBtn;
@@ -323,6 +327,11 @@ private:
     bool ensureAgentModelConfigured();
     QStringList buildAllowedCommandsDocsCompact(const PromptStep& step) const;
     QByteArray repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step);
+    void resetSequenceStabilityState();
+    QString commandBatchSignature(const QList<Command*>& commands) const;
+    bool isReadOnlyCommandBatch(const QList<Command*>& commands) const;
+    void appendResultToUi(const QString& title, const QString& content);
+    void autoFinalizeSequenceWithResult(const QString& reason, const QList<Command*>& recentCommands);
     bool maybeAutoRepairAfterExecution(const PromptStep& step,
                                        const QDateTime& execStartedAt,
                                        const QList<Command*>& executedCommands,

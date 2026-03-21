@@ -1,21 +1,25 @@
 ﻿#pragma once
 
 #include <QComboBox>
-#include <QDialog>
+#include <QWidget>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QTextEdit>
 
 #include "customWidgets/MemoryLineEdit.h"
 
-class OllamaSettingsDialog : public QDialog
+class OllamaSettingsDialog : public QWidget
 {
     Q_OBJECT
 public:
     explicit OllamaSettingsDialog(QWidget* parent = nullptr);
+    void reloadFromConfig();
     QString provider() const { return m_provider ? m_provider->currentData().toString() : QStringLiteral("ollama"); }
     QString endpoint() const { return m_endpoint->text(); }
     QVariantMap params() const;
+
+signals:
+    void saveRequested();
 
 private:
     void applyDefaults();

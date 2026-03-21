@@ -22,6 +22,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QHash>
+#include <QDate>
 #include <QDateTime>
 #include <QTextCodec>
 #include <functional>
@@ -100,6 +101,93 @@ static bool httpPost(const QUrl& url,
 static qint64 nowMs()
 {
     return QDateTime::currentMSecsSinceEpoch();
+}
+
+static bool looksLikeNewsQuery(const QString& lowerQuery)
+{
+    return lowerQuery.contains(QStringLiteral("\u043d\u043e\u0432\u043e\u0441\u0442")) ||
+           lowerQuery.contains(QStringLiteral("\u0441\u0435\u0433\u043e\u0434\u043d\u044f")) ||
+           lowerQuery.contains(QStringLiteral("\u043f\u043e\u0441\u043b\u0435\u0434\u043d")) ||
+           lowerQuery.contains(QStringLiteral("\u0441\u0435\u0439\u0447\u0430\u0441")) ||
+           lowerQuery.contains(QStringLiteral("latest")) ||
+           lowerQuery.contains(QStringLiteral("breaking")) ||
+           lowerQuery.contains(QStringLiteral("current")) ||
+           lowerQuery.contains(QStringLiteral("news"));
+}
+
+static bool hasRecencyIntent(const QString& lowerQuery)
+{
+    return lowerQuery.contains(QStringLiteral("\u0441\u0435\u0433\u043e\u0434\u043d\u044f")) ||
+           lowerQuery.contains(QStringLiteral("\u0441\u0435\u0439\u0447\u0430\u0441")) ||
+           lowerQuery.contains(QStringLiteral("\u043f\u043e\u0441\u043b\u0435\u0434\u043d")) ||
+           lowerQuery.contains(QStringLiteral("today")) ||
+           lowerQuery.contains(QStringLiteral("latest")) ||
+           lowerQuery.contains(QStringLiteral("breaking")) ||
+           lowerQuery.contains(QStringLiteral("current")) ||
+           lowerQuery.contains(QStringLiteral("now"));
+}
+
+static QString normalizeRecencyQuery(const QString& rawQuery, QString* noteOut = nullptr)
+{
+    QString normalized = rawQuery.simplified();
+    const QString lower = normalized.toLower();
+    if (!looksLikeNewsQuery(lower) || !hasRecencyIntent(lower))
+        return normalized;
+
+    const int currentYear = QDate::currentDate().year();
+    const QString currentYearStr = QString::number(currentYear);
+    const QRegularExpression yearRe(QStringLiteral("\\b(20\\d{2})\\b"));
+
+    bool hasAnyYear = false;
+    bool hasCurrentYear = false;
+    bool hasOnlyOldYears = true;
+    auto it = yearRe.globalMatch(normalized);
+    while (it.hasNext()) {
+        const QRegularExpressionMatch m = it.next();
+        hasAnyYear = true;
+        const QString y = m.captured(1);
+        if (y == currentYearStr) {
+            hasCurrentYear = true;
+            hasOnlyOldYears = false;
+            break;
+        }
+    }
+
+    if (hasAnyYear && !hasCurrentYear && hasOnlyOldYears) {
+        normalized.remove(yearRe);
+        normalized = normalized.simplified();
+        if (!normalized.isEmpty())
+            normalized += QLatin1Char(' ');
+        normalized += currentYearStr;
+        if (noteOut) {
+            *noteOut = QStringLiteral("Query year normalized to current year %1 for recency intent.")
+                           .arg(currentYearStr);
+        }
+        return normalized;
+    }
+
+    if (!hasAnyYear) {
+        if (!normalized.isEmpty())
+            normalized += QLatin1Char(' ');
+        normalized += currentYearStr;
+        if (noteOut) {
+            *noteOut = QStringLiteral("Current year %1 appended for recency intent.")
+                           .arg(currentYearStr);
+        }
+    }
+    return normalized;
+}
+
+static bool isGoogleNewsWrapperUrl(const QString& urlText)
+{
+    const QUrl url(urlText);
+    if (!url.isValid())
+        return false;
+    const QString host = url.host().toLower();
+    if (!host.contains(QStringLiteral("news.google.")))
+        return false;
+    const QString path = url.path().toLower();
+    return path.contains(QStringLiteral("/rss/articles/")) || path.contains(QStringLiteral("/articles/"));
 }
 
 template <typename T>
@@ -883,8 +971,12 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
     (void)devAss;
     // Вызываем основную логику, но с возможностью использовать LLM для суммаризации
     m_results.clear();
-    const QString query = m_params.value("query").toString().trimmed();
-    qDebug() << "[SearchWebCommand] Starting search with query (with LLM):" << query;
+    m_rawResults.clear();
+    const QString originalQuery = m_params.value("query").toString().trimmed();
+    QString queryNormalizationNote;
+    const QString query = normalizeRecencyQuery(originalQuery, &queryNormalizationNote);
+    qDebug() << "[SearchWebCommand] Starting search with query (with LLM):" << query
+             << "original:" << originalQuery;
 
     if (query.isEmpty()) {
         if (errorOut) *errorOut = QStringLiteral("SEARCH_WEB: пустой запрос");
@@ -895,18 +987,32 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
     const int maxResults = qMax(1, m_params.value("maxResults").toInt(5));
     // Fast-by-default: search should return something quickly; deeper content extraction is separate.
     // Keep SEARCH_WEB fast and predictable even if the LLM suggests huge timeouts.
-    const int searchTimeoutMs = qBound(1200, m_params.value("searchTimeoutMs").toInt(3500), 8000);
-    const int overallSearchTimeoutMs = qBound(2000, m_params.value("overallSearchTimeoutMs").toInt(8000), 12000);
-    const int pageTimeoutMs = qBound(1200, m_params.value("pageTimeoutMs").toInt(4500), 9000);
-    const int overallPageTimeoutMs = qBound(2500, m_params.value("overallPageTimeoutMs").toInt(9000), 15000);
-    const int pageConcurrency = qBound(1, m_params.value("pageConcurrency").toInt(3), 8);
-    const int maxContentChars = qBound(500, m_params.value("maxContentChars").toInt(2500), 20000);
+    const int searchTimeoutMs = qBound(900, m_params.value("searchTimeoutMs").toInt(2200), 5000);
+    const int overallSearchTimeoutMs = qBound(1800, m_params.value("overallSearchTimeoutMs").toInt(5200), 9000);
+    const int pageTimeoutMs = qBound(900, m_params.value("pageTimeoutMs").toInt(2200), 5000);
+    const int overallPageTimeoutMs = qBound(1400, m_params.value("overallPageTimeoutMs").toInt(4200), 9000);
+    const int pageConcurrency = qBound(1, m_params.value("pageConcurrency").toInt(2), 4);
+    const int maxContentChars = qBound(400, m_params.value("maxContentChars").toInt(1800), 12000);
     const int cacheTtlMs = qBound(0, m_params.value("cacheTtlMs").toInt(10 * 60 * 1000), 60 * 60 * 1000);
     const int negativeCacheTtlMs = qBound(0, m_params.value("negativeCacheTtlMs").toInt(30 * 1000), 10 * 60 * 1000);
     const int maxPagesToExtractParam = m_params.value("maxPagesToExtract").toInt(3);
     const int maxPagesToExtractConfigured = qBound(0, maxPagesToExtractParam, qMin(8, maxResults));
     const bool useInstantAnswer = m_params.value("useInstantAnswer").toBool(false);
     const bool preferNoCaptchaSources = m_params.value("preferNoCaptchaSources").toBool(true);
+    const QString lowerQuery = query.toLower();
+    const bool looksLikeNews = looksLikeNewsQuery(lowerQuery);
+    const bool looksLikeProgramming =
+        lowerQuery.contains(QStringLiteral("qt")) ||
+        lowerQuery.contains(QStringLiteral("c++")) ||
+        lowerQuery.contains(QStringLiteral("cpp")) ||
+        lowerQuery.contains(QStringLiteral("python")) ||
+        lowerQuery.contains(QStringLiteral("java")) ||
+        lowerQuery.contains(QStringLiteral("javascript")) ||
+        lowerQuery.contains(QStringLiteral("\u043e\u0448\u0438\u0431\u043a\u0430")) ||
+        lowerQuery.contains(QStringLiteral("error")) ||
+        lowerQuery.contains(QStringLiteral("exception")) ||
+        lowerQuery.contains(QStringLiteral("stack")) ||
+        lowerQuery.contains(QStringLiteral("debug"));
     QString lastError;
     bool captchaEncountered = false;
     QSet<QString> seen;
@@ -943,26 +1049,6 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
                     hits.push_back(h);
                 }
             };
-
-            const QString lowerQuery = normalizedQuery.toLower();
-            const bool looksLikeNews =
-                lowerQuery.contains(QStringLiteral("новост")) ||
-                lowerQuery.contains(QStringLiteral("сегодня")) ||
-                lowerQuery.contains(QStringLiteral("latest")) ||
-                lowerQuery.contains(QStringLiteral("breaking")) ||
-                lowerQuery.contains(QStringLiteral("news"));
-            const bool looksLikeProgramming =
-                lowerQuery.contains(QStringLiteral("qt")) ||
-                lowerQuery.contains(QStringLiteral("c++")) ||
-                lowerQuery.contains(QStringLiteral("cpp")) ||
-                lowerQuery.contains(QStringLiteral("python")) ||
-                lowerQuery.contains(QStringLiteral("java")) ||
-                lowerQuery.contains(QStringLiteral("javascript")) ||
-                lowerQuery.contains(QStringLiteral("ошибка")) ||
-                lowerQuery.contains(QStringLiteral("error")) ||
-                lowerQuery.contains(QStringLiteral("exception")) ||
-                lowerQuery.contains(QStringLiteral("stack")) ||
-                lowerQuery.contains(QStringLiteral("debug"));
 
             auto tryNoCaptcha = [&]() {
                 if (hits.size() >= maxResults)
@@ -1261,37 +1347,57 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
         qDebug() << "[SearchWebCommand] Processing" << hits.size() << "hits into final results";
 
         QStringList articleContents;
-        const int maxPagesToExtract = qMin(maxPagesToExtractConfigured, maxResults);
+        QStringList snippetContents;
+        for (int i = 0; i < hits.size() && i < maxResults; ++i) {
+            const SearchHit& hit = hits[i];
+            QString compact = hit.title.trimmed();
+            if (!hit.snippet.trimmed().isEmpty())
+                compact += QStringLiteral(". ") + hit.snippet.trimmed();
+            if (!compact.isEmpty())
+                snippetContents << compact;
+        }
 
+        const int maxPagesToExtract = looksLikeNews ? 0 : qMin(maxPagesToExtractConfigured, maxResults);
         if (maxPagesToExtract > 0) {
             QStringList urlsToExtract;
             urlsToExtract.reserve(maxPagesToExtract);
-            for (int i = 0; i < hits.size() && i < maxPagesToExtract; ++i)
-                urlsToExtract << hits[i].url;
+            for (int i = 0; i < hits.size() && i < maxPagesToExtract; ++i) {
+                const QString& u = hits[i].url;
+                if (isGoogleNewsWrapperUrl(u))
+                    continue;
+                urlsToExtract << u;
+            }
 
-            articleContents = fetchManyPageTexts(urlsToExtract,
-                                                 maxContentChars,
-                                                 pageTimeoutMs,
-                                                 overallPageTimeoutMs,
-                                                 pageConcurrency,
-                                                 cacheTtlMs);
+            if (!urlsToExtract.isEmpty()) {
+                articleContents = fetchManyPageTexts(urlsToExtract,
+                                                     maxContentChars,
+                                                     pageTimeoutMs,
+                                                     overallPageTimeoutMs,
+                                                     pageConcurrency,
+                                                     cacheTtlMs);
+            }
         }
+
+        const QString combinedFromPages = articleContents.join(QStringLiteral("\n\n")).trimmed();
+        const QString combinedFromSnippets = snippetContents.join(QStringLiteral("\n")).trimmed();
+        const QString summarySource = !combinedFromPages.isEmpty() ? combinedFromPages : combinedFromSnippets;
 
         // Подготовка результата - если доступен LLM, используем его для суммаризации
         QStringList resultBlocks;
         resultBlocks << QString("=== РЕЗУЛЬТАТЫ ПОИСКА ПО ЗАПРОСУ '%1' ===").arg(query);
 
-        if (!articleContents.isEmpty() && adapter) {
-            // Используем LLM для суммаризации
-            QString combinedContent = articleContents.join(QStringLiteral("\n\n")).trimmed();
-            QString llmSummary = generateLLMSummary(adapter, combinedContent, query);
-            resultBlocks << QString("LLM-суммаризация по %1 источникам:").arg(articleContents.size());
+        if (!queryNormalizationNote.isEmpty())
+            resultBlocks << QString("Query note: %1").arg(queryNormalizationNote);
+
+        if (!summarySource.isEmpty() && adapter) {
+            QString llmSummary = generateLLMSummary(adapter, summarySource, query);
+            const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
+            resultBlocks << QString("LLM-суммаризация по %1 источникам:").arg(sourceCount);
             resultBlocks << llmSummary;
-        } else if (!articleContents.isEmpty()) {
-            // Используем внутреннюю суммаризацию если LLM недоступен
-            resultBlocks << QString("Суммаризация по %1 источникам:").arg(articleContents.size());
-            const QString combinedContent = articleContents.join(QStringLiteral("\n\n")).trimmed();
-            resultBlocks << summarizeContentInternal(combinedContent, query);
+        } else if (!summarySource.isEmpty()) {
+            const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
+            resultBlocks << QString("Суммаризация по %1 источникам:").arg(sourceCount);
+            resultBlocks << summarizeContentInternal(summarySource, query);
         } else {
             resultBlocks << QString("Найдено %1 результатов, но контент для суммаризации отсутствует.").arg(hits.size());
         }
@@ -1304,6 +1410,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, void* adapter, QStrin
             if (!hit.snippet.isEmpty())
                 linkBlock += QLatin1Char('\n') + hit.snippet;
             resultBlocks << linkBlock;
+            m_rawResults << linkBlock;
         }
 
         m_results = resultBlocks;

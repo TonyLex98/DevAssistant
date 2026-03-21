@@ -1,13 +1,14 @@
 #include "OllamaSettingsDialog.h"
 
 #include <QComboBox>
-#include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QLabel>
 #include <QPushButton>
+#include <QSizePolicy>
 #include <QTabWidget>
 #include <QVBoxLayout>
 
@@ -15,14 +16,13 @@
 #include "utils/AppConfig.h"
 
 OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
-    : QDialog(parent)
+    : QWidget(parent)
 {
-    setWindowTitle(QStringLiteral("LLM Settings"));
-    resize(860, 660);
-    setMinimumSize(780, 560);
+    setObjectName(QStringLiteral("llmSettingsWidget"));
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     setStyleSheet(
-        "QDialog { background: #f5fbfa; }"
+        "QWidget#llmSettingsWidget { background: #f5fbfa; border: 1px solid #bfeee7; border-radius: 8px; }"
         "QLabel#title { font: 700 18px 'Segoe UI'; color: #0f172a; }"
         "QLabel#subtitle { font: 10pt 'Segoe UI'; color: #334155; }"
         "QGroupBox {"
@@ -48,8 +48,8 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         "  background: #def7f2;"
         "  border: 1px solid #bfeee7;"
         "  border-bottom: none;"
-        "  padding: 8px 14px;"
-        "  min-width: 130px;"
+        "  padding: 6px 10px;"
+        "  min-width: 70px;"
         "  color: #0f172a;"
         "}"
         "QTabBar::tab:selected {"
@@ -62,9 +62,9 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         "  padding: 6px 8px;"
         "  background: #ffffff;"
         "}"
-        "QDialogButtonBox QPushButton {"
-        "  min-width: 112px;"
-        "  padding: 8px 12px;"
+        "QPushButton {"
+        "  min-width: 72px;"
+        "  padding: 6px 10px;"
         "  border-radius: 8px;"
         "}"
     );
@@ -241,12 +241,15 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         tabs->addTab(page, QStringLiteral("Context and output"));
     }
 
-    auto* bb = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
-    QPushButton* resetBtn = bb->addButton(QStringLiteral("Reset"), QDialogButtonBox::ResetRole);
+    auto* buttonRow = new QHBoxLayout();
+    auto* resetBtn = new QPushButton(QStringLiteral("Reset"), this);
+    auto* saveBtn = new QPushButton(QStringLiteral("Save"), this);
+    buttonRow->addStretch(1);
+    buttonRow->addWidget(resetBtn);
+    buttonRow->addWidget(saveBtn);
+    root->addLayout(buttonRow);
     connect(resetBtn, &QPushButton::clicked, this, &OllamaSettingsDialog::applyDefaults);
-    connect(bb, &QDialogButtonBox::accepted, this, &OllamaSettingsDialog::accept);
-    connect(bb, &QDialogButtonBox::rejected, this, &OllamaSettingsDialog::reject);
-    root->addWidget(bb);
+    connect(saveBtn, &QPushButton::clicked, this, &OllamaSettingsDialog::saveRequested);
 
     connect(m_provider, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
         const QString endpointText = m_endpoint->text().trimmed();
@@ -261,6 +264,11 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     });
 
     applyDefaults();
+    loadFromConfig();
+}
+
+void OllamaSettingsDialog::reloadFromConfig()
+{
     loadFromConfig();
 }
 

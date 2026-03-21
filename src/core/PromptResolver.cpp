@@ -10,6 +10,8 @@
 #include <QDebug>
 #include <QFileInfo>
 #include <QDir>
+#include <QDateTime>
+#include <QtGlobal>
 #include <QJsonDocument>
 
 // Static members initialization
@@ -51,12 +53,36 @@ static QString truncateLinesForPrompt(const QString& text, int maxLines, int max
     return out;
 }
 
+static QString formatUtcOffset(int offsetSeconds)
+{
+    const int absSeconds = qAbs(offsetSeconds);
+    const int hours = absSeconds / 3600;
+    const int minutes = (absSeconds % 3600) / 60;
+    const QChar sign = (offsetSeconds >= 0) ? QChar('+') : QChar('-');
+    return QStringLiteral("UTC%1%2:%3")
+        .arg(sign)
+        .arg(hours, 2, 10, QChar('0'))
+        .arg(minutes, 2, 10, QChar('0'));
+}
+
 PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
                                                        const PromptStep &step,
                                                        MainWindow *ctx)
 {
     QString result = tmpl;
     QString userQuery = ctx ? ctx->lastUserMessage() : QString();
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString currentDate = now.date().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString currentDateTime = QStringLiteral("%1 %2 (%3)")
+        .arg(currentDate,
+             now.time().toString(QStringLiteral("HH:mm:ss")),
+             formatUtcOffset(now.offsetFromUtc()));
+    const QString runtimeDateContext = QStringLiteral(
+        "Runtime date context:\n"
+        "- CURRENT_DATE: %1\n"
+        "- CURRENT_DATETIME: %2\n"
+        "- Interpret relative dates (today/now) using CURRENT_DATE.\n\n")
+        .arg(currentDate, currentDateTime);
     qDebug() << "[PromptResolver] USER_QUERY =" << userQuery;
 
     // 1) {{PROJECT_ROOT}}
@@ -116,6 +142,9 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
 
     // 6) {{USER_QUERY}} – текущий запрос пользователя
     result.replace("{{USER_QUERY}}", userQuery);
+    result.replace("{{CURRENT_DATE}}", currentDate);
+    result.replace("{{TODAY}}", currentDate);
+    result.replace("{{CURRENT_DATETIME}}", currentDateTime);
 
     // Последний ответ ассистента
     result.replace("{{LAST_ASSISTANTS_RESPONSE}}", ctx->lastAssistantMessage());
@@ -157,6 +186,7 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
     // Но делаем это только ПОСЛЕ замены всех известных шаблонов
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
+    result.prepend(runtimeDateContext);
 
     // Добавляем четкие инструкции о формате JSON-ответа
     // Это поможет нейросети лучше понять, что нужно возвращать JSON команды
@@ -184,6 +214,9 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
     vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
     vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
     vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
+    vec.append({"CURRENT_DATE",    "Текущая дата (YYYY-MM-DD)"});
+    vec.append({"TODAY",           "Синоним текущей даты (YYYY-MM-DD)"});
+    vec.append({"CURRENT_DATETIME","Текущие дата/время с UTC-смещением"});
     vec.append({"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистент"});
     vec.append({"OPEN_FILES",      "Открытые файлы"});
     vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
