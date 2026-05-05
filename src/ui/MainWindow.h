@@ -46,6 +46,7 @@
 #include <MemoryLineEdit.h>
 #include <ProjectRelationView.h>
 #include "GraphWidget.h"
+#include "ContextGraphWidget.h"
 #include <QMap>
 #include <QVector>
 #include "customWidgets/MemoryComboBox.h"
@@ -192,7 +193,9 @@ private:
     // New context management system
     ContextManager* m_contextManager;
     QWidget* m_contextStatusWidget; // Widget to display context command status
+    QTabWidget* m_contextTabs = nullptr; // Tabs: command list / context graph
     QTreeWidget* m_contextCommandsList; // Tree to show which commands are in context with expandable details
+    ContextGraphWidget* m_contextGraphWidget = nullptr;
 
     QListWidget* m_files=nullptr;
     MemoryLineEdit* m_rootEdit=nullptr;

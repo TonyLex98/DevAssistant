@@ -653,6 +653,9 @@ MainWindow::MainWindow(QWidget *parent)
     m_contextStatusWidget = new QWidget(this);
     m_contextCommandsList = new QTreeWidget(m_contextStatusWidget);
     m_contextCommandsList->setObjectName("contextCommandsList");
+    m_contextGraphWidget = new ContextGraphWidget(m_contextStatusWidget);
+    m_contextTabs = new QTabWidget(m_contextStatusWidget);
+    m_contextTabs->setDocumentMode(true);
 
     QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
     contextLayout->setContentsMargins(5, 5, 5, 5);
@@ -664,7 +667,9 @@ MainWindow::MainWindow(QWidget *parent)
     headerLayout->addStretch();
 
     contextLayout->addLayout(headerLayout);
-    contextLayout->addWidget(m_contextCommandsList);
+    m_contextTabs->addTab(m_contextCommandsList, tr("Commands"));
+    m_contextTabs->addTab(m_contextGraphWidget, tr("Context Graph"));
+    contextLayout->addWidget(m_contextTabs);
 
     // Set up the tree widget
     m_contextCommandsList->setHeaderLabels(QStringList() << "Time" << "Description");
@@ -674,7 +679,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
 
     // Set size preference for the context status widget
-    m_contextStatusWidget->setMinimumWidth(200);
+    m_contextStatusWidget->setMinimumWidth(260);
     m_contextStatusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
     // Set the MainWindow reference in the ChatDialog so it can signal template stops
@@ -1094,6 +1099,7 @@ MainWindow::MainWindow(QWidget *parent)
         // When context changes, update the GUI display
         updateContextStatusDisplay();
     });
+    updateContextStatusDisplay();
 
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
@@ -4375,7 +4381,7 @@ void MainWindow::refreshAllSequences()
 
 void MainWindow::updateContextStatusDisplay()
 {
-    if (!m_contextCommandsList) {
+    if (!m_contextCommandsList || !m_contextManager) {
         return;
     }
 
@@ -4572,6 +4578,12 @@ void MainWindow::updateContextStatusDisplay()
             // Keep child items (like results) collapsed by default
             childItem->setExpanded(false);
         }
+    }
+
+    if (m_contextGraphWidget) {
+        m_contextGraphWidget->setGraphData(
+            m_contextManager->getContextGraphNodes(),
+            m_contextManager->activeContextGraphNodeId());
     }
 }
 
