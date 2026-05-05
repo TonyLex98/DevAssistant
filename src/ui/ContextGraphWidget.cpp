@@ -22,7 +22,7 @@ ContextGraphWidget::ContextGraphWidget(QWidget* parent)
     : QWidget(parent)
 {
     m_scene = new QGraphicsScene(this);
-    m_view = new QGraphicsView(m_scene, this);
+    m_view = new ContextGraphView(m_scene, this);
     m_view->setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
     m_view->setDragMode(QGraphicsView::ScrollHandDrag);
     m_view->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
@@ -166,7 +166,7 @@ void ContextGraphWidget::rebuildScene()
         auto* box = m_scene->addRect(rect, pen, QBrush(colorForCategory(node.category)));
         box->setZValue(1);
 
-        auto* text = m_scene->addText(buildNodeLabel(node), QFont(QStringLiteral("Segoe UI"), 8));
+        auto* text = m_scene->addText(buildNodeLabel(node), QFont(QStringLiteral("Segoe UI"), 10));
         text->setTextWidth(kNodeWidth - 12);
         text->setDefaultTextColor(QColor(20, 20, 20));
         text->setPos(pos + QPointF(6, 5));

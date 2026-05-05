@@ -21,12 +21,12 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     
     // Create a horizontal layout for the label and combobox
     auto *topLayout = new QHBoxLayout();
-    topLayout->addWidget(m_templateLabel);
-    topLayout->addWidget(m_templateComboBox);
+    topLayout->setSpacing(6);
+    topLayout->addWidget(m_templateLabel, 0, Qt::AlignVCenter);
+    m_templateComboBox->setMaximumWidth(160);
+    topLayout->addWidget(m_templateComboBox, 0, Qt::AlignVCenter);
     StyledButton *fitAllBtn = new StyledButton(tr("Поместить всё"), this);
-    fitAllBtn->setFixedHeight(26);
-    fitAllBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    topLayout->addWidget(fitAllBtn);
+    topLayout->addWidget(fitAllBtn, 0, Qt::AlignVCenter);
     topLayout->addStretch(); // Add stretch to push the combo box to the left
     connect(fitAllBtn, &StyledButton::clicked, this, [this]() {
         if (m_view)

@@ -4,11 +4,26 @@
 #include <QWidget>
 #include <QMap>
 #include <QPointF>
+#include <QGraphicsView>
+#include <QWheelEvent>
 
 #include "../core/ContextManager.h"
 
-class QGraphicsScene;
-class QGraphicsView;
+class ContextGraphView : public QGraphicsView
+{
+    Q_OBJECT
+public:
+    explicit ContextGraphView(QGraphicsScene* scene, QWidget* parent = nullptr)
+        : QGraphicsView(scene, parent) {}
+
+protected:
+    void wheelEvent(QWheelEvent* event) override
+    {
+        const double factor = (event->angleDelta().y() > 0) ? 1.15 : 1.0 / 1.15;
+        scale(factor, factor);
+        event->accept();
+    }
+};
 
 class ContextGraphWidget : public QWidget
 {
