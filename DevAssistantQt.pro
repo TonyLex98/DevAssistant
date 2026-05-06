@@ -281,6 +281,9 @@ SOURCES += $$PWD/src/core/SolutionTemplate.cpp
 SOURCES += $$PWD/src/core/SolutionTemplateManager.cpp
 SOURCES += $$PWD/src/ui/RunTemplateOrSequenceDialog.cpp
 SOURCES += $$PWD/src/ui/SolutionTemplateViewer.cpp
+SOURCES += $$PWD/src/ui/controllers/TtsController.cpp
+SOURCES += $$PWD/src/ui/controllers/TaskStatusController.cpp
+SOURCES += $$PWD/src/ui/controllers/ProjectBrowserController.cpp
 HEADERS += $$PWD/src/utils/AppConfig.h
 HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
 HEADERS += $$PWD/src/command/AskUserCommand.h
@@ -288,6 +291,9 @@ HEADERS += $$PWD/src/command/OpenAppCommand.h
 HEADERS += $$PWD/src/command/OpenUrlCommand.h
 HEADERS += $$PWD/src/command/ClipboardSetCommand.h
 HEADERS += $$PWD/src/command/ClipboardGetCommand.h
+HEADERS += $$PWD/src/ui/controllers/TtsController.h
+HEADERS += $$PWD/src/ui/controllers/TaskStatusController.h
+HEADERS += $$PWD/src/ui/controllers/ProjectBrowserController.h
 
 FORMS += \
     src/uiide/IDEWidget.ui

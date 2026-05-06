@@ -127,11 +127,9 @@ static QVariantMap generationParamsFromConfig(const AppConfig& cfg)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    // Initialize member variables for task tracking
-    m_taskTimer = nullptr;
-    m_timerActive = false;
-    m_taskRunning = false;
-    m_totalElapsedTime = 0;
+    // Initialize controllers
+    m_statusController = new TaskStatusController(this);
+    m_ttsController = new TtsController(this);
 
     AppConfig startupCfg;
     startupCfg.load();
@@ -304,19 +302,11 @@ MainWindow::MainWindow(QWidget *parent)
     pages->addWidget(p4);
     auto* audioLay = pageLay(p4);
     addSection(tr("Синтез речи (TTS)"), audioLay);
-    QSettings ttsSettings;
-    m_ttsEnabled = ttsSettings.value("tts/enabled", true).toBool();
-    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), this);
-    audioLay->addWidget(m_ttsToggleBtn);
+    // Use TtsController for TTS management
+    audioLay->addWidget(m_ttsController->toggleButton());
     audioLay->addStretch();
-    if (m_ttsEnabled) {
-        m_ttsRunner = new TtsRunner(this);
-        connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
-        connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& e){ log("TTS Error: "+e); });
-        connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this](){
-            if (m_chat && m_chat->isRecording()) m_chat->resumeRecordingAfterResponse();
-        });
-    }
+    connect(m_ttsController, &TtsController::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
+    connect(m_ttsController, &TtsController::errorMessage, this, [this](const QString& e){ log("TTS Error: "+e); });
 
     // -- Page 5: System --
     auto* p5 = makePage();
@@ -989,14 +979,9 @@ MainWindow::MainWindow(QWidget *parent)
         mainSplitter->setSizes(fallbackSizes);
     }
 
-    // Initialize task timer and status widget
-    m_taskTimer = new QTimer(this);
-    connect(m_taskTimer, &QTimer::timeout, this, &MainWindow::updateStatusDisplay);
-    m_taskTimer->start(1000); // Update every second
-    m_timerActive = false;
-
-    createStatusWidget();
-    updateStatusDisplay(); // Initial update
+    // Initialize task status controller (timer + status bar)
+    m_statusController->initStatusBar(statusBar());
+    m_statusController->setModel(&m_model);
 
     //rescan();
 
@@ -1562,7 +1547,7 @@ void MainWindow::runSequenceDialog()
         resetSequenceStabilityState();
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] About to start task timer for sequence execution";
-        startTaskTimer(); // Start the task timer when sequence begins
+        m_statusController->startTask();
         qDebug() << "[runSequenceDialog] Starting sequence:" << m_currentSeq.name();
         runNextStep();   // сразу стартуем первый шаг
     } else {
@@ -1604,7 +1589,7 @@ void MainWindow::runSequenceDialog()
         resetSequenceStabilityState();
         updateSequenceGraphHighlight();  // Update the graph highlighting
         qDebug() << "[runSequenceDialog] About to start task timer for template execution";
-        startTaskTimer(); // Start the task timer when sequence begins
+        m_statusController->startTask();
         runNextStep();   // сразу стартуем первый шаг
     }
 }
@@ -1643,7 +1628,7 @@ void MainWindow::runNextStep()
         }
         m_sequenceMode = false;
         m_currentSeqId.clear(); // Clear the current sequence ID
-        stopTaskTimer(); // Stop the task timer when sequence completes
+        m_statusController->stopTask(); // Stop the task timer when sequence completes
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
         return;
     }
@@ -1882,7 +1867,7 @@ void MainWindow::handleAssistantFinished()
         // Show message that execution was stopped
         QMessageBox::information(this, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
-        stopTaskTimer(); // Stop the task timer when execution is stopped
+        m_statusController->stopTask(); // Stop the task timer when execution is stopped
         qDeleteAll(CommandParser::parse(m_streamBuf.toUtf8()));
         return;
     }
@@ -2199,7 +2184,7 @@ void MainWindow::handleAssistantFinished()
             m_lastBatchSignature.clear();
 
             // Speak the SHOW_RESULT content if TTS is enabled
-            if (m_ttsEnabled && m_ttsRunner && m_ttsRunner->isReady()) {
+            if (m_ttsController && m_ttsController->isEnabled() && m_ttsController->runner() && m_ttsController->runner()->isReady()) {
                 QString textToSpeak = c->params().value("content").toString();
                 textToSpeak.replace("\\n", " ").replace("\\r", "").replace("\n", " ");
                 // Limit length for TTS
@@ -2207,7 +2192,7 @@ void MainWindow::handleAssistantFinished()
                     textToSpeak = textToSpeak.left(1000) + "...";
                 }
                 if (!textToSpeak.isEmpty() && textToSpeak.length() > 5) {
-                    m_ttsRunner->speak(textToSpeak);
+                    m_ttsController->speak(textToSpeak);
                 }
             }
 
@@ -3391,7 +3376,7 @@ void MainWindow::autoFinalizeSequenceWithResult(const QString& reason, const QLi
     m_currentSeqId.clear();
     m_sequenceMode = false;
     updateSequenceGraphHighlight();
-    stopTaskTimer();
+    m_statusController->stopTask();
 }
 
 void MainWindow::retryCurrentSequenceStep()
@@ -3638,7 +3623,7 @@ void MainWindow::runNextSequence()
         }
         m_sequenceMode = false;
         m_currentSeqId.clear(); // Clear the current sequence ID
-        stopTaskTimer(); // Stop the task timer when sequence completes
+        m_statusController->stopTask(); // Stop the task timer when sequence completes
         updateSequenceGraphHighlight();  // Update the graph highlighting (will clear highlight)
         return;
     }
@@ -4585,7 +4570,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
     updateSequenceGraphHighlight();  // Update the graph highlighting
     qDebug() << "[runTemplateRequested] About to start task timer for template execution";
-    startTaskTimer(); // Start the task timer when template begins
+    m_statusController->startTask();
     runNextStep();  // Start the sequence immediately
 }
 
@@ -4816,7 +4801,7 @@ void MainWindow::stopTemplateExecution()
     // If we're in sequence mode, the next runNextStep call will check the flag and stop
     if (m_sequenceMode) {
         log("Шаблонное выполнение остановлено пользователем.");
-        stopTaskTimer(); // Stop the task timer when user stops execution
+        m_statusController->stopTask(); // Stop the task timer when user stops execution
     }
 }
 
@@ -4841,148 +4826,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
-void MainWindow::createStatusWidget()
-{
-    // Create a status widget to display the task information
-    m_statusWidget = new QLabel(this);
-    m_statusWidget->setStyleSheet("QLabel { background-color: #f0f0f0; border: 1px solid gray; padding: 2px; }");
-    m_statusWidget->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    m_statusWidget->setMinimumWidth(300); // Set minimum width for the status widget
-    m_statusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
-    // Add the status widget to the main window's status bar
-    statusBar()->addPermanentWidget(m_statusWidget);
-}
-
-void MainWindow::updateStatusDisplay()
-{
-    // Calculate and format the elapsed time
-    QString timeStr;
-    if (m_timerActive) {
-        // Calculate total elapsed time: accumulated time + current elapsed time
-        int totalElapsedMs = m_totalElapsedTime;
-        if (m_taskRunning) {
-            // Add the currently running time to the accumulated time
-            totalElapsedMs += m_elapsedTime.elapsed();
-        }
-        QTime elapsedTime = QTime(0, 0).addMSecs(totalElapsedMs);
-        timeStr = elapsedTime.toString("hh:mm:ss");
-        qDebug() << "[DEBUG] Timer active - Total elapsed time (ms):" << totalElapsedMs << "Time string:" << timeStr;
-    } else if (m_totalElapsedTime > 0) {
-        // Timer is not active, but we have accumulated time from last run, show it
-        QTime elapsedTime = QTime(0, 0).addMSecs(m_totalElapsedTime);
-        timeStr = elapsedTime.toString("hh:mm:ss");
-        //qDebug() << "[DEBUG] Timer not active but showing accumulated time (ms):" << m_totalElapsedTime << "Time string:" << timeStr;
-    } else {
-        timeStr = "00:00:00";
-        //qDebug() << "[DEBUG] Timer not active - Showing default time";
-    }
-
-    // Get context usage using estimateTokens for both used and total
-    quint64 usedTokens = 0;
-    quint64 totalTokens = 0;
-
-    // Calculate context usage based on the current prompt being sent to the model
-    if (!m_currentPrompt.isEmpty()) {
-        // Use the actual prompt that's being sent to the model
-        usedTokens = m_model.estimateTokens(m_currentPrompt);
-    } else {
-        // Fallback: calculate based on the context content
-        if (m_contextManager) {
-            QString contextText = m_contextManager->generateContextText();
-            usedTokens = m_model.estimateTokens(contextText);
-        } else {
-            usedTokens = m_model.estimateTokens(m_contextContent);
-        }
-
-        // Add currently streamed content if any
-        if (!m_streamBuf.isEmpty()) {
-            usedTokens += m_model.estimateTokens(m_streamBuf);
-        }
-    }
-
-    // Get total context window size from Ollama adapter
-    totalTokens = m_model.generationParams().num_ctx;
-
-    // Make sure usedTokens doesn't exceed totalTokens
-    if (usedTokens > totalTokens) {
-        usedTokens = totalTokens; // Cap at maximum
-    }
-
-    // Format the token counts with abbreviations
-    QString usedTokenStr = formatNumber(usedTokens);
-    QString totalTokenStr = formatNumber(totalTokens);
-    double pers = 100 - (double)usedTokens/totalTokens*100;
-    QString usedTokenStrPers = QString::number(pers,'f', 2);
-
-    // Update the status widget text
-    QString statusText = QString("Time: %1 | Context left: %2/%3 (%4%)")
-                            .arg(timeStr)
-                            .arg(usedTokenStr)
-                            .arg(totalTokenStr)
-                            .arg(usedTokenStrPers);
-
-    if (m_statusWidget) {
-        m_statusWidget->setText(statusText);
-    }
-}
-
-void MainWindow::startTaskTimer()
-{
-    qDebug() << "[DEBUG] startTaskTimer called. m_taskRunning:" << m_taskRunning << "m_timerActive:" << m_timerActive;
-    if (!m_taskRunning) {
-        // First time starting the task - initialize everything
-        m_elapsedTime.start();  // Start the timer
-        m_taskRunning = true;
-        m_timerActive = true;
-        m_totalElapsedTime = 0; // Reset for a new template execution session
-        qDebug() << "[DEBUG] Timer started. Current time reset for new session.";
-    } else {
-        // Task is already running (e.g. continuing execution), ensure timer is active
-        m_timerActive = true;
-        qDebug() << "[DEBUG] Task already running, ensuring timer is active.";
-    }
-    updateStatusDisplay();
-}
-
-void MainWindow::stopTaskTimer()
-{
-    qDebug() << "[DEBUG] stopTaskTimer called. m_timerActive:" << m_timerActive << "m_taskRunning:" << m_taskRunning;
-    if (m_taskRunning) {
-        // Add the elapsed time to the total when stopping
-        int currentElapsed = m_elapsedTime.elapsed();
-        m_totalElapsedTime += currentElapsed;
-        qDebug() << "[DEBUG] Adding elapsed time to total:" << currentElapsed << "New total:" << m_totalElapsedTime;
-    } else {
-        qDebug() << "[DEBUG] Task not running, not adding elapsed time";
-    }
-    m_timerActive = false;
-    m_taskRunning = false;  // Reset the running flag
-    updateStatusDisplay();
-}
-
-QString MainWindow::formatNumber(quint64 num) const
-{
-    if (num >= 1000000) { // 1M+
-        double value = static_cast<double>(num) / 1000000.0;
-        // Only show 2 decimal places if needed, otherwise show whole number
-        if (value == static_cast<int>(value)) {
-            return QString::number(static_cast<int>(value)) + "млн";
-        } else {
-            return QString::number(value, 'f', 2) + "млн";
-        }
-    } else if (num >= 1000) { // 1k+
-        double value = static_cast<double>(num) / 1000.0;
-        // Only show 2 decimal places if needed, otherwise show whole number
-        if (value == static_cast<int>(value)) {
-            return QString::number(static_cast<int>(value)) + "к";
-        } else {
-            return QString::number(value, 'f', 2) + "к";
-        }
-    } else {
-        return QString::number(num);
-    }
-}
 
 void MainWindow::onOmniAsrText(const QString& text)
 {

@@ -62,6 +62,11 @@
 // TTS
 #include "../audio/TtsRunner.h"
 
+// Controllers
+#include "controllers/TtsController.h"
+#include "controllers/TaskStatusController.h"
+#include "controllers/ProjectBrowserController.h"
+
 class ChatDialog;
 class ModelsDialog;
 class OllamaSettingsDialog;
@@ -175,14 +180,9 @@ private:
     OllamaAdapter m_agentModel;
     PromptManager m_promptMgr;
 
-    // Variables for tracking task execution time and context usage
-    QTimer* m_taskTimer;
-    QTime m_elapsedTime;  // Timer for measuring elapsed time
-    int m_totalElapsedTime; // Total elapsed time in milliseconds
-    QLabel* m_statusWidget;
-    bool m_timerActive;
-    bool m_taskRunning;  // Flag to track if a task is currently running
-    QString m_currentPrompt;  // Current prompt being sent to the model
+    // Task status controller (timer + status bar)
+    TaskStatusController* m_statusController{nullptr};
+    QString m_currentPrompt;  // Current prompt being sent to the model (needed for context estimation)
     
     // File system monitoring to track external file changes
     QFileSystemWatcher* m_fileWatcher;
@@ -294,9 +294,7 @@ private:
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
-    TtsRunner *m_ttsRunner{nullptr}; // TTS Runner
-    StyledButton *m_ttsToggleBtn{nullptr}; // TTS toggle button
-    bool m_ttsEnabled{false}; // TTS enabled flag
+    TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
 
     struct ContextRange {
         int startLine = -1;
@@ -351,12 +349,5 @@ private:
 private:
     void updateContextStatusDisplay(); // Update the visual display of context commands
     void addCommandToContext(Command* cmd, const QString& result = QString()); // Wrapper to handle command addition logic
-
-    // Methods to manage the task status display
-    void createStatusWidget();
-    void updateStatusDisplay();
-    void startTaskTimer();
-    void stopTaskTimer();
-    QString formatNumber(quint64 num) const;
 
 };
