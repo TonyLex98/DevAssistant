@@ -6,3 +6,22 @@ src/uiide/tree-sitter/
 /DevelopersAssistant
 /release
 /models
+
+# Build artifacts
+Makefile
+Makefile.Debug
+Makefile.Release
+object_script.*
+.qmake.stash
+
+# Local configs
+.qwen/settings.json
+.qwen/settings.json.orig
+
+# Tunnel binaries/scripts
+cloudflared.exe
+ngrok.exe
+ngrok.zip
+start_tunnel.bat
+tunnel_url.txt
+warning
