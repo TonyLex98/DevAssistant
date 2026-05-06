@@ -208,23 +208,20 @@ MainWindow::MainWindow(QWidget *parent)
     pages->setStyleSheet("QStackedWidget { background: transparent; }");
     settingsRoot->addWidget(pages, 1);
     connect(sidebar, &QListWidget::currentRowChanged, pages, &QStackedWidget::setCurrentIndex);
-
+    
     // Helper: scrollable page
-    auto makePage = []() -> QScrollArea* {
-        auto* s = new QScrollArea();
-        s->setWidgetResizable(true);
-        s->setFrameShape(QFrame::NoFrame);
-        s->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    auto makePage = []() -> QWidget* {
         auto* w = new QWidget();
         w->setStyleSheet("QWidget { background: #f8fffd; }");
+        w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         auto* l = new QVBoxLayout(w);
         l->setContentsMargins(12, 12, 12, 12);
         l->setSpacing(8);
-        s->setWidget(w);
-        return s;
+        l->addStretch();
+        return w;
     };
-    auto pageLay = [](QScrollArea* s) -> QVBoxLayout* {
-        return static_cast<QVBoxLayout*>(static_cast<QWidget*>(s->widget())->layout());
+    auto pageLay = [](QWidget* w) -> QVBoxLayout* {
+        return static_cast<QVBoxLayout*>(w->layout());
     };
     auto addSection = [](const QString& t, QVBoxLayout* l) {
         auto* lb = new QLabel(t);
@@ -240,7 +237,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // -- Page 0: Project --
     auto* p0 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p0->widget()));
+    pages->addWidget(p0);
     auto* projLay = pageLay(p0);
     addSection(tr("Путь к проекту"), projLay);
     projLay->addWidget(top_widget);
@@ -248,13 +245,15 @@ MainWindow::MainWindow(QWidget *parent)
     addSection(tr("Действия"), projLay);
     rescanBtn = new StyledButton(tr("Обновить проект"), this);
     descBtn = new StyledButton(tr("Сгенерировать описания"), this);
+    rescanBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    descBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     projLay->addWidget(rescanBtn);
     projLay->addWidget(descBtn);
     projLay->addStretch();
 
     // -- Page 1: Model --
     auto* p1 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p1->widget()));
+    pages->addWidget(p1);
     auto* llmLay = pageLay(p1);
     addSection(tr("Настройки модели"), llmLay);
     settingsBtn = new StyledButton(tr("Открыть настройки LLM"), this);
@@ -269,7 +268,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // -- Page 2: Sequences --
     auto* p2 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p2->widget()));
+    pages->addWidget(p2);
     auto* seqLay = pageLay(p2);
     addSection(tr("Последовательности"), seqLay);
     editSeqBtn = new StyledButton(tr("Редактировать"), this);
@@ -286,7 +285,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // -- Page 3: Graphs --
     auto* p3 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p3->widget()));
+    pages->addWidget(p3);
     auto* graphLay = pageLay(p3);
     addSection(tr("Визуализация"), graphLay);
     graphBtn = new StyledButton(tr("Граф контекста"), this);
@@ -302,7 +301,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // -- Page 4: Audio --
     auto* p4 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p4->widget()));
+    pages->addWidget(p4);
     auto* audioLay = pageLay(p4);
     addSection(tr("Синтез речи (TTS)"), audioLay);
     QSettings ttsSettings;
@@ -321,7 +320,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // -- Page 5: System --
     auto* p5 = makePage();
-    pages->addWidget(static_cast<QWidget*>(p5->widget()));
+    pages->addWidget(p5);
     auto* sysLay = pageLay(p5);
     addSection(tr("Безопасность"), sysLay);
     confirmModeCombo = new MemoryComboBox("confirmMode", this);
@@ -333,9 +332,19 @@ MainWindow::MainWindow(QWidget *parent)
     addSection(tr("Интерфейс"), sysLay);
     chatToggleBtn = new StyledButton(tr("Показать чат"), this);
     logToggleBtn = new StyledButton(tr("Показать лог"), this);
+    chatToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    logToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     sysLay->addWidget(chatToggleBtn);
     sysLay->addWidget(logToggleBtn);
     sysLay->addStretch();
+   // Set Expanding policy for all buttons on settings pages so they stretch to fill width
+    for (int i = 0; i < pages->count(); ++i) {
+        auto* page = qobject_cast<QWidget*>(pages->widget(i));
+        if (page) {
+            for (auto* btn : page->findChildren<StyledButton*>())
+                btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        }
+    }
 
     // Hidden buttons
     applyBtn = new StyledButton("Apply", this);
@@ -546,10 +555,8 @@ MainWindow::MainWindow(QWidget *parent)
     rightLayout->addLayout(btns);
     rightLayout->addWidget(m_log, 1);
     rightLayout->addWidget(m_chat, 1);*/
-    auto *settingsScroll = new QScrollArea(this);
-    settingsScroll->setWidgetResizable(true);
-    settingsScroll->setFrameShape(QFrame::NoFrame);
-    settingsScroll->setWidget(m_settingsPanel);
+    // Settings panel is its own scrollable container (pages have inner scroll)
+    m_settingsPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     // --------  5. Формируем layout: слева context, по центру основной контент, справа graph ----------
     m_centerSplitter = new MemorySplitter("MainWindowsCenterSplitter", Qt::Vertical, this);
@@ -581,7 +588,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     QTabWidget *rootTabs = new QTabWidget(this);
     rootTabs->addTab(mainSplitter, tr("Assistant"));
-    rootTabs->addTab(settingsScroll, tr("Settings"));
+    rootTabs->addTab(m_settingsPanel, tr("Settings"));
 
     // Задаём начальные размеры (опционально)
     setCentralWidget(rootTabs);
