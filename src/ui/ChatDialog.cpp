@@ -97,10 +97,11 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     
     // Create a horizontal layout for the send/stop buttons
     auto buttonsLayout = new QHBoxLayout();
-    buttonsLayout->addWidget(m_send);
-    buttonsLayout->addWidget(m_stop);
-    buttonsLayout->addWidget(m_attachBtn);
-    buttonsLayout->addWidget(m_micBtn);
+    buttonsLayout->setSpacing(6);
+    buttonsLayout->addWidget(m_send, 0, Qt::AlignVCenter);
+    buttonsLayout->addWidget(m_stop, 0, Qt::AlignVCenter);
+    buttonsLayout->addWidget(m_attachBtn, 0, Qt::AlignVCenter);
+    buttonsLayout->addWidget(m_micBtn, 0, Qt::AlignVCenter);
     rightColumnLayout->addLayout(buttonsLayout);
     
     // Add the template selection combobox below the buttons

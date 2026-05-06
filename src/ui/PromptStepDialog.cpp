@@ -30,21 +30,21 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 {
     if (!parent) {
         setWindowTitle(QStringLiteral("Редактирование шага"));
-        resize(1280, 820);
-        setMinimumSize(1024, 700);
+        resize(900, 650);
+        setMinimumSize(600, 450);
     }
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(12, 12, 12, 12);
-    root->setSpacing(10);
+    root->setContentsMargins(8, 8, 8, 8);
+    root->setSpacing(6);
 
     auto *splitter = new QSplitter(Qt::Horizontal, this);
     splitter->setChildrenCollapsible(false);
     splitter->setOpaqueResize(true);
-    splitter->setHandleWidth(12);
+    splitter->setHandleWidth(6);
     splitter->setStyleSheet(
         "QSplitter::handle:horizontal {"
-        "  width: 12px;"
+        "  width: 6px;"
         "  background: #c8def8;"
         "  border-left: 1px solid #5A9;"
         "  border-right: 1px solid #5A9;"
@@ -54,37 +54,38 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 
     // ---------- Left panel: editor tools ----------
     auto *leftPanel = new QWidget(splitter);
-    leftPanel->setMinimumWidth(360);
+    leftPanel->setMinimumWidth(240);
     auto *leftLay = new QVBoxLayout(leftPanel);
-    leftLay->setContentsMargins(0, 0, 0, 0);
-    leftLay->setSpacing(8);
+    leftLay->setContentsMargins(4, 4, 4, 4);
+    leftLay->setSpacing(6);
 
     auto *tabs = new QTabWidget(leftPanel);
+    tabs->setDocumentMode(true);
     tabs->setUsesScrollButtons(true);
     if (tabs->tabBar())
         tabs->tabBar()->setElideMode(Qt::ElideRight);
     if (tabs->tabBar())
         tabs->tabBar()->setExpanding(false);
     tabs->setStyleSheet(
-        "QTabWidget::tab-bar { left: 8px; }"
+        "QTabWidget::tab-bar { left: 4px; }"
         "QTabWidget::pane {"
         "  border: 1px solid #8ed9cf;"
-        "  border-radius: 6px;"
+        "  border-radius: 4px;"
         "  background-color: #ffffff;"
         "}"
         "QTabBar::tab {"
-        "  font: 600 10pt \"Segoe UI Variable\";"
+        "  font: 600 9pt \"Segoe UI Variable\";"
         "  color: #0f172a;"
         "  background-color: #dff8f3;"
         "  border: 1px solid #8ed9cf;"
-        "  border-top-left-radius: 6px;"
-        "  border-top-right-radius: 6px;"
-        "  padding: 5px 10px;"
+        "  border-top-left-radius: 4px;"
+        "  border-top-right-radius: 4px;"
+        "  padding: 4px 8px;"
         "  margin-right: 1px;"
-        "  min-width: 120px;"
-        "  min-height: 30px;"
+        "  min-width: 60px;"
+        "  min-height: 24px;"
         "}"
-        "QTabBar::tab:first { margin-left: 2px; }"
+        "QTabBar::tab:first { margin-left: 1px; }"
         "QTabBar::tab:selected {"
         "  background-color: #ffffff;"
         "  border-bottom-color: #ffffff;"
@@ -98,14 +99,14 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
 
     // ---------- Right panel: template editor ----------
     auto *rightPanel = new QWidget(splitter);
-    rightPanel->setMinimumWidth(560);
+    rightPanel->setMinimumWidth(280);
     rightPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     auto *rightLay = new QVBoxLayout(rightPanel);
-    rightLay->setContentsMargins(0, 0, 0, 0);
-    rightLay->setSpacing(8);
+    rightLay->setContentsMargins(6, 6, 6, 6);
+    rightLay->setSpacing(6);
 
     auto *editorTitle = new QLabel(QStringLiteral("Шаблон шага"), rightPanel);
-    editorTitle->setStyleSheet("QLabel { font: 18px \"Arial\", sans-serif; font-weight: 600; }");
+    editorTitle->setStyleSheet("QLabel { font: 13px \"Segoe UI Variable\", sans-serif; font-weight: 600; color: #0f172a; }");
     rightLay->addWidget(editorTitle);
 
     m_templateEdit = new StyleTextEdit(rightPanel);
@@ -116,22 +117,27 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     splitter->addWidget(rightPanel);
 
     splitter->setStretchFactor(0, 1);
-    splitter->setStretchFactor(1, 5);
+    splitter->setStretchFactor(1, 2);
 
     for (int i = 1; i < splitter->count(); ++i) {
         if (auto *h = splitter->handle(i))
             h->setCursor(Qt::SplitHCursor);
     }
 
+    // Set initial sizes proportional to minimums
     QTimer::singleShot(0, this, [splitter]() {
-        splitter->setSizes({380, 900});
+        QList<int> sizes;
+        for (int i = 0; i < splitter->count(); ++i) {
+            sizes.append(splitter->widget(i)->minimumWidth() + 60);
+        }
+        splitter->setSizes(sizes);
     });
 
     // ========== Tab: Inserts ==========
     auto *insertTab = new QWidget(tabs);
     auto *insertLay = new QVBoxLayout(insertTab);
-    insertLay->setContentsMargins(12, 12, 12, 12);
-    insertLay->setSpacing(10);
+    insertLay->setContentsMargins(6, 6, 6, 6);
+    insertLay->setSpacing(6);
 
     auto *insertHint = new QLabel(QStringLiteral("Вставка переменных в шаблон (формат: {{TOKEN}})."), insertTab);
     insertHint->setWordWrap(true);
@@ -194,8 +200,8 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     // ========== Tab: Commands ==========
     auto *cmdTab = new QWidget(tabs);
     auto *cmdLay = new QVBoxLayout(cmdTab);
-    cmdLay->setContentsMargins(12, 12, 12, 12);
-    cmdLay->setSpacing(10);
+    cmdLay->setContentsMargins(6, 6, 6, 6);
+    cmdLay->setSpacing(6);
 
     auto *cmdTitle = new QLabel(QStringLiteral("Разрешённые команды для этого шага (попадают в {{SUPPORTED_COMMANDS}})."), cmdTab);
     cmdTitle->setWordWrap(true);
@@ -250,8 +256,8 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     // ========== Tab: Sequences ==========
     auto *seqTab = new QWidget(tabs);
     auto *seqLay = new QVBoxLayout(seqTab);
-    seqLay->setContentsMargins(12, 12, 12, 12);
-    seqLay->setSpacing(10);
+    seqLay->setContentsMargins(6, 6, 6, 6);
+    seqLay->setSpacing(6);
 
     auto *seqTitle = new QLabel(QStringLiteral("Доступные последовательности в шаблоне (связи для {{OPEN_SEQUENCE_INFO}})."), seqTab);
     seqTitle->setWordWrap(true);
@@ -286,8 +292,8 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     // ---------- Options (bottom) ----------
     auto *options = new QGroupBox(QStringLiteral("Параметры шага"), this);
     auto *optLay = new QVBoxLayout(options);
-    optLay->setContentsMargins(12, 12, 12, 12);
-    optLay->setSpacing(6);
+    optLay->setContentsMargins(8, 8, 8, 8);
+    optLay->setSpacing(4);
 
     m_loopCheck = new QCheckBox(QStringLiteral("Зациклить шаг (повторять до остановки)"), options);
     optLay->addWidget(m_loopCheck);
