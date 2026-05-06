@@ -67,6 +67,7 @@
 #include "controllers/TaskStatusController.h"
 #include "controllers/ProjectBrowserController.h"
 #include "controllers/SettingsPageBuilder.h"
+#include "controllers/ContextCacheManager.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -297,28 +298,9 @@ private:
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
     SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
+    ContextCacheManager m_contextCache; // Manages context slices cache
 
-    struct ContextRange {
-        int startLine = -1;
-        int endLine = -1;
-        QStringList lines;
-    };
-    struct FileContextSlice {
-        enum Mode { None, FullFile, Ranges } mode = None;
-        QStringList fullFileLines;
-        QVector<ContextRange> regions;
-    };
-
-    QMap<QString, FileContextSlice> m_contextSlices;
-    QStringList m_consoleLogs;
-    QStringList m_externalSources;
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
-
-    void rebuildContextCache();
-    QString formatNumberedLines(const QStringList& lines, int startLine) const;
-    void setFullFileContext(const QString& path, const QStringList& lines);
-    void addRegionContext(const QString& path, int startLine, const QStringList& lines);
-    void clearContextForPath(const QString& path);
     bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err);
     void handleOpenCommand(Command* cmd);
     void handlePostApplyContextCleanup(Command* cmd);

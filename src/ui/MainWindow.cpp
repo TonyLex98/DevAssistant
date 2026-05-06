@@ -1365,8 +1365,8 @@ QString MainWindow::buildProjectContext() const
     }
 
     // ---------- Контент файлов, открытых командой OPEN_FILE ----------
-    if (!m_contextContent.isEmpty())
-        s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextContent + "\n";
+    if (!m_contextCache.contextContent().isEmpty())
+        s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextCache.contextContent() + "\n";
 
     // ---------- Context chain from command execution ----------
     if (m_contextManager) {
@@ -1806,7 +1806,7 @@ void MainWindow::handleAssistantFinished()
                     }
                 } else { snippet = txt; }
                 if (!snippet.isEmpty()) {
-                    m_contextContent += QString("\n==== %1 ====%2\n%3\n").arg(path).arg(c->name()=="OPEN_FILE_REGION"?" (region)":"").arg(snippet);
+                    m_contextCache.appendExternalSource(QString("\n==== %1 ====%2\n%3\n").arg(path).arg(c->name()=="OPEN_FILE_REGION"?" (region)":"").arg(snippet));
                 }
             }
         }
@@ -2230,10 +2230,10 @@ void MainWindow::handleAssistantFinished()
                 addCommandToContext(c, c->getResult());
             }
         } else if (c->name() == "CONTEXT_SHOW") {
-            rebuildContextCache();
+            m_contextCache.rebuildContextCache();
             int maxChars = c->params().value("maxChars").toInt(8000);
             if (maxChars <= 0) maxChars = 0;
-            QString ctx = m_contextContent;
+            QString ctx = m_contextCache.contextContent();
             if (maxChars > 0 && ctx.size() > maxChars) {
                 ctx = ctx.left(maxChars) + "\n[...truncated...]";
             }
@@ -2257,14 +2257,14 @@ void MainWindow::handleAssistantFinished()
             const QString scope = c->params().value("scope").toString().trimmed().toLower();
 
             // Clear file-based context cache
-            m_contextSlices.clear();
+            m_contextCache.clearAll();
             m_fileToContextCommands.clear();
             if (m_fileWatcher)
                 m_fileWatcher->removePaths(m_fileWatcher->files());
 
             // Clear console/external context caches
-            m_consoleLogs.clear();
-            m_externalSources.clear();
+            m_contextCache.clearConsoleLogs();
+            m_contextCache.clearExternalSources();
             m_shellCommandOutputs.clear();
             m_pythonScriptOutputs.clear();
 
@@ -2275,7 +2275,7 @@ void MainWindow::handleAssistantFinished()
                     m_contextManager->clearActiveContextOnly();
             }
 
-            rebuildContextCache();
+            m_contextCache.rebuildContextCache();
 
             const QString result = QString("CONTEXT_CLEAR\n[scope]\n%1\n[status]\nOK").arg(scope.isEmpty() ? "active" : scope);
             m_history.push_back(qMakePair(QString("system"), result));
@@ -2819,7 +2819,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
     if (text.endsWith('\n') && !allLines.isEmpty())
         allLines.removeLast();
     if (cmd->name() == "OPEN_FILE") {
-        setFullFileContext(normalized, allLines);
+        m_contextCache.setFullFileContext(normalized, allLines);
         // Track that this file's content is in context from OPEN_FILE command
         m_fileToContextCommands[normalized].insert("OPEN_FILE");
         // Add file to watcher to monitor for external changes
@@ -2883,7 +2883,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
     }
 
     if (!snippet.isEmpty()) {
-        addRegionContext(normalized, startLine, snippet);
+        m_contextCache.addRegionContext(normalized, startLine, snippet);
         // Track that this file's content is in context from OPEN_FILE_REGION command
         m_fileToContextCommands[normalized].insert("OPEN_FILE_REGION");
         // Add file to watcher to monitor for external changes
@@ -2892,138 +2892,13 @@ void MainWindow::handleOpenCommand(Command* cmd)
         }
         // Add command to context manager - include the actual numbered content
         if (m_contextManager) {
-            QString numberedContent = formatNumberedLines(snippet, startLine);
+            QString numberedContent = m_contextCache.formatNumberedLines(snippet, startLine);
             QString result = QString("OPEN_FILE_REGION: %1\n%2").arg(rawPath, numberedContent);
             addCommandToContext(cmd, result);
         }
     }
 }
 
-void MainWindow::rebuildContextCache()
-{
-    QStringList blocks;
-    for (auto it = m_contextSlices.cbegin(); it != m_contextSlices.cend(); ++it) {
-        const FileContextSlice& slice = it.value();
-        if (slice.mode == FileContextSlice::None)
-            continue;
-
-        QString block = QString("==== %1 ====")
-                .arg(displayContextPath(it.key(), m_projectRoot));
-        if (slice.mode == FileContextSlice::Ranges)
-            block += " (selected lines)";
-        block += "\n";
-
-        if (slice.mode == FileContextSlice::FullFile) {
-            block += formatNumberedLines(slice.fullFileLines, 1);
-        } else {
-            for (const ContextRange& range : slice.regions) {
-                // Include only the numbered lines without the range header for cleaner output
-                block += formatNumberedLines(range.lines, range.startLine);
-                block += "\n";
-            }
-            block = block.trimmed();
-        }
-        blocks << block.trimmed();
-    }
-    m_contextContent = blocks.join("\n\n");
-    if (!m_consoleLogs.isEmpty()) {
-        if (!m_contextContent.isEmpty())
-            m_contextContent += "\n\n";
-        m_contextContent += m_consoleLogs.join("\n\n");
-    }
-    if (!m_externalSources.isEmpty()) {
-        if (!m_contextContent.isEmpty())
-            m_contextContent += "\n\n";
-        m_contextContent += m_externalSources.join("\n\n");
-    }
-
-    // If ContextManager is available, append its generated context
-    if (m_contextManager) {
-        QString contextManagerContent = m_contextManager->generateContextText();
-        if (!contextManagerContent.isEmpty()) {
-            if (!m_contextContent.isEmpty()) {
-                m_contextContent += "\n\n";
-            }
-            m_contextContent += contextManagerContent;
-        }
-    }
-}
-
-QString MainWindow::formatNumberedLines(const QStringList& lines, int startLine) const
-{
-    if (lines.isEmpty())
-        return QString();
-    const int width = QString::number(startLine + lines.size() - 1).size();
-    QStringList numbered;
-    for (int i = 0; i < lines.size(); ++i) {
-        const int lineNo = startLine + i;
-        numbered << QString("%1| %2")
-                        .arg(lineNo, width, 10, QChar('0'))
-                        .arg(lines.at(i));
-    }
-    return numbered.join("\n");
-}
-
-void MainWindow::setFullFileContext(const QString& path, const QStringList& lines)
-{
-    const QString normalized = normalizeContextPath(path, m_projectRoot);
-    if (normalized.isEmpty())
-        return;
-    FileContextSlice& slice = m_contextSlices[normalized];
-    slice.mode = FileContextSlice::FullFile;
-    slice.fullFileLines = lines;
-    slice.regions.clear();
-    rebuildContextCache();
-}
-
-void MainWindow::addRegionContext(const QString& path, int startLine, const QStringList& lines)
-{
-    const QString normalized = normalizeContextPath(path, m_projectRoot);
-    if (normalized.isEmpty() || lines.isEmpty())
-        return;
-
-    FileContextSlice& slice = m_contextSlices[normalized];
-    slice.mode = FileContextSlice::Ranges;
-    slice.fullFileLines.clear();
-
-    ContextRange incoming;
-    incoming.startLine = startLine;
-    incoming.lines = lines;
-    incoming.endLine = startLine + lines.size() - 1;
-
-    bool replaced = false;
-    for (ContextRange& existing : slice.regions) {
-        if (existing.startLine == incoming.startLine && existing.endLine == incoming.endLine) {
-            existing.lines = lines;
-            replaced = true;
-            break;
-        }
-    }
-    if (!replaced) {
-        slice.regions.append(incoming);
-        std::sort(slice.regions.begin(), slice.regions.end(),
-                  [](const ContextRange& a, const ContextRange& b){
-                      return a.startLine < b.startLine;
-                  });
-    }
-    rebuildContextCache();
-}
-
-void MainWindow::clearContextForPath(const QString& path)
-{
-    const QString normalized = normalizeContextPath(path, m_projectRoot);
-    if (normalized.isEmpty())
-        return;
-    if (m_contextSlices.remove(normalized) > 0) {
-        rebuildContextCache();
-    }
-    // Remove from file watcher if it was being monitored
-    if (m_fileWatcher->files().contains(normalized)) {
-        m_fileWatcher->removePath(normalized);
-    }
-    // Remove from file-to-context-commands mapping
-    m_fileToContextCommands.remove(normalized);
-}
 
 bool MainWindow::applyGroupedEditInRange(const QList<Command*>& commands, QString* err)
 {
@@ -3039,7 +2914,7 @@ bool MainWindow::applyGroupedEditInRange(const QList<Command*>& commands, QStrin
     for (auto it = grouped.begin(); it != grouped.end(); ++it) {
         if (!EditInRangeCommand::applyBatch(it.value(), &m_dev_manager, err))
             return false;
-        clearContextForPath(it.key());
+        m_contextCache.clearContextForPath(it.key());
     }
     return true;
 }
@@ -3050,7 +2925,7 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     const QJsonObject p = cmd->params();
     auto clear = [&](const QString& key) {
         if (!key.isEmpty())
-            clearContextForPath(key);
+            m_contextCache.clearContextForPath(key);
     };
 
     if (name == "EDIT_IN_RANGE" || name == "REPLACE_IN_FILE"
@@ -3077,21 +2952,13 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     }
 
     if (name == "APPLY_PATCH") {
-        const auto keys = m_contextSlices.keys();
-        for (const QString& k : keys) {
-            clearContextForPath(k);
-        }
-        rebuildContextCache();
+        m_contextCache.clearAll();
         return;
     }
 
     if (name == "UNDO_LAST_CHANGE") {
         // We don't know which files changed; clear all file-context slices.
-        const auto keys = m_contextSlices.keys();
-        for (const QString& k : keys) {
-            clearContextForPath(k);
-        }
-        rebuildContextCache();
+        m_contextCache.clearAll();
         return;
     }
 
@@ -3099,14 +2966,8 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
     if (name == "RUN_SHELL") {
         QString command = p.value("command").toString();
         if (!command.isEmpty()) {
-            // Remove existing output for this shell command
-            auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
-                [&command](const QString& log) {
-                    return log.startsWith("==== RUN_SHELL: " + command);
-                });
-            m_consoleLogs.erase(it, m_consoleLogs.end());
+            m_contextCache.removeConsoleLogsWithPrefix("==== RUN_SHELL: " + command);
             m_shellCommandOutputs.remove(command);
-            rebuildContextCache();
         }
         return;
     }
@@ -3118,14 +2979,8 @@ void MainWindow::handlePostApplyContextCleanup(Command* cmd)
         QString identifier = !scriptPath.isEmpty() ? scriptPath : "inline code";
 
         if (!identifier.isEmpty()) {
-            // Remove existing output for this Python script/command
-            auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
-                [&identifier](const QString& log) {
-                    return log.startsWith("==== RUN_PYTHON: " + identifier);
-                });
-            m_consoleLogs.erase(it, m_consoleLogs.end());
+            m_contextCache.removeConsoleLogsWithPrefix("==== RUN_PYTHON: " + identifier);
             m_pythonScriptOutputs.remove(identifier);
-            rebuildContextCache();
         }
         return;
     }
@@ -3195,7 +3050,7 @@ void MainWindow::handleSearchResults(Command* cmd)
 
 QString MainWindow::searchResultsText() const
 {
-    return m_externalSources.join("\n\n");
+    return m_contextCache.externalSources().join("\n\n");
 }
 
 void MainWindow::appendConsoleContext(const QString& title,
@@ -3215,42 +3070,41 @@ void MainWindow::appendConsoleContext(const QString& title,
     // If this is a RUN_SHELL command output, replace existing output for the same command
     if (title.startsWith("RUN_SHELL: ")) {
         QString cmd = title.mid(11); // Extract the command part after "RUN_SHELL: "
-        // Remove existing output for this command
-        auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
-            [&cmd](const QString& log) {
-                return log.startsWith("==== RUN_SHELL: " + cmd);
-            });
-        m_consoleLogs.erase(it, m_consoleLogs.end());
+        m_contextCache.removeConsoleLogsWithPrefix("==== RUN_SHELL: " + cmd);
         m_shellCommandOutputs.remove(cmd);
     }
     // If this is a RUN_PYTHON command output, replace existing output for the same script
     else if (title.startsWith("RUN_PYTHON: ")) {
         QString script = title.mid(12); // Extract the script part after "RUN_PYTHON: "
-        // Remove existing output for this script
-        auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
-            [&script](const QString& log) {
-                return log.startsWith("==== RUN_PYTHON: " + script);
-            });
-        m_consoleLogs.erase(it, m_consoleLogs.end());
+        m_contextCache.removeConsoleLogsWithPrefix("==== RUN_PYTHON: " + script);
         m_pythonScriptOutputs.remove(script);
     }
 
-    m_consoleLogs << block.trimmed();
-    const int maxLogs = 5;
-    while (m_consoleLogs.size() > maxLogs)
-        m_consoleLogs.removeFirst();
-    rebuildContextCache();
+    m_contextCache.appendConsoleLog(block.trimmed());
+    // Limit to 5 logs
+    while (m_contextCache.consoleLogs().size() > 5) {
+        auto logs = m_contextCache.consoleLogs();
+        m_contextCache.clearConsoleLogs();
+        for (int i = 0; i < qMin(5, logs.size()); ++i) {
+            m_contextCache.appendConsoleLog(logs.at(i));
+        }
+    }
 }
 
 void MainWindow::appendExternalContext(const QString& block)
 {
     if (block.trimmed().isEmpty())
         return;
-    m_externalSources << block.trimmed();
-    const int maxBlocks = 5;
-    while (m_externalSources.size() > maxBlocks)
-        m_externalSources.removeFirst();
-    rebuildContextCache();
+    m_contextCache.appendExternalSource(block.trimmed());
+    // Limit to 5 blocks
+    while (m_contextCache.externalSources().size() > 5) {
+        // Workaround: clear and re-add all but first 5
+        auto sources = m_contextCache.externalSources();
+        m_contextCache.clearExternalSources();
+        for (int i = 0; i < qMin(5, sources.size()); ++i) {
+            m_contextCache.appendExternalSource(sources.at(i));
+        }
+    }
 }
 
 void MainWindow::resetSequenceStabilityState()
@@ -4452,7 +4306,7 @@ void MainWindow::onFileChanged(const QString &path)
             qDebug() << "[MainWindow] Clearing context for file due to external change:" << path;
 
             // Clear contexts related to this file
-            clearContextForPath(path);
+            m_contextCache.clearContextForPath(path);
 
             // Also remove from file-to-commands mapping
             m_fileToContextCommands.remove(path);
