@@ -232,6 +232,9 @@ private:
     StyledButton* runSeqBtn;
     StyledButton *editSeqBtn;
     StyledButton *newSeqBtn;
+    StyledButton *runTemplateBtn;
+    StyledButton *editTemplatesBtn;
+    StyledButton *exportSequenceAsTemplateBtn;
     MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
     StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка

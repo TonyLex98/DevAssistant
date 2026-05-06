@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFileDialog>
@@ -30,6 +30,7 @@
 #include <QFileInfo>
 #include <QTimer>
 #include <QScrollArea>
+#include <QStackedWidget>
 #include <algorithm>
 #include "../command/EditInRangeCommand.h"
 #include "../command/RunShellCommand.h"
@@ -172,250 +173,199 @@ MainWindow::MainWindow(QWidget *parent)
     // 3.2   Список файлов
     m_files = new QListWidget(this);
 
-    // 3.3   Settings tab content
+    // 3.3   Settings tab content — sidebar + pages
     m_settingsPanel = new QWidget(this);
     m_settingsPanel->setWindowTitle(tr("Settings"));
     m_settingsPanel->setAttribute(Qt::WA_DeleteOnClose, false);
     m_settingsPanel->setAttribute(Qt::WA_StyledBackground, true);
     m_settingsPanel->setObjectName("settingsPanel");
     m_settingsPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_settingsPanel->setStyleSheet(
-        "QWidget#settingsPanel {"
-        "  background: #f8fffd;"
-        "  border: 1px solid #86d8cc;"
-        "  border-radius: 10px;"
-        "}"
-        "QWidget#settingsPanel QLabel[sectionTitle=\"true\"] {"
-        "  color: #0f766e;"
-        "  font: 600 9pt \"Segoe UI Variable\";"
-        "  padding: 2px 0px;"
-        "}"
-        "QWidget#settingsPanel QFrame[sectionDivider=\"true\"] {"
-        "  background: #bdebe4;"
-        "  min-height: 1px;"
-        "  max-height: 1px;"
-        "  border: none;"
-        "}"
+
+    auto* settingsRoot = new QHBoxLayout(m_settingsPanel);
+    settingsRoot->setContentsMargins(12, 12, 12, 12);
+    settingsRoot->setSpacing(12);
+
+    // ---- Sidebar ----
+    auto* sidebar = new QListWidget(this);
+    sidebar->setMaximumWidth(180);
+    sidebar->setMinimumWidth(140);
+    sidebar->setStyleSheet(
+        "QListWidget { background: #fff; border: 1px solid #8ed9cf; border-radius: 8px; padding: 6px; }"
+        "QListWidget::item { padding: 8px 12px; border-radius: 6px; margin: 2px 0; font: 9pt \"Segoe UI Variable\"; color: #334155; }"
+        "QListWidget::item:selected { background: #dff8f3; color: #0f766e; font-weight: 600; }"
+        "QListWidget::item:hover { background: #e6f5f1; }"
     );
-    QVBoxLayout *settingsLayout = new QVBoxLayout(m_settingsPanel);
-    settingsLayout->setSpacing(7);
-    settingsLayout->setContentsMargins(10, 10, 10, 10);
-    settingsLayout->setSizeConstraint(QLayout::SetDefaultConstraint);
+    sidebar->addItem("📁  Проект");
+    sidebar->addItem("🤖  Модель");
+    sidebar->addItem("📋  Последовательности");
+    sidebar->addItem("📊  Графики");
+    sidebar->addItem("🔊  Аудио");
+    sidebar->addItem("⚙️  Система");
+    settingsRoot->addWidget(sidebar, 0);
 
-    auto addSettingsSection = [this, settingsLayout](const QString &title) {
-        auto *section = new QLabel(title, m_settingsPanel);
-        section->setProperty("sectionTitle", true);
-        settingsLayout->addWidget(section);
+    // ---- Pages stack ----
+    auto* pages = new QStackedWidget(this);
+    pages->setStyleSheet("QStackedWidget { background: transparent; }");
+    settingsRoot->addWidget(pages, 1);
+    connect(sidebar, &QListWidget::currentRowChanged, pages, &QStackedWidget::setCurrentIndex);
+
+    // Helper: scrollable page
+    auto makePage = []() -> QScrollArea* {
+        auto* s = new QScrollArea();
+        s->setWidgetResizable(true);
+        s->setFrameShape(QFrame::NoFrame);
+        s->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        auto* w = new QWidget();
+        w->setStyleSheet("QWidget { background: #f8fffd; }");
+        auto* l = new QVBoxLayout(w);
+        l->setContentsMargins(12, 12, 12, 12);
+        l->setSpacing(8);
+        s->setWidget(w);
+        return s;
     };
-    auto addSettingsDivider = [this, settingsLayout]() {
-        auto *line = new QFrame(m_settingsPanel);
-        line->setFrameShape(QFrame::HLine);
-        line->setProperty("sectionDivider", true);
-        settingsLayout->addWidget(line);
+    auto pageLay = [](QScrollArea* s) -> QVBoxLayout* {
+        return static_cast<QVBoxLayout*>(static_cast<QWidget*>(s->widget())->layout());
+    };
+    auto addSection = [](const QString& t, QVBoxLayout* l) {
+        auto* lb = new QLabel(t);
+        lb->setStyleSheet("QLabel { color: #0f766e; font: 600 11pt \"Segoe UI Variable\"; padding: 4px 0; }");
+        l->addWidget(lb);
+    };
+    auto addDiv = [](QVBoxLayout* l) {
+        auto* ln = new QFrame();
+        ln->setFrameShape(QFrame::HLine);
+        ln->setStyleSheet("QFrame { background: #bdebe4; min-height: 1px; max-height: 1px; border: none; }");
+        l->addWidget(ln);
     };
 
-    addSettingsSection(tr("Project Path"));
-    settingsLayout->addWidget(top_widget);
-    addSettingsDivider();
+    // -- Page 0: Project --
+    auto* p0 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p0->widget()));
+    auto* projLay = pageLay(p0);
+    addSection(tr("Путь к проекту"), projLay);
+    projLay->addWidget(top_widget);
+    addDiv(projLay);
+    addSection(tr("Действия"), projLay);
+    rescanBtn = new StyledButton(tr("Обновить проект"), this);
+    descBtn = new StyledButton(tr("Сгенерировать описания"), this);
+    projLay->addWidget(rescanBtn);
+    projLay->addWidget(descBtn);
+    projLay->addStretch();
 
-    rescanBtn   = new StyledButton("Rescan", this);
-    settingsBtn = new StyledButton("LLM Settings", this);
-    promptBtn   = new StyledButton("Edit Base Prompt", this);
-    applyBtn    = new StyledButton("Apply changes", this);
-    undoBtn     = new StyledButton("Undo", this);
-    descBtn     = new StyledButton("Generate Descriptions", this);
-    addSettingsSection(tr("Project"));
-    settingsLayout->addWidget(rescanBtn);
-    settingsLayout->addWidget(settingsBtn);
-    m_llmSettingsWindow = new OllamaSettingsDialog(m_settingsPanel);
+    // -- Page 1: Model --
+    auto* p1 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p1->widget()));
+    auto* llmLay = pageLay(p1);
+    addSection(tr("Настройки модели"), llmLay);
+    settingsBtn = new StyledButton(tr("Открыть настройки LLM"), this);
+    promptBtn = new StyledButton(tr("Редактировать базовый промпт"), this);
+    llmLay->addWidget(settingsBtn);
+    llmLay->addWidget(promptBtn);
+    addDiv(llmLay);
+    m_llmSettingsWindow = new OllamaSettingsDialog(this);
     m_llmSettingsWindow->setVisible(false);
-    settingsLayout->addWidget(m_llmSettingsWindow);
-    settingsLayout->addWidget(descBtn);
-    addSettingsDivider();
-    addSettingsSection(tr("Sequences"));
+    llmLay->addWidget(m_llmSettingsWindow);
+    llmLay->addStretch();
 
-    runSeqBtn  = new StyledButton(tr("Запустить шаблон/последовательность"));
-    //btns->addWidget(runSeqBtn);
+    // -- Page 2: Sequences --
+    auto* p2 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p2->widget()));
+    auto* seqLay = pageLay(p2);
+    addSection(tr("Последовательности"), seqLay);
+    editSeqBtn = new StyledButton(tr("Редактировать"), this);
+    newSeqBtn = new StyledButton(tr("Создать"), this);
+    runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
+    editTemplatesBtn = new StyledButton(tr("Редактировать шаблоны"), this);
+    exportSequenceAsTemplateBtn = new StyledButton(tr("Экспорт как шаблон"), this);
+    seqLay->addWidget(editSeqBtn);
+    seqLay->addWidget(newSeqBtn);
+    seqLay->addWidget(runTemplateBtn);
+    seqLay->addWidget(editTemplatesBtn);
+    seqLay->addWidget(exportSequenceAsTemplateBtn);
+    seqLay->addStretch();
+
+    // -- Page 3: Graphs --
+    auto* p3 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p3->widget()));
+    auto* graphLay = pageLay(p3);
+    addSection(tr("Визуализация"), graphLay);
+    graphBtn = new StyledButton(tr("Граф контекста"), this);
+    seqGraphBtn = new StyledButton(tr("Граф последовательностей"), this);
+    lightRagBtn = new StyledButton(tr("LightRAG"), this);
+    graphLay->addWidget(graphBtn);
+    graphLay->addWidget(seqGraphBtn);
+    graphLay->addWidget(lightRagBtn);
+    graphLay->addStretch();
+    connect(graphBtn, &StyledButton::clicked, this, &MainWindow::openGraph);
+    connect(seqGraphBtn, &StyledButton::clicked, this, &MainWindow::openSequenceGraph);
+    connect(lightRagBtn, &StyledButton::clicked, this, &MainWindow::openLightRag);
+
+    // -- Page 4: Audio --
+    auto* p4 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p4->widget()));
+    auto* audioLay = pageLay(p4);
+    addSection(tr("Синтез речи (TTS)"), audioLay);
+    QSettings ttsSettings;
+    m_ttsEnabled = ttsSettings.value("tts/enabled", true).toBool();
+    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), this);
+    audioLay->addWidget(m_ttsToggleBtn);
+    audioLay->addStretch();
+    if (m_ttsEnabled) {
+        m_ttsRunner = new TtsRunner(this);
+        connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
+        connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& e){ log("TTS Error: "+e); });
+        connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this](){
+            if (m_chat && m_chat->isRecording()) m_chat->resumeRecordingAfterResponse();
+        });
+    }
+
+    // -- Page 5: System --
+    auto* p5 = makePage();
+    pages->addWidget(static_cast<QWidget*>(p5->widget()));
+    auto* sysLay = pageLay(p5);
+    addSection(tr("Безопасность"), sysLay);
+    confirmModeCombo = new MemoryComboBox("confirmMode", this);
+    confirmModeCombo->addItem("Автоподтверждение команд", "auto");
+    confirmModeCombo->addItem("Спрашивать подтверждение", "ask");
+    confirmModeCombo->setCurrentIndex(0);
+    sysLay->addWidget(confirmModeCombo);
+    addDiv(sysLay);
+    addSection(tr("Интерфейс"), sysLay);
+    chatToggleBtn = new StyledButton(tr("Показать чат"), this);
+    logToggleBtn = new StyledButton(tr("Показать лог"), this);
+    sysLay->addWidget(chatToggleBtn);
+    sysLay->addWidget(logToggleBtn);
+    sysLay->addStretch();
+
+    // Hidden buttons
+    applyBtn = new StyledButton("Apply", this);
+    undoBtn = new StyledButton("Undo", this);
+    applyBtn->hide();
+    undoBtn->hide();
+    runSeqBtn = new StyledButton(tr("Запустить"), this);
     runSeqBtn->hide();
-    StyledButton *runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
-    runTemplateBtn->hide();
-    // settings panel layout placeholder to be added later
-
-    editSeqBtn = new StyledButton(tr("Edit Sequences"), this);
-    newSeqBtn = new StyledButton("New sequence...", this);
-    settingsLayout->addWidget(editSeqBtn);
-    settingsLayout->addWidget(newSeqBtn);
 
     connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
 
-    // Connect the new template-only button
+    // -- Connections for page buttons --
     connect(runTemplateBtn, &StyledButton::clicked, this, [this]() {
-        // Directly open template mode
-        refreshAllSequences();
-        ensureDefaultSequence();
-
+        refreshAllSequences(); ensureDefaultSequence();
         RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
-        dlg.setTemplateModeOnly(); // Set to template mode
+        dlg.setTemplateModeOnly();
         if (dlg.exec() != QDialog::Accepted) return;
-
         if (dlg.selectedMode() != RunTemplateOrSequenceDialog::RunTemplate) {
-            QMessageBox::warning(this, "Ошибка", "Необходимо выбрать шаблон.");
-            return;
+            QMessageBox::warning(this, "Ошибка", "Необходимо выбрать шаблон."); return;
         }
-
-        // Run template with selected sequence
-        QString templatePath = dlg.selectedTemplatePath();
-        QString sequencePath = dlg.selectedDefaultSequencePath();
-
-        if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
-            QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
-            return;
+        QString sp = dlg.selectedDefaultSequencePath();
+        if (sp.isEmpty() || !QFile::exists(sp)) {
+            QMessageBox::warning(this, "Ошибка", "Последовательность не найдена."); return;
         }
-
-        // Load the selected sequence
-        PromptSequence seq;
-        QFile seqFile(sequencePath);
-        if (seqFile.open(QIODevice::ReadOnly)) {
-            QByteArray data = seqFile.readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isObject()) {
-                seq = PromptSequence::fromJson(doc.object());
-            }
-        }
-
-        if (seq.name().isEmpty()) {
-            QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
-            return;
-        }
-
-        m_currentSeq = seq;
-        m_currentStepIdx = 0;
-        m_sequenceMode = true;
-        updateSequenceGraphHighlight();  // Update the graph highlighting
-        runNextStep();   // сразу стартуем первый шаг
+        PromptSequence seq; QFile sf(sp);
+        if (sf.open(QIODevice::ReadOnly)) seq = PromptSequence::fromJson(QJsonDocument::fromJson(sf.readAll()).object());
+        if (seq.name().isEmpty()) { QMessageBox::warning(this, "Ошибка", "Не удалось загрузить."); return; }
+        m_currentSeq = seq; m_currentStepIdx = 0; m_sequenceMode = true;
+        updateSequenceGraphHighlight(); runNextStep();
     });
-
-    // Add a direct button for the main "Прогер" template
-    StyledButton *runProgTemplateBtn = new StyledButton(tr("Запустить Прогер-шаблон"), this);
-    runProgTemplateBtn->hide();
-    //btns->addWidget(runProgTemplateBtn);
-
-    connect(runProgTemplateBtn, &StyledButton::clicked, this, [this]() {
-        refreshAllSequences();
-        ensureDefaultSequence();
-
-        // Look for the "Прогер" template specifically
-        const QMap<QString, SolutionTemplate>& templates = m_templateMgr.templates();
-        QString progTemplatePath;
-        for (auto it = templates.constBegin(); it != templates.constEnd(); ++it) {
-            if (it.value().name() == "Прогер" || it.value().name().contains("Прогер", Qt::CaseInsensitive)) {
-                progTemplatePath = it.key();
-                break;
-            }
-        }
-
-        if (progTemplatePath.isEmpty()) {
-            QMessageBox::warning(this, "Ошибка", "Шаблон 'Прогер' не найден. Пожалуйста, убедитесь, что он существует.");
-            // Fallback to normal template selection
-            RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
-            dlg.setTemplateModeOnly();
-            if (dlg.exec() != QDialog::Accepted) return;
-
-            QString templatePath = dlg.selectedTemplatePath();
-            QString sequencePath = dlg.selectedDefaultSequencePath();
-
-            if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
-                QMessageBox::warning(this, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
-                return;
-            }
-
-            PromptSequence seq;
-            QFile seqFile(sequencePath);
-            if (seqFile.open(QIODevice::ReadOnly)) {
-                QByteArray data = seqFile.readAll();
-                QJsonDocument doc = QJsonDocument::fromJson(data);
-                if (doc.isObject()) {
-                    seq = PromptSequence::fromJson(doc.object());
-                }
-            }
-
-            if (seq.name().isEmpty()) {
-                QMessageBox::warning(this, "Ошибка", "Не удалось загрузить выбранную последовательность.");
-                return;
-            }
-
-            m_currentSeq = seq;
-            m_currentStepIdx = 0;
-            m_sequenceMode = true;
-            m_currentSeqPath = sequencePath; // Track the sequence path for related sequence lookup
-            m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
-            updateSequenceGraphHighlight();
-            runNextStep();
-            return;
-        }
-
-        // Find the main sequence for the Прогер template
-        SolutionTemplate progTemplate = templates.value(progTemplatePath);
-        QString mainSequencePath = progTemplate.mainSequencePath();
-
-        // First, try to use the main sequence path as specified in the template file,
-        // resolved relative to the template directory
-        if (!mainSequencePath.isEmpty()) {
-            QString resolvedMainSeqPath = QDir(progTemplatePath).absoluteFilePath(mainSequencePath);
-            if (QFile::exists(resolvedMainSeqPath)) {
-                mainSequencePath = resolvedMainSeqPath;
-            } else {
-                // If the main sequence specified in template doesn't exist, fall back to first sequence
-                auto sequences = progTemplate.sequences();
-                if (!sequences.isEmpty()) {
-                    // Get the first sequence in the template directory
-                    mainSequencePath = QDir(progTemplatePath).absoluteFilePath(sequences[0]);
-                } else {
-                    mainSequencePath = ""; // No sequences available
-                }
-            }
-        } else {
-            // If no main sequence is set in template, use the first available sequence
-            auto sequences = progTemplate.sequences();
-            if (!sequences.isEmpty()) {
-                // Get the first sequence in the template directory
-                mainSequencePath = QDir(progTemplatePath).absoluteFilePath(sequences[0]);
-            }
-        }
-
-        if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
-            QMessageBox::warning(this, "Ошибка", "Основная последовательность для шаблона 'Прогер' не найдена.");
-            return;
-        }
-
-        // Load the main sequence
-        PromptSequence seq;
-        QFile seqFile(mainSequencePath);
-        if (seqFile.open(QIODevice::ReadOnly)) {
-            QByteArray data = seqFile.readAll();
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            if (doc.isObject()) {
-                seq = PromptSequence::fromJson(doc.object());
-            }
-        }
-
-        if (seq.name().isEmpty()) {
-            QMessageBox::warning(this, "Ошибка", "Не удалось загрузить основную последовательность шаблона 'Прогер'.");
-            return;
-        }
-
-        m_currentSeq = seq;
-        m_currentStepIdx = 0;
-        m_sequenceMode = true;
-        m_currentSeqPath = mainSequencePath; // Track the sequence path for related sequence lookup
-        m_currentSeqId = m_contextManager->startCommandSequence(m_currentSeq.name(), m_currentSeq.description()); // Start tracking this sequence
-        updateSequenceGraphHighlight();
-        runNextStep();
-    });
-
-    // Add button for solution templates
-    StyledButton *editTemplatesBtn = new StyledButton(tr("Edit Templates"), this);
-    settingsLayout->addWidget(editTemplatesBtn);
 
     connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
         // Create and show the template viewer
@@ -433,10 +383,6 @@ MainWindow::MainWindow(QWidget *parent)
 
         dialog.exec();
     });
-
-    // Add button to export selected sequence as template
-    StyledButton *exportSequenceAsTemplateBtn = new StyledButton(tr("Export Sequence as Template"), this);
-    settingsLayout->addWidget(exportSequenceAsTemplateBtn);
 
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
         // First, refresh sequence manager
@@ -502,92 +448,6 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // buttons already added to settings panel above
-    addSettingsDivider();
-    addSettingsSection(tr("Tools"));
-
-
-    // ---------- Добавляем кнопку «Show Graph» ----------
-    graphBtn = new StyledButton("Show Graph", this);
-    settingsLayout->addWidget(graphBtn);
-    connect(graphBtn, &StyledButton::clicked, this,
-            &MainWindow::openGraph);
-
-    // ---------- Добавляем кнопку «Show Sequence Graph» ----------
-    seqGraphBtn = new StyledButton("Show Sequence Graph", this);
-    settingsLayout->addWidget(seqGraphBtn);
-    connect(seqGraphBtn, &StyledButton::clicked, this,
-            &MainWindow::openSequenceGraph);
-
-    // ---------- Добавляем кнопку «LightRAG» ----------
-    lightRagBtn = new StyledButton("LightRAG", this);
-    settingsLayout->addWidget(lightRagBtn);
-    connect(lightRagBtn, &StyledButton::clicked, this,
-            &MainWindow::openLightRag);
-    // -------------------------------------------------
-
-    // ---------- Добавляем кнопку «TTS» ----------
-    // Load TTS state from settings (default: enabled)
-    QSettings ttsSettings;
-    m_ttsEnabled = ttsSettings.value("tts/enabled", true).toBool();
-    
-    m_ttsToggleBtn = new StyledButton(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), this);
-    settingsLayout->addWidget(m_ttsToggleBtn);
-    
-    // Initialize TTS if enabled
-    if (m_ttsEnabled) {
-        m_ttsRunner = new TtsRunner(this);
-        connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& msg) {
-            log("TTS: " + msg);
-        });
-        connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
-            log("TTS Error: " + err);
-        });
-        connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this]() {
-            // Resume recording after TTS finishes speaking
-            if (m_chat && m_chat->isRecording()) {
-                m_chat->resumeRecordingAfterResponse();
-            }
-        });
-    }
-    
-    connect(m_ttsToggleBtn, &StyledButton::clicked, this, [this]() {
-        m_ttsEnabled = !m_ttsEnabled;
-        m_ttsToggleBtn->setText(m_ttsEnabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"));
-        
-        // Save state to settings
-        QSettings settings;
-        settings.setValue("tts/enabled", m_ttsEnabled);
-        
-        if (m_ttsEnabled && !m_ttsRunner) {
-            m_ttsRunner = new TtsRunner(this);
-            connect(m_ttsRunner, &TtsRunner::statusMessage, this, [this](const QString& msg) {
-                log("TTS: " + msg);
-            });
-            connect(m_ttsRunner, &TtsRunner::errorOccurred, this, [this](const QString& err) {
-                log("TTS Error: " + err);
-            });
-            connect(m_ttsRunner, &TtsRunner::speakingFinished, this, [this]() {
-                // Resume recording after TTS finishes speaking
-                if (m_chat && m_chat->isRecording()) {
-                    m_chat->resumeRecordingAfterResponse();
-                }
-            });
-        }
-    });
-    // -------------------------------------------------
-
-
-    addSettingsDivider();
-    addSettingsSection(tr("Safety"));
-
-    // Add confirmation mode combo box
-    confirmModeCombo = new MemoryComboBox("confirmMode", this);
-    confirmModeCombo->addItem("Auto-confirm commands", "auto");
-    confirmModeCombo->addItem("Ask for command confirmation", "ask");
-    confirmModeCombo->setCurrentIndex(0); // Default to auto-confirm
-    settingsLayout->addWidget(confirmModeCombo);
-
     promptBtn->hide();
     applyBtn->hide();
     undoBtn->hide();
@@ -615,16 +475,11 @@ MainWindow::MainWindow(QWidget *parent)
                 openSequenceEditorForName(sequenceName);
             });
 
-    // Toggle button to show/hide chat
-    chatToggleBtn = new StyledButton(tr("Show chat"), this);
-    settingsLayout->addWidget(chatToggleBtn);
     connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_chat->isChatLogVisible();
         m_chat->setChatLogVisible(shouldShow);
         chatToggleBtn->setText(shouldShow ? tr("Hide chat") : tr("Show chat"));
     });
-    logToggleBtn = new StyledButton(tr("Show log"), this);
-    settingsLayout->addWidget(logToggleBtn);
     connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
         const bool shouldShow = !m_log->isVisible();
         m_log->setVisible(shouldShow);
@@ -635,7 +490,6 @@ MainWindow::MainWindow(QWidget *parent)
         btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         btn->setMinimumHeight(32);
     }
-    settingsLayout->addStretch(1);
 
     // 3.5 Result display widget
     m_resultDisplayWidget = new ResultDisplayWidget(this);
