@@ -66,6 +66,7 @@
 #include "controllers/TtsController.h"
 #include "controllers/TaskStatusController.h"
 #include "controllers/ProjectBrowserController.h"
+#include "controllers/SettingsPageBuilder.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -295,6 +296,7 @@ private:
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
+    SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
 
     struct ContextRange {
         int startLine = -1;
