@@ -68,6 +68,8 @@
 #include "controllers/ProjectBrowserController.h"
 #include "controllers/SettingsPageBuilder.h"
 #include "controllers/ContextCacheManager.h"
+#include "controllers/SequenceRunner.h"
+#include "controllers/SequenceEditorController.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -75,7 +77,12 @@ class OllamaSettingsDialog;
 class PromptEditorDialog;
 class ChangesDialog;
 
+class SequenceRunner;
+class SequenceEditorController;
+
 class MainWindow : public QMainWindow {
+    friend class SequenceRunner;
+    friend class SequenceEditorController;
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent=nullptr);
@@ -124,9 +131,10 @@ private slots:
     void onOmniAsrText(const QString&);
 
     void openGraph();
-    void openSequenceGraph();
-    void openSequenceEditorForName(const QString &sequenceName);
-    void updateSequenceGraphHighlight();  // Update the highlighted sequence in the graph
+    void openSequenceGraph();  // Forwarder to m_sequenceEditor
+    void openSequenceEditorForName(const QString &sequenceName);  // Forwarder
+    void updateSequenceGraphHighlight();  // Forwarder
+    void updateSequenceGraphTemplateSelection();  // Forwarder
 
     // New slots for template selection combobox in ChatDialog
     void runTemplateRequested(const QString &templatePath, const QString &text);
@@ -156,22 +164,20 @@ public:
     ProjectIndex& projectIndex() { return m_index; }  // Access to project index for structure resolver
 
 private slots:
-    void createNewSequence();
+    void createNewSequence();  // Forwarder to m_sequenceEditor
     //void onFileDoubleClicked(QListWidgetItem *item);
     void setupModelWithGenerationParams(); // Configure model with generation parameters
     void onFileChanged(const QString &path); // Handle external file changes
-    void onChatTemplateSelectionChanged(const QString &templatePath);
+    void onChatTemplateSelectionChanged(const QString &templatePath);  // Forwarder
 
 private:
     QString buildProjectContext() const;
     void log(const QString& m);
-    void openSequenceEditorWindow(const QString& title, const QString& filePath, const PromptSequence& seq);
 
     void sendUserMessage(const QString& text);
     void onModelChunk(const QString& s);
     QByteArray extractJsonPart(const QByteArray& txt) const;
-    void editSequences();
-    void updateSequenceGraphTemplateSelection();
+    void editSequences();  // Forwarder to m_sequenceEditor
 
 
 private:
@@ -219,10 +225,6 @@ private:
     bool m_inAgentAutoRepair = false;
     int m_agentRepairStepIdx = -1;
     QString m_agentRepairSeqId;
-    bool m_resultShownInCurrentRun = false;
-    int m_batchesWithoutResult = 0;
-    int m_sameBatchRepeatCount = 0;
-    QString m_lastBatchSignature;
 
     StyledButton* rescanBtn;
     StyledButton* settingsBtn;
@@ -262,9 +264,8 @@ private:
     // Вспомогательная функция для суммаризации результатов поиска
     QString summarizeSearchResults(const QString& content, const QString& query);
     /* ────── NEW ────── */
-    static PromptSequence defaultSequenceTemplate();   // шаблон по умолчанию
-    void ensureDefaultSequence();                      // создаём, если нет
-    void refreshAllSequences();                        // Refresh sequences from both PromptSequences and template folders
+    void ensureDefaultSequence();  // Forwarder to m_sequenceEditor
+    void refreshAllSequences();    // Forwarder to m_sequenceEditor
     /* ────── END ────── */
 
     void reOpenRootDir();
@@ -299,6 +300,8 @@ private:
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
     SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
     ContextCacheManager m_contextCache; // Manages context slices cache
+    SequenceRunner* m_sequenceRunner{nullptr}; // Sequence execution orchestrator
+    SequenceEditorController* m_sequenceEditor{nullptr}; // Sequence editor controller
 
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
     bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err);
