@@ -4,9 +4,7 @@
 #include <PromptSequence.h>
 #include <PromptSequenceManager.h>
 #include <SolutionTemplateManager.h>
-
-class MainWindow;
-class SequenceGraphWidget;
+#include "../../services/IService.h"
 
 // Контроллер редактора последовательностей
 // Отвечает за:
@@ -16,7 +14,7 @@ class SequenceGraphWidget;
 class SequenceEditorController
 {
 public:
-    explicit SequenceEditorController(MainWindow* mw);
+    SequenceEditorController(ISequenceService* seq, ITemplateService* tmpl, IGraphService* graph, IUIUpdater* ui);
 
     // Открытие графа последовательностей
     void openSequenceGraph();
@@ -49,7 +47,10 @@ public:
     static PromptSequence defaultSequenceTemplate();
 
 private:
-    MainWindow* m_mw;
+    ISequenceService* m_seq;
+    ITemplateService* m_tmpl;
+    IGraphService* m_graph;
+    IUIUpdater* m_ui;
 
     // Открытие окна редактора последовательности
     void openSequenceEditorWindow(const QString& title,

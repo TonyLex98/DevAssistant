@@ -1,115 +1,49 @@
 #include "ProjectBrowserController.h"
-#include <QListWidget>
 #include <QFileDialog>
-#include <QDir>
-#include <QFileInfo>
-#include <QWidget>
-#include <QHBoxLayout>
-#include "MemoryLineEdit.h"
-#include "StyledButton.h"
-#include "ProjectIndex.h"
-#include "DevAssManager.h"
-#include "IDEWidget.h"
+#include <QListWidget>
+#include <QDirIterator>
+#include <QSet>
+#include "../../core/DevAssManager.h"
+#include "utils/Logging.h"
 
-ProjectBrowserController::ProjectBrowserController(QObject* parent)
-    : QObject(parent)
-    , m_fileList(nullptr)
-    , m_rootEdit(nullptr)
-    , m_browseBtn(nullptr)
-    , m_rescanBtn(nullptr)
-    , m_index(nullptr)
-    , m_devManager(nullptr)
-    , m_ideWidget(nullptr)
+ProjectBrowserController::ProjectBrowserController(IProjectService* project, IContextService* ctx, IUIUpdater* ui)
+    : QObject(nullptr)
+    , m_project(project)
+    , m_ctx(ctx)
+    , m_ui(ui)
 {
 }
 
-QWidget* ProjectBrowserController::createPathWidget()
+void ProjectBrowserController::browse()
 {
-    auto* widget = new QWidget();
-    auto* lay = new QHBoxLayout(widget);
-    lay->setContentsMargins(0, 0, 0, 0);
+    QString d = QFileDialog::getExistingDirectory(nullptr, "Select project folder", m_project->projectRoot());
+    if (d.isEmpty()) return;
 
-    m_rootEdit = new MemoryLineEdit("projectRoot", nullptr);
-    m_browseBtn = new StyledButton("...", nullptr);
-    m_rescanBtn = new StyledButton(tr("Обновить проект"), nullptr);
-
-    lay->addWidget(m_rootEdit, 1);
-    lay->addWidget(m_browseBtn);
-    lay->addWidget(m_rescanBtn);
-
-    connect(m_browseBtn, &StyledButton::clicked, this, &ProjectBrowserController::onBrowse);
-    connect(m_rescanBtn, &StyledButton::clicked, this, &ProjectBrowserController::onRescan);
-
-    return widget;
+    m_project->setProjectRoot(d);
+    reOpenRootDir();
 }
 
-void ProjectBrowserController::setProjectRoot(const QString& root)
+void ProjectBrowserController::rescan()
 {
-    m_projectRoot = root;
-    if (m_rootEdit)
-        m_rootEdit->setText(root);
-    emit projectRootChanged(root);
-}
+    m_project->loadDevManager();
 
-void ProjectBrowserController::setIndex(ProjectIndex* idx)
-{
-    m_index = idx;
-}
+    const QString devAssPath = m_project->devAssDirPath();
+    const QString projectRootPath = m_project->projectRoot();
 
-void ProjectBrowserController::setDevManager(DevAssManager* mgr)
-{
-    m_devManager = mgr;
-}
+    m_project->setIndexRoot(projectRootPath);
+    m_project->filesList()->clear();
 
-void ProjectBrowserController::setIDEWidget(IDEWidget* ide)
-{
-    m_ideWidget = ide;
-}
+    QSet<QString> needRed_set;
 
-void ProjectBrowserController::setFileList(QListWidget* list)
-{
-    m_fileList = list;
-}
-
-void ProjectBrowserController::onBrowse()
-{
-    QString dir = QFileDialog::getExistingDirectory(nullptr, tr("Выберите корень проекта"), m_projectRoot);
-    if (!dir.isEmpty()) {
-        setProjectRoot(dir);
-        onRescan();
-    }
-}
-
-void ProjectBrowserController::onRescan()
-{
-    if (!m_index || !m_fileList || m_projectRoot.isEmpty())
-        return;
-
-    // Load .dapro before scanning
-    if (m_devManager)
-        m_devManager->load();
-
-    const QString devAssPath = m_devManager ? m_devManager->devAssDir().absolutePath() : QString();
-    const QString projectRootPath = m_projectRoot;
-
-    m_index->setRoot(m_projectRoot);
-    m_fileList->clear();
-
-    QSet<QString> needRedSet;
-
-    for (const QString& rel : m_index->files()) {
+    for (const QString& rel : m_project->indexedFiles()) {
         const QString absPath = QDir(projectRootPath).filePath(rel);
 
-        // Filter out DevelopersAssistant files
-        if (!devAssPath.isEmpty() && absPath.startsWith(devAssPath))
+        if (absPath.startsWith(devAssPath))
             continue;
 
-        QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(rel), m_fileList);
+        QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(rel), m_project->filesList());
 
-        FileDescription* fd = nullptr;
-        if (m_devManager)
-            fd = m_devManager->findFileDescription(absPath);
-
+        FileDescription* fd = m_project->findFileDescription(absPath);
         QDateTime fileMod = QFileInfo(absPath).lastModified();
 
         bool needRed = false;
@@ -119,15 +53,135 @@ void ProjectBrowserController::onRescan()
             needRed = true;
         }
 
-        if (needRed) {
-            needRedSet.insert(absPath);
+        if (needRed){
+            needRed_set.insert(absPath);
             item->setBackgroundColor(Qt::red);
-        } else {
-            item->setBackgroundColor(Qt::green);
         }
+        else
+            item->setBackgroundColor(Qt::green);
 
         item->setData(Qt::UserRole, absPath);
     }
 
-    emit filesListChanged();
+    m_project->emitMissingFilesUpdated(needRed_set);
+
+    m_ui->log("Rescanned project.");
+}
+
+void ProjectBrowserController::onFileChanged(const QString& path)
+{
+    if (m_ctx->fileHasContextCommands(path)) {
+        const QSet<QString>& commands = m_ctx->getContextCommandsForFile(path);
+        if (!commands.isEmpty()) {
+            m_ui->log(QString("File changed externally: %1. Context from commands %2 may be stale.")
+                      .arg(path).arg(commands.values().join(", ")));
+            m_ctx->clearContextForPath(path);
+        }
+    }
+}
+
+void ProjectBrowserController::reOpenRootDir()
+{
+    if (m_project->projectRoot().isEmpty()) {
+        return;
+    }
+
+    m_ctx->fileWatcher()->removePaths(m_ctx->fileWatcher()->files());
+    m_ctx->clearFileToContextCommands();
+    m_ctx->clearShellCommandOutputs();
+    m_ctx->clearPythonScriptOutputs();
+
+    m_project->openProjectInIDE(m_project->projectRoot());
+
+    m_project->setRootEditText(m_project->projectRoot());
+    m_project->setDevProjectRoot(m_project->projectRoot());
+    m_project->setPromptProjectRoot(m_project->projectRoot());
+
+    auto* dm = m_project->devManagerPtr();
+    if (!dm->createFolder() || !dm->createDaproFile())
+    {
+        qCritical(logProject) << "Не удалось подготовить DevelopersAssistant / .dapro";
+    }
+
+    if (!dm->generateDescrFiles())
+    {
+        qCritical(logProject) << "Ошибка при создании .dadescr файлов";
+    }
+
+    rescan();
+}
+
+QString ProjectBrowserController::buildProjectContext() const
+{
+    const QString projectRootPath = m_project->projectRoot();
+    const QString devAssPath = m_project->devAssDirPath();
+
+    QString s = "Корневая папка: " + projectRootPath + "\nФайлы:\n";
+
+    int file_counter = 0;
+    for (const QString& f : m_project->indexedFiles()) {
+        const QString abs = QDir(projectRootPath).filePath(f);
+
+        if (abs.startsWith(devAssPath) ||
+            f.startsWith(QStringLiteral("DevelopersAssistant") + QDir::separator()) ||
+            f.endsWith(QStringLiteral(".dadescr")))
+            continue;
+
+        s += " - " + QDir::toNativeSeparators(abs) + '\n';
+        ++file_counter;
+
+        const QString rel = QDir(projectRootPath).relativeFilePath(abs);
+        const QString descrPath =
+            m_project->devAssDirPath() + QDir::separator() + rel + ".dadescr";
+        QFile descrFile(descrPath);
+        if (descrFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString descr = QString::fromUtf8(descrFile.readAll());
+            descrFile.close();
+
+            if (!descr.isEmpty()) {
+                s += "   Описание:\n";
+                s += "   " + descr.replace("\n", "\n   ") + "\n";
+            }
+        }
+    }
+
+    if (file_counter == 0) {
+        s += "Файлов в проекте пока нет." + '\n';
+    }
+
+    if (!m_ctx->contextContent().isEmpty())
+        s += "\nСодержимое файлов, добавленных в контекст:\n" + m_ctx->contextContent() + "\n";
+
+    if (m_ctx->hasContextManager()) {
+        QString contextChain = m_ctx->generateContextText();
+        if (!contextChain.isEmpty()) {
+            s += "\nЦепочка контекста из выполненных команд:\n" + contextChain + "\n";
+        }
+    }
+
+    return s;
+}
+
+QString ProjectBrowserController::fileDescriptionsText() const
+{
+    QString out;
+    QDir dev = m_project->devManagerPtr()->devAssDir();
+    if (!dev.exists()) return out;
+
+    QDirIterator it(dev.absolutePath(), QStringList() << "*.dadescr", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString descrPath = it.next();
+        QFile f(descrPath);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+        QString descr = QString::fromUtf8(f.readAll());
+        f.close();
+
+        QString rel = dev.relativeFilePath(descrPath);
+        rel.chop(QString(".dadescr").size());
+        QString absTarget = QDir(m_project->projectRoot()).filePath(rel);
+
+        out += "==== " + QDir::toNativeSeparators(absTarget) + " ====\n";
+        out += descr.trimmed() + "\n\n";
+    }
+    return out.trimmed();
 }

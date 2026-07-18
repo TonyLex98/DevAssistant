@@ -2,10 +2,10 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
-#include <QDebug>
 #include <QtMath>
 #include <QDateTime>
 #include <QSettings>
+#include "utils/Logging.h"
 
 FasterWhisperRunner::FasterWhisperRunner(QObject* parent) 
     : QObject(parent)
@@ -80,7 +80,7 @@ void FasterWhisperRunner::startServer() {
     connect(m_process, &QProcess::readyReadStandardError, this, [this](){
         QString msg = QString::fromLocal8Bit(m_process->readAllStandardError()).trimmed();
         if (!msg.isEmpty()) {
-            qDebug() << "Whisper Server Stderr:" << msg;
+            qCDebug(logAudio) << "Whisper Server Stderr:" << msg;
             emit statusMessage(msg);
             QCoreApplication::processEvents(); // Force UI update
         }
@@ -94,7 +94,7 @@ void FasterWhisperRunner::startServer() {
         scriptPath = "c:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/scripts/run_faster_whisper_server.py";
     }
 
-    qDebug() << "Starting Faster Whisper Server: " << scriptPath;
+    qCDebug(logAudio) << "Starting Faster Whisper Server: " << scriptPath;
     m_process->start("python", QStringList() << "-u" << scriptPath);
 }
 
@@ -226,13 +226,13 @@ void FasterWhisperRunner::processAudioChunk() {
     // Condition 1: Silence detected AND minimum duration reached
     if (m_currentSilenceDuration >= m_silenceDurationMs && durationMs >= m_minChunkDurationMs) {
         shouldCut = true;
-        // qDebug() << "Cutting due to silence. Duration:" << durationMs;
+        // qCDebug(logAudio) << "Cutting due to silence. Duration:" << durationMs;
     }
     
     // Condition 2: Maximum duration reached
     if (durationMs >= m_maxChunkDurationMs) {
         shouldCut = true;
-        // qDebug() << "Cutting due to max duration.";
+        // qCDebug(logAudio) << "Cutting due to max duration.";
     }
     
     if (shouldCut) {
@@ -247,7 +247,7 @@ void FasterWhisperRunner::processAudioChunk() {
             if (m_process && m_process->state() == QProcess::Running) {
                 m_process->write((tempPath + "\n").toUtf8());
             } else {
-                qDebug() << "Server not running, restarting...";
+                qCDebug(logAudio) << "Server not running, restarting...";
                 startServer();
             }
         }
@@ -264,7 +264,7 @@ void FasterWhisperRunner::onProcessReadyRead() {
         if (line == "READY") {
             m_serverReady = true;
             emit serverReady();
-            qDebug() << "Faster Whisper Server Ready";
+            qCDebug(logAudio) << "Faster Whisper Server Ready";
         } else if (line.startsWith("STATUS:")) {
             emit statusMessage(line.mid(QString("STATUS:").size()).trimmed());
         } else if (line.startsWith("ERROR:")) {
@@ -276,7 +276,7 @@ void FasterWhisperRunner::onProcessReadyRead() {
 }
 
 void FasterWhisperRunner::onProcessFinished(int exitCode, QProcess::ExitStatus) {
-    qDebug() << "Faster Whisper Server exited code:" << exitCode;
+    qCDebug(logAudio) << "Faster Whisper Server exited code:" << exitCode;
     m_serverReady = false;
     // Auto restart if recording?
 }

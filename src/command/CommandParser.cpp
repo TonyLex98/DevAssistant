@@ -3,7 +3,7 @@
 #include "CommandRegistry.h"
 #include <QRegularExpression>
 #include <QJsonArray>
-#include <QDebug>
+#include "utils/Logging.h"
 
 /* Преобразование объекта с path/content в команду */
 static QByteArray convertToObjectCommand(const QByteArray& rawObj);
@@ -375,7 +375,7 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
             if (err.error == QJsonParseError::NoError) {
                 d = fixedDoc;
             } else {
-                qWarning() << "CommandParser: skip invalid JSON part:" << err.errorString() << "Content:" << QString::fromUtf8(p).toLocal8Bit();
+                qCWarning(logCmd) << "CommandParser: skip invalid JSON part:" << err.errorString() << "Content:" << QString::fromUtf8(p).toLocal8Bit();
                 continue;
             }
         }

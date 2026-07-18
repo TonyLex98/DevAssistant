@@ -1,4 +1,7 @@
 // CommandRegistry.cpp
+// Macro-based command registration to replace the monolithic if-else chain.
+// Each command is registered via REGISTER_COMMAND() with a factory lambda that
+// extracts parameters from the normalized JSON and returns a Command*.
 #include "CommandRegistry.h"
 #include "CreateFileCommand.h"
 #include "ReplaceInFileCommand.h"
@@ -39,6 +42,11 @@
 #include <QJsonDocument>
 #include <QHash>
 #include <QRegularExpression>
+#include <functional>
+
+/* ------------------------------------------------------------------ */
+/*  Helpers (unchanged)                                                */
+/* ------------------------------------------------------------------ */
 
 static QJsonObject parseJsonObject(const QByteArray& bytes)
 {
@@ -315,6 +323,407 @@ static int firstNonZeroInt(const QJsonObject& obj, const QStringList& keys, int 
     return fallback;
 }
 
+static QString resolvePath(const QJsonObject& p, const QJsonObject& obj)
+{
+    QString path = p["path"].toString();
+    if (path.isEmpty()) path = obj["file_path"].toString();
+    if (path.isEmpty()) path = p["file_path"].toString();
+    return path;
+}
+
+static QByteArray resolveContent(const QJsonObject& p, const QJsonObject& obj)
+{
+    QByteArray content = p["content"].toString().toUtf8();
+    if (content.isEmpty()) content = obj["content"].toString().toUtf8();
+    if (content.isEmpty()) content = p["file_content"].toString().toUtf8();
+    return content;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Factory type & registry                                            */
+/* ------------------------------------------------------------------ */
+
+using FactoryFn = std::function<Command*(const QJsonObject&)>;
+
+static QHash<QString, FactoryFn>& registry()
+{
+    static QHash<QString, FactoryFn> s_registry;
+    static bool s_initialized = false;
+    if (!s_initialized) {
+        s_initialized = true;
+
+#define REGISTER_COMMAND(NAME, BODY) \
+    registry().insert(#NAME, (BODY))
+
+        /* ---- File commands ---- */
+        REGISTER_COMMAND(CREATE_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            QByteArray content = resolveContent(p, obj);
+            QString description = obj["description"].toString();
+            return new CreateFileCommand(path, content, description);
+        });
+
+        REGISTER_COMMAND(REPLACE_IN_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            QByteArray content = resolveContent(p, obj);
+            QString description = obj["description"].toString();
+            return new ReplaceInFileCommand(path, content, description);
+        });
+
+        REGISTER_COMMAND(DELETE_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            QString description = obj["description"].toString();
+            return new DeleteFileCommand(path, description);
+        });
+
+        REGISTER_COMMAND(RENAME_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString oldPath = p["oldPath"].toString();
+            QString newPath = p["newPath"].toString();
+            if (oldPath.isEmpty()) oldPath = obj["old_path"].toString();
+            if (newPath.isEmpty()) newPath = obj["new_path"].toString();
+            if (oldPath.isEmpty()) oldPath = p["old_path"].toString();
+            if (newPath.isEmpty()) newPath = p["new_path"].toString();
+            QString description = obj["description"].toString();
+            return new RenameFileCommand(oldPath, newPath, description);
+        });
+
+        REGISTER_COMMAND(EDIT_IN_RANGE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            int startLine = p["startLine"].toInt();
+            int endLine = p["endLine"].toInt();
+            QByteArray content = p.value("content").toString().toUtf8();
+            if (content.isEmpty()) content = obj["content"].toString().toUtf8();
+            if (content.isEmpty()) content = p["file_content"].toString().toUtf8();
+            if (startLine == 0) startLine = obj["start_line"].toInt();
+            if (startLine == 0) startLine = p["start_line"].toInt();
+            if (endLine == 0) endLine = obj["end_line"].toInt();
+            if (endLine == 0) endLine = p["end_line"].toInt();
+            QJsonArray linesArray = p.value("replacementLines").toArray();
+            if (linesArray.isEmpty() && p.contains("lines"))
+                linesArray = p.value("lines").toArray();
+            QString description = obj["description"].toString();
+            return new EditInRangeCommand(path, startLine, endLine, content, linesArray, description);
+        });
+
+        REGISTER_COMMAND(WRITE_DESCRIPTION, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString sourceFilePath = p["sourceFilePath"].toString();
+            if (sourceFilePath.isEmpty()) sourceFilePath = resolvePath(p, obj);
+            QString description = p["description"].toString();
+            if (description.isEmpty()) description = obj["description"].toString();
+            if (description.isEmpty()) description = p["description_text"].toString();
+            return new WriteDescriptionCommand(sourceFilePath, description);
+        });
+
+        REGISTER_COMMAND(OPEN_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            QString description = obj["description"].toString();
+            return new OpenFileContextCommand(path, description);
+        });
+
+        REGISTER_COMMAND(OPEN_FILE_REGION, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString path = resolvePath(p, obj);
+            QString region = p.value("region").toString();
+            if (region.isEmpty()) region = p["region_text"].toString();
+            int startLine = p.value("startLine").toInt(-1);
+            int endLine = p.value("endLine").toInt(-1);
+            QString description = obj["description"].toString();
+            return new OpenFileRegionCommand(path, region, startLine, endLine, description);
+        });
+
+        /* ---- User interaction ---- */
+        REGISTER_COMMAND(ASK_USER, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString question = firstNonEmptyString(p, {"question", "question_text"});
+            if (question.isEmpty()) question = obj["question"].toString();
+            QString description = obj["description"].toString();
+            return new AskUserCommand(question, description);
+        });
+
+        /* ---- Script / shell ---- */
+        REGISTER_COMMAND(RUN_PYTHON, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString scriptPath = firstNonEmptyString(p, {"scriptPath", "script_path", "path", "file_path"});
+            if (scriptPath.isEmpty()) scriptPath = obj["script_path"].toString();
+            if (scriptPath.isEmpty()) scriptPath = obj["file_path"].toString();
+            QString codeStr = firstNonEmptyString(p, {"code", "inlineCode", "inline_code", "python", "python_code", "content"});
+            if (codeStr.isEmpty()) codeStr = obj["code"].toString();
+            if (codeStr.isEmpty()) codeStr = p["python_code"].toString();
+            const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
+            const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
+            return new RunPythonCommand(scriptPath, codeStr.toUtf8(), cwd, timeoutMs, obj["description"].toString());
+        });
+
+        REGISTER_COMMAND(RUN_SHELL, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString command = firstNonEmptyString(p, {"command", "cmd", "command_text"});
+            if (command.isEmpty()) command = obj["command_text"].toString();
+            if (command.isEmpty()) command = p["command_text"].toString();
+            QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
+            const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
+            QString description = obj["description"].toString();
+            return new RunShellCommand(command, cwd, timeoutMs, description);
+        });
+
+        /* ---- Search ---- */
+        REGISTER_COMMAND(SEARCH_WEB, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString query = firstNonEmptyString(p, {"query", "search_query"});
+            if (query.isEmpty()) query = obj["query"].toString();
+            if (query.isEmpty()) query = p["search_query"].toString();
+            int maxResults = firstNonZeroInt(p, {"maxResults", "max_results"}, 5);
+            QString description = obj["description"].toString();
+            return new SearchWebCommand(query, maxResults, description);
+        });
+
+        REGISTER_COMMAND(SEARCH_PROJECT, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString query = firstNonEmptyString(p, {"query", "search_query"});
+            if (query.isEmpty()) query = obj["query"].toString();
+            if (query.isEmpty()) query = p["search_query"].toString();
+            int maxMatches = firstNonZeroInt(p, {"maxMatches", "max_matches"}, 10);
+            bool caseSensitive = p.value("caseSensitive").toBool(p.value("case_sensitive").toBool(false));
+            bool useRegex = p.value("useRegex").toBool(p.value("use_regex").toBool(false));
+            int contextLines = p.value("contextLines").toInt(p.value("context_lines").toInt(0));
+            QStringList includes;
+            QJsonArray arr = p.value("include").toArray();
+            if (arr.isEmpty()) arr = p.value("includeGlobs").toArray();
+            if (arr.isEmpty()) arr = obj.value("include").toArray();
+            for (const QJsonValue& v : arr) includes << v.toString();
+            QStringList includePaths;
+            QJsonArray includePathsArr = p.value("includePaths").toArray();
+            for (const QJsonValue& v : includePathsArr) includePaths << v.toString();
+            QStringList excludePaths;
+            QJsonArray excludePathsArr = p.value("excludePaths").toArray();
+            for (const QJsonValue& v : excludePathsArr) excludePaths << v.toString();
+            QString description = obj["description"].toString();
+            return new SearchProjectCommand(query, includePaths, excludePaths, includes, maxMatches, caseSensitive, useRegex, contextLines, description);
+        });
+
+        REGISTER_COMMAND(SEARCH_PROJECT_CASE_INSENSITIVE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString query = firstNonEmptyString(p, {"query", "search_query"});
+            if (query.isEmpty()) query = obj["query"].toString();
+            if (query.isEmpty()) query = p["search_query"].toString();
+            int maxMatches = p.value("maxMatches").toInt(10);
+            QStringList includes;
+            QJsonArray arr = p.value("include").toArray();
+            if (arr.isEmpty()) arr = obj.value("include").toArray();
+            for (const QJsonValue& v : arr) includes << v.toString();
+            QString description = obj["description"].toString();
+            return new SearchProjectCaseInsensitiveCommand(query, maxMatches, includes, description);
+        });
+
+        /* ---- Result / output ---- */
+        REGISTER_COMMAND(SHOW_RESULT, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString content = firstNonEmptyString(p, {"content", "text", "result", "message"});
+            if (content.isEmpty()) content = obj["content"].toString();
+            if (content.isEmpty()) content = p["result_content"].toString();
+            QString title = firstNonEmptyString(p, {"title", "result_title"});
+            if (title.isEmpty()) title = obj["title"].toString();
+            if (title.isEmpty()) title = p["result_title"].toString();
+            QString description = obj["description"].toString();
+            return new ShowResultCommand(content, title, description);
+        });
+
+        /* ---- Sequences ---- */
+        REGISTER_COMMAND(CALL_SEQUENCE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
+            if (sequenceName.isEmpty()) sequenceName = obj["sequence_name"].toString();
+            if (sequenceName.isEmpty()) sequenceName = p["sequence_name"].toString();
+            bool needSummary = true;
+            if (p.contains("summarize")) needSummary = p.value("summarize").toBool();
+            else if (obj.contains("summarize")) needSummary = obj.value("summarize").toBool();
+            QString description = obj["description"].toString();
+            return new CallSequenceCommand(sequenceName, needSummary, description);
+        });
+
+        REGISTER_COMMAND(OPEN_SEQUENCE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
+            if (sequenceName.isEmpty()) sequenceName = obj["sequence_name"].toString();
+            if (sequenceName.isEmpty()) sequenceName = p["sequence_name"].toString();
+            QString description = obj["description"].toString();
+            return new OpenSequenceCommand(sequenceName, description);
+        });
+
+        /* ---- Directory listing ---- */
+        REGISTER_COMMAND(LIST_FILES_IN_FOLDER, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString folderPath = firstNonEmptyString(p, {"folderPath", "path", "folder_path"});
+            if (folderPath.isEmpty()) folderPath = obj["folder_path"].toString();
+            if (folderPath.isEmpty()) folderPath = p["folder_path"].toString();
+            const QString pattern = firstNonEmptyString(p, {"pattern", "filter", "glob"});
+            QString description = obj["description"].toString();
+            return new ListFilesInFolderCommand(folderPath, pattern, description);
+        });
+
+        /* ---- Reasoning ---- */
+        REGISTER_COMMAND(REASONING, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            QString reasoning = firstNonEmptyString(p, {"reasoning", "thoughts"});
+            if (reasoning.isEmpty()) reasoning = obj["reasoning"].toString();
+            if (reasoning.isEmpty()) reasoning = p["thought_process"].toString();
+            if (reasoning.isEmpty()) reasoning = p["reasoning_text"].toString();
+            QString nextCommand = firstNonEmptyString(p, {"nextCommand", "next_command"});
+            if (nextCommand.isEmpty()) nextCommand = obj["next_command"].toString();
+            if (nextCommand.isEmpty()) nextCommand = p["next_command"].toString();
+            QJsonObject nextCommandParams = objectFromValue(p.value("nextCommandParams"));
+            QString description = obj["description"].toString();
+            return new ReasoningCommand(reasoning, nextCommand, nextCommandParams, description);
+        });
+
+        /* ---- File copy / dir ops ---- */
+        REGISTER_COMMAND(COPY_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString from = firstNonEmptyString(p, {"from", "src", "source", "sourcePath", "source_path"});
+            const QString to = firstNonEmptyString(p, {"to", "dst", "dest", "destination", "destinationPath", "dest_path"});
+            const bool overwrite = p.value("overwrite").toBool(obj.value("overwrite").toBool(false));
+            const QString description = obj["description"].toString();
+            return new CopyFileCommand(from, to, overwrite, description);
+        });
+
+        REGISTER_COMMAND(CREATE_DIR, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
+            const QString description = obj["description"].toString();
+            return new CreateDirCommand(path, description);
+        });
+
+        REGISTER_COMMAND(DELETE_DIR, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
+            const bool recursive = p.value("recursive").toBool(obj.value("recursive").toBool(false));
+            const QString description = obj["description"].toString();
+            return new DeleteDirCommand(path, recursive, description);
+        });
+
+        REGISTER_COMMAND(APPEND_TO_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
+            const QString content = firstNonEmptyString(p, {"content", "text", "data"});
+            const bool createIfMissing = p.value("createIfMissing").toBool(obj.value("createIfMissing").toBool(true));
+            const bool ensureNewline = p.value("ensureNewline").toBool(obj.value("ensureNewline").toBool(false));
+            const QString description = obj["description"].toString();
+            return new AppendToFileCommand(path, content.toUtf8(), createIfMissing, ensureNewline, description);
+        });
+
+        REGISTER_COMMAND(INSERT_AT_LINE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
+            const int line = firstNonZeroInt(p, {"line", "lineNumber", "line_number"}, obj.value("line").toInt());
+            const QString content = firstNonEmptyString(p, {"content", "text"});
+            const QString description = obj["description"].toString();
+            return new InsertAtLineCommand(path, line, content.toUtf8(), description);
+        });
+
+        REGISTER_COMMAND(APPLY_PATCH, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString patch = firstNonEmptyString(p, {"patch", "diff"});
+            const int strip = p.value("strip").toInt(obj.value("strip").toInt(0));
+            const QString description = obj["description"].toString();
+            return new ApplyPatchCommand(patch.toUtf8(), strip, description);
+        });
+
+        /* ---- Git commands ---- */
+        REGISTER_COMMAND(GIT_STATUS, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const bool porcelain = p.value("porcelain").toBool(obj.value("porcelain").toBool(true));
+            const QString path = firstNonEmptyString(p, {"path", "file"});
+            const QString description = obj["description"].toString();
+            return new GitStatusCommand(porcelain, path, description);
+        });
+
+        REGISTER_COMMAND(GIT_DIFF, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
+            const int contextLines = p.value("contextLines").toInt(obj.value("contextLines").toInt(-1));
+            const QString path = firstNonEmptyString(p, {"path", "file"});
+            const QString description = obj["description"].toString();
+            return new GitDiffCommand(staged, contextLines, path, description);
+        });
+
+        REGISTER_COMMAND(GIT_RESTORE_FILE, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString path = firstNonEmptyString(p, {"path", "file"});
+            const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
+            const bool worktree = p.value("worktree").toBool(obj.value("worktree").toBool(true));
+            const QString description = obj["description"].toString();
+            return new GitRestoreFileCommand(path, staged, worktree, description);
+        });
+
+        REGISTER_COMMAND(UNDO_LAST_CHANGE, [](const QJsonObject& obj) {
+            const QString description = obj["description"].toString();
+            return new UndoLastChangeCommand(description);
+        });
+
+        /* ---- Context commands ---- */
+        REGISTER_COMMAND(CONTEXT_SHOW, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(8000));
+            const QString description = obj["description"].toString();
+            return new ContextShowCommand(maxChars, description);
+        });
+
+        REGISTER_COMMAND(CONTEXT_CLEAR, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString scope = firstNonEmptyString(p, {"scope"});
+            const QString description = obj["description"].toString();
+            return new ContextClearCommand(scope, description);
+        });
+
+        /* ---- App / URL ---- */
+        REGISTER_COMMAND(OPEN_APP, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString app = firstNonEmptyString(p, {"app", "path", "program", "application", "exe"});
+            QJsonValue args = p.value("args");
+            if (args.isUndefined() || args.isNull()) args = p.value("arguments");
+            const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
+            const bool detached = p.value("detached").toBool(obj.value("detached").toBool(true));
+            const int waitMs = p.value("waitMs").toInt(obj.value("waitMs").toInt(15000));
+            const QString description = obj["description"].toString();
+            return new OpenAppCommand(app, args, cwd, detached, waitMs, description);
+        });
+
+        REGISTER_COMMAND(OPEN_URL, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString url = firstNonEmptyString(p, {"url", "link", "uri", "address"});
+            const QString description = obj["description"].toString();
+            return new OpenUrlCommand(url, description);
+        });
+
+        /* ---- Clipboard ---- */
+        REGISTER_COMMAND(CLIPBOARD_SET, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString text = firstNonEmptyString(p, {"text", "content", "value"});
+            const QString description = obj["description"].toString();
+            return new ClipboardSetCommand(text, description);
+        });
+
+        REGISTER_COMMAND(CLIPBOARD_GET, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(4000));
+            const QString description = obj["description"].toString();
+            return new ClipboardGetCommand(maxChars, description);
+        });
+
+#undef REGISTER_COMMAND
+    }
+    return s_registry;
+}
+
+/* ------------------------------------------------------------------ */
+/*  all() - unchanged                                                  */
+/* ------------------------------------------------------------------ */
 
 QVector<Command*> CommandRegistry::all()
 {
@@ -357,590 +766,18 @@ QVector<Command*> CommandRegistry::all()
     };
 }
 
-/* ---------- Реализация create() ---------- */
+/* ------------------------------------------------------------------ */
+/*  create() - now just a hash lookup                                  */
+/* ------------------------------------------------------------------ */
+
 Command* CommandRegistry::create(const QJsonObject& obj)
 {
     QString cmd = firstNonEmptyString(obj, {"command", "action", "name", "tool", "type"});
     cmd = canonicalCommandName(cmd);
 
-    if (cmd == "CREATE_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        QByteArray content = p["content"].toString().toUtf8();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата (для случаев, когда нейросеть возвращает в другом формате)
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();  // Поддержка "file_path" вместо "path" в params
-        }
-        if (content.isEmpty()) {
-            content = obj["content"].toString().toUtf8();  // Поддержка "content" на верхнем уровне
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();  // Поддержка "file_path" в params
-        }
-        if (content.isEmpty()) {
-            content = p["file_content"].toString().toUtf8();  // Поддержка "file_content" вместо "content"
-        }
-        
-        return new CreateFileCommand(path, content, description);
-    }
+    auto it = registry().find(cmd);
+    if (it != registry().end())
+        return it.value()(obj);
 
-    if (cmd == "REPLACE_IN_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        QByteArray content = p["content"].toString().toUtf8();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();
-        }
-        if (content.isEmpty()) {
-            content = obj["content"].toString().toUtf8();
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();
-        }
-        if (content.isEmpty()) {
-            content = p["file_content"].toString().toUtf8();
-        }
-        
-        return new ReplaceInFileCommand(path, content, description);
-    }
-
-    if (cmd == "DELETE_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();
-        }
-        
-        return new DeleteFileCommand(path, description);
-    }
-
-    if (cmd == "RENAME_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString oldPath = p["oldPath"].toString();
-        QString newPath = p["newPath"].toString();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (oldPath.isEmpty()) {
-            oldPath = obj["old_path"].toString();
-        }
-        if (newPath.isEmpty()) {
-            newPath = obj["new_path"].toString();
-        }
-        if (oldPath.isEmpty()) {
-            oldPath = p["old_path"].toString();
-        }
-        if (newPath.isEmpty()) {
-            newPath = p["new_path"].toString();
-        }
-        
-        return new RenameFileCommand(oldPath, newPath, description);
-    }
-
-    if (cmd == "EDIT_IN_RANGE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        int startLine = p["startLine"].toInt();
-        int endLine = p["endLine"].toInt();
-        QByteArray content = p.value("content").toString().toUtf8();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();
-        }
-        if (startLine == 0) {
-            startLine = obj["start_line"].toInt();
-        }
-        if (startLine == 0) {
-            startLine = p["start_line"].toInt();
-        }
-        if (endLine == 0) {
-            endLine = obj["end_line"].toInt();
-        }
-        if (endLine == 0) {
-            endLine = p["end_line"].toInt();
-        }
-        if (content.isEmpty()) {
-            content = obj["content"].toString().toUtf8();
-        }
-        if (content.isEmpty()) {
-            content = p["file_content"].toString().toUtf8();
-        }
-        
-        QJsonArray linesArray = p.value("replacementLines").toArray();
-        if (linesArray.isEmpty() && p.contains("lines"))
-            linesArray = p.value("lines").toArray();
-        
-        return new EditInRangeCommand(path, startLine, endLine, content, linesArray, description);
-    }
-
-    if (cmd == "WRITE_DESCRIPTION") {
-        const QJsonObject p = normalizedParams(obj);
-        QString sourceFilePath = p["sourceFilePath"].toString();
-        QString description = p["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (sourceFilePath.isEmpty()) {
-            sourceFilePath = obj["file_path"].toString();
-        }
-        if (sourceFilePath.isEmpty()) {
-            sourceFilePath = p["file_path"].toString();
-        }
-        
-        if (description.isEmpty()) {
-            description = obj["description_text"].toString();
-        }
-        if (description.isEmpty()) {
-            description = p["description_text"].toString();
-        }
-        
-        return new WriteDescriptionCommand(sourceFilePath, description);
-    }
-
-    // +++ в CommandRegistry::create()
-    if (cmd == "OPEN_FILE_REGION") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        QString region = p.value("region").toString();
-        int startLine = p.value("startLine").toInt(-1);
-        int endLine = p.value("endLine").toInt(-1);
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();
-        }
-        if (region.isEmpty()) {
-            region = obj["region"].toString();
-        }
-        if (region.isEmpty()) {
-            region = p["region_text"].toString();
-        }
-        
-        return new OpenFileRegionCommand(path, region, startLine, endLine, description);
-    }
-
-    if (cmd == "OPEN_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString path = p["path"].toString();
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (path.isEmpty()) {
-            path = obj["file_path"].toString();
-        }
-        if (path.isEmpty()) {
-            path = p["file_path"].toString();
-        }
-        
-        return new OpenFileContextCommand(path, description);
-    }
-
-    if (cmd == "ASK_USER") {
-        const QJsonObject p = normalizedParams(obj);
-        QString question = firstNonEmptyString(p, {"question", "question_text"});
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (question.isEmpty()) {
-            question = obj["question"].toString();
-        }
-        if (question.isEmpty()) {
-            question = p["question_text"].toString();
-        }
-        
-        return new AskUserCommand(question, description);
-    }
-
-    // +++ в CommandRegistry::create()
-    if (cmd == "RUN_PYTHON") {
-        const QJsonObject p = normalizedParams(obj);
-        QString scriptPath = firstNonEmptyString(p, {"scriptPath", "script_path", "path", "file_path"});
-        
-        // Поддержка альтернативного формата
-        if (scriptPath.isEmpty()) {
-            scriptPath = obj["script_path"].toString();
-        }
-        if (scriptPath.isEmpty()) {
-            scriptPath = obj["file_path"].toString();
-        }
-
-        QString codeStr = firstNonEmptyString(p, {"code", "inlineCode", "inline_code", "python", "python_code", "content"});
-            
-        // Поддержка альтернативного формата
-        if (codeStr.isEmpty()) {
-            codeStr = obj["code"].toString();
-        }
-        if (codeStr.isEmpty()) {
-            codeStr = p["python_code"].toString();
-        }
-
-        const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
-        const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
-        return new RunPythonCommand(scriptPath, codeStr.toUtf8(), cwd, timeoutMs, obj["description"].toString());
-    }
-
-    if (cmd == "RUN_SHELL") {
-        const QJsonObject p = normalizedParams(obj);
-        QString command = firstNonEmptyString(p, {"command", "cmd", "command_text"});
-        QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (command.isEmpty()) {
-            command = obj["command_text"].toString();
-        }
-        if (command.isEmpty()) {
-            command = p["command_text"].toString();
-        }
-        
-        const int timeoutMs = p.value("timeoutMs").toInt(obj.value("timeoutMs").toInt(120000));
-        return new RunShellCommand(command, cwd, timeoutMs, description);
-    }
-
-    if (cmd == "SEARCH_WEB") {
-        const QJsonObject p = normalizedParams(obj);
-        QString query = firstNonEmptyString(p, {"query", "search_query"});
-        int maxResults = firstNonZeroInt(p, {"maxResults", "max_results"}, 5);
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (query.isEmpty()) {
-            query = obj["query"].toString();
-        }
-        if (query.isEmpty()) {
-            query = p["search_query"].toString();
-        }
-        
-        return new SearchWebCommand(query, maxResults, description);
-    }
-
-    if (cmd == "SEARCH_PROJECT") {
-        const QJsonObject p = normalizedParams(obj);
-        QString query = firstNonEmptyString(p, {"query", "search_query"});
-        int maxMatches = firstNonZeroInt(p, {"maxMatches", "max_matches"}, 10);
-        bool caseSensitive = p.value("caseSensitive").toBool(p.value("case_sensitive").toBool(false));
-        QString description = obj["description"].toString();
-        
-        QStringList includes;
-        QJsonArray arr = p.value("include").toArray();
-        if (arr.isEmpty())
-            arr = p.value("includeGlobs").toArray();
-        if (arr.isEmpty()) {
-            // Поддержка альтернативного формата для include
-            arr = obj.value("include").toArray();
-        }
-        for (const QJsonValue& v : arr)
-            includes << v.toString();
-        
-        // Поддержка альтернативного формата для query
-        if (query.isEmpty()) {
-            query = obj["query"].toString();
-        }
-        if (query.isEmpty()) {
-            query = p["search_query"].toString();
-        }
-        
-        bool useRegex = p.value("useRegex").toBool(p.value("use_regex").toBool(false));
-        int contextLines = p.value("contextLines").toInt(p.value("context_lines").toInt(0));
-        QStringList includePaths = QStringList();
-        QStringList excludePaths = QStringList();
-
-        // Читаем includePaths если они есть
-        QJsonArray includePathsArr = p.value("includePaths").toArray();
-        for (const QJsonValue& v : includePathsArr) {
-            includePaths << v.toString();
-        }
-
-        // Читаем excludePaths если они есть
-        QJsonArray excludePathsArr = p.value("excludePaths").toArray();
-        for (const QJsonValue& v : excludePathsArr) {
-            excludePaths << v.toString();
-        }
-
-        return new SearchProjectCommand(query, maxMatches, caseSensitive, includes, useRegex, contextLines, includePaths, excludePaths, description);
-    }
-
-    if (cmd == "SEARCH_PROJECT_CASE_INSENSITIVE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString query = firstNonEmptyString(p, {"query", "search_query"});
-        int maxMatches = p.value("maxMatches").toInt(10);
-        QString description = obj["description"].toString();
-        
-        QStringList includes;
-        QJsonArray arr = p.value("include").toArray();
-        if (arr.isEmpty()) {
-            // Поддержка альтернативного формата для include
-            arr = obj.value("include").toArray();
-        }
-        for (const QJsonValue& v : arr)
-            includes << v.toString();
-        
-        // Поддержка альтернативного формата для query
-        if (query.isEmpty()) {
-            query = obj["query"].toString();
-        }
-        if (query.isEmpty()) {
-            query = p["search_query"].toString();
-        }
-        
-        return new SearchProjectCaseInsensitiveCommand(query, maxMatches, includes, description);
-    }
-
-    if (cmd == "SHOW_RESULT") {
-        const QJsonObject p = normalizedParams(obj);
-        QString content = firstNonEmptyString(p, {"content", "text", "result", "message"});
-        QString title = firstNonEmptyString(p, {"title", "result_title"});
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (content.isEmpty()) {
-            content = obj["content"].toString();
-        }
-        if (content.isEmpty()) {
-            content = p["result_content"].toString();
-        }
-        if (title.isEmpty()) {
-            title = obj["title"].toString();
-        }
-        if (title.isEmpty()) {
-            title = p["result_title"].toString();
-        }
-        
-        return new ShowResultCommand(content, title, description);
-    }
-
-    if (cmd == "CALL_SEQUENCE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
-        QString description = obj["description"].toString();
-        bool needSummary = true;
-        
-        // Поддержка альтернативного формата
-        if (sequenceName.isEmpty()) {
-            sequenceName = obj["sequence_name"].toString();
-        }
-        if (sequenceName.isEmpty()) {
-            sequenceName = p["sequence_name"].toString();
-        }
-        
-        if (p.contains("summarize")) {
-            needSummary = p.value("summarize").toBool();
-        } else if (obj.contains("summarize")) {
-            needSummary = obj.value("summarize").toBool();
-        }
-        
-        return new CallSequenceCommand(sequenceName, needSummary, description);
-    }
-
-    if (cmd == "OPEN_SEQUENCE") {
-        const QJsonObject p = normalizedParams(obj);
-        QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (sequenceName.isEmpty()) {
-            sequenceName = obj["sequence_name"].toString();
-        }
-        if (sequenceName.isEmpty()) {
-            sequenceName = p["sequence_name"].toString();
-        }
-        
-        return new OpenSequenceCommand(sequenceName, description);
-    }
-
-    if (cmd == "LIST_FILES_IN_FOLDER") {
-        const QJsonObject p = normalizedParams(obj);
-        QString folderPath = firstNonEmptyString(p, {"folderPath", "path", "folder_path"});
-        const QString pattern = firstNonEmptyString(p, {"pattern", "filter", "glob"});
-        QString description = obj["description"].toString();
-        
-        // Поддержка альтернативного формата
-        if (folderPath.isEmpty()) {
-            folderPath = obj["folder_path"].toString();
-        }
-        if (folderPath.isEmpty()) {
-            folderPath = p["folder_path"].toString();
-        }
-        
-        return new ListFilesInFolderCommand(folderPath, pattern, description);
-    }
-
-    if (cmd == "REASONING") {
-        const QJsonObject p = normalizedParams(obj);
-        QString reasoning = firstNonEmptyString(p, {"reasoning", "thoughts"});
-        QString nextCommand = firstNonEmptyString(p, {"nextCommand", "next_command"});
-        QJsonObject nextCommandParams = objectFromValue(p.value("nextCommandParams"));
-        QString description = obj["description"].toString();
-
-        // Поддержка альтернативного формата
-        if (reasoning.isEmpty()) {
-            reasoning = obj["reasoning"].toString();
-        }
-        if (reasoning.isEmpty()) {
-            reasoning = p["thought_process"].toString();
-        }
-        if (reasoning.isEmpty()) {
-            reasoning = p["reasoning_text"].toString();
-        }
-        if (nextCommand.isEmpty()) {
-            nextCommand = obj["next_command"].toString();
-        }
-        if (nextCommand.isEmpty()) {
-            nextCommand = p["next_command"].toString();
-        }
-
-        return new ReasoningCommand(reasoning, nextCommand, nextCommandParams, description);
-    }
-
-    if (cmd == "COPY_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString from = firstNonEmptyString(p, {"from", "src", "source", "sourcePath", "source_path"});
-        const QString to = firstNonEmptyString(p, {"to", "dst", "dest", "destination", "destinationPath", "dest_path"});
-        const bool overwrite = p.value("overwrite").toBool(obj.value("overwrite").toBool(false));
-        const QString description = obj["description"].toString();
-        return new CopyFileCommand(from, to, overwrite, description);
-    }
-
-    if (cmd == "CREATE_DIR") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
-        const QString description = obj["description"].toString();
-        return new CreateDirCommand(path, description);
-    }
-
-    if (cmd == "DELETE_DIR") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString path = firstNonEmptyString(p, {"path", "dir", "folder", "directory"});
-        const bool recursive = p.value("recursive").toBool(obj.value("recursive").toBool(false));
-        const QString description = obj["description"].toString();
-        return new DeleteDirCommand(path, recursive, description);
-    }
-
-    if (cmd == "APPEND_TO_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
-        const QString content = firstNonEmptyString(p, {"content", "text", "data"});
-        const bool createIfMissing = p.value("createIfMissing").toBool(obj.value("createIfMissing").toBool(true));
-        const bool ensureNewline = p.value("ensureNewline").toBool(obj.value("ensureNewline").toBool(false));
-        const QString description = obj["description"].toString();
-        return new AppendToFileCommand(path, content.toUtf8(), createIfMissing, ensureNewline, description);
-    }
-
-    if (cmd == "INSERT_AT_LINE") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString path = firstNonEmptyString(p, {"path", "file", "filePath", "file_path"});
-        const int line = firstNonZeroInt(p, {"line", "lineNumber", "line_number"}, obj.value("line").toInt());
-        const QString content = firstNonEmptyString(p, {"content", "text"});
-        const QString description = obj["description"].toString();
-        return new InsertAtLineCommand(path, line, content.toUtf8(), description);
-    }
-
-    if (cmd == "APPLY_PATCH") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString patch = firstNonEmptyString(p, {"patch", "diff"});
-        const int strip = p.value("strip").toInt(obj.value("strip").toInt(0));
-        const QString description = obj["description"].toString();
-        return new ApplyPatchCommand(patch.toUtf8(), strip, description);
-    }
-
-    if (cmd == "GIT_STATUS") {
-        const QJsonObject p = normalizedParams(obj);
-        const bool porcelain = p.value("porcelain").toBool(obj.value("porcelain").toBool(true));
-        const QString path = firstNonEmptyString(p, {"path", "file"});
-        const QString description = obj["description"].toString();
-        return new GitStatusCommand(porcelain, path, description);
-    }
-
-    if (cmd == "GIT_DIFF") {
-        const QJsonObject p = normalizedParams(obj);
-        const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
-        const int contextLines = p.value("contextLines").toInt(obj.value("contextLines").toInt(-1));
-        const QString path = firstNonEmptyString(p, {"path", "file"});
-        const QString description = obj["description"].toString();
-        return new GitDiffCommand(staged, contextLines, path, description);
-    }
-
-    if (cmd == "GIT_RESTORE_FILE") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString path = firstNonEmptyString(p, {"path", "file"});
-        const bool staged = p.value("staged").toBool(obj.value("staged").toBool(false));
-        const bool worktree = p.value("worktree").toBool(obj.value("worktree").toBool(true));
-        const QString description = obj["description"].toString();
-        return new GitRestoreFileCommand(path, staged, worktree, description);
-    }
-
-    if (cmd == "UNDO_LAST_CHANGE") {
-        const QString description = obj["description"].toString();
-        return new UndoLastChangeCommand(description);
-    }
-
-    if (cmd == "CONTEXT_SHOW") {
-        const QJsonObject p = normalizedParams(obj);
-        const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(8000));
-        const QString description = obj["description"].toString();
-        return new ContextShowCommand(maxChars, description);
-    }
-
-    if (cmd == "CONTEXT_CLEAR") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString scope = firstNonEmptyString(p, {"scope"});
-        const QString description = obj["description"].toString();
-        return new ContextClearCommand(scope, description);
-    }
-
-    if (cmd == "OPEN_APP") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString app = firstNonEmptyString(p, {"app", "path", "program", "application", "exe"});
-        QJsonValue args = p.value("args");
-        if (args.isUndefined() || args.isNull())
-            args = p.value("arguments");
-        const QString cwd = firstNonEmptyString(p, {"cwd", "workdir", "workingDirectory"});
-        const bool detached = p.value("detached").toBool(obj.value("detached").toBool(true));
-        const int waitMs = p.value("waitMs").toInt(obj.value("waitMs").toInt(15000));
-        const QString description = obj["description"].toString();
-        return new OpenAppCommand(app, args, cwd, detached, waitMs, description);
-    }
-
-    if (cmd == "OPEN_URL") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString url = firstNonEmptyString(p, {"url", "link", "uri", "address"});
-        const QString description = obj["description"].toString();
-        return new OpenUrlCommand(url, description);
-    }
-
-    if (cmd == "CLIPBOARD_SET") {
-        const QJsonObject p = normalizedParams(obj);
-        const QString text = firstNonEmptyString(p, {"text", "content", "value"});
-        const QString description = obj["description"].toString();
-        return new ClipboardSetCommand(text, description);
-    }
-
-    if (cmd == "CLIPBOARD_GET") {
-        const QJsonObject p = normalizedParams(obj);
-        const int maxChars = p.value("maxChars").toInt(obj.value("maxChars").toInt(4000));
-        const QString description = obj["description"].toString();
-        return new ClipboardGetCommand(maxChars, description);
-    }
-
-    /* Неизвестная команда */
     return nullptr;
 }

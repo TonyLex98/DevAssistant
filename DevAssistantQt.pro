@@ -19,7 +19,7 @@ INCLUDEPATH += \
     src/audio \
     src/uiide \
     src/ui/customWidgets \
-    src/codeviwer
+    src/codeviewer
 
 INCLUDEPATH += \
     $$PWD/src/uiide/tree-sitter/lib/src \
@@ -40,15 +40,15 @@ SOURCES += \
     src/audio/TtsRunner.cpp \
     src/core/ContextManager.cpp \
     src/core/ContextChainResolver.cpp \
-    src/codeviwer/CodePatcher.cpp \
-    src/codeviwer/GraphItems.cpp \
-    src/codeviwer/GraphLayout.cpp \
-    src/codeviwer/GraphWidget.cpp \
-    src/codeviwer/ProjectIndexer.cpp \
-    src/codeviwer/ProjectRelationView.cpp \
-    src/codeviwer/SequenceGraphWidget.cpp \
-    src/codeviwer/SequenceRelationView.cpp \
-    src/codeviwer/TemplateSequenceGraphWidget.cpp \
+    src/codeviewer/CodePatcher.cpp \
+    src/codeviewer/GraphItems.cpp \
+    src/codeviewer/GraphLayout.cpp \
+    src/codeviewer/GraphWidget.cpp \
+    src/codeviewer/ProjectIndexer.cpp \
+    src/codeviewer/ProjectRelationView.cpp \
+    src/codeviewer/SequenceGraphWidget.cpp \
+    src/codeviewer/SequenceRelationView.cpp \
+    src/codeviewer/TemplateSequenceGraphWidget.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandFactory.cpp \
@@ -137,6 +137,7 @@ SOURCES += \
     src/uiide/methodeditdialog.cpp \
     src/utils/DescriptionGenerator.cpp \
     src/utils/PromptManager.cpp\
+    src/utils/json_utils.cpp \
     src/uiide/tree-sitter/lib/src/lib.c \
     src/uiide/tree-sitter-cpp/src/parser.c \
     src/uiide/tree-sitter-cpp/src/scanner.c \
@@ -162,16 +163,16 @@ HEADERS += \
     src/audio/TtsRunner.h \
     src/core/ContextManager.h \
     src/core/ContextChainResolver.h \
-    src/codeviwer/CodePatcher.h \
-    src/codeviwer/GraphItems.h \
-    src/codeviwer/GraphLayout.h \
-    src/codeviwer/GraphWidget.h \
-    src/codeviwer/ProjectIndexer.h \
-    src/codeviwer/ProjectRelationView.h \
-    src/codeviwer/SequenceGraphWidget.h \
-    src/codeviwer/SequenceRelationView.h \
-    src/codeviwer/TemplateSequenceGraphWidget.h \
-    src/codeviwer/SymbolModel.h \
+    src/codeviewer/CodePatcher.h \
+    src/codeviewer/GraphItems.h \
+    src/codeviewer/GraphLayout.h \
+    src/codeviewer/GraphWidget.h \
+    src/codeviewer/ProjectIndexer.h \
+    src/codeviewer/ProjectRelationView.h \
+    src/codeviewer/SequenceGraphWidget.h \
+    src/codeviewer/SequenceRelationView.h \
+    src/codeviewer/TemplateSequenceGraphWidget.h \
+    src/codeviewer/SymbolModel.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \
     src/command/CommandFactory.h \
@@ -288,9 +289,22 @@ SOURCES += $$PWD/src/ui/controllers/SettingsPageBuilder.cpp
 SOURCES += $$PWD/src/ui/controllers/ContextCacheManager.cpp
 SOURCES += $$PWD/src/ui/controllers/SequenceRunner.cpp
 SOURCES += $$PWD/src/ui/controllers/SequenceEditorController.cpp
+SOURCES += $$PWD/src/ui/controllers/GraphController.cpp
+SOURCES += $$PWD/src/ui/controllers/DescriptionController.cpp
+SOURCES += $$PWD/src/ui/controllers/ModelConfigController.cpp
+SOURCES += $$PWD/src/ui/controllers/ContextDisplayController.cpp
+SOURCES += $$PWD/src/ui/controllers/ChatController.cpp
+SOURCES += $$PWD/src/ui/controllers/UiBuilder.cpp
 HEADERS += $$PWD/src/utils/AppConfig.h
+HEADERS += $$PWD/src/utils/json_utils.h
 HEADERS += $$PWD/src/ui/controllers/SequenceRunner.h
 HEADERS += $$PWD/src/ui/controllers/SequenceEditorController.h
+HEADERS += $$PWD/src/ui/controllers/GraphController.h
+HEADERS += $$PWD/src/ui/controllers/DescriptionController.h
+HEADERS += $$PWD/src/ui/controllers/ModelConfigController.h
+HEADERS += $$PWD/src/ui/controllers/ContextDisplayController.h
+HEADERS += $$PWD/src/ui/controllers/ChatController.h
+HEADERS += $$PWD/src/ui/controllers/UiBuilder.h
 HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
 HEADERS += $$PWD/src/command/AskUserCommand.h
 HEADERS += $$PWD/src/command/OpenAppCommand.h
@@ -306,3 +320,6 @@ HEADERS += $$PWD/src/ui/controllers/ContextCacheManager.h
 FORMS += \
     src/uiide/IDEWidget.ui
 
+
+HEADERS += $$PWD/src/utils/Logging.h
+SOURCES += $$PWD/src/utils/Logging.cpp

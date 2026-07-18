@@ -1,9 +1,9 @@
 #include "OmniAsrRunner.h"
 #include <QTemporaryFile>
-#include <QDebug>
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
+#include "utils/Logging.h"
 
 OmniAsrRunner::OmniAsrRunner(QObject* parent) : QObject(parent), m_audioInput(nullptr), m_audioDevice(nullptr), m_process(nullptr) {
     m_format.setSampleRate(16000);
@@ -76,7 +76,7 @@ void OmniAsrRunner::stopRecording() {
 
     // Assuming 'python' is in PATH. If not, user might need to configure it.
     // We could use a setting for python path.
-    qDebug() << "Starting ASR process: python" << args;
+    qCDebug(logAudio) << "Starting ASR process: python" << args;
     m_process->start("python", args);
 }
 
@@ -89,7 +89,7 @@ void OmniAsrRunner::onAudioReady() {
 void OmniAsrRunner::onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus) {
     QString stderrOutput = QString::fromLocal8Bit(m_process->readAllStandardError());
     if (!stderrOutput.isEmpty()) {
-        qDebug() << "ASR Process Stderr:" << stderrOutput;
+        qCDebug(logAudio) << "ASR Process Stderr:" << stderrOutput;
     }
 
     if (exitStatus == QProcess::CrashExit || exitCode != 0) {
@@ -97,7 +97,7 @@ void OmniAsrRunner::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
     } else {
         QByteArray outputData = m_process->readAllStandardOutput();
         QString output = QString::fromUtf8(outputData).trimmed();
-        qDebug() << "ASR Process Output:" << output;
+        qCDebug(logAudio) << "ASR Process Output:" << output;
         emit recognitionFinished(output);
     }
     // Optional: remove temp file
@@ -111,7 +111,7 @@ void OmniAsrRunner::checkAndInstallDependencies() {
     checkProcess.waitForFinished();
     
     if (checkProcess.exitCode() != 0) {
-        qDebug() << "Dependencies missing. Installing...";
+        qCDebug(logAudio) << "Dependencies missing. Installing...";
         // Install dependencies
         QProcess installProcess;
         // Use pip to install requirements
@@ -132,9 +132,9 @@ void OmniAsrRunner::checkAndInstallDependencies() {
         installProcess.waitForFinished(-1); // Wait indefinitely
         
         if (installProcess.exitCode() == 0) {
-            qDebug() << "Dependencies installed successfully.";
+            qCDebug(logAudio) << "Dependencies installed successfully.";
         } else {
-            qDebug() << "Failed to install dependencies: " << installProcess.readAllStandardError();
+            qCDebug(logAudio) << "Failed to install dependencies: " << installProcess.readAllStandardError();
         }
     }
 }

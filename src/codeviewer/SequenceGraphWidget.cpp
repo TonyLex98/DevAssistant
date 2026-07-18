@@ -5,6 +5,7 @@
 #include <QSizePolicy>
 #include "../core/SolutionTemplateManager.h"
 #include "../core/PromptSequenceManager.h"
+#include "utils/Logging.h"
 
 SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
@@ -51,12 +52,12 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
         emit sequenceSelected(sequenceName);
     });
     
-    qDebug() << "[SequenceGraphWidget] Constructor completed";
+    qCDebug(logViewer) << "[SequenceGraphWidget] Constructor completed";
 }
 
 void SequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqMgr)
 {
-    qDebug() << "[SequenceGraphWidget] setSequenceManager called";
+    qCDebug(logViewer) << "[SequenceGraphWidget] setSequenceManager called";
     m_seqMgr = seqMgr; // Store the sequence manager reference
     m_view->setSequenceManager(seqMgr);
 }
@@ -68,32 +69,32 @@ void SequenceGraphWidget::setCurrentSequence(const QString &sequenceName)
 
 void SequenceGraphWidget::setTemplateFilter(const QString &templateDirPath)
 {
-    qDebug() << "[SequenceGraphWidget] setTemplateFilter called with:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceGraphWidget] setTemplateFilter called with:" << templateDirPath;
     // In a full implementation, we would use this to filter
     m_view->rebuildGraphForTemplate(templateDirPath);
 }
 
 void SequenceGraphWidget::rebuildGraph()
 {
-    qDebug() << "[SequenceGraphWidget] rebuildGraph called";
+    qCDebug(logViewer) << "[SequenceGraphWidget] rebuildGraph called";
     m_view->rebuildGraph();
 }
 
 void SequenceGraphWidget::rebuildGraphForTemplate(const QString &templateDirPath)
 {
-    qDebug() << "[SequenceGraphWidget] rebuildGraphForTemplate called with:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceGraphWidget] rebuildGraphForTemplate called with:" << templateDirPath;
     m_view->rebuildGraphForTemplate(templateDirPath);
 }
 
 void SequenceGraphWidget::saveLayout()
 {
-    qDebug() << "[SequenceGraphWidget] saveLayout called";
+    qCDebug(logViewer) << "[SequenceGraphWidget] saveLayout called";
     m_view->saveLayout();
 }
 
 void SequenceGraphWidget::restoreLayout()
 {
-    qDebug() << "[SequenceGraphWidget] restoreLayout called";
+    qCDebug(logViewer) << "[SequenceGraphWidget] restoreLayout called";
     m_view->restoreLayout();
 }
 
@@ -126,7 +127,7 @@ void SequenceGraphWidget::populateTemplateComboBox()
     m_templateComboBox->blockSignals(false);
     onTemplateComboBoxChanged();
     
-    qDebug() << "[SequenceGraphWidget] Template combobox populated, items count:" << m_templateComboBox->count();
+    qCDebug(logViewer) << "[SequenceGraphWidget] Template combobox populated, items count:" << m_templateComboBox->count();
 }
 
 void SequenceGraphWidget::onTemplateComboBoxChanged()
@@ -137,7 +138,7 @@ void SequenceGraphWidget::onTemplateComboBoxChanged()
     
     QString selectedPath = m_templateComboBox->currentData().toString();
     m_currentTemplatePath = selectedPath;
-    qDebug() << "[SequenceGraphWidget] Template selection changed to data path:" << selectedPath;
+    qCDebug(logViewer) << "[SequenceGraphWidget] Template selection changed to data path:" << selectedPath;
     
     if (selectedPath.isEmpty()) {
         m_view->setCurrentTemplateDir(QString());
@@ -149,11 +150,11 @@ void SequenceGraphWidget::onTemplateComboBoxChanged()
 
 void SequenceGraphWidget::setTemplateManager(SolutionTemplateManager *templateMgr)
 {
-    qDebug() << "[SequenceGraphWidget] setTemplateManager called";
+    qCDebug(logViewer) << "[SequenceGraphWidget] setTemplateManager called";
     m_templateMgr = templateMgr; // Store the template manager reference
     if (m_view) {
         m_view->setTemplateManager(templateMgr);
-        qDebug() << "[SequenceGraphWidget] Template manager set on view";
+        qCDebug(logViewer) << "[SequenceGraphWidget] Template manager set on view";
     }
     
     // Populate the combobox with available templates

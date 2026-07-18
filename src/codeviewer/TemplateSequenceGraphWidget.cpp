@@ -16,6 +16,7 @@
 #include <QJsonArray>
 #include <QGroupBox>
 #include <QGridLayout>
+#include "utils/Logging.h"
 
 TemplateSequenceGraphWidget::TemplateSequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
@@ -130,26 +131,26 @@ void TemplateSequenceGraphWidget::setTemplateManager(SolutionTemplateManager *te
     m_templateManager = templateManager;
     if (m_graphView && m_templateManager) {
         m_graphView->setTemplateManager(m_templateManager);
-        qDebug() << "[TemplateSequenceGraphWidget] Template manager set on graph view";
+        qCDebug(logViewer) << "[TemplateSequenceGraphWidget] Template manager set on graph view";
     }
 }
 
 void TemplateSequenceGraphWidget::setSequenceManager(PromptSequenceManager *seqManager)
 {
-    qDebug() << "[TemplateSequenceGraphWidget] setSequenceManager called with seqManager:" << seqManager;
+    qCDebug(logViewer) << "[TemplateSequenceGraphWidget] setSequenceManager called with seqManager:" << seqManager;
     m_sequenceManager = seqManager;
     if (m_graphView) {
-        qDebug() << "[TemplateSequenceGraphWidget] Setting sequence manager on graph view";
+        qCDebug(logViewer) << "[TemplateSequenceGraphWidget] Setting sequence manager on graph view";
         m_graphView->setSequenceManager(seqManager);
-        qDebug() << "[TemplateSequenceGraphWidget] Sequence manager set on graph view";
+        qCDebug(logViewer) << "[TemplateSequenceGraphWidget] Sequence manager set on graph view";
         
         // Also set the template manager if it's available
         if (m_templateManager) {
             m_graphView->setTemplateManager(m_templateManager);
-            qDebug() << "[TemplateSequenceGraphWidget] Template manager set on graph view";
+            qCDebug(logViewer) << "[TemplateSequenceGraphWidget] Template manager set on graph view";
         }
     } else {
-        qDebug() << "[TemplateSequenceGraphWidget] Warning: m_graphView is null, cannot set sequence manager";
+        qCDebug(logViewer) << "[TemplateSequenceGraphWidget] Warning: m_graphView is null, cannot set sequence manager";
     }
     
     // Update available sequences list when sequence manager is set

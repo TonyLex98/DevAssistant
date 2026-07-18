@@ -1,4 +1,5 @@
 #include "DevAssManager.h"
+#include "utils/Logging.h"
 
 DevAssManager::DevAssManager(const QString &projectRoot,
                              QObject *parent)
@@ -67,7 +68,7 @@ bool DevAssManager::createFolder()
     {
         if (!m_devAssDir.mkpath("."))
         {
-            qWarning() << "Не удалось создать папку DevelopersAssistant:" << m_devAssDir.absolutePath();
+            qCWarning(logCore) << "Не удалось создать папку DevelopersAssistant:" << m_devAssDir.absolutePath();
             return false;
         }
     }
@@ -89,7 +90,7 @@ bool DevAssManager::createDaproFile()
     {
         if (!m_daproFile.open(QIODevice::WriteOnly))
         {
-            qWarning() << "Не удалось создать .dapro файл:" << m_daproFile.fileName();
+            qCWarning(logCore) << "Не удалось создать .dapro файл:" << m_daproFile.fileName();
             return false;
         }
         m_daproFile.close();
@@ -144,7 +145,7 @@ bool DevAssManager::generateDescrFiles()
         QFile descrFile(descrPath);
         if (!descrFile.open(QIODevice::WriteOnly))
         {
-            qWarning() << "Не удалось создать дескриптор:" << descrPath;
+            qCWarning(logCore) << "Не удалось создать дескриптор:" << descrPath;
             ok = false;
             continue;
         }
@@ -242,7 +243,7 @@ bool DevAssManager::save()
 
     if (!m_daproFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
     {
-        qWarning() << "Не удалось открыть .dapro файл для записи:" << m_daproFile.fileName();
+        qCWarning(logCore) << "Не удалось открыть .dapro файл для записи:" << m_daproFile.fileName();
         return false;
     }
 
@@ -258,7 +259,7 @@ bool DevAssManager::load()
 
     if (!m_daproFile.open(QIODevice::ReadOnly))
     {
-        qWarning() << "Не удалось открыть .dapro файл для чтения:" << m_daproFile.fileName();
+        qCWarning(logCore) << "Не удалось открыть .dapro файл для чтения:" << m_daproFile.fileName();
         return false;
     }
 
@@ -269,7 +270,7 @@ bool DevAssManager::load()
     QJsonDocument doc = QJsonDocument::fromJson(jsonBytes, &parseError);
     if (parseError.error != QJsonParseError::NoError)
     {
-        qWarning() << "Ошибка разбора JSON в .dapro:" << parseError.errorString();
+        qCWarning(logCore) << "Ошибка разбора JSON в .dapro:" << parseError.errorString();
         return false;
     }
 

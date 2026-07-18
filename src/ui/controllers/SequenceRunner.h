@@ -5,30 +5,37 @@
 #include <QMap>
 #include <QSet>
 #include <QDateTime>
+#include "../../services/IService.h"
 
-class MainWindow;
 class PromptSequence;
 class PromptStep;
 class Command;
-class OllamaAdapter;
+class MainWindow;
 
 /*
  * SequenceRunner — orchestrates execution of prompt sequences.
  *
- * Extracted from MainWindow to isolate the ~2200-line sequence execution
+ * Extracted from MainWindow to isolate the ~1700-line sequence execution
  * loop (runSequenceDialog → runNextStep → handleAssistantFinished → …).
  *
  * The runner holds its own execution state (step index, stability counters,
- * stop-flag) and delegates back to MainWindow for:
- *   - UI operations (QMessageBox, QInputDialog, CommandConfirmDialog)
- *   - Model calls (OllamaAdapter streaming / generation)
- *   - Command application (DevAssManager, ChangeApplier)
- *   - Logging, rescan, context-cache updates
+ * stop-flag) and depends on interfaces for:
+ *   - ISequenceService: sequence state, stop, agent pipeline
+ *   - IContextService: context cache, file watcher, shell/python outputs
+ *   - IModelService: model, agent model, stream buf, history
+ *   - IProjectService: project root, dev manager
+ *   - IUIUpdater: log, result display, status bar
+ *   - ITemplateService: template manager
+ *   - IStatusControllerService: status controller
+ *   - ITTSService: TTS controller
  */
 class SequenceRunner
 {
 public:
-    explicit SequenceRunner(MainWindow* mw);
+    SequenceRunner(MainWindow* mainWindow,
+                   ISequenceService* seq, IContextService* ctx, IModelService* model,
+                   IProjectService* project, IUIUpdater* ui, ITemplateService* tmpl,
+                   IStatusControllerService* status, ITTSService* tts);
 
     // Entry points (replace MainWindow::runSequenceDialog / runNextStep / handleAssistantFinished)
     void runSequenceDialog();
@@ -69,8 +76,27 @@ public:
     // Result display helpers
     void appendUserQuestionToResultDisplay(const QString& question);
 
+    // Command handlers (extracted from MainWindow)
+    void handleOpenCommand(Command* cmd);
+    bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err);
+    void handlePostApplyContextCleanup(Command* cmd);
+    void handleSearchResults(Command* cmd);
+    void appendConsoleContext(const QString& title,
+                              const QString& stdOut,
+                              const QString& stdErr,
+                              int exitCode);
+    void appendExternalContext(const QString& block);
+
 private:
-    MainWindow* m_mw;
+    MainWindow* m_mainWindow;
+    ISequenceService* m_seq;
+    IContextService* m_ctx;
+    IModelService* m_model;
+    IProjectService* m_project;
+    IUIUpdater* m_ui;
+    ITemplateService* m_tmpl;
+    IStatusControllerService* m_status;
+    ITTSService* m_tts;
 
     // Execution state (moved from MainWindow)
     bool m_resultShownInCurrentRun{false};

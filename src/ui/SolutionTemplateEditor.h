@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <QWidget>
 #include <QVBoxLayout>
@@ -30,7 +30,7 @@
 #include "customWidgets/StyledButton.h"
 #include "customWidgets/MemoryLineEdit.h"
 #include "SolutionTemplateManager.h"
-#include "../codeviwer/TemplateSequenceGraphWidget.h"
+#include "../codeviewer/TemplateSequenceGraphWidget.h"
 
 class SolutionTemplateEditor : public QWidget
 {
@@ -42,7 +42,7 @@ public:
     void setTemplate(const SolutionTemplate &templateValue);
     SolutionTemplate templateValue() const;
 
-    // Обновление списка доступных последовательностей
+    // РћР±РЅРѕРІР»РµРЅРёРµ СЃРїРёСЃРєР° РґРѕСЃС‚СѓРїРЅС‹С… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
     void updateAvailableSequences();
 
 signals:
@@ -74,9 +74,9 @@ private:
     StyledButton *m_setMainSequenceBtn;
     StyledButton *m_selectImageBtn;
     
-    // Для отображения всех последовательностей из проекта
-    QMap<QString, QString> m_seqPathByName;  // name -> fullPath для доступных последовательностей
-    QString m_imagePath; // Путь к выбранному изображению
+    // Р”Р»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІСЃРµС… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№ РёР· РїСЂРѕРµРєС‚Р°
+    QMap<QString, QString> m_seqPathByName;  // name -> fullPath РґР»СЏ РґРѕСЃС‚СѓРїРЅС‹С… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
+    QString m_imagePath; // РџСѓС‚СЊ Рє РІС‹Р±СЂР°РЅРЅРѕРјСѓ РёР·РѕР±СЂР°Р¶РµРЅРёСЋ
     
     // Graph visualization
     TemplateSequenceGraphWidget *m_graphWidget;

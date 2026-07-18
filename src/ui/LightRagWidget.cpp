@@ -9,7 +9,7 @@
 #include <QJsonParseError>
 #include <QStandardPaths>
 #include <QApplication>
-#include <QDebug>
+#include "utils/Logging.h"
 
 // FileTableModel implementation
 FileTableModel::FileTableModel(QObject *parent)
@@ -273,7 +273,7 @@ void LightRagWidget::saveSettings()
         file.write(doc.toJson());
         file.close();
     } else {
-        qWarning() << "Could not save config file:" << m_configFilePath;
+        qCWarning(logRag) << "Could not save config file:" << m_configFilePath;
     }
 }
 

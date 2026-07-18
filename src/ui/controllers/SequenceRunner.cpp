@@ -1,4 +1,4 @@
-#include "SequenceRunner.h"
+﻿#include "SequenceRunner.h"
 #include "../MainWindow.h"
 #include "../../adapters/OllamaAdapter.h"
 #include "../../command/CommandParser.h"
@@ -6,13 +6,20 @@
 #include "../../command/CommandDocs.h"
 #include "../../command/EditInRangeCommand.h"
 #include "../../command/SearchWebCommand.h"
+#include "../../command/SearchProjectCommand.h"
+#include "../../utils/json_utils.h"
 #include "../../core/PromptSequenceManager.h"
 #include "../../core/PromptSequence.h"
 #include "../../core/PromptResolver.h"
 #include "../../core/DevAssManager.h"
+#include "../../core/ContextManager.h"
+#include "../../core/SolutionTemplateManager.h"
 #include "../../ui/ResultDisplayWidget.h"
 #include "../../ui/customWidgets/MemoryComboBox.h"
 #include "../../ui/RunTemplateOrSequenceDialog.h"
+#include "../../ui/controllers/ContextCacheManager.h"
+#include "../../ui/controllers/TaskStatusController.h"
+#include "../../ui/controllers/TtsController.h"
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QTimer>
@@ -26,68 +33,79 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <algorithm>
+#include "utils/Logging.h"
 
-SequenceRunner::SequenceRunner(MainWindow* mw)
-    : m_mw(mw)
+SequenceRunner::SequenceRunner(MainWindow* mainWindow, ISequenceService* seq, IContextService* ctx, IModelService* model,
+                               IProjectService* project, IUIUpdater* ui, ITemplateService* tmpl,
+                               IStatusControllerService* status, ITTSService* tts)
+    : m_mainWindow(mainWindow)
+    , m_seq(seq)
+    , m_ctx(ctx)
+    , m_model(model)
+    , m_project(project)
+    , m_ui(ui)
+    , m_tmpl(tmpl)
+    , m_status(status)
+    , m_tts(tts)
 {
 }
 
 void SequenceRunner::runSequenceDialog()
 {
-    qDebug() << "[runSequenceDialog] Starting sequence dialog";
-    qDebug() << "[runSequenceDialog] Template manager root:" << m_mw->m_templateMgr.root();
-    qDebug() << "[runSequenceDialog] About to refresh template manager";
+    qCDebug(logSeq) << "[runSequenceDialog] Starting sequence dialog";
+    qCDebug(logSeq) << "[runSequenceDialog] Template manager root:" << m_tmpl->templateMgrPtr()->root();
+    qCDebug(logSeq) << "[runSequenceDialog] About to refresh template manager";
 
-    m_mw->m_templateMgr.refresh();
-    qDebug() << "[runSequenceDialog] Template manager refresh completed";
+    m_tmpl->templateMgrPtr()->refresh();
+    qCDebug(logSeq) << "[runSequenceDialog] Template manager refresh completed";
 
-    m_mw->refreshAllSequences();
-    qDebug() << "[runSequenceDialog] refreshAllSequences completed";
+    m_seq->refreshAllSequences();
+    qCDebug(logSeq) << "[runSequenceDialog] refreshAllSequences completed";
 
-    m_mw->ensureDefaultSequence();
-    qDebug() << "[runSequenceDialog] ensureDefaultSequence completed";
+    m_seq->ensureDefaultSequence();
+    qCDebug(logSeq) << "[runSequenceDialog] ensureDefaultSequence completed";
 
-    auto sequencesCopy = m_mw->m_seqMgr.sequences();
+    auto sequencesCopy = m_seq->seqMgrPtr()->sequences();
     int seqCount = sequencesCopy.size();
-    qDebug() << "[runSequenceDialog] Sequence count before dialog creation:" << seqCount;
+    qCDebug(logSeq) << "[runSequenceDialog] Sequence count before dialog creation:" << seqCount;
 
-    RunTemplateOrSequenceDialog dlg(sequencesCopy, &m_mw->m_templateMgr, m_mw);
-    qDebug() << "[runSequenceDialog] Created RunTemplateOrSequenceDialog with" << seqCount << "sequences";
+    RunTemplateOrSequenceDialog dlg(sequencesCopy, m_tmpl->templateMgrPtr(), nullptr);
+    qCDebug(logSeq) << "[runSequenceDialog] Created RunTemplateOrSequenceDialog with" << seqCount << "sequences";
 
     if (dlg.exec() != QDialog::Accepted) {
-        qDebug() << "[runSequenceDialog] Dialog cancelled";
+        qCDebug(logSeq) << "[runSequenceDialog] Dialog cancelled";
         return;
     }
 
-    qDebug() << "[runSequenceDialog] Dialog completed with selection";
+    qCDebug(logSeq) << "[runSequenceDialog] Dialog completed with selection";
 
     if (dlg.selectedMode() == RunTemplateOrSequenceDialog::RunSequence) {
-        qDebug() << "[runSequenceDialog] Running individual sequence mode";
-        const auto& currentSequences = m_mw->m_seqMgr.sequences();
+        qCDebug(logSeq) << "[runSequenceDialog] Running individual sequence mode";
+        const auto& currentSequences = m_seq->seqMgrPtr()->sequences();
         QString path = dlg.selectedSequencePath();
         if (!currentSequences.contains(path)) {
-            QMessageBox::warning(m_mw, "Ошибка", "Файл последовательности не найден.");
+            QMessageBox::warning(nullptr, "Ошибка", "Файл последовательности не найден.");
             return;
         }
 
-        m_mw->m_currentSeq = currentSequences.value(path);
-        m_mw->m_currentStepIdx = 0;
-        m_mw->m_sequenceMode = true;
-        m_mw->m_currentSeqPath = path;
-        m_mw->m_currentSeqId = m_mw->m_contextManager->startCommandSequence(m_mw->m_currentSeq.name(), m_mw->m_currentSeq.description());
+        m_seq->currentSeq() = currentSequences.value(path);
+        m_seq->setCurrentStepIndex(0);
+        m_seq->setSequenceMode(true);
+        m_seq->setCurrentSeqPath(path);
+        m_seq->setCurrentSeqId(m_ctx->contextManagerPtr()->startCommandSequence(m_seq->currentSeq().name(), m_seq->currentSeq().description()));
         resetSequenceStabilityState();
-        m_mw->updateSequenceGraphHighlight();
-        qDebug() << "[runSequenceDialog] About to start task timer for sequence execution";
-        m_mw->m_statusController->startTask();
-        qDebug() << "[runSequenceDialog] Starting sequence:" << m_mw->m_currentSeq.name();
+        m_seq->updateSequenceGraphHighlight();
+        qCDebug(logSeq) << "[runSequenceDialog] About to start task timer for sequence execution";
+        m_status->statusControllerPtr()->startTask();
+        qCDebug(logSeq) << "[runSequenceDialog] Starting sequence:" << m_seq->currentSeq().name();
         runNextStep();
     } else {
-        qDebug() << "[runSequenceDialog] Running template mode";
+        qCDebug(logSeq) << "[runSequenceDialog] Running template mode";
         QString templatePath = dlg.selectedTemplatePath();
         QString sequencePath = dlg.selectedDefaultSequencePath();
 
         if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
-            QMessageBox::warning(m_mw, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
+            QMessageBox::warning(nullptr, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
             return;
         }
 
@@ -102,104 +120,104 @@ void SequenceRunner::runSequenceDialog()
         }
 
         if (seq.name().isEmpty()) {
-            QMessageBox::warning(m_mw, "Ошибка", "Не удалось загрузить выбранную последовательность.");
+            QMessageBox::warning(nullptr, "Ошибка", "Не удалось загрузить выбранную последовательность.");
             return;
         }
 
-        m_mw->m_currentSeq = seq;
-        m_mw->m_currentStepIdx = 0;
-        m_mw->m_sequenceMode = true;
-        m_mw->m_currentSeqPath = sequencePath;
-        if (m_mw->m_contextManager)
-            m_mw->m_currentSeqId = m_mw->m_contextManager->startCommandSequence(m_mw->m_currentSeq.name(), m_mw->m_currentSeq.description());
+        m_seq->currentSeq() = seq;
+        m_seq->setCurrentStepIndex(0);
+        m_seq->setSequenceMode(true);
+        m_seq->setCurrentSeqPath(sequencePath);
+        if (m_ctx->contextManagerPtr())
+            m_seq->setCurrentSeqId(m_ctx->contextManagerPtr()->startCommandSequence(m_seq->currentSeq().name(), m_seq->currentSeq().description()));
         else
-            m_mw->m_currentSeqId.clear();
-        m_mw->m_currentTemplatePath = templatePath;
+            m_seq->setCurrentSeqId("");
+        m_seq->setCurrentTemplatePath(templatePath);
         resetSequenceStabilityState();
-        m_mw->updateSequenceGraphHighlight();
-        qDebug() << "[runSequenceDialog] About to start task timer for template execution";
-        m_mw->m_statusController->startTask();
+        m_seq->updateSequenceGraphHighlight();
+        qCDebug(logSeq) << "[runSequenceDialog] About to start task timer for template execution";
+        m_status->statusControllerPtr()->startTask();
         runNextStep();
     }
 }
 
 void SequenceRunner::runNextStep()
 {
-    qDebug() << "[runNextStep] m_sequenceMode:" << m_mw->m_sequenceMode << "m_currentStepIdx:" << m_mw->m_currentStepIdx;
-    if (!m_mw->m_sequenceMode) return;
+    qCDebug(logSeq) << "[runNextStep] m_sequenceMode:" << m_seq->isSequenceMode() << "m_currentStepIdx:" << m_seq->currentStepIndex();
+    if (!m_seq->isSequenceMode()) return;
 
-    if (m_mw->m_stopRequested) {
-        m_mw->m_stopRequested = false;
-        m_mw->m_sequenceMode = false;
-        m_mw->m_currentSeqId.clear();
-        m_mw->updateSequenceGraphHighlight();
+    if (m_seq->isStopRequested()) {
+        m_seq->setStopRequested(false);
+        m_seq->setSequenceMode(false);
+        m_seq->setCurrentSeqId("");
+        m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(m_mw, "Остановлено",
+        QMessageBox::information(nullptr, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
         return;
     }
 
-    if (m_mw->m_currentStepIdx < 0 ||
-            m_mw->m_currentStepIdx >= m_mw->m_currentSeq.steps().size()) {
+    if (m_seq->currentStepIndex() < 0 ||
+            m_seq->currentStepIndex() >= m_seq->currentSeq().steps().size()) {
         if (!m_resultShownInCurrentRun) {
-            autoFinalizeSequenceWithResult(m_mw->tr("последовательность завершилась без SHOW_RESULT"), QList<Command*>());
+            autoFinalizeSequenceWithResult(QStringLiteral("последовательность завершилась без SHOW_RESULT"), QList<Command*>());
             return;
         }
-        QMessageBox::information(m_mw, "Готово",
+        QMessageBox::information(nullptr, "Готово",
                                  "Последовательность выполнена полностью.");
-        if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager) {
-            m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
+        if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
+            m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
         }
-        m_mw->m_sequenceMode = false;
-        m_mw->m_currentSeqId.clear();
-        m_mw->m_statusController->stopTask();
-        m_mw->updateSequenceGraphHighlight();
+        m_seq->setSequenceMode(false);
+        m_seq->setCurrentSeqId("");
+        m_status->statusControllerPtr()->stopTask();
+        m_seq->updateSequenceGraphHighlight();
         return;
     }
 
-    const PromptStep &step = m_mw->m_currentSeq.steps()[m_mw->m_currentStepIdx];
-    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, m_mw);
-    qDebug() << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt;
-    qDebug() << "[runNextStep] userPrompt:" << resolved.userPrompt;
+    const PromptStep &step = m_seq->currentSeq().steps()[m_seq->currentStepIndex()];
+    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, m_mainWindow);
+    qCDebug(logSeq) << "[runNextStep] systemPrompt snippet:" << resolved.systemPrompt;
+    qCDebug(logSeq) << "[runNextStep] userPrompt:" << resolved.userPrompt;
 
     {
-        int tokens = m_mw->m_model.estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
-        m_mw->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_mw->m_currentStepIdx+1).arg(tokens));
+        int tokens = m_model->modelPtr()->estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
+        m_ui->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_seq->currentStepIndex()+1).arg(tokens));
     }
-    m_mw->log(QString("\n--- Шаг %1 ------------------------------------------------")
-        .arg(m_mw->m_currentStepIdx+1));
-    m_mw->log(resolved.systemPrompt);
+    m_ui->log(QString("\n--- Шаг %1 ------------------------------------------------")
+        .arg(m_seq->currentStepIndex()+1));
+    m_ui->log(resolved.systemPrompt);
     if (!resolved.userPrompt.isEmpty())
-        m_mw->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
+        m_ui->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
     if (!resolved.userPrompt.isEmpty()) {
-        if (m_mw->m_lastUserMessages.isEmpty() || m_mw->m_lastUserMessages.last() != resolved.userPrompt) {
-            m_mw->m_history.push_back(qMakePair(QString("user"), resolved.userPrompt));
-            m_mw->m_lastUserMessages.append(resolved.userPrompt);
-            while (m_mw->m_lastUserMessages.size() > MainWindow::MAX_USER_MESSAGES) {
-                m_mw->m_lastUserMessages.removeFirst();
+        if (m_model->lastUserMessages().isEmpty() || m_model->lastUserMessages().last() != resolved.userPrompt) {
+            m_model->history().push_back(qMakePair(QString("user"), resolved.userPrompt));
+            m_model->lastUserMessages().append(resolved.userPrompt);
+            while (m_model->lastUserMessages().size() > m_model->maxUserMessages()) {
+                m_model->lastUserMessages().removeFirst();
             }
-            qDebug() << "[runNextStep] Added user prompt to LAST_USER_MESSAGES storage. Current count:" << m_mw->m_lastUserMessages.size();
+            qCDebug(logSeq) << "[runNextStep] Added user prompt to LAST_USER_MESSAGES storage. Current count:" << m_model->lastUserMessages().size();
         } else {
-            qDebug() << "[runNextStep] Skipping duplicate user prompt in LAST_USER_MESSAGES storage";
+            qCDebug(logSeq) << "[runNextStep] Skipping duplicate user prompt in LAST_USER_MESSAGES storage";
         }
     }
 
-    m_mw->m_streamBuf.clear();
+    m_model->streamBuf().clear();
 
-    qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
-    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
-    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
 
-    m_mw->m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;
+    m_model->currentPrompt() = resolved.systemPrompt + "\n" + resolved.userPrompt;
 
-    if (m_mw->m_agentRepairStepIdx != m_mw->m_currentStepIdx || m_mw->m_agentRepairSeqId != m_mw->m_currentSeqId) {
-        m_mw->m_agentRepairCountThisStep = 0;
-        m_mw->m_agentRepairStepIdx = m_mw->m_currentStepIdx;
-        m_mw->m_agentRepairSeqId = m_mw->m_currentSeqId;
+    if (m_seq->agentRepairStepIdx() != m_seq->currentStepIndex() || m_seq->agentRepairSeqId() != m_seq->currentSeqId()) {
+        m_seq->agentRepairCountThisStep() = 0;
+        m_seq->setAgentRepairStepIdx(m_seq->currentStepIndex());
+        m_seq->setAgentRepairSeqId(m_seq->currentSeqId());
     }
 
-    if (m_mw->m_useAgentPipeline && ensureAgentModelConfigured()) {
+    if (m_seq->useAgentPipeline() && ensureAgentModelConfigured()) {
         QVariantMap draftOpts;
         draftOpts.insert("temperature", 0.5);
         draftOpts.insert("num_predict", 600);
@@ -211,9 +229,9 @@ void SequenceRunner::runNextStep()
                 "Return a short plan (5-10 bullets) and, if needed, 1-3 clarifying questions.\n"
                 "Do NOT output JSON commands in this step.\n");
 
-        const QString rawDraft = m_mw->m_agentModel.generateWithSystem(resolved.userPrompt, draftSystem, draftOpts).trimmed();
+        const QString rawDraft = m_model->agentModelPtr()->generateWithSystem(resolved.userPrompt, draftSystem, draftOpts).trimmed();
         if (!rawDraft.isEmpty())
-            m_mw->appendConsoleContext(QStringLiteral("AGENT_RAW_DRAFT"), rawDraft, QString(), 0);
+            m_ctx->appendConsoleContext(QStringLiteral("AGENT_RAW_DRAFT"), rawDraft, QString(), 0);
 
         QVariantMap compileOpts;
         compileOpts.insert("temperature", 0.1);
@@ -226,42 +244,42 @@ void SequenceRunner::runNextStep()
         }
         compileSystem += QStringLiteral("\n\nIMPORTANT: Output ONLY a JSON array of commands. No extra text.\n");
 
-        const QString compiled = m_mw->m_agentModel.generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
-        QTimer::singleShot(0, m_mw, [this, compiled]() {
-            m_mw->m_streamBuf = compiled;
+        const QString compiled = m_model->agentModelPtr()->generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
+        QTimer::singleShot(0, nullptr, [this, compiled]() {
+            m_model->streamBuf() = compiled;
             handleAssistantFinished();
         });
         return;
     }
 
-    if (!m_mw->m_activeImagesBase64.isEmpty()) {
-        m_mw->m_model.startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_mw->m_activeImagesBase64, QVariantMap());
+    if (!m_model->activeImagesBase64().isEmpty()) {
+        m_model->modelPtr()->startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_model->activeImagesBase64(), QVariantMap());
     } else {
-        m_mw->m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+        m_model->modelPtr()->startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
     }
 }
 
 void SequenceRunner::handleAssistantFinished()
 {
-    if (m_mw->m_stopRequested) {
-        m_mw->m_stopRequested = false;
-        m_mw->m_sequenceMode = false;
-        m_mw->m_currentSeqId.clear();
-        m_mw->updateSequenceGraphHighlight();
+    if (m_seq->isStopRequested()) {
+        m_seq->setStopRequested(false);
+        m_seq->setSequenceMode(false);
+        m_seq->setCurrentSeqId("");
+        m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(m_mw, "Остановлено",
+        QMessageBox::information(nullptr, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
-        m_mw->m_statusController->stopTask();
-        qDeleteAll(CommandParser::parse(m_mw->m_streamBuf.toUtf8()));
+        m_status->statusControllerPtr()->stopTask();
+        qDeleteAll(CommandParser::parse(m_model->streamBuf().toUtf8()));
         return;
     }
 
-    QByteArray fullResp = m_mw->m_streamBuf.toUtf8();
-    QByteArray jsonResp = m_mw->extractJsonPart(fullResp);
+    QByteArray fullResp = m_model->streamBuf().toUtf8();
+    QByteArray jsonResp = m_model->extractJsonPart(fullResp);
 
-    if (jsonResp.isEmpty() && m_mw->m_sequenceMode &&
-        m_mw->m_currentStepIdx >= 0 && m_mw->m_currentStepIdx < m_mw->m_currentSeq.steps().size()) {
-        const PromptStep &step = m_mw->m_currentSeq.steps()[m_mw->m_currentStepIdx];
+    if (jsonResp.isEmpty() && m_seq->isSequenceMode() &&
+        m_seq->currentStepIndex() >= 0 && m_seq->currentStepIndex() < m_seq->currentSeq().steps().size()) {
+        const PromptStep &step = m_seq->currentSeq().steps()[m_seq->currentStepIndex()];
         const QByteArray repaired = repairToJsonArrayIfNeeded(fullResp, step);
         if (!repaired.isEmpty()) {
             jsonResp = repaired;
@@ -271,20 +289,20 @@ void SequenceRunner::handleAssistantFinished()
     const bool usedRaw = jsonResp.isEmpty();
     const QByteArray payload = usedRaw ? fullResp : jsonResp;
     if (usedRaw) {
-        m_mw->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
-        m_mw->log("LLM ответ сохранён как контекст: не удалось извлечь JSON. Пытаемся распарсить сырой ответ.");
+        m_ctx->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
+        m_ui->log("LLM ответ сохранён как контекст: не удалось извлечь JSON. Пытаемся распарсить сырой ответ.");
     }
 
-    m_mw->m_history.push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
-    m_mw->m_lastAssistantMessage = QString::fromUtf8(payload);
+    m_model->history().push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
+    m_model->lastAssistantMessage() = QString::fromUtf8(payload);
 
     // Check if the LLM specified to open a new sequence
     QString nextSeqName = PromptResolver::getNextSequence();
     if (!nextSeqName.isEmpty()) {
-        m_mw->log("DEBUG: NEXT_SEQUENCE requested, searching for: " + nextSeqName);
-        m_mw->refreshAllSequences();
+        m_ui->log("DEBUG: NEXT_SEQUENCE requested, searching for: " + nextSeqName);
+        m_seq->refreshAllSequences();
 
-        const QMap<QString, PromptSequence>& allSequences = m_mw->m_seqMgr.sequences();
+        const QMap<QString, PromptSequence>& allSequences = m_seq->seqMgrPtr()->sequences();
         PromptSequence foundSeq;
         QString foundPath;
 
@@ -292,7 +310,7 @@ void SequenceRunner::handleAssistantFinished()
             if (it.value().name() == nextSeqName) {
                 foundSeq = it.value();
                 foundPath = it.key();
-                m_mw->log("Found sequence by name: " + nextSeqName + " at " + foundPath);
+                m_ui->log("Found sequence by name: " + nextSeqName + " at " + foundPath);
                 break;
             }
         }
@@ -303,7 +321,7 @@ void SequenceRunner::handleAssistantFinished()
                 if (fileInfo.fileName() == nextSeqName) {
                     foundSeq = it.value();
                     foundPath = it.key();
-                    m_mw->log("Found sequence by filename: " + nextSeqName + " at " + foundPath);
+                    m_ui->log("Found sequence by filename: " + nextSeqName + " at " + foundPath);
                     break;
                 }
             }
@@ -319,7 +337,7 @@ void SequenceRunner::handleAssistantFinished()
                 if (fileInfo.fileName() == expectedFileName) {
                     foundSeq = it.value();
                     foundPath = it.key();
-                    m_mw->log("Found sequence by expected filename: " + expectedFileName + " at " + foundPath);
+                    m_ui->log("Found sequence by expected filename: " + expectedFileName + " at " + foundPath);
                     break;
                 }
             }
@@ -331,7 +349,7 @@ void SequenceRunner::handleAssistantFinished()
                 if (fileInfo.baseName() == nextSeqName) {
                     foundSeq = it.value();
                     foundPath = it.key();
-                    m_mw->log("Found sequence by basename match: " + nextSeqName + " at " + foundPath);
+                    m_ui->log("Found sequence by basename match: " + nextSeqName + " at " + foundPath);
                     break;
                 }
             }
@@ -343,14 +361,14 @@ void SequenceRunner::handleAssistantFinished()
                 if (fileInfo.baseName() == nextSeqName + ".seq") {
                     foundSeq = it.value();
                     foundPath = it.key();
-                    m_mw->log("Found sequence by basename + .seq match: " + nextSeqName + ".seq" + " at " + foundPath);
+                    m_ui->log("Found sequence by basename + .seq match: " + nextSeqName + ".seq" + " at " + foundPath);
                     break;
                 }
             }
         }
 
-        if (foundPath.isEmpty() && !m_mw->m_currentSeqPath.isEmpty()) {
-            QFileInfo currentSeqInfo(m_mw->m_currentSeqPath);
+        if (foundPath.isEmpty() && !m_seq->currentSeqPath().isEmpty()) {
+            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
             QDir templateDir = currentSeqInfo.absoluteDir();
 
             QStringList possibleFilenames;
@@ -372,7 +390,7 @@ void SequenceRunner::handleAssistantFinished()
                         if (doc.isObject()) {
                             foundSeq = PromptSequence::fromJson(doc.object());
                             foundPath = sequenceFilePath;
-                            m_mw->log(QString("Found sequence in template directory: %1").arg(sequenceFilePath));
+                            m_ui->log(QString("Found sequence in template directory: %1").arg(sequenceFilePath));
                             break;
                         }
                         seqFile.close();
@@ -383,31 +401,31 @@ void SequenceRunner::handleAssistantFinished()
         }
 
         if (!foundPath.isEmpty()) {
-            m_mw->m_currentSeq = foundSeq;
-            m_mw->m_currentStepIdx = 0;
-            m_mw->m_sequenceMode = true;
-            m_mw->m_currentSeqPath = foundPath;
+            m_seq->currentSeq() = foundSeq;
+            m_seq->setCurrentStepIndex(0);
+            m_seq->setSequenceMode(true);
+            m_seq->setCurrentSeqPath(foundPath);
             addSequenceTransitionToHistory(nextSeqName);
-            m_mw->updateSequenceGraphHighlight();
+            m_seq->updateSequenceGraphHighlight();
             PromptResolver::clearNextSequence();
-            QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+            QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
             qDeleteAll(CommandParser::parse(payload));
             return;
         }
 
-        m_mw->log("Указанная последовательность не найдена: " + nextSeqName);
-        m_mw->log("DEBUG: NEXT_SEQUENCE - Available sequences debugging:");
-        m_mw->log("  Total sequences in manager: " + QString::number(allSequences.size()));
-        m_mw->log("  Searched sequence name: '" + nextSeqName + "'");
-        m_mw->log("  Available sequence names and paths:");
+        m_ui->log("Указанная последовательность не найдена: " + nextSeqName);
+        m_ui->log("DEBUG: NEXT_SEQUENCE - Available sequences debugging:");
+        m_ui->log("  Total sequences in manager: " + QString::number(allSequences.size()));
+        m_ui->log("  Searched sequence name: '" + nextSeqName + "'");
+        m_ui->log("  Available sequence names and paths:");
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             QString seqName = it.value().name();
             QString filePath = it.key();
             QFileInfo fileInfo(filePath);
-            m_mw->log("    - Sequence name: '" + seqName + "'");
-            m_mw->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_mw->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_mw->log("    - File path: " + filePath);
+            m_ui->log("    - Sequence name: '" + seqName + "'");
+            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
+            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
+            m_ui->log("    - File path: " + filePath);
         }
         PromptResolver::clearNextSequence();
     }
@@ -415,27 +433,27 @@ void SequenceRunner::handleAssistantFinished()
     QVector<Command*> cmds = CommandParser::parse(payload);
     if (cmds.isEmpty()) {
         if (!usedRaw)
-            m_mw->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
-        m_mw->log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
+            m_ctx->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
+        m_ui->log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
 
-        if (m_mw->m_sequenceMode) {
+        if (m_seq->isSequenceMode()) {
             ++m_batchesWithoutResult;
             if (m_batchesWithoutResult >= 7 && !m_resultShownInCurrentRun) {
-                autoFinalizeSequenceWithResult(m_mw->tr("LLM несколько шагов подряд не возвращает команды"), QList<Command*>());
+                autoFinalizeSequenceWithResult(QStringLiteral("LLM несколько шагов подряд не возвращает команды"), QList<Command*>());
                 return;
             }
-            if (m_mw->m_stopRequested) {
-                m_mw->m_stopRequested = false;
-                m_mw->m_sequenceMode = false;
-                m_mw->m_currentSeqId.clear();
-                m_mw->updateSequenceGraphHighlight();
+            if (m_seq->isStopRequested()) {
+                m_seq->setStopRequested(false);
+                m_seq->setSequenceMode(false);
+                m_seq->setCurrentSeqId("");
+                m_seq->updateSequenceGraphHighlight();
 
-                QMessageBox::information(m_mw, "Остановлено",
+                QMessageBox::information(nullptr, "Остановлено",
                                          "Выполнение шаблона остановлено пользователем.");
                 return;
             }
-            ++m_mw->m_currentStepIdx;
-            QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+            m_seq->setCurrentStepIndex(m_seq->currentStepIndex() + 1);
+            QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
         } else {
             retryCurrentSequenceStep();
         }
@@ -443,13 +461,13 @@ void SequenceRunner::handleAssistantFinished()
     }
 
     QList<Command*> toRun;
-    if (m_mw->confirmModeCombo->currentData().toString() == "auto") {
+    if (m_ui->confirmModeComboBox()->currentData().toString() == "auto") {
         toRun = cmds.toList();
-        m_mw->log(QString("Команды запускаются без подтверждения (режим: %1).").arg(m_mw->confirmModeCombo->currentText()));
+        m_ui->log(QString("Команды запускаются без подтверждения (режим: %1).").arg(m_ui->confirmModeComboBox()->currentText()));
     } else {
-        auto dlg = new CommandConfirmDialog(cmds.toList(), m_mw, true);
+        auto dlg = new CommandConfirmDialog(cmds.toList(), nullptr, true);
         if (dlg->exec() != QDialog::Accepted) {
-            m_mw->log("Пользователь отклонил команды");
+            m_ui->log("Пользователь отклонил команды");
             qDeleteAll(cmds);
             delete dlg;
             return;
@@ -466,7 +484,7 @@ void SequenceRunner::handleAssistantFinished()
 
     bool shouldAutoFinalizeBeforeTransition = false;
     QString autoFinalizeReason;
-    if (m_mw->m_sequenceMode) {
+    if (m_seq->isSequenceMode()) {
         if (hasShowResultCommand) {
             m_batchesWithoutResult = 0;
             m_sameBatchRepeatCount = 0;
@@ -482,10 +500,10 @@ void SequenceRunner::handleAssistantFinished()
 
             if (readOnlyBatch && m_batchesWithoutResult >= 8) {
                 shouldAutoFinalizeBeforeTransition = true;
-                autoFinalizeReason = m_mw->tr("слишком много шагов без финального ответа");
+                autoFinalizeReason = QStringLiteral("слишком много шагов без финального ответа");
             } else if (readOnlyBatch && m_sameBatchRepeatCount >= 3) {
                 shouldAutoFinalizeBeforeTransition = true;
-                autoFinalizeReason = m_mw->tr("повторяющиеся команды без прогресса");
+                autoFinalizeReason = QStringLiteral("повторяющиеся команды без прогресса");
             }
         }
     }
@@ -499,47 +517,47 @@ void SequenceRunner::handleAssistantFinished()
         if (c->name() == "ASK_USER") {
             const QString question = c->params().value("question").toString();
             bool ok = false;
-            const QString ans = QInputDialog::getText(m_mw,
-                                                      m_mw->tr("Ответьте на вопрос нейросети"),
+            const QString ans = QInputDialog::getText(nullptr,
+                                                      QStringLiteral("Ответьте на вопрос нейросети"),
                                                       question,
                                                       QLineEdit::Normal,
                                                       QString(),
                                                       &ok);
             if (ok) {
-                m_mw->m_history.push_back(qMakePair(QString("user"), ans));
-                m_mw->m_lastUserMessages.append(ans);
-                while (m_mw->m_lastUserMessages.size() > MainWindow::MAX_USER_MESSAGES) {
-                    m_mw->m_lastUserMessages.removeFirst();
+                m_model->history().push_back(qMakePair(QString("user"), ans));
+                m_model->lastUserMessages().append(ans);
+                while (m_model->lastUserMessages().size() > m_model->maxUserMessages()) {
+                    m_model->lastUserMessages().removeFirst();
                 }
             }
         } else if (c->name() == "OPEN_FILE_REGION" || c->name() == "OPEN_FILE") {
-            m_mw->handleOpenCommand(c);
+            m_ctx->handleOpenCommand(c);
         } else if (c->name() == "SHOW_RESULT") {
             QString title = c->params().value("title").toString();
             if (title.isEmpty())
-                title = m_mw->tr("Ответ от %1:\n\n").arg(m_mw->m_model.selectedModel());
+                title = QStringLiteral("Ответ от %1:\n\n").arg(m_model->modelPtr()->selectedModel());
             QString content = c->params().value("content").toString() + "\n\n\n";
             if (content.isEmpty())
-                content = m_mw->tr("SHOW_RESULT вызван без текста.\n\n\n");
+                content = QStringLiteral("SHOW_RESULT вызван без текста.\n\n\n");
             appendResultToUi(title, content);
             m_resultShownInCurrentRun = true;
             m_batchesWithoutResult = 0;
             m_sameBatchRepeatCount = 0;
             m_lastBatchSignature.clear();
 
-            if (m_mw->m_ttsController && m_mw->m_ttsController->isEnabled() && m_mw->m_ttsController->runner() && m_mw->m_ttsController->runner()->isReady()) {
+            if (m_tts->ttsControllerPtr() && m_tts->ttsControllerPtr()->isEnabled() && m_tts->ttsControllerPtr()->runner() && m_tts->ttsControllerPtr()->runner()->isReady()) {
                 QString textToSpeak = c->params().value("content").toString();
                 textToSpeak.replace("\\n", " ").replace("\\r", "").replace("\n", " ");
                 if (textToSpeak.length() > 1000) {
                     textToSpeak = textToSpeak.left(1000) + "...";
                 }
                 if (!textToSpeak.isEmpty() && textToSpeak.length() > 5) {
-                    m_mw->m_ttsController->speak(textToSpeak);
+                    m_tts->ttsControllerPtr()->speak(textToSpeak);
                 }
             }
 
-            if (m_mw->m_contextManager) {
-                m_mw->addCommandToContext(c, c->getResult());
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(c, c->getResult());
             }
         } else if (c->name() == "REASONING") {
             QString reasoning = c->params().value("reasoning").toString();
@@ -549,70 +567,70 @@ void SequenceRunner::handleAssistantFinished()
                 reasoning = c->params().value("reasoning_text").toString();
 
             if (!reasoning.isEmpty()) {
-                if (m_mw->m_resultDisplayWidget) {
+                if (m_ui->resultDisplayWidget()) {
                     QString formattedReasoning = reasoning;
-                    auto metadata = m_mw->collectContextMetadataSince(m_mw->m_lastQuestionTimestamp);
-                    m_mw->m_resultDisplayWidget->appendResult("", formattedReasoning,
+                    auto metadata = m_seq->collectContextMetadataSince(m_ui->lastQuestionTimestamp());
+                    m_ui->resultDisplayWidget()->appendResult("", formattedReasoning,
                                                     ResultDisplayWidget::EntryType::Reasoning,
                                                     metadata);
                 } else {
-                    m_mw->m_history.push_back(qMakePair(QString("system"), reasoning));
+                    m_model->history().push_back(qMakePair(QString("system"), reasoning));
                 }
             }
 
-            if (m_mw->m_contextManager) {
-                m_mw->addCommandToContext(c, c->getResult());
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(c, c->getResult());
             }
         } else if (c->name() == "CONTEXT_SHOW") {
-            m_mw->m_contextCache.rebuildContextCache();
+            m_ctx->contextCachePtr()->rebuildContextCache();
             int maxChars = c->params().value("maxChars").toInt(8000);
             if (maxChars <= 0) maxChars = 0;
-            QString ctx = m_mw->m_contextCache.contextContent();
+            QString ctx = m_ctx->contextCachePtr()->contextContent();
             if (maxChars > 0 && ctx.size() > maxChars) {
                 ctx = ctx.left(maxChars) + "\n[...truncated...]";
             }
 
             const QString result = QString("CONTEXT_SHOW\n[context]\n%1").arg(ctx.trimmed());
 
-            if (m_mw->m_resultDisplayWidget) {
-                auto metadata = m_mw->collectContextMetadataSince(m_mw->m_lastQuestionTimestamp);
-                m_mw->m_resultDisplayWidget->appendResult(m_mw->tr("Context"), result,
+            if (m_ui->resultDisplayWidget()) {
+                auto metadata = m_seq->collectContextMetadataSince(m_ui->lastQuestionTimestamp());
+                m_ui->resultDisplayWidget()->appendResult(QStringLiteral("Context"), result,
                                                     ResultDisplayWidget::EntryType::Default,
                                                     metadata);
             } else {
-                m_mw->appendExternalContext(QString("==== CONTEXT_SHOW ====\n%1").arg(ctx));
+                m_ctx->appendExternalContext(QString("==== CONTEXT_SHOW ====\n%1").arg(ctx));
             }
 
-            m_mw->m_history.push_back(qMakePair(QString("system"), result));
-            if (m_mw->m_contextManager) {
-                m_mw->addCommandToContext(c, result);
+            m_model->history().push_back(qMakePair(QString("system"), result));
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(c, result);
             }
         } else if (c->name() == "CONTEXT_CLEAR") {
             const QString scope = c->params().value("scope").toString().trimmed().toLower();
 
-            m_mw->m_contextCache.clearAll();
-            m_mw->m_fileToContextCommands.clear();
-            if (m_mw->m_fileWatcher)
-                m_mw->m_fileWatcher->removePaths(m_mw->m_fileWatcher->files());
+            m_ctx->contextCachePtr()->clearAll();
+            m_ctx->fileToContextCommands().clear();
+            if (m_ctx->fileWatcher())
+                m_ctx->fileWatcher()->removePaths(m_ctx->fileWatcher()->files());
 
-            m_mw->m_contextCache.clearConsoleLogs();
-            m_mw->m_contextCache.clearExternalSources();
-            m_mw->m_shellCommandOutputs.clear();
-            m_mw->m_pythonScriptOutputs.clear();
+            m_ctx->contextCachePtr()->clearConsoleLogs();
+            m_ctx->contextCachePtr()->clearExternalSources();
+            m_ctx->shellCommandOutputs().clear();
+            m_ctx->pythonScriptOutputs().clear();
 
-            if (m_mw->m_contextManager) {
+            if (m_ctx->contextManagerPtr()) {
                 if (scope == "all")
-                    m_mw->m_contextManager->clearAll();
+                    m_ctx->contextManagerPtr()->clearAll();
                 else
-                    m_mw->m_contextManager->clearActiveContextOnly();
+                    m_ctx->contextManagerPtr()->clearActiveContextOnly();
             }
 
-            m_mw->m_contextCache.rebuildContextCache();
+            m_ctx->contextCachePtr()->rebuildContextCache();
 
             const QString result = QString("CONTEXT_CLEAR\n[scope]\n%1\n[status]\nOK").arg(scope.isEmpty() ? "active" : scope);
-            m_mw->m_history.push_back(qMakePair(QString("system"), result));
-            if (m_mw->m_contextManager) {
-                m_mw->addCommandToContext(c, result);
+            m_model->history().push_back(qMakePair(QString("system"), result));
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(c, result);
             }
         } else if (c->name() == "CALL_SEQUENCE") {
             sequenceToCall = c->params().value("sequenceName").toString();
@@ -633,7 +651,7 @@ void SequenceRunner::handleAssistantFinished()
     if (hasCallSequenceCommand && !sequenceToCall.isEmpty()) {
         PromptSequence foundSeq;
         QString foundPath;
-        const QMap<QString, PromptSequence>& allSequences = m_mw->m_seqMgr.sequences();
+        const QMap<QString, PromptSequence>& allSequences = m_seq->seqMgrPtr()->sequences();
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == sequenceToCall) {
                 foundSeq = it.value();
@@ -642,8 +660,8 @@ void SequenceRunner::handleAssistantFinished()
             }
         }
 
-        if (foundPath.isEmpty() && !m_mw->m_currentSeqPath.isEmpty()) {
-            QFileInfo currentSeqInfo(m_mw->m_currentSeqPath);
+        if (foundPath.isEmpty() && !m_seq->currentSeqPath().isEmpty()) {
+            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
             QDir templateDir = currentSeqInfo.absoluteDir();
 
             QStringList possibleFilenames;
@@ -691,79 +709,79 @@ void SequenceRunner::handleAssistantFinished()
 
             if (needSummary) {
                 QStringList completedStepsSummary;
-                for (int i = 0; i < m_mw->m_currentStepIdx; ++i) {
-                    if (i < m_mw->m_currentSeq.steps().size()) {
-                        QString stepDesc = m_mw->m_currentSeq.steps()[i].tmpl().section('\n', 0, 0).trimmed();
+                for (int i = 0; i < m_seq->currentStepIndex(); ++i) {
+                    if (i < m_seq->currentSeq().steps().size()) {
+                        QString stepDesc = m_seq->currentSeq().steps()[i].tmpl().section('\n', 0, 0).trimmed();
                         if (stepDesc.length() > 80) stepDesc = stepDesc.left(80) + "...";
                         completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
                     }
                 }
 
-                if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager) {
-                    m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
+                if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
+                    m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
                 }
 
-                m_mw->m_currentSeq = foundSeq;
-                m_mw->m_currentStepIdx = 0;
-                m_mw->m_sequenceMode = true;
-                m_mw->m_currentSeqId = m_mw->m_contextManager->startCommandSequence(m_mw->m_currentSeq.name(), m_mw->m_currentSeq.description());
-                m_mw->m_currentSeqPath = foundPath;
+                m_seq->currentSeq() = foundSeq;
+                m_seq->setCurrentStepIndex(0);
+                m_seq->setSequenceMode(true);
+                m_seq->setCurrentSeqId(m_ctx->contextManagerPtr()->startCommandSequence(m_seq->currentSeq().name(), m_seq->currentSeq().description()));
+                m_seq->setCurrentSeqPath(foundPath);
 
                 if (!completedStepsSummary.isEmpty()) {
                     QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
-                    m_mw->m_history.push_back(qMakePair(QString("system"), summaryText));
+                    m_model->history().push_back(qMakePair(QString("system"), summaryText));
                 }
 
                 addSequenceTransitionToHistory(sequenceToCall);
-                m_mw->updateSequenceGraphHighlight();
+                m_seq->updateSequenceGraphHighlight();
                 qDeleteAll(toRun);
-                QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+                QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
                 return;
             } else {
-                if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager) {
-                    m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
+                if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
+                    m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
                 }
 
-                m_mw->m_currentSeq = foundSeq;
-                m_mw->m_currentStepIdx = 0;
-                m_mw->m_sequenceMode = true;
-                m_mw->m_currentSeqId = m_mw->m_contextManager->startCommandSequence(m_mw->m_currentSeq.name(), m_mw->m_currentSeq.description());
-                m_mw->m_currentSeqPath = foundPath;
+                m_seq->currentSeq() = foundSeq;
+                m_seq->setCurrentStepIndex(0);
+                m_seq->setSequenceMode(true);
+                m_seq->setCurrentSeqId(m_ctx->contextManagerPtr()->startCommandSequence(m_seq->currentSeq().name(), m_seq->currentSeq().description()));
+                m_seq->setCurrentSeqPath(foundPath);
 
                 addSequenceTransitionToHistory(sequenceToCall);
-                m_mw->updateSequenceGraphHighlight();
+                m_seq->updateSequenceGraphHighlight();
                 qDeleteAll(toRun);
-                QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+                QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
                 return;
             }
         }
 
-        m_mw->log("Указанная последовательность не найдена: " + sequenceToCall);
-        const QMap<QString, PromptSequence>& allSequences_debug = m_mw->m_seqMgr.sequences();
-        m_mw->log("DEBUG: CALL_SEQUENCE - Available sequences debugging:");
-        m_mw->log("  Total sequences in main manager: " + QString::number(allSequences_debug.size()));
-        m_mw->log("  Current sequence path: '" + m_mw->m_currentSeqPath + "'");
-        if (!m_mw->m_currentSeqPath.isEmpty()) {
-            QFileInfo currentSeqInfo(m_mw->m_currentSeqPath);
+        m_ui->log("Указанная последовательность не найдена: " + sequenceToCall);
+        const QMap<QString, PromptSequence>& allSequences_debug = m_seq->seqMgrPtr()->sequences();
+        m_ui->log("DEBUG: CALL_SEQUENCE - Available sequences debugging:");
+        m_ui->log("  Total sequences in main manager: " + QString::number(allSequences_debug.size()));
+        m_ui->log("  Current sequence path: '" + m_seq->currentSeqPath() + "'");
+        if (!m_seq->currentSeqPath().isEmpty()) {
+            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
             QDir templateDir = currentSeqInfo.absoluteDir();
-            m_mw->log("  Current sequence directory: " + templateDir.absolutePath());
+            m_ui->log("  Current sequence directory: " + templateDir.absolutePath());
             QStringList filters = {"*.seq.json", "*.seq", "*.json"};
             QFileInfoList files = templateDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
-            m_mw->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
+            m_ui->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
             for (const QFileInfo& fileInfo : files) {
-                m_mw->log("    - File: " + fileInfo.fileName());
+                m_ui->log("    - File: " + fileInfo.fileName());
             }
         }
-        m_mw->log("  Searched sequence name: '" + sequenceToCall + "'");
-        m_mw->log("  Available sequence names and paths in main manager:");
+        m_ui->log("  Searched sequence name: '" + sequenceToCall + "'");
+        m_ui->log("  Available sequence names and paths in main manager:");
         for (auto it = allSequences_debug.constBegin(); it != allSequences_debug.constEnd(); ++it) {
             QString seqName = it.value().name();
             QString filePath = it.key();
             QFileInfo fileInfo(filePath);
-            m_mw->log("    - Sequence name: '" + seqName + "'");
-            m_mw->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_mw->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_mw->log("    - File path: " + filePath);
+            m_ui->log("    - Sequence name: '" + seqName + "'");
+            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
+            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
+            m_ui->log("    - File path: " + filePath);
         }
     }
 
@@ -771,7 +789,7 @@ void SequenceRunner::handleAssistantFinished()
     if (hasOpenSequenceCommand && !openSequenceName.isEmpty()) {
         PromptSequence foundSeq2;
         QString foundPath2;
-        const QMap<QString, PromptSequence>& allSequences = m_mw->m_seqMgr.sequences();
+        const QMap<QString, PromptSequence>& allSequences = m_seq->seqMgrPtr()->sequences();
         for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
             if (it.value().name() == openSequenceName) {
                 foundSeq2 = it.value();
@@ -780,8 +798,8 @@ void SequenceRunner::handleAssistantFinished()
             }
         }
 
-        if (foundPath2.isEmpty() && !m_mw->m_currentSeqPath.isEmpty()) {
-            QFileInfo currentSeqInfo(m_mw->m_currentSeqPath);
+        if (foundPath2.isEmpty() && !m_seq->currentSeqPath().isEmpty()) {
+            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
             QDir templateDir = currentSeqInfo.absoluteDir();
 
             QStringList possibleFilenames;
@@ -813,49 +831,49 @@ void SequenceRunner::handleAssistantFinished()
         }
 
         if (!foundPath2.isEmpty()) {
-            if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager) {
-                m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
+            if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
+                m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
             }
 
-            m_mw->m_currentSeq = foundSeq2;
-            m_mw->m_currentStepIdx = 0;
-            m_mw->m_sequenceMode = true;
-            m_mw->m_currentSeqId = m_mw->m_contextManager->startCommandSequence(m_mw->m_currentSeq.name(), m_mw->m_currentSeq.description());
-            m_mw->m_currentSeqPath = foundPath2;
+            m_seq->currentSeq() = foundSeq2;
+            m_seq->setCurrentStepIndex(0);
+            m_seq->setSequenceMode(true);
+            m_seq->setCurrentSeqId(m_ctx->contextManagerPtr()->startCommandSequence(m_seq->currentSeq().name(), m_seq->currentSeq().description()));
+            m_seq->setCurrentSeqPath(foundPath2);
 
             addSequenceTransitionToHistory(openSequenceName);
-            m_mw->updateSequenceGraphHighlight();
+            m_seq->updateSequenceGraphHighlight();
             qDeleteAll(toRun);
-            QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+            QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
             return;
         }
 
-        m_mw->log("Указанная последовательность не найдена: " + openSequenceName);
-        const QMap<QString, PromptSequence>& allSequences_debug2 = m_mw->m_seqMgr.sequences();
-        m_mw->log("DEBUG: OPEN_SEQUENCE - Available sequences debugging:");
-        m_mw->log("  Total sequences in main manager: " + QString::number(allSequences_debug2.size()));
-        m_mw->log("  Current sequence path: '" + m_mw->m_currentSeqPath + "'");
-        if (!m_mw->m_currentSeqPath.isEmpty()) {
-            QFileInfo currentSeqInfo(m_mw->m_currentSeqPath);
+        m_ui->log("Указанная последовательность не найдена: " + openSequenceName);
+        const QMap<QString, PromptSequence>& allSequences_debug2 = m_seq->seqMgrPtr()->sequences();
+        m_ui->log("DEBUG: OPEN_SEQUENCE - Available sequences debugging:");
+        m_ui->log("  Total sequences in main manager: " + QString::number(allSequences_debug2.size()));
+        m_ui->log("  Current sequence path: '" + m_seq->currentSeqPath() + "'");
+        if (!m_seq->currentSeqPath().isEmpty()) {
+            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
             QDir templateDir = currentSeqInfo.absoluteDir();
-            m_mw->log("  Current sequence directory: " + templateDir.absolutePath());
+            m_ui->log("  Current sequence directory: " + templateDir.absolutePath());
             QStringList filters = {"*.seq.json", "*.seq", "*.json"};
             QFileInfoList files = templateDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
-            m_mw->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
+            m_ui->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
             for (const QFileInfo& fileInfo : files) {
-                m_mw->log("    - File: " + fileInfo.fileName());
+                m_ui->log("    - File: " + fileInfo.fileName());
             }
         }
-        m_mw->log("  Searched sequence name: '" + openSequenceName + "'");
-        m_mw->log("  Available sequence names and paths in main manager:");
+        m_ui->log("  Searched sequence name: '" + openSequenceName + "'");
+        m_ui->log("  Available sequence names and paths in main manager:");
         for (auto it = allSequences_debug2.constBegin(); it != allSequences_debug2.constEnd(); ++it) {
             QString seqName = it.value().name();
             QString filePath = it.key();
             QFileInfo fileInfo(filePath);
-            m_mw->log("    - Sequence name: '" + seqName + "'");
-            m_mw->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_mw->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_mw->log("    - File path: " + filePath);
+            m_ui->log("    - Sequence name: '" + seqName + "'");
+            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
+            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
+            m_ui->log("    - File path: " + filePath);
         }
     }
 
@@ -871,7 +889,7 @@ void SequenceRunner::handleAssistantFinished()
         appliedSummary << one;
     }
     if (!appliedSummary.isEmpty()) {
-        m_mw->m_prevSteps << QString("Шаг %1: %2").arg(m_mw->m_currentStepIdx + 1).arg(appliedSummary.join("; "));
+        m_seq->prevSteps() << QString("Шаг %1: %2").arg(m_seq->currentStepIndex() + 1).arg(appliedSummary.join("; "));
     }
 
     QString err;
@@ -880,22 +898,22 @@ void SequenceRunner::handleAssistantFinished()
 
         if (!result.isEmpty()) {
             QString fullTitle = result.split('\n').first();
-            m_mw->appendConsoleContext(fullTitle, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
+            m_ctx->appendConsoleContext(fullTitle, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
 
-            m_mw->m_history.push_back(qMakePair(QString("system"), result));
+            m_model->history().push_back(qMakePair(QString("system"), result));
         }
 
-        if (m_mw->m_contextManager) {
-            m_mw->addCommandToContext(cmd, result);
+        if (m_ctx->contextManagerPtr()) {
+            m_ctx->addCommandToContext(cmd, result);
         }
     };
 
     QList<Command*> pendingEdits;
     bool applyFailed = false;
     const QDateTime execStartedAt = QDateTime::currentDateTime();
-    OllamaAdapter* execModel = &m_mw->m_model;
-    if (m_mw->m_useAgentPipeline && ensureAgentModelConfigured())
-        execModel = &m_mw->m_agentModel;
+    OllamaAdapter* execModel = m_model->modelPtr();
+    if (m_seq->useAgentPipeline() && ensureAgentModelConfigured())
+        execModel = m_model->agentModelPtr();
     for (Command* c : toRun) {
         const QString name = c->name();
         if (name == "ASK_USER" || name == "OPEN_FILE" || name == "OPEN_FILE_REGION" || name == "SHOW_RESULT" || name == "REASONING"
@@ -905,63 +923,63 @@ void SequenceRunner::handleAssistantFinished()
             pendingEdits << c;
             continue;
         }
-        if (!c->applyWithLLM(&m_mw->m_dev_manager, execModel, &err)) {
+        if (!c->applyWithLLM(m_project->devManagerPtr(), execModel, &err)) {
             c->setExecutionResult(false, err);
             logConsoleResult(c, err);
-            QMessageBox::warning(m_mw, m_mw->tr("Ошибка выполнения"), err);
+            QMessageBox::warning(nullptr, QStringLiteral("Ошибка выполнения"), err);
             applyFailed = true;
             break;
         }
         c->setExecutionResult(true);
-        m_mw->handlePostApplyContextCleanup(c);
+        m_ctx->handlePostApplyContextCleanup(c);
         logConsoleResult(c, QString());
-        m_mw->handleSearchResults(c);
+        m_ctx->handleSearchResults(c);
     }
 
     if (!applyFailed && !pendingEdits.isEmpty()) {
-        if (!m_mw->applyGroupedEditInRange(pendingEdits, &err)) {
-            QMessageBox::warning(m_mw, m_mw->tr("Ошибка выполнения"), err);
+        if (!m_project->applyGroupedEditInRange(pendingEdits, &err)) {
+            QMessageBox::warning(nullptr, QStringLiteral("Ошибка выполнения"), err);
         } else {
             for (Command* c : pendingEdits) {
-                m_mw->handlePostApplyContextCleanup(c);
-                m_mw->handleSearchResults(c);
+                m_ctx->handlePostApplyContextCleanup(c);
+                m_ctx->handleSearchResults(c);
             }
         }
     }
 
-    m_mw->rescan();
+    m_project->rescan();
 
-    if (applyFailed && !m_mw->m_sequenceMode) {
+    if (applyFailed && !m_seq->isSequenceMode()) {
         retryCurrentSequenceStep();
-    } else if (m_mw->m_sequenceMode) {
-        if (m_mw->m_stopRequested) {
-            m_mw->m_stopRequested = false;
-            m_mw->m_sequenceMode = false;
-            m_mw->m_currentSeqId.clear();
-            m_mw->updateSequenceGraphHighlight();
+    } else if (m_seq->isSequenceMode()) {
+        if (m_seq->isStopRequested()) {
+            m_seq->setStopRequested(false);
+            m_seq->setSequenceMode(false);
+            m_seq->setCurrentSeqId("");
+            m_seq->updateSequenceGraphHighlight();
 
-            QMessageBox::information(m_mw, "Остановлено",
+            QMessageBox::information(nullptr, "Остановлено",
                                      "Выполнение шаблона остановлено пользователем.");
             qDeleteAll(toRun);
             return;
         }
 
-        const PromptStep &step = m_mw->m_currentSeq.steps()[m_mw->m_currentStepIdx];
+        const PromptStep &step = m_seq->currentSeq().steps()[m_seq->currentStepIndex()];
         if (maybeAutoRepairAfterExecution(step, execStartedAt, toRun, applyFailed, err)) {
             qDeleteAll(toRun);
             return;
         }
-        const bool finishingCurrentStep = !step.loop() && (m_mw->m_currentStepIdx + 1 >= m_mw->m_currentSeq.steps().size());
+        const bool finishingCurrentStep = !step.loop() && (m_seq->currentStepIndex() + 1 >= m_seq->currentSeq().steps().size());
         if (finishingCurrentStep && !hasShowResultCommand && !m_resultShownInCurrentRun) {
-            autoFinalizeSequenceWithResult(m_mw->tr("финальный шаг не вернул SHOW_RESULT"), toRun);
+            autoFinalizeSequenceWithResult(QStringLiteral("финальный шаг не вернул SHOW_RESULT"), toRun);
             qDeleteAll(toRun);
             return;
         }
         if (step.loop()) {
-            QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+            QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
         } else {
-            ++m_mw->m_currentStepIdx;
-            QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+            m_seq->setCurrentStepIndex(m_seq->currentStepIndex() + 1);
+            QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
         }
     }
 
@@ -1033,13 +1051,13 @@ bool SequenceRunner::isReadOnlyCommandBatch(const QList<Command*>& commands) con
 
 void SequenceRunner::appendResultToUi(const QString& title, const QString& content)
 {
-    if (m_mw->m_resultDisplayWidget) {
-        auto metadata = m_mw->collectContextMetadataSince(m_mw->m_lastQuestionTimestamp);
-        m_mw->m_resultDisplayWidget->appendResult(title, content,
+    if (m_ui->resultDisplayWidget()) {
+        auto metadata = m_seq->collectContextMetadataSince(m_ui->lastQuestionTimestamp());
+        m_ui->resultDisplayWidget()->appendResult(title, content,
                                             ResultDisplayWidget::EntryType::Default,
                                             metadata);
     } else {
-        m_mw->appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
+        m_ctx->appendExternalContext(QString("==== SHOW_RESULT ====\n%1").arg(content));
     }
 }
 
@@ -1047,9 +1065,9 @@ void SequenceRunner::autoFinalizeSequenceWithResult(const QString& reason, const
 {
     QStringList lines;
     Q_UNUSED(reason);
-    lines << m_mw->tr("Я завершил выполнение автоматически, чтобы не допустить зацикливания.");
-    if (!m_mw->m_lastUserMessage.trimmed().isEmpty())
-        lines << m_mw->tr("Запрос: %1").arg(m_mw->m_lastUserMessage.trimmed());
+    lines << QStringLiteral("Я завершил выполнение автоматически, чтобы не допустить зацикливания.");
+    if (!m_model->lastUserMessage().trimmed().isEmpty())
+        lines << QStringLiteral("Запрос: %1").arg(m_model->lastUserMessage().trimmed());
 
     QStringList sourceLines;
     QStringList commandNames;
@@ -1074,57 +1092,57 @@ void SequenceRunner::autoFinalizeSequenceWithResult(const QString& reason, const
         }
     }
     if (!sourceLines.isEmpty()) {
-        lines << m_mw->tr("Найденные источники:");
+        lines << QStringLiteral("Найденные источники:");
         for (const QString& s : sourceLines)
             lines << QString("- %1").arg(s);
     } else if (!commandNames.isEmpty()) {
-        lines << m_mw->tr("Последние выполненные команды: %1").arg(commandNames.join(", "));
+        lines << QStringLiteral("Последние выполненные команды: %1").arg(commandNames.join(", "));
     }
 
-    lines << m_mw->tr("Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.");
+    lines << QStringLiteral("Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.");
     const QString content = lines.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n\n");
-    appendResultToUi(m_mw->tr("Ответ нейросети"), content);
+    appendResultToUi(QStringLiteral("Ответ нейросети"), content);
     m_resultShownInCurrentRun = true;
 
-    if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager)
-        m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
-    m_mw->m_currentSeqId.clear();
-    m_mw->m_sequenceMode = false;
-    m_mw->updateSequenceGraphHighlight();
-    m_mw->m_statusController->stopTask();
+    if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr())
+        m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
+    m_seq->setCurrentSeqId("");
+    m_seq->setSequenceMode(false);
+    m_seq->updateSequenceGraphHighlight();
+    m_status->statusControllerPtr()->stopTask();
 }
 
 void SequenceRunner::retryCurrentSequenceStep()
 {
-    if (!m_mw->m_sequenceMode)
+    if (!m_seq->isSequenceMode())
         return;
 
-    if (m_mw->m_stopRequested) {
-        m_mw->m_stopRequested = false;
-        m_mw->m_sequenceMode = false;
-        m_mw->m_currentSeqId.clear();
-        m_mw->updateSequenceGraphHighlight();
+    if (m_seq->isStopRequested()) {
+        m_seq->setStopRequested(false);
+        m_seq->setSequenceMode(false);
+        m_seq->setCurrentSeqId("");
+        m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(m_mw, "Остановлено",
+        QMessageBox::information(nullptr, "Остановлено",
                                  "Выполнение шаблона остановлено пользователем.");
         return;
     }
 
-    QTimer::singleShot(200, m_mw, [this]() { runNextStep(); });
+    QTimer::singleShot(200, nullptr, [this]() { runNextStep(); });
 }
 
 bool SequenceRunner::ensureAgentModelConfigured()
 {
-    if (!m_mw->m_useAgentPipeline)
+    if (!m_seq->useAgentPipeline())
         return false;
 
-    if (m_mw->m_agentModel.selectedModel().isEmpty()) {
-        m_mw->m_agentModel.configure(QStringLiteral("gpt-oss:20b"), QVariantMap());
+    if (m_model->agentModelPtr()->selectedModel().isEmpty()) {
+        m_model->agentModelPtr()->configure(QStringLiteral("gpt-oss:20b"), QVariantMap());
     }
 
     QString err;
-    if (!m_mw->m_agentModel.isAvailable(&err)) {
-        m_mw->log(QString("Agent model unavailable (%1). Falling back to selected model.").arg(err));
+    if (!m_model->agentModelPtr()->isAvailable(&err)) {
+        m_ui->log(QString("Agent model unavailable (%1). Falling back to selected model.").arg(err));
         return false;
     }
     return true;
@@ -1149,7 +1167,7 @@ QStringList SequenceRunner::buildAllowedCommandsDocsCompact(const PromptStep& st
 
 QByteArray SequenceRunner::repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step)
 {
-    const QByteArray extracted = m_mw->extractJsonPart(rawText);
+    const QByteArray extracted = m_model->extractJsonPart(rawText);
     if (!extracted.isEmpty())
         return extracted;
 
@@ -1176,9 +1194,9 @@ QByteArray SequenceRunner::repairToJsonArrayIfNeeded(const QByteArray& rawText, 
     opts.insert("num_predict", 800);
     opts.insert("timeoutMs", 45000);
 
-    const QString repaired = m_mw->m_agentModel.generateWithSystem(QString::fromUtf8(rawText), systemPrompt, opts);
+    const QString repaired = m_model->agentModelPtr()->generateWithSystem(QString::fromUtf8(rawText), systemPrompt, opts);
     const QByteArray repairedUtf8 = repaired.toUtf8();
-    const QByteArray repairedJson = m_mw->extractJsonPart(repairedUtf8);
+    const QByteArray repairedJson = m_model->extractJsonPart(repairedUtf8);
     return repairedJson.isEmpty() ? QByteArray() : repairedJson;
 }
 
@@ -1223,7 +1241,7 @@ bool SequenceRunner::didAnyAffectedPathChangeSince(const QDateTime& since, const
         const QJsonObject params = c->params();
         for (const QString& k : keys) {
             const QString raw = params.value(k).toString();
-            const QString p = normalizePathForProject(raw, m_mw->m_projectRoot);
+            const QString p = normalizePathForProject(raw, m_project->projectRoot());
             if (!p.isEmpty())
                 touched.insert(p);
         }
@@ -1243,23 +1261,23 @@ bool SequenceRunner::maybeAutoRepairAfterExecution(const PromptStep& step,
                                                   bool applyFailed,
                                                   const QString& lastError)
 {
-    if (!m_mw->m_sequenceMode)
+    if (!m_seq->isSequenceMode())
         return false;
-    if (!m_mw->m_useAgentPipeline)
+    if (!m_seq->useAgentPipeline())
         return false;
-    if (m_mw->m_inAgentAutoRepair)
+    if (m_seq->inAgentAutoRepair())
         return false;
 
-    if (m_mw->m_agentRepairStepIdx != m_mw->m_currentStepIdx || m_mw->m_agentRepairSeqId != m_mw->m_currentSeqId) {
-        m_mw->m_agentRepairCountThisStep = 0;
-        m_mw->m_agentRepairStepIdx = m_mw->m_currentStepIdx;
-        m_mw->m_agentRepairSeqId = m_mw->m_currentSeqId;
+    if (m_seq->agentRepairStepIdx() != m_seq->currentStepIndex() || m_seq->agentRepairSeqId() != m_seq->currentSeqId()) {
+        m_seq->agentRepairCountThisStep() = 0;
+        m_seq->setAgentRepairStepIdx(m_seq->currentStepIndex());
+        m_seq->setAgentRepairSeqId(m_seq->currentSeqId());
     }
 
-    if (m_mw->m_agentRepairCountThisStep >= m_mw->m_agentMaxRepairsPerStep)
+    if (m_seq->agentRepairCountThisStep() >= m_seq->agentMaxRepairs())
         return false;
 
-    const bool implIntent = isImplementationIntentText(m_mw->m_lastUserMessage);
+    const bool implIntent = isImplementationIntentText(m_model->lastUserMessage());
     const bool changed = didAnyAffectedPathChangeSince(execStartedAt, executedCommands);
     const bool needRepair = applyFailed || (implIntent && !changed);
     if (!needRepair)
@@ -1269,7 +1287,7 @@ bool SequenceRunner::maybeAutoRepairAfterExecution(const PromptStep& step,
         return false;
 
     const QStringList allowedDocs = buildAllowedCommandsDocsCompact(step);
-    const QString ctx = m_mw->m_contextManager ? m_mw->m_contextManager->generateContextText() : QString();
+    const QString ctx = m_ctx->contextManagerPtr() ? m_ctx->contextManagerPtr()->generateContextText() : QString();
     const QString systemPrompt =
         QStringLiteral(
             "You are an expert developer agent that must output ONLY a JSON array of commands.\n"
@@ -1283,7 +1301,7 @@ bool SequenceRunner::maybeAutoRepairAfterExecution(const PromptStep& step,
             "Allowed commands:\n%1\n")
             .arg(allowedDocs.join(QStringLiteral("\n")));
 
-    QString userPrompt = QStringLiteral("USER REQUEST:\n%1\n").arg(m_mw->m_lastUserMessage);
+    QString userPrompt = QStringLiteral("USER REQUEST:\n%1\n").arg(m_model->lastUserMessage());
     if (applyFailed && !lastError.trimmed().isEmpty()) {
         userPrompt += QStringLiteral("\nLAST ERROR:\n%1\n").arg(lastError);
     }
@@ -1296,114 +1314,391 @@ bool SequenceRunner::maybeAutoRepairAfterExecution(const PromptStep& step,
     opts.insert("num_predict", 1200);
     opts.insert("timeoutMs", 60000);
 
-    const QString repair = m_mw->m_agentModel.generateWithSystem(userPrompt, systemPrompt, opts);
-    const QByteArray repairedJson = m_mw->extractJsonPart(repair.toUtf8());
+    const QString repair = m_model->agentModelPtr()->generateWithSystem(userPrompt, systemPrompt, opts);
+    const QByteArray repairedJson = m_model->extractJsonPart(repair.toUtf8());
     if (repairedJson.isEmpty())
         return false;
 
-    m_mw->m_agentRepairCountThisStep++;
-    m_mw->m_inAgentAutoRepair = true;
-    m_mw->appendConsoleContext(QStringLiteral("AGENT_REPAIR_DRAFT"), repair, QString(), 0);
+    ++m_seq->agentRepairCountThisStep();
+    m_seq->setInAgentAutoRepair(true);
+    m_ctx->appendConsoleContext(QStringLiteral("AGENT_REPAIR_DRAFT"), repair, QString(), 0);
 
-    QTimer::singleShot(0, m_mw, [this, repairedJson]() {
-        m_mw->m_streamBuf = QString::fromUtf8(repairedJson);
+    QTimer::singleShot(0, nullptr, [this, repairedJson]() {
+        m_model->streamBuf() = QString::fromUtf8(repairedJson);
         handleAssistantFinished();
-        m_mw->m_inAgentAutoRepair = false;
+        m_seq->setInAgentAutoRepair(false);
     });
     return true;
 }
 
 void SequenceRunner::runNextSequence()
 {
-    if (!m_mw->m_sequenceMode) return;
-    if (m_mw->m_currentStepIdx < 0 ||
-            m_mw->m_currentStepIdx >= m_mw->m_currentSeq.steps().size()) {
-        QMessageBox::information(m_mw, "Готово",
+    if (!m_seq->isSequenceMode()) return;
+    if (m_seq->currentStepIndex() < 0 ||
+            m_seq->currentStepIndex() >= m_seq->currentSeq().steps().size()) {
+        QMessageBox::information(nullptr, "Готово",
                                  "Последовательность выполнена полностью.");
-        if (!m_mw->m_currentSeqId.isEmpty() && m_mw->m_contextManager) {
-            m_mw->m_contextManager->endCommandSequence(m_mw->m_currentSeqId);
+        if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
+            m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
         }
-        m_mw->m_sequenceMode = false;
-        m_mw->m_currentSeqId.clear();
-        m_mw->m_statusController->stopTask();
-        m_mw->updateSequenceGraphHighlight();
+        m_seq->setSequenceMode(false);
+        m_seq->setCurrentSeqId("");
+        m_status->statusControllerPtr()->stopTask();
+        m_seq->updateSequenceGraphHighlight();
         return;
     }
 
-    const PromptStep &step = m_mw->m_currentSeq.steps()[m_mw->m_currentStepIdx];
-    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, m_mw);
-    qDebug() << "[runNextSequence] systemPrompt snippet:" << resolved.systemPrompt.left(200);
-    qDebug() << "[runNextSequence] userPrompt:" << resolved.userPrompt;
+    const PromptStep &step = m_seq->currentSeq().steps()[m_seq->currentStepIndex()];
+    PromptResolver::ResolvedPrompt resolved = PromptResolver::resolve(step.tmpl(), step, m_mainWindow);
+    qCDebug(logSeq) << "[runNextSequence] systemPrompt snippet:" << resolved.systemPrompt.left(200);
+    qCDebug(logSeq) << "[runNextSequence] userPrompt:" << resolved.userPrompt;
 
     {
-        int tokens = m_mw->m_model.estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
-        m_mw->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_mw->m_currentStepIdx+1).arg(tokens));
+        int tokens = m_model->modelPtr()->estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
+        m_ui->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_seq->currentStepIndex()+1).arg(tokens));
     }
-    m_mw->log(QString("\n--- Шаг %1 ------------------------------------------------")
-        .arg(m_mw->m_currentStepIdx+1));
-    m_mw->log(resolved.systemPrompt);
+    m_ui->log(QString("\n--- Шаг %1 ------------------------------------------------")
+        .arg(m_seq->currentStepIndex()+1));
+    m_ui->log(resolved.systemPrompt);
     if (!resolved.userPrompt.isEmpty())
-        m_mw->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
+        m_ui->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
-    m_mw->m_streamBuf.clear();
+    m_model->streamBuf().clear();
 
-    qDebug() << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
-    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
-    qDebug() << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - USER PROMPT:" << resolved.userPrompt;
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - SYSTEM PROMPT (first 500 chars):" << resolved.systemPrompt.left(500);
+    qCDebug(logSeq) << "[DEBUG SEND TO LLM] - SYSTEM PROMPT LENGTH:" << resolved.systemPrompt.length();
 
-    m_mw->m_currentPrompt = resolved.systemPrompt + "\n" + resolved.userPrompt;
+    m_model->currentPrompt() = resolved.systemPrompt + "\n" + resolved.userPrompt;
 
-    if (m_mw->m_useAgentPipeline && ensureAgentModelConfigured()) {
+    if (m_seq->useAgentPipeline() && ensureAgentModelConfigured()) {
         QVariantMap compileOpts;
         compileOpts.insert("temperature", 0.1);
         compileOpts.insert("num_predict", 1400);
         compileOpts.insert("timeoutMs", 90000);
 
         const QString compileSystem = resolved.systemPrompt + QStringLiteral("\n\nIMPORTANT: Output ONLY a JSON array of commands. No extra text.\n");
-        const QString compiled = m_mw->m_agentModel.generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
-        QTimer::singleShot(0, m_mw, [this, compiled]() {
-            m_mw->m_streamBuf = compiled;
+        const QString compiled = m_model->agentModelPtr()->generateWithSystem(resolved.userPrompt, compileSystem, compileOpts);
+        QTimer::singleShot(0, nullptr, [this, compiled]() {
+            m_model->streamBuf() = compiled;
             handleAssistantFinished();
         });
         return;
     }
 
-    if (!m_mw->m_activeImagesBase64.isEmpty()) {
-        m_mw->m_model.startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_mw->m_activeImagesBase64, QVariantMap());
+    if (!m_model->activeImagesBase64().isEmpty()) {
+        m_model->modelPtr()->startStreamWithSystemAndImages(resolved.userPrompt, resolved.systemPrompt, m_model->activeImagesBase64(), QVariantMap());
     } else {
-        m_mw->m_model.startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
+        m_model->modelPtr()->startStreamWithSystem(resolved.userPrompt, resolved.systemPrompt);
     }
 }
 
 void SequenceRunner::addSequenceTransitionToHistory(const QString& sequenceName)
 {
     QString transitionMsg = QString("Переход к последовательности: %1").arg(sequenceName);
-    m_mw->m_history.push_back(qMakePair(QString("system"), transitionMsg));
+    m_model->history().push_back(qMakePair(QString("system"), transitionMsg));
 }
 
 void SequenceRunner::appendUserQuestionToResultDisplay(const QString& question)
 {
-    if (!m_mw->m_resultDisplayWidget)
+    if (!m_ui->resultDisplayWidget())
         return;
 
     const QString trimmedQuestion = question.trimmed();
     if (trimmedQuestion.isEmpty())
         return;
 
-    m_mw->m_lastQuestionTimestamp = QDateTime::currentDateTime();
+    m_ui->lastQuestionTimestamp() = QDateTime::currentDateTime();
 
     const QString formattedQuestion = QString("\n\n%1\n").arg(trimmedQuestion);
-    m_mw->m_resultDisplayWidget->appendResult(m_mw->tr("Вопрос пользователя"),
+    m_ui->resultDisplayWidget()->appendResult(QStringLiteral("Вопрос пользователя"),
                                         formattedQuestion,
                                         ResultDisplayWidget::EntryType::UserQuestion);
 }
 
 void SequenceRunner::stopExecution()
 {
-    m_mw->m_stopRequested = true;
+    m_seq->setStopRequested(true);
 
-    if (m_mw->m_sequenceMode) {
-        m_mw->log("Шаблонное выполнение остановлено пользователем.");
-        m_mw->m_statusController->stopTask();
+    if (m_seq->isSequenceMode()) {
+        m_ui->log("Шаблонное выполнение остановлено пользователем.");
+        m_status->statusControllerPtr()->stopTask();
+    }
+}
+
+void SequenceRunner::handleOpenCommand(Command* cmd)
+{
+    const QJsonObject params = cmd->params();
+    const QString rawPath = params.value("path").toString();
+    if (rawPath.isEmpty())
+        return;
+
+    const QString normalized = normalizeContextPath(rawPath, m_project->projectRoot());
+    QFile file(normalized);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+    const QString text = QString::fromUtf8(file.readAll());
+    file.close();
+
+    QStringList allLines = text.split('\n', QString::KeepEmptyParts);
+    if (text.endsWith('\n') && !allLines.isEmpty())
+        allLines.removeLast();
+    if (cmd->name() == "OPEN_FILE") {
+        m_ctx->contextCachePtr()->setFullFileContext(normalized, allLines);
+        m_ctx->fileToContextCommands()[normalized].insert("OPEN_FILE");
+        if (!m_ctx->fileWatcher()->files().contains(normalized) && QFileInfo::exists(normalized)) {
+            m_ctx->fileWatcher()->addPath(normalized);
+        }
+        if (m_ctx->contextManagerPtr()) {
+            QString result = QString("OPEN_FILE: %1 (full content)").arg(rawPath);
+            m_ctx->addCommandToContext(cmd, result);
+        }
+        return;
+    }
+
+    int startLine = params.value("startLine").toInt(-1);
+    int endLine = params.value("endLine").toInt(-1);
+    QStringList snippet;
+
+    if (startLine >= 1 && endLine >= startLine) {
+        if (startLine > allLines.size()) {
+            QString errorMsg = QString("ERROR: Cannot OPEN_FILE_REGION %1: requested start line %2 is beyond file length of %3 lines. Remember: line numbering starts from 1, not 0.")
+                    .arg(rawPath).arg(startLine).arg(allLines.size());
+            m_ui->log(errorMsg);
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(cmd, errorMsg);
+            }
+            return;
+        }
+
+        if (endLine > allLines.size()) {
+            QString errorMsg = QString("ERROR: Cannot OPEN_FILE_REGION %1: requested end line %2 is beyond file length of %3 lines. Remember: line numbering starts from 1, not 0.")
+                    .arg(rawPath).arg(endLine).arg(allLines.size());
+            m_ui->log(errorMsg);
+            if (m_ctx->contextManagerPtr()) {
+                m_ctx->addCommandToContext(cmd, errorMsg);
+            }
+            return;
+        }
+
+        startLine = qMax(1, startLine);
+        endLine = qMin(endLine, allLines.size());
+        snippet = allLines.mid(startLine - 1, endLine - startLine + 1);
+    } else {
+        const QString region = params.value("region").toString();
+        if (region.isEmpty())
+            return;
+        QRegularExpression re(region, QRegularExpression::DotMatchesEverythingOption
+                                        | QRegularExpression::MultilineOption);
+        auto match = re.match(text);
+        if (!match.hasMatch())
+            return;
+        const int startIndex = match.capturedStart();
+        startLine = text.left(startIndex).count('\n') + 1;
+        const QString captured = match.captured(0);
+        snippet = captured.split('\n', QString::KeepEmptyParts);
+        if (captured.endsWith('\n') && !snippet.isEmpty())
+            snippet.removeLast();
+    }
+
+    if (!snippet.isEmpty()) {
+        m_ctx->contextCachePtr()->addRegionContext(normalized, startLine, snippet);
+        m_ctx->fileToContextCommands()[normalized].insert("OPEN_FILE_REGION");
+        if (!m_ctx->fileWatcher()->files().contains(normalized) && QFileInfo::exists(normalized)) {
+            m_ctx->fileWatcher()->addPath(normalized);
+        }
+        if (m_ctx->contextManagerPtr()) {
+            QString numberedContent = m_ctx->contextCachePtr()->formatNumberedLines(snippet, startLine);
+            QString result = QString("OPEN_FILE_REGION: %1\n%2").arg(rawPath, numberedContent);
+            m_ctx->addCommandToContext(cmd, result);
+        }
+    }
+}
+
+bool SequenceRunner::applyGroupedEditInRange(const QList<Command*>& commands, QString* err)
+{
+    QMap<QString, QList<EditInRangeCommand*>> grouped;
+    for (Command* c : commands) {
+        auto edit = dynamic_cast<EditInRangeCommand*>(c);
+        if (!edit)
+            continue;
+        const QString normalized = normalizeContextPath(edit->path(), m_project->projectRoot());
+        grouped[normalized].append(edit);
+    }
+
+    for (auto it = grouped.begin(); it != grouped.end(); ++it) {
+        if (!EditInRangeCommand::applyBatch(it.value(), m_project->devManagerPtr(), err))
+            return false;
+        m_ctx->contextCachePtr()->clearContextForPath(it.key());
+    }
+    return true;
+}
+
+void SequenceRunner::handlePostApplyContextCleanup(Command* cmd)
+{
+    const QString name = cmd->name();
+    const QJsonObject p = cmd->params();
+    auto clear = [&](const QString& key) {
+        if (!key.isEmpty())
+            m_ctx->contextCachePtr()->clearContextForPath(key);
+    };
+
+    if (name == "EDIT_IN_RANGE" || name == "REPLACE_IN_FILE"
+        || name == "DELETE_FILE" || name == "CREATE_FILE"
+        || name == "APPEND_TO_FILE" || name == "INSERT_AT_LINE") {
+        clear(p.value("path").toString());
+        return;
+    }
+
+    if (name == "RENAME_FILE") {
+        clear(p.value("oldPath").toString());
+        clear(p.value("newPath").toString());
+        return;
+    }
+
+    if (name == "COPY_FILE") {
+        clear(p.value("to").toString());
+        return;
+    }
+
+    if (name == "GIT_RESTORE_FILE") {
+        clear(p.value("path").toString());
+        return;
+    }
+
+    if (name == "APPLY_PATCH") {
+        m_ctx->contextCachePtr()->clearAll();
+        return;
+    }
+
+    if (name == "UNDO_LAST_CHANGE") {
+        m_ctx->contextCachePtr()->clearAll();
+        return;
+    }
+
+    if (name == "RUN_SHELL") {
+        QString command = p.value("command").toString();
+        if (!command.isEmpty()) {
+            m_ctx->contextCachePtr()->removeConsoleLogsWithPrefix("==== RUN_SHELL: " + command);
+            m_ctx->shellCommandOutputs().remove(command);
+        }
+        return;
+    }
+
+    if (name == "RUN_PYTHON") {
+        QString scriptPath = p.value("scriptPath").toString();
+        QString code = p.value("code").toString();
+        QString identifier = !scriptPath.isEmpty() ? scriptPath : "inline code";
+
+        if (!identifier.isEmpty()) {
+            m_ctx->contextCachePtr()->removeConsoleLogsWithPrefix("==== RUN_PYTHON: " + identifier);
+            m_ctx->pythonScriptOutputs().remove(identifier);
+        }
+        return;
+    }
+
+    if (name == "OPEN_FILE" || name == "OPEN_FILE_REGION") {
+        QString path = p.value("path").toString();
+        if (!path.isEmpty()) {
+            const QString normalized = normalizeContextPath(path, m_project->projectRoot());
+            if (!m_ctx->fileWatcher()->files().contains(normalized) && QFileInfo::exists(normalized)) {
+                m_ctx->fileWatcher()->addPath(normalized);
+            }
+        }
+    }
+}
+
+void SequenceRunner::handleSearchResults(Command* cmd)
+{
+    if (auto web = dynamic_cast<SearchWebCommand*>(cmd)) {
+        if (web->results().isEmpty())
+            return;
+        QString query = cmd->params().value("query").toString();
+        QString title = QString("==== SEARCH_WEB: %1 ====").arg(query);
+        QString body = web->results().join("\n\n");
+        qCDebug(logSeq) << "[MainWindow] SEARCH_WEB results count:" << web->results().size();
+        qCDebug(logSeq) << "[MainWindow] SEARCH_WEB result body length:" << body.length();
+        if (!body.isEmpty()) {
+            qCDebug(logSeq) << "[MainWindow] SEARCH_WEB first 200 chars of result:" << body.left(200);
+        } else {
+            qCDebug(logSeq) << "[MainWindow] SEARCH_WEB result body is empty";
+        }
+
+        bool needsSummarization = body.contains("Контент для суммаризации", Qt::CaseInsensitive);
+
+        QString resultBody = body;
+        if (needsSummarization) {
+            resultBody = m_model->summarizeSearchResults(body, query);
+        }
+
+        appendExternalContext(QString("%1\n%2").arg(title, resultBody));
+
+        if (m_ctx->contextManagerPtr()) {
+            qCDebug(logSeq) << "[MainWindow] Adding SEARCH_WEB command to context manager";
+            m_ctx->addCommandToContext(cmd, QString("%1\n%2").arg(title, resultBody));
+        } else {
+            qCDebug(logSeq) << "[MainWindow] Context manager is null, skipping context addition";
+        }
+        return;
+    }
+    if (auto local = dynamic_cast<SearchProjectCommand*>(cmd)) {
+        if (local->matches().isEmpty())
+            return;
+        QString title = QString("==== SEARCH_PROJECT: %1 ====").arg(cmd->params().value("query").toString());
+        QString body = local->matches().join("\n\n");
+        appendExternalContext(QString("%1\n%2").arg(title, body));
+
+        if (m_ctx->contextManagerPtr()) {
+            m_ctx->addCommandToContext(cmd, QString("%1\n%2").arg(title, body));
+        }
+    }
+}
+
+void SequenceRunner::appendConsoleContext(const QString& title,
+                                          const QString& stdOut,
+                                          const QString& stdErr,
+                                          int exitCode)
+{
+    QString block = QString("==== %1 ====\n").arg(title.isEmpty() ? "Console" : title);
+    if (!stdOut.trimmed().isEmpty()) {
+        block += "[stdout]\n" + stdOut.trimmed() + "\n";
+    }
+    if (!stdErr.trimmed().isEmpty()) {
+        block += "[stderr]\n" + stdErr.trimmed() + "\n";
+    }
+    block += QString("exitCode=%1").arg(exitCode);
+
+    if (title.startsWith("RUN_SHELL: ")) {
+        QString cmd = title.mid(11);
+        m_ctx->contextCachePtr()->removeConsoleLogsWithPrefix("==== RUN_SHELL: " + cmd);
+        m_ctx->shellCommandOutputs().remove(cmd);
+    }
+    else if (title.startsWith("RUN_PYTHON: ")) {
+        QString script = title.mid(12);
+        m_ctx->contextCachePtr()->removeConsoleLogsWithPrefix("==== RUN_PYTHON: " + script);
+        m_ctx->pythonScriptOutputs().remove(script);
+    }
+
+    m_ctx->contextCachePtr()->appendConsoleLog(block.trimmed());
+    while (m_ctx->contextCachePtr()->consoleLogs().size() > 5) {
+        auto logs = m_ctx->contextCachePtr()->consoleLogs();
+        m_ctx->contextCachePtr()->clearConsoleLogs();
+        for (int i = 0; i < qMin(5, logs.size()); ++i) {
+            m_ctx->contextCachePtr()->appendConsoleLog(logs.at(i));
+        }
+    }
+}
+
+void SequenceRunner::appendExternalContext(const QString& block)
+{
+    if (block.trimmed().isEmpty())
+        return;
+    m_ctx->contextCachePtr()->appendExternalSource(block.trimmed());
+    while (m_ctx->contextCachePtr()->externalSources().size() > 5) {
+        auto sources = m_ctx->contextCachePtr()->externalSources();
+        m_ctx->contextCachePtr()->clearExternalSources();
+        for (int i = 0; i < qMin(5, sources.size()); ++i) {
+            m_ctx->contextCachePtr()->appendExternalSource(sources.at(i));
+        }
     }
 }

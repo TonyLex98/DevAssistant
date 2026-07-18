@@ -9,6 +9,7 @@
 #include <DevAssManager.h>
 
 class DevAssManager;   // forward
+class ModelAdapter;    // forward - LLM adapter interface
 
 class Command
 {
@@ -29,31 +30,31 @@ public:
        `errorOut` – сообщение об ошибке (если false). */
     virtual bool apply(DevAssManager* devAss,
                        QString* errorOut = nullptr) = 0;
-    
+
     /* apply command using LLM (optional).
        This method can be overridden by commands that require LLM.
        `devAss` - description manager.
-       `adapter` - OllamaAdapter for LLM-based generation.
+       `adapter` - ModelAdapter for LLM-based generation.
        `errorOut` - error message (if false). */
     virtual bool applyWithLLM(DevAssManager* devAss,
-                              void* adapter,  // OllamaAdapter* (using void* to avoid circular dependencies)
-                              QString* errorOut = nullptr) { 
+                              ModelAdapter* adapter,
+                              QString* errorOut = nullptr) {
         Q_UNUSED(adapter)
-        return apply(devAss, errorOut); 
+        return apply(devAss, errorOut);
     }
 
     /* сериализовать в JSON (можно использовать для *.dadescr) */
     virtual QJsonObject toJson() const = 0;
-    
+
     /* получить результат выполнения команды (для отображения пользователю и LLM) */
     virtual QString getResult() const { return QString(); }
-    
+
     /* методы для установки и получения результата выполнения */
     void setExecutionResult(bool success, const QString& error = QString()) {
         m_executionSuccess = success;
         m_errorMessage = error;
     }
-    
+
     bool wasSuccessful() const { return m_executionSuccess; }
     QString getErrorMessage() const { return m_errorMessage; }
 

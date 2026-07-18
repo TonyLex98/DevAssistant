@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <QMainWindow>
 #include <QListWidget>
 #include <StyleTextEdit.h>
@@ -12,7 +12,7 @@
 #include <StyledButton.h>
 #include <DevAssManager.h>
 #include <QProgressDialog>
-#include "DescriptionDialog.h"      // ← новый диалог
+#include "DescriptionDialog.h"      // в†ђ РЅРѕРІС‹Р№ РґРёР°Р»РѕРі
 #include <CommandParser.h>
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
@@ -54,7 +54,7 @@
 #include "LightRagWidget.h"
 
 // Need the complete definition for sequence graph widget
-#include "../codeviwer/SequenceGraphWidget.h"
+#include "../codeviewer/SequenceGraphWidget.h"
 
 // Solution templates
 #include "../core/SolutionTemplateManager.h"
@@ -70,6 +70,13 @@
 #include "controllers/ContextCacheManager.h"
 #include "controllers/SequenceRunner.h"
 #include "controllers/SequenceEditorController.h"
+#include "controllers/GraphController.h"
+#include "controllers/DescriptionController.h"
+#include "controllers/ModelConfigController.h"
+#include "controllers/ContextDisplayController.h"
+#include "controllers/ChatController.h"
+#include "controllers/UiBuilder.h"
+#include "../services/IService.h"
 
 class ChatDialog;
 class ModelsDialog;
@@ -80,33 +87,208 @@ class ChangesDialog;
 class SequenceRunner;
 class SequenceEditorController;
 
-class MainWindow : public QMainWindow {
-    friend class SequenceRunner;
-    friend class SequenceEditorController;
+class MainWindow : public QMainWindow,
+                   public IContextService,
+                   public IModelService,
+                   public IProjectService,
+                   public IUIUpdater,
+                   public ISequenceService,
+                   public IGraphService,
+                   public ISettingsService,
+                   public ITemplateService,
+                   public IStatusControllerService,
+                   public ITTSService {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent=nullptr);
 
     const QString& projectRootPath() const { return m_projectRoot; }
     PromptManager*  promptManager() { return &m_promptMgr; }
-    const QList<QPair<QString,QString>>& history() const { return m_history; }
     const QString& openedFilesContent() const { return m_contextContent; }
-    const QString& lastUserMessage() const { return m_lastUserMessage; }
-    const QString& lastAssistantMessage() const { return m_lastAssistantMessage; }
 
     QString searchResultsText() const;
     QString getContextChainText() const; // Public access to context chain (only active commands)
-    QString getAllCommandsText() const;  // Public access to all commands (for full chain view)
-    
-    // Accessor for last user messages (for resolver)
-    QString getLastUserMessages() const;
 
     void updateChatToggleButton(bool visible);
 
+    // в”Ђв”Ђв”Ђ IContextService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    void setFullFileContext(const QString& path, const QStringList& lines) override;
+    void addRegionContext(const QString& path, int startLine, const QStringList& lines) override;
+    void clearContextForPath(const QString& path) override;
+    void clearAll() override;
+    QString contextContent() const override;
+    void appendConsoleLog(const QString& log) override;
+    void removeConsoleLogsWithPrefix(const QString& prefix) override;
+    void appendExternalSource(const QString& source) override;
+    void clearConsoleLogs() override;
+    void clearExternalSources() override;
+    QStringList consoleLogs() const override;
+    QStringList externalSources() const override;
+    QString formatNumberedLines(const QStringList& lines, int startLine) const override;
+    bool hasContextManager() const override;
+    void observeUserQuery(const QString& query) override;
+    void addCommandToContext(int cmdIndex, const QString& description, const QString& result = QString()) override;
+    QString generateContextText() const override;
+    QString getAllCommandsText() const override;
+    QList<IContextService::SeqInfo> getCommandSequences() const override;
+    IContextService::SeqInfo getSequenceInfo(const QString& id) const override;
+    QList<IContextService::CmdInfo> getAllCommands() const override;
+    QList<IContextService::CmdInfo> getCommandsInSequence(const QString& seqId) const override;
+    bool fileHasContextCommands(const QString& path) const override;
+    QSet<QString> getContextCommandsForFile(const QString& path) const override;
+    void clearFileToContextCommands() override;
+    void insertFileContextCommand(const QString& path, const QString& cmd) override;
+    void clearShellCommandOutputs() override;
+    void clearPythonScriptOutputs() override;
+    void removeShellOutput(const QString& key) override;
+    void removePythonOutput(const QString& key) override;
+    QFileSystemWatcher* fileWatcher() override;
+
+    // IContextService - additional accessors
+    ContextManager* contextManagerPtr() override;
+    ContextCacheManager* contextCachePtr() override;
+    QMap<QString, QSet<QString>>& fileToContextCommands() override;
+    QMap<QString, QString>& shellCommandOutputs() override;
+    QMap<QString, QString>& pythonScriptOutputs() override;
+    void handleOpenCommand(Command* cmd) override;
+    void handlePostApplyContextCleanup(Command* cmd) override;
+    void handleSearchResults(Command* cmd) override;
+    void addCommandToContext(Command* cmd, const QString& result = QString()) override;
+    void appendConsoleContext(const QString& title, const QString& stdOut, const QString& stdErr, int exitCode) override;
+    void appendExternalContext(const QString& block) override;
+
+    // в”Ђв”Ђв”Ђ IModelService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    void configure(const QString& model, const QVariantMap& params) override;
+    void setProvider(int provider) override;
+    void setEndpoint(const QUrl& url) override;
+    QString selectedModel() const override;
+    int provider() const override;
+    QString providerName() const override;
+    void appendAssistantChunk(const QString& chunk) override;
+    void refreshModelList() override;
+    bool hasChat() const override;
+    QString& streamBuf() override;
+    void appendHistory(const QString& role, const QString& content) override;
+    void appendLastUserMessage(const QString& msg) override;
+    int maxUserMessages() const override;
+    OllamaAdapter* modelPtr() override;
+    void setLastUserMessage(const QString& msg) override;
+    QString lastUserMessage() const override;
+    QString selectedAgentModel() const override;
+    void configureAgentModel(const QString& model, const QVariantMap& params) override;
+    void setAgentProvider(int provider) override;
+    void setAgentEndpoint(const QUrl& url) override;
+
+    // IModelService - additional accessors
+    QList<QPair<QString, QString>>& history() override;
+    QList<QString>& lastUserMessages() override;
+    QString getLastUserMessages() const; // formatted string for PromptResolver
+    QString& lastAssistantMessage() override;
+    QString& currentPrompt() override;
+    QStringList& activeImagesBase64() override;
+    OllamaAdapter* agentModelPtr() override;
+    QByteArray extractJsonPart(const QByteArray& txt) const override;
+    QString summarizeSearchResults(const QString& content, const QString& query) override;
+
+    // в”Ђв”Ђв”Ђ IProjectService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    QString projectRoot() const override;
+    void setProjectRoot(const QString& path) override;
+    QStringList indexedFiles() const override;
+    void setIndexRoot(const QString& path) override;
+    void loadDevManager() override;
+    QString devAssDirPath() const override;
+    FileDescription* findFileDescription(const QString& path) override;
+    void setDevProjectRoot(const QString& path) override;
+    bool createFolder() override;
+    bool createDaproFile() override;
+    bool generateDescrFiles() override;
+    void setPromptProjectRoot(const QString& path) override;
+    void* promptMgr() override;
+    QListWidget* filesList() override;
+    void openProjectInIDE(const QString& path) override;
+    void setRootEditText(const QString& path) override;
+    void emitMissingFilesUpdated(const QSet<QString>& paths) override;
+    void rescan() override;
+    DevAssManager* devManagerPtr() override;
+
+    // IProjectService - additional
+    bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err) override;
+
+    // в”Ђв”Ђв”Ђ IUIUpdater в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    void log(const QString& msg) override;
+    void statusBarMessage(const QString& msg) override;
+    void appendUserQuestionToResultDisplay(const QString& question) override;
+    void appendConsoleToResultDisplay(const QString& block) override;
+    void appendExternalToResultDisplay(const QString& block) override;
+    QTreeWidget* contextCommandsList() override;
+
+    // IUIUpdater - additional
+    ResultDisplayWidget* resultDisplayWidget() override;
+    QDateTime& lastQuestionTimestamp() override;
+    QComboBox* confirmModeComboBox() override;
+
+    // в”Ђв”Ђв”Ђ ISequenceService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    bool isStopRequested() const override;
+    void setStopRequested(bool v) override;
+    bool isSequenceMode() const override;
+    void resetSequenceStabilityState() override;
+    void runSequenceDialog() override;
+    void stopTask() override;
+    PromptSequenceManager* seqMgrPtr() override;
+    PromptSequence* currentSequencePtr() override;
+    int currentStepIndex() const override;
+    void setCurrentStepIndex(int idx) override;
+    QString currentSeqPath() const override;
+    void setCurrentSeqPath(const QString& path) override;
+    QString currentSeqId() const override;
+    void setCurrentSeqId(const QString& id) override;
+    QString currentTemplatePath() const override;
+    void setCurrentTemplatePath(const QString& path) override;
+    bool useAgentPipeline() const override;
+    void setUseAgentPipeline(bool v) override;
+    int agentRepairCount() const override;
+    void setAgentRepairCount(int v) override;
+    int agentMaxRepairs() const override;
+    bool inAgentAutoRepair() const override;
+    void setInAgentAutoRepair(bool v) override;
+    int agentRepairStepIdx() const override;
+    void setAgentRepairStepIdx(int v) override;
+    QString agentRepairSeqId() const override;
+    void setAgentRepairSeqId(const QString& id) override;
+    QList<Change>& pendingChanges() override;
+    ChangeApplier* applierPtr() override;
+    ResultDisplayWidget::ResultEntryMetadata collectContextMetadataSince(const QDateTime& since) const override;
+
+    // ISequenceService - additional
+    PromptSequence& currentSeq() override;
+    QStringList& prevSteps() override;
+    void setSequenceMode(bool v) override;
+    int& agentRepairCountThisStep() override;
+
+    // в”Ђв”Ђв”Ђ IGraphService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    void showGraphWindow() override;
+    void showLightRagWindow() override;
+    SequenceGraphWidget* sequenceGraphWindow() override;
+
+    // в”Ђв”Ђв”Ђ ISettingsService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    void showSettings() override;
+    void hideSettings() override;
+    bool isSettingsVisible() const override;
+    void reloadSettingsFromConfig() override;
+    void setSettingsButtonText(const QString& text) override;
+    QString providerString() const override;
+    QString endpointString() const override;
+    QVariantMap paramsMap() const override;
+
+    // ITemplateService
+    SolutionTemplateManager* templateMgrPtr() override;
+    // IStatusControllerService
+    TaskStatusController* statusControllerPtr() override;
+    // ITTSService
+    TtsController* ttsControllerPtr() override;
+
 public slots:
-    void runSequenceDialog();
     void slot_updatelastUserMessage(const QString& lastUserMessage);
-    void stopTemplateExecution();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -118,24 +300,16 @@ signals:
 
 private slots:
     void browse();
-    void rescan();
     void openSettings();
     void editBasePrompt();
     void applyChanges();
     void undoLast();
 
-    void handleAssistantFinished();
-
-    void generateDescriptions();      // <‑‑ новый слот
-    void onVoskText(const QString&);  // <‑‑ новый слот
+    void generateDescriptions();      // <вЂ‘вЂ‘ РЅРѕРІС‹Р№ СЃР»РѕС‚
+    void onVoskText(const QString&);  // <вЂ‘вЂ‘ РЅРѕРІС‹Р№ СЃР»РѕС‚
     void onOmniAsrText(const QString&);
 
     void openGraph();
-    void openSequenceGraph();  // Forwarder to m_sequenceEditor
-    void openSequenceEditorForName(const QString &sequenceName);  // Forwarder
-    void updateSequenceGraphHighlight();  // Forwarder
-    void updateSequenceGraphTemplateSelection();  // Forwarder
-
     // New slots for template selection combobox in ChatDialog
     void runTemplateRequested(const QString &templatePath, const QString &text);
     void runSimpleChat(const QString &text);
@@ -163,22 +337,14 @@ public:
     QString currentSequencePath() const { return m_currentSeqPath; }  // Access to current sequence path
     ProjectIndex& projectIndex() { return m_index; }  // Access to project index for structure resolver
 
-private slots:
-    void createNewSequence();  // Forwarder to m_sequenceEditor
-    //void onFileDoubleClicked(QListWidgetItem *item);
+private slots:    //void onFileDoubleClicked(QListWidgetItem *item);
     void setupModelWithGenerationParams(); // Configure model with generation parameters
     void onFileChanged(const QString &path); // Handle external file changes
-    void onChatTemplateSelectionChanged(const QString &templatePath);  // Forwarder
-
 private:
     QString buildProjectContext() const;
-    void log(const QString& m);
 
     void sendUserMessage(const QString& text);
     void onModelChunk(const QString& s);
-    QByteArray extractJsonPart(const QByteArray& txt) const;
-    void editSequences();  // Forwarder to m_sequenceEditor
-
 
 private:
     QString m_projectRoot;
@@ -241,32 +407,24 @@ private:
     StyledButton *exportSequenceAsTemplateBtn;
     MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
-    StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
-    VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
+    StyledButton* descBtn = nullptr;   // <вЂ‘вЂ‘ РЅРѕРІР°СЏ РєРЅРѕРїРєР°
+    VoskWidget* m_voskWidget = nullptr;  // <вЂ‘вЂ‘ РІРёРґР¶РµС‚ Vosk
 
     QString m_contextContent;
 
     QStringList m_prevSteps;
 
-    // ... уже есть
-    PromptSequenceManager m_seqMgr;          // менеджер наборов
-    SolutionTemplateManager m_templateMgr;   // менеджер шаблонов
-    PromptSequence        m_currentSeq;     // текущая выбранная последовательность
+    // ... СѓР¶Рµ РµСЃС‚СЊ
+    PromptSequenceManager m_seqMgr;          // РјРµРЅРµРґР¶РµСЂ РЅР°Р±РѕСЂРѕРІ
+    SolutionTemplateManager m_templateMgr;   // РјРµРЅРµРґР¶РµСЂ С€Р°Р±Р»РѕРЅРѕРІ
+    PromptSequence        m_currentSeq;     // С‚РµРєСѓС‰Р°СЏ РІС‹Р±СЂР°РЅРЅР°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ
     bool                  m_sequenceMode = false;
     bool                  m_stopRequested = false; // Flag to indicate that the sequence execution should be stopped
-    int                   m_currentStepIdx = -1; // -1 = не запущено
-
-
-    void runNextStep();
-    void runNextSequence();  // Run the next sequence specified by OPEN_SEQUENCE
+    int                   m_currentStepIdx = -1; // -1 = РЅРµ Р·Р°РїСѓС‰РµРЅРѕ  // Run the next sequence specified by OPEN_SEQUENCE
     void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
     
-    // Вспомогательная функция для суммаризации результатов поиска
-    QString summarizeSearchResults(const QString& content, const QString& query);
-    /* ────── NEW ────── */
-    void ensureDefaultSequence();  // Forwarder to m_sequenceEditor
-    void refreshAllSequences();    // Forwarder to m_sequenceEditor
-    /* ────── END ────── */
+    /* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ NEW в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */    void ensureUniversalAgentTemplateInternal(); // Write UniversalAgent template v3 if missing/outdated
+    /* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ END в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
     void reOpenRootDir();
 
@@ -288,37 +446,30 @@ private:
     QTabWidget *project_view_tabs = new QTabWidget();
     ProjectRelationView *project_view = new ProjectRelationView;
 
-    StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
-    StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
+    StyledButton *graphBtn{nullptr};    // РєРЅРѕРїРєР° В«Show GraphВ»
+    StyledButton *seqGraphBtn{nullptr}; // РєРЅРѕРїРєР° В«Show Sequence GraphВ»
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
-    StyledButton *lightRagBtn{nullptr}; // кнопка «LightRAG»
+    StyledButton *lightRagBtn{nullptr}; // РєРЅРѕРїРєР° В«LightRAGВ»
     QWidget *m_settingsPanel{nullptr};
-    GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
-    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
+    GraphWidget  *m_graphWindow{nullptr};   // РѕРєРЅРѕ-РІРёРґР¶РµС‚ РіСЂР°С„Р°
+    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // РѕРєРЅРѕ-РІРёРґР¶РµС‚ РіСЂР°С„Р° РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
     SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
     ContextCacheManager m_contextCache; // Manages context slices cache
     SequenceRunner* m_sequenceRunner{nullptr}; // Sequence execution orchestrator
     SequenceEditorController* m_sequenceEditor{nullptr}; // Sequence editor controller
+    GraphController* m_graphController{nullptr};
+    DescriptionController* m_descriptionController{nullptr};
+    ModelConfigController* m_modelConfigController{nullptr};
+    ContextDisplayController* m_contextDisplayController{nullptr};
+    ChatController* m_chatController{nullptr};
+    ProjectBrowserController* m_projectBrowserController{nullptr};
 
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
-    bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err);
-    void handleOpenCommand(Command* cmd);
-    void handlePostApplyContextCleanup(Command* cmd);
-    void appendConsoleContext(const QString& title,
-                              const QString& stdOut,
-                              const QString& stdErr,
-                              int exitCode);
-    void appendExternalContext(const QString& block);
-    void handleSearchResults(Command* cmd);
-
-    void retryCurrentSequenceStep();
-    bool ensureAgentModelConfigured();
     QStringList buildAllowedCommandsDocsCompact(const PromptStep& step) const;
     QByteArray repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step);
-    void resetSequenceStabilityState();
     QString commandBatchSignature(const QList<Command*>& commands) const;
     bool isReadOnlyCommandBatch(const QList<Command*>& commands) const;
     void appendResultToUi(const QString& title, const QString& content);
@@ -330,11 +481,8 @@ private:
                                        const QString& lastError);
     static bool isImplementationIntentText(const QString& text);
     bool didAnyAffectedPathChangeSince(const QDateTime& since, const QList<Command*>& executedCommands) const;
-    void appendUserQuestionToResultDisplay(const QString& question);
-    ResultDisplayWidget::ResultEntryMetadata collectContextMetadataSince(const QDateTime &since) const;
 
 private:
     void updateContextStatusDisplay(); // Update the visual display of context commands
-    void addCommandToContext(Command* cmd, const QString& result = QString()); // Wrapper to handle command addition logic
 
 };

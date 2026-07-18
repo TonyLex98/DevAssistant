@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QTextStream>
-#include <QDebug>
+#include "utils/Logging.h"
 
 DescriptionGenerator::DescriptionGenerator(OllamaAdapter* model,
                                          DevAssManager* devAss,
@@ -66,7 +66,7 @@ QString DescriptionGenerator::writeDescription(const QString& relPath,
 
     QFile f(descrPath);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "Не удалось записать дескриптор:" << descrPath;
+        qCWarning(logUtils) << "Не удалось записать дескриптор:" << descrPath;
         return QString();
     }
     f.write(description.toUtf8());
@@ -90,7 +90,7 @@ QString DescriptionGenerator::generateAndSave(const QString& filePath)
     // --- 2. Читаем файл ---
     QFile f(filePath);
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "Не удалось открыть файл:" << filePath;
+        qCWarning(logUtils) << "Не удалось открыть файл:" << filePath;
         return QString();
     }
     QString content = QString::fromUtf8(f.readAll());
@@ -100,7 +100,7 @@ QString DescriptionGenerator::generateAndSave(const QString& filePath)
     QString prompt = createPrompt(content);
     QString description = m_model->generate(prompt);
     if (description.isEmpty()) {
-        qWarning() << "LLM вернул пустое описание для:" << filePath;
+        qCWarning(logUtils) << "LLM вернул пустое описание для:" << filePath;
         return QString();
     }
 

@@ -3,8 +3,8 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
-#include <QDebug>
 #include <QFileInfo>
+#include "utils/Logging.h"
 
 static bool copyRecursively(const QString& sourcePath, const QString& destPath)
 {
@@ -48,69 +48,69 @@ void SolutionTemplateManager::setRoot(const QString &rootPath)
 
 void SolutionTemplateManager::refresh()
 {
-    if (false) qDebug() << "[SolutionTemplateManager] Starting refresh operation, root path:" << m_root;
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Starting refresh operation, root path:" << m_root;
     m_templates.clear();
     m_templateDirs.clear();
 
     if (m_root.isEmpty()) {
-        if (false) qDebug() << "[SolutionTemplateManager] Root path is empty, returning";
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Root path is empty, returning";
         return;
     }
 
     QDir dir(m_root);
     if (!dir.exists()) {
-        if (false) qDebug() << "[SolutionTemplateManager] Root directory does not exist:" << m_root;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Root directory does not exist:" << m_root;
         return;
     }
 
     // Получаем все поддиректории (это будут папки шаблонов)
     QFileInfoList entryList = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    if (false) qDebug() << "[SolutionTemplateManager] Found" << entryList.size() << "template directories";
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Found" << entryList.size() << "template directories";
     
     for (const QFileInfo& info : entryList) {
         QString templateDirPath = info.absoluteFilePath();
-        if (false) qDebug() << "[SolutionTemplateManager] Processing template directory:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Processing template directory:" << templateDirPath;
         
         // Синхронизируем содержимое папки шаблона с файлом шаблона
         bool syncSuccess = syncTemplateFileWithFolder(templateDirPath);
-        if (false) qDebug() << "[SolutionTemplateManager] syncTemplateFileWithFolder result for" << templateDirPath << ":" << syncSuccess;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] syncTemplateFileWithFolder result for" << templateDirPath << ":" << syncSuccess;
         
         QString templateJsonPath = templateDirPath + "/template.templ.json";
-        if (false) qDebug() << "[SolutionTemplateManager] Attempting to load template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Attempting to load template file:" << templateJsonPath;
         
         // Загружаем JSON-файл шаблона
         QFile tmplFile(templateJsonPath);
         if (!tmplFile.open(QIODevice::ReadOnly)) {
-            if (false) qDebug() << "Could not open template file:" << templateJsonPath;
+            if (false) qCDebug(logTemplate) << "Could not open template file:" << templateJsonPath;
             continue;
         }
 
         QByteArray data = tmplFile.readAll();
-        if (false) qDebug() << "[SolutionTemplateManager] Read" << data.size() << "bytes from template file";
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Read" << data.size() << "bytes from template file";
         
         QJsonDocument doc = QJsonDocument::fromJson(data);
         if (!doc.isObject()) {
-            if (false) qDebug() << "Invalid JSON in template file:" << templateJsonPath;
+            if (false) qCDebug(logTemplate) << "Invalid JSON in template file:" << templateJsonPath;
             continue;
         }
 
         SolutionTemplate tmpl = SolutionTemplate::fromJson(doc.object());
-        if (false) qDebug() << "[SolutionTemplateManager] Loaded template:" << tmpl.name() << "with" << tmpl.sequences().size() << "sequences";
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Loaded template:" << tmpl.name() << "with" << tmpl.sequences().size() << "sequences";
         
         // Проверяем целостность шаблона и выводим предупреждение о несуществующих последовательностях
         auto sequences = tmpl.sequences(); // QVector<QString> 
         for (const QString& seqPath : sequences) {
             QString fullPath = QDir(templateDirPath).filePath(seqPath);
             if (!QFile::exists(fullPath)) {
-                qWarning() << "Template" << info.fileName() << "references non-existent sequence:" << seqPath;
+                qCWarning(logTemplate) << "Template" << info.fileName() << "references non-existent sequence:" << seqPath;
             }
         }
         
         m_templates.insert(templateDirPath, tmpl);
         m_templateDirs << templateDirPath;
-        if (false) qDebug() << "[SolutionTemplateManager] Added template to cache, now have" << m_templates.size() << "templates";
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Added template to cache, now have" << m_templates.size() << "templates";
     }
-    if (false) qDebug() << "[SolutionTemplateManager] Refresh completed with" << m_templates.size() << "templates";
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Refresh completed with" << m_templates.size() << "templates";
 }
 
 const QMap<QString, SolutionTemplate> &SolutionTemplateManager::templates()
@@ -124,7 +124,7 @@ bool SolutionTemplateManager::save(const SolutionTemplate &tmpl, const QString &
 {
     QDir dir;
     if (!dir.mkpath(templateDirPath)) {
-        if (false) qDebug() << "Could not create template directory:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "Could not create template directory:" << templateDirPath;
         return false;
     }
 
@@ -215,7 +215,7 @@ bool SolutionTemplateManager::exportTemplate(const QString& templateDirPath, con
 {
     QDir templateDir(templateDirPath);
     if (!templateDir.exists()) {
-        if (false) qDebug() << "Template directory does not exist:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "Template directory does not exist:" << templateDirPath;
         return false;
     }
 
@@ -256,21 +256,21 @@ bool SolutionTemplateManager::exportSequenceAsTemplate(const QString& sequencePa
     // Load the sequence from the file
     QFile seqFile(sequencePath);
     if (!seqFile.open(QIODevice::ReadOnly)) {
-        if (false) qDebug() << "Could not open sequence file:" << sequencePath;
+        if (false) qCDebug(logTemplate) << "Could not open sequence file:" << sequencePath;
         return false;
     }
     
     QByteArray data = seqFile.readAll();
     QJsonDocument seqDoc = QJsonDocument::fromJson(data);
     if (!seqDoc.isObject()) {
-        if (false) qDebug() << "Invalid JSON in sequence file:" << sequencePath;
+        if (false) qCDebug(logTemplate) << "Invalid JSON in sequence file:" << sequencePath;
         return false;
     }
     
     // Create template directory
     QDir dir;
     if (!dir.mkpath(templateDirPath)) {
-        if (false) qDebug() << "Could not create template directory:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "Could not create template directory:" << templateDirPath;
         return false;
     }
     
@@ -278,7 +278,7 @@ bool SolutionTemplateManager::exportSequenceAsTemplate(const QString& sequencePa
     QFileInfo seqInfo(sequencePath);
     QString targetSeqPath = templateDirPath + "/" + seqInfo.fileName();
     if (!QFile::copy(sequencePath, targetSeqPath)) {
-        if (false) qDebug() << "Could not copy sequence file to template directory:" << targetSeqPath;
+        if (false) qCDebug(logTemplate) << "Could not copy sequence file to template directory:" << targetSeqPath;
         return false;
     }
     
@@ -293,7 +293,7 @@ bool SolutionTemplateManager::exportSequenceAsTemplate(const QString& sequencePa
     QJsonDocument tmplDoc(tmplObj);
     QFile tmplFile(templateDirPath + "/template.templ.json");
     if (!tmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (false) qDebug() << "Could not create template.templ.json file in:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "Could not create template.templ.json file in:" << templateDirPath;
         return false;
     }
     tmplFile.write(tmplDoc.toJson(QJsonDocument::Indented));
@@ -324,7 +324,7 @@ bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templat
     // Create the file and write the default sequence
     QFile sequenceFile(sequenceFilePath);
     if (!sequenceFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (false) qDebug() << "Could not create sequence file in template directory:" << sequenceFilePath;
+        if (false) qCDebug(logTemplate) << "Could not create sequence file in template directory:" << sequenceFilePath;
         return false;
     }
     
@@ -336,14 +336,14 @@ bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templat
     QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
     QFile tmplFile(templateJsonPath);
     if (!tmplFile.open(QIODevice::ReadOnly)) {
-        if (false) qDebug() << "Could not open template file for updating:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "Could not open template file for updating:" << templateJsonPath;
         return true; // Return true since the sequence was created, just couldn't update template
     }
     
     QByteArray data = tmplFile.readAll();
     QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
     if (!tmplDoc.isObject()) {
-        if (false) qDebug() << "Invalid JSON in template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "Invalid JSON in template file:" << templateJsonPath;
         return true; // Return true since the sequence was created, just couldn't update template
     }
     
@@ -358,7 +358,7 @@ bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templat
     
     QFile updatedTmplFile(templateJsonPath);
     if (!updatedTmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (false) qDebug() << "Could not update template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "Could not update template file:" << templateJsonPath;
         return true; // Return true since the sequence was created, just couldn't update template
     }
     
@@ -371,19 +371,19 @@ bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templat
 /* Синхронизировать файл шаблона с содержимым папки шаблона (добавить отсутствующие файлы последовательностей) */
 bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& templateDirPath) const
 {
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Starting sync for directory:" << templateDirPath;
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Starting sync for directory:" << templateDirPath;
     QDir dir(templateDirPath);
     if (!dir.exists()) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Template directory does not exist:" << templateDirPath;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Template directory does not exist:" << templateDirPath;
         return false;
     }
     
     QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Template JSON path:" << templateJsonPath;
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Template JSON path:" << templateJsonPath;
     
     // Check if template file exists, if not create a default one
     if (!QFile::exists(templateJsonPath)) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Template file does not exist, creating default";
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Template file does not exist, creating default";
         // Create a default template based on the sequence files in the directory
         SolutionTemplate tmpl(QFileInfo(templateDirPath).fileName()); // Use directory name as template name
         tmpl.setDescription("Default template created from sequence files in directory");
@@ -391,23 +391,23 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
         // Find all sequence files in the directory
         QStringList seqFilters = {"*.seq.json"};
         QFileInfoList fileInfoList = dir.entryInfoList(seqFilters, QDir::Files | QDir::NoSymLinks);
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Found" << fileInfoList.size() << "sequence files";
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Found" << fileInfoList.size() << "sequence files";
         
         // Add all sequence files to the template
         for (const QFileInfo& fileInfo : fileInfoList) {
-            if (false) qDebug() << "[syncTemplateFileWithFolder] Adding sequence file:" << fileInfo.fileName();
+            if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Adding sequence file:" << fileInfo.fileName();
             tmpl.addSequence(fileInfo.fileName()); // Add relative path to sequence file
             
             // If this is the first sequence, set it as the main sequence
             if (tmpl.mainSequencePath().isEmpty()) {
                 tmpl.setMainSequencePath(fileInfo.fileName());
-                if (false) qDebug() << "[syncTemplateFileWithFolder] Set main sequence to:" << fileInfo.fileName();
+                if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Set main sequence to:" << fileInfo.fileName();
             }
         }
         
         // If no sequence files found, create a minimal default
         if (tmpl.sequences().empty()) {
-            if (false) qDebug() << "[syncTemplateFileWithFolder] No sequence files found, adding default";
+            if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] No sequence files found, adding default";
             // Create a default sequence to ensure template is valid
             tmpl.addSequence("default.seq.json");
         }
@@ -417,34 +417,34 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
         QJsonDocument tmplDoc(tmplObj);
         QFile tmplFile(templateJsonPath);
         if (!tmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            if (false) qDebug() << "[syncTemplateFileWithFolder] Could not create template file:" << templateJsonPath;
+            if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Could not create template file:" << templateJsonPath;
             return false;
         }
         tmplFile.write(tmplDoc.toJson(QJsonDocument::Indented));
         tmplFile.close();
         
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Created default template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Created default template file:" << templateJsonPath;
     } else {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Template file exists, proceeding with sync";
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Template file exists, proceeding with sync";
     }
     
     // Now proceed with loading and synchronizing
     QFile tmplFile(templateJsonPath);
     if (!tmplFile.open(QIODevice::ReadOnly)) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Could not open template file for synchronization:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Could not open template file for synchronization:" << templateJsonPath;
         return false;
     }
     
     QByteArray data = tmplFile.readAll();
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Read" << data.size() << "bytes from template file";
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Read" << data.size() << "bytes from template file";
     QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
     if (!tmplDoc.isObject()) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Invalid JSON in template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Invalid JSON in template file:" << templateJsonPath;
         return false;
     }
     
     SolutionTemplate tmpl = SolutionTemplate::fromJson(tmplDoc.object());
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Loaded template:" << tmpl.name() << "with" << tmpl.sequences().size() << "sequences";
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Loaded template:" << tmpl.name() << "with" << tmpl.sequences().size() << "sequences";
     
     // Получаем список всех файлов последовательностей в папке шаблона
     QStringList seqFilters = {"*.seq.json"};
@@ -455,11 +455,11 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
     for (const QFileInfo& fileInfo : fileInfoList) {
         folderSeqFiles << fileInfo.fileName();
     }
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Found" << folderSeqFiles.size() << "sequence files in folder";
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Found" << folderSeqFiles.size() << "sequence files in folder";
     
     // Проверяем, какие файлы уже есть в шаблоне
     auto existingSequences = tmpl.sequences();  // QVector<QString>
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Template currently has" << existingSequences.size() << "sequences";
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Template currently has" << existingSequences.size() << "sequences";
     
     // Добавляем новые файлы, которых нет в шаблоне
     for (const QString& fileName : folderSeqFiles) {
@@ -471,7 +471,7 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
             }
         }
         if (!found) {
-            if (false) qDebug() << "[syncTemplateFileWithFolder] Adding new sequence to template:" << fileName;
+            if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Adding new sequence to template:" << fileName;
             // Добавляем файл к шаблону
             tmpl.addSequence(fileName);
         }
@@ -481,12 +481,12 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
     QVector<QString> seqsToRemove;
     for (const QString& seqPath : existingSequences) {
         if (!folderSeqFiles.contains(seqPath)) {
-            if (false) qDebug() << "[syncTemplateFileWithFolder] Marking sequence for removal:" << seqPath;
+            if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Marking sequence for removal:" << seqPath;
             seqsToRemove.append(seqPath);
         }
     }
     for (const QString& seqToRemove : seqsToRemove) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Removing sequence from template:" << seqToRemove;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Removing sequence from template:" << seqToRemove;
         tmpl.removeSequenceByPath(seqToRemove);
     }
     
@@ -496,14 +496,14 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
     
     QFile updatedTmplFile(templateJsonPath);
     if (!updatedTmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (false) qDebug() << "[syncTemplateFileWithFolder] Could not update template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Could not update template file:" << templateJsonPath;
         return false;
     }
     
     updatedTmplFile.write(updatedTmplDoc.toJson(QJsonDocument::Indented));
     updatedTmplFile.close();
     
-    if (false) qDebug() << "[syncTemplateFileWithFolder] Successfully synchronized template";
+    if (false) qCDebug(logTemplate) << "[syncTemplateFileWithFolder] Successfully synchronized template";
     return true;
 }
 
@@ -548,22 +548,22 @@ QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templ
 /* Сохранить позиции последовательностей в шаблон */
 void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDirPath, const QMap<QString, QPointF>& positions)
 {
-    if (false) qDebug() << "[SolutionTemplateManager] Saving positions to template:" << templateDirPath;
-    if (false) qDebug() << "[SolutionTemplateManager] Number of positions to save:" << positions.size();
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Saving positions to template:" << templateDirPath;
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Number of positions to save:" << positions.size();
     
     QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
     
     // Load the existing template
     QFile tmplFile(templateJsonPath);
     if (!tmplFile.open(QIODevice::ReadOnly)) {
-        if (false) qDebug() << "[SolutionTemplateManager] Could not open template file for position update:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Could not open template file for position update:" << templateJsonPath;
         return;
     }
     
     QByteArray data = tmplFile.readAll();
     QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
     if (!tmplDoc.isObject()) {
-        if (false) qDebug() << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
         tmplFile.close();
         return;
     }
@@ -576,7 +576,7 @@ void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDir
     // Update positions in the template
     for (auto it = positions.constBegin(); it != positions.constEnd(); ++it) {
         tmpl.setPositionForSequence(it.key(), it.value());
-        if (false) qDebug() << "[SolutionTemplateManager] Set position for sequence:" << it.key() << "at" << it.value();
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Set position for sequence:" << it.key() << "at" << it.value();
     }
     
     // Save the updated template back to file
@@ -585,7 +585,7 @@ void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDir
     
     QFile updatedTmplFile(templateJsonPath);
     if (!updatedTmplFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        if (false) qDebug() << "[SolutionTemplateManager] Could not update template file for positions:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Could not update template file for positions:" << templateJsonPath;
         return;
     }
     
@@ -595,27 +595,27 @@ void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDir
     // Also update the cached template in memory
     m_templates.insert(templateDirPath, tmpl);
     
-    if (false) qDebug() << "[SolutionTemplateManager] Successfully saved positions to template file:" << templateJsonPath;
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Successfully saved positions to template file:" << templateJsonPath;
 }
 
 /* Загрузить позиции последовательностей из шаблона */
 QMap<QString, QPointF> SolutionTemplateManager::loadPositionsFromTemplate(const QString& templateDirPath) const
 {
-    if (false) qDebug() << "[SolutionTemplateManager] Loading positions from template:" << templateDirPath;
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Loading positions from template:" << templateDirPath;
     
     QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
     
     // Load the template file
     QFile tmplFile(templateJsonPath);
     if (!tmplFile.open(QIODevice::ReadOnly)) {
-        if (false) qDebug() << "[SolutionTemplateManager] Could not open template file for position loading:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Could not open template file for position loading:" << templateJsonPath;
         return QMap<QString, QPointF>(); // Return empty map
     }
     
     QByteArray data = tmplFile.readAll();
     QJsonDocument tmplDoc = QJsonDocument::fromJson(data);
     if (!tmplDoc.isObject()) {
-        if (false) qDebug() << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
+        if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Invalid JSON in template file:" << templateJsonPath;
         tmplFile.close();
         return QMap<QString, QPointF>(); // Return empty map
     }
@@ -628,7 +628,7 @@ QMap<QString, QPointF> SolutionTemplateManager::loadPositionsFromTemplate(const 
     // Get positions from the template
     QMap<QString, QPointF> positions = tmpl.positions();
     
-    if (false) qDebug() << "[SolutionTemplateManager] Loaded" << positions.size() << "positions from template";
+    if (false) qCDebug(logTemplate) << "[SolutionTemplateManager] Loaded" << positions.size() << "positions from template";
     
     return positions;
 }

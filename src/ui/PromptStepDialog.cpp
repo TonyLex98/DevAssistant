@@ -17,12 +17,12 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QDebug>
 #include <QListWidgetItem>
 #include <StyledButton.h>
 #include <QMessageBox>
 #include "customWidgets/MemoryLineEdit.h"
 #include "customWidgets/StyledListWidget.h"
+#include "utils/Logging.h"
 
 
 PromptStepDialog::PromptStepDialog(QWidget *parent)
@@ -510,8 +510,8 @@ void PromptStepDialog::onAddSequenceInfo()
 void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
 {
     Q_UNUSED(item);
-    if (false) qDebug() << "[onSequenceItemChanged] Slot called for item:" << (item ? item->text() : "NULL");
-    if (false) qDebug() << "[onSequenceItemChanged] Item check state:" << item->checkState();
+    if (false) qCDebug(logUI) << "[onSequenceItemChanged] Slot called for item:" << (item ? item->text() : "NULL");
+    if (false) qCDebug(logUI) << "[onSequenceItemChanged] Item check state:" << item->checkState();
     
     // Update the main template file based on the checked items
     if (!m_templateDir.isEmpty() && QDir(m_templateDir).exists()) {
@@ -521,7 +521,7 @@ void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
             // Load the existing template
             QFile templateFile(mainTemplatePath);
             if (!templateFile.open(QIODevice::ReadOnly)) {
-                if (false) qDebug() << "[onSequenceItemChanged] Could not read template file:" << mainTemplatePath;
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Could not read template file:" << mainTemplatePath;
                 return;
             }
             
@@ -530,7 +530,7 @@ void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
             templateFile.close();
             
             if (!templateDoc.isObject()) {
-                if (false) qDebug() << "[onSequenceItemChanged] Invalid JSON in template file";
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Invalid JSON in template file";
                 return;
             }
             
@@ -546,7 +546,7 @@ void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
                 QListWidgetItem *listItem = m_sequenceListWidget->item(i);
                 if (listItem->checkState() == Qt::Checked) {
                     QString seqFileName = listItem->data(Qt::UserRole).toString();
-                    if (false) qDebug() << "[onSequenceItemChanged] Found checked item:" << seqFileName;
+                    if (false) qCDebug(logUI) << "[onSequenceItemChanged] Found checked item:" << seqFileName;
                     
                     // Add to current sequence's targets
                     currentTargets.append(seqFileName);
@@ -574,12 +574,12 @@ void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
             if (outFile.open(QIODevice::WriteOnly)) {
                 outFile.write(updatedDoc.toJson(QJsonDocument::Indented));
                 outFile.close();
-                if (false) qDebug() << "[onSequenceItemChanged] Updated template file with sequence targets for sequence:" << m_currentSequenceName;
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Updated template file with sequence targets for sequence:" << m_currentSequenceName;
             } else {
-                if (false) qDebug() << "[onSequenceItemChanged] Could not write to template file:" << mainTemplatePath;
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Could not write to template file:" << mainTemplatePath;
             }
         } else {
-            if (false) qDebug() << "[onSequenceItemChanged] Main template file does not exist, creating default structure...";
+            if (false) qCDebug(logUI) << "[onSequenceItemChanged] Main template file does not exist, creating default structure...";
             
             // Create a basic template file structure if it doesn't exist
             QJsonObject templateObj;
@@ -615,25 +615,25 @@ void PromptStepDialog::onSequenceItemChanged(QListWidgetItem *item)
             if (outFile.open(QIODevice::WriteOnly)) {
                 outFile.write(newDoc.toJson(QJsonDocument::Indented));
                 outFile.close();
-                if (false) qDebug() << "[onSequenceItemChanged] Created new template file with sequence targets for sequence:" << m_currentSequenceName;
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Created new template file with sequence targets for sequence:" << m_currentSequenceName;
             } else {
-                if (false) qDebug() << "[onSequenceItemChanged] Could not create template file:" << mainTemplatePath;
+                if (false) qCDebug(logUI) << "[onSequenceItemChanged] Could not create template file:" << mainTemplatePath;
             }
         }
     } else {
-        if (false) qDebug() << "[onSequenceItemChanged] Template directory is empty or doesn't exist";
+        if (false) qCDebug(logUI) << "[onSequenceItemChanged] Template directory is empty or doesn't exist";
     }
 }
 
 void PromptStepDialog::loadAvailableSequences()
 {
-    if (false) qDebug() << "[loadAvailableSequences] Starting to load available sequences";
-    if (false) qDebug() << "[loadAvailableSequences] m_seqMgr is null:" << (m_seqMgr == nullptr);
-    if (false) qDebug() << "[loadAvailableSequences] m_sequenceListWidget is null:" << (m_sequenceListWidget == nullptr);
-    if (false) qDebug() << "[loadAvailableSequences] m_templateDir:" << m_templateDir;
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] Starting to load available sequences";
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] m_seqMgr is null:" << (m_seqMgr == nullptr);
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] m_sequenceListWidget is null:" << (m_sequenceListWidget == nullptr);
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] m_templateDir:" << m_templateDir;
     
     if (!m_sequenceListWidget) {
-        if (false) qDebug() << "[loadAvailableSequences] m_sequenceListWidget is null, returning";
+        if (false) qCDebug(logUI) << "[loadAvailableSequences] m_sequenceListWidget is null, returning";
         return;
     }
 
@@ -644,7 +644,7 @@ void PromptStepDialog::loadAvailableSequences()
     QString currentTemplate = m_templateEdit ? m_templateEdit->toPlainText() : QString();
     
     // Look for the main template file to read sequence links
-    if (false) qDebug() << "[loadAvailableSequences] Checking for main template file. m_templateDir:" << m_templateDir;
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] Checking for main template file. m_templateDir:" << m_templateDir;
     bool hasMainTemplate = false;
     if (!m_templateDir.isEmpty() && QDir(m_templateDir).exists()) {
         QString mainTemplatePath = QDir(m_templateDir).filePath("template.templ.json");
@@ -663,7 +663,7 @@ void PromptStepDialog::loadAvailableSequences()
                     if (templateObj.contains("sequenceTargets")) {
                         hasMainTemplate = true;
                         
-                        if (false) qDebug() << "[loadAvailableSequences] Found sequenceTargets in main template";
+                        if (false) qCDebug(logUI) << "[loadAvailableSequences] Found sequenceTargets in main template";
                         
                         // Get targets for the current sequence (directed links)
                         QJsonArray currentSequenceTargets;
@@ -671,16 +671,16 @@ void PromptStepDialog::loadAvailableSequences()
                             QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
                             if (sequenceTargets.contains(m_currentSequenceName)) {
                                 currentSequenceTargets = sequenceTargets.value(m_currentSequenceName).toArray();
-                                if (false) qDebug() << "[loadAvailableSequences] Current sequence" << m_currentSequenceName << "has" << currentSequenceTargets.size() << "target sequences";
+                                if (false) qCDebug(logUI) << "[loadAvailableSequences] Current sequence" << m_currentSequenceName << "has" << currentSequenceTargets.size() << "target sequences";
                                 
                                 for (int i = 0; i < currentSequenceTargets.size(); ++i) {
-                                    if (false) qDebug() << "[loadAvailableSequences] Target" << i << ":" << currentSequenceTargets[i].toString();
+                                    if (false) qCDebug(logUI) << "[loadAvailableSequences] Target" << i << ":" << currentSequenceTargets[i].toString();
                                 }
                             } else {
-                                if (false) qDebug() << "[loadAvailableSequences] Current sequence" << m_currentSequenceName << "has no target sequences defined";
+                                if (false) qCDebug(logUI) << "[loadAvailableSequences] Current sequence" << m_currentSequenceName << "has no target sequences defined";
                             }
                         } else {
-                            if (false) qDebug() << "[loadAvailableSequences] No current sequence name or sequenceTargets in template";
+                            if (false) qCDebug(logUI) << "[loadAvailableSequences] No current sequence name or sequenceTargets in template";
                         }
                         
                         // Get all sequence files in the directory
@@ -719,7 +719,7 @@ void PromptStepDialog::loadAvailableSequences()
                                 }
                                 
                                 PromptSequence seq = PromptSequence::fromJson(doc.object());
-                                if (false) qDebug() << "[loadAvailableSequences] Loaded target sequence:" << seq.name() << "file:" << targetFile;
+                                if (false) qCDebug(logUI) << "[loadAvailableSequences] Loaded target sequence:" << seq.name() << "file:" << targetFile;
                                 
                                 QString display = seq.name();
                                 if (!seq.description().isEmpty())
@@ -730,7 +730,7 @@ void PromptStepDialog::loadAvailableSequences()
                                 item->setCheckState(Qt::Checked);  // Target sequences are checked
                                 item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
                                 
-                                if (false) qDebug() << "[loadAvailableSequences] Added checked target sequence:" << targetFile;
+                                if (false) qCDebug(logUI) << "[loadAvailableSequences] Added checked target sequence:" << targetFile;
                             }
                         }
                         
@@ -756,7 +756,7 @@ void PromptStepDialog::loadAvailableSequences()
                             }
                             
                             PromptSequence seq = PromptSequence::fromJson(doc.object());
-                            if (false) qDebug() << "[loadAvailableSequences] Loaded non-target sequence:" << seq.name();
+                            if (false) qCDebug(logUI) << "[loadAvailableSequences] Loaded non-target sequence:" << seq.name();
                             
                             QString display = seq.name();
                             if (!seq.description().isEmpty())
@@ -767,7 +767,7 @@ void PromptStepDialog::loadAvailableSequences()
                             item->setCheckState(Qt::Unchecked);        // Non-target sequences are unchecked
                             item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
                             
-                            if (false) qDebug() << "[loadAvailableSequences] Added unchecked non-target item for:" << seqBaseName;
+                            if (false) qCDebug(logUI) << "[loadAvailableSequences] Added unchecked non-target item for:" << seqBaseName;
                         }
                     }
                 }
@@ -783,28 +783,28 @@ void PromptStepDialog::loadAvailableSequences()
             QStringList filters = {"*.seq.json"};
             QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
             
-            if (false) qDebug() << "[loadAvailableSequences] Found" << fileInfoList.size() << "sequence files in template directory:" << m_templateDir;
+            if (false) qCDebug(logUI) << "[loadAvailableSequences] Found" << fileInfoList.size() << "sequence files in template directory:" << m_templateDir;
             
             for (const QFileInfo& fileInfo : fileInfoList) {
                 QString seqPath = fileInfo.absoluteFilePath();
-                if (false) qDebug() << "[loadAvailableSequences] Processing sequence file:" << seqPath;
+                if (false) qCDebug(logUI) << "[loadAvailableSequences] Processing sequence file:" << seqPath;
                 
                 // Load the sequence from file to get its name and description
                 QFile seqFile(seqPath);
                 if (!seqFile.open(QIODevice::ReadOnly)) {
-                    if (false) qDebug() << "[loadAvailableSequences] Could not open file:" << seqPath;
+                    if (false) qCDebug(logUI) << "[loadAvailableSequences] Could not open file:" << seqPath;
                     continue;
                 }
                 
                 QByteArray data = seqFile.readAll();
                 QJsonDocument doc = QJsonDocument::fromJson(data);
                 if (!doc.isObject()) {
-                    if (false) qDebug() << "[loadAvailableSequences] Invalid JSON in file:" << seqPath;
+                    if (false) qCDebug(logUI) << "[loadAvailableSequences] Invalid JSON in file:" << seqPath;
                     continue;  // Skip invalid JSON files
                 }
                 
                 PromptSequence seq = PromptSequence::fromJson(doc.object());
-                if (false) qDebug() << "[loadAvailableSequences] Loaded sequence:" << seq.name();
+                if (false) qCDebug(logUI) << "[loadAvailableSequences] Loaded sequence:" << seq.name();
                 
                 QString display = seq.name();
                 if (!seq.description().isEmpty())
@@ -825,15 +825,15 @@ void PromptStepDialog::loadAvailableSequences()
                 
                 item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
                 
-                if (false) qDebug() << "[loadAvailableSequences] Added item for:" << fileInfo.baseName() << "with check state:" << item->checkState();
+                if (false) qCDebug(logUI) << "[loadAvailableSequences] Added item for:" << fileInfo.baseName() << "with check state:" << item->checkState();
             }
         } else {
-            if (false) qDebug() << "[loadAvailableSequences] Template directory is empty or doesn't exist, trying to find template directory...";
+            if (false) qCDebug(logUI) << "[loadAvailableSequences] Template directory is empty or doesn't exist, trying to find template directory...";
             
             // Try to determine template directory from the sequence manager's root or common template locations
             if (m_seqMgr) {
                 QString seqMgrRoot = m_seqMgr->root();
-                if (false) qDebug() << "[loadAvailableSequences] Sequence manager root:" << seqMgrRoot;
+                if (false) qCDebug(logUI) << "[loadAvailableSequences] Sequence manager root:" << seqMgrRoot;
                 
                 // Check if this is in a template directory structure
                 QDir checkDir(seqMgrRoot);
@@ -848,11 +848,11 @@ void PromptStepDialog::loadAvailableSequences()
                             QFileInfoList fileInfoList = templateDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
                             
                             if (!fileInfoList.isEmpty()) {
-                                if (false) qDebug() << "[loadAvailableSequences] Found template directory with sequences:" << dirInfo.absoluteFilePath();
+                                if (false) qCDebug(logUI) << "[loadAvailableSequences] Found template directory with sequences:" << dirInfo.absoluteFilePath();
                                 
                                 for (const QFileInfo& fileInfo : fileInfoList) {
                                     QString seqPath = fileInfo.absoluteFilePath();
-                                    if (false) qDebug() << "[loadAvailableSequences] Processing sequence file:" << seqPath;
+                                    if (false) qCDebug(logUI) << "[loadAvailableSequences] Processing sequence file:" << seqPath;
                                     
                                     QFile seqFile(seqPath);
                                     if (!seqFile.open(QIODevice::ReadOnly)) {
@@ -900,5 +900,5 @@ void PromptStepDialog::loadAvailableSequences()
         }
     }
 
-    if (false) qDebug() << "[loadAvailableSequences] Final count of items:" << m_sequenceListWidget->count();
+    if (false) qCDebug(logUI) << "[loadAvailableSequences] Final count of items:" << m_sequenceListWidget->count();
 }

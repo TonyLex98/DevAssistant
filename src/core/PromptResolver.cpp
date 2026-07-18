@@ -7,12 +7,12 @@
 #include "../command/CommandDocs.h"
 #include <QMap>
 #include <QRegularExpression>
-#include <QDebug>
 #include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
 #include <QtGlobal>
 #include <QJsonDocument>
+#include "utils/Logging.h"
 
 // Static members initialization
 QString PromptResolver::m_nextSequenceName;
@@ -83,7 +83,7 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         "- CURRENT_DATETIME: %2\n"
         "- Interpret relative dates (today/now) using CURRENT_DATE.\n\n")
         .arg(currentDate, currentDateTime);
-    qDebug() << "[PromptResolver] USER_QUERY =" << userQuery;
+    qCDebug(logPrompt) << "[PromptResolver] USER_QUERY =" << userQuery;
 
     // 1) {{PROJECT_ROOT}}
     result.replace("{{PROJECT_ROOT}}", ctx->projectRootPath());
@@ -108,8 +108,8 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
 
     // 3.1) {{LAST_USER_MESSAGES}} – берём последние N пользовательских сообщений из отдельного хранилища
     QString userMessages = ctx->getLastUserMessages();
-    qDebug() << "[PromptResolver] LAST_USER_MESSAGES content:" << userMessages;
-    qDebug() << "[PromptResolver] LAST_USER_MESSAGES count:" << userMessages.split('\n').size();
+    qCDebug(logPrompt) << "[PromptResolver] LAST_USER_MESSAGES content:" << userMessages;
+    qCDebug(logPrompt) << "[PromptResolver] LAST_USER_MESSAGES count:" << userMessages.split('\n').size();
     result.replace("{{LAST_USER_MESSAGES}}", userMessages);
 
     // 4) {{OPEN_FILES}} – содержимое файлов, открытых через OPEN_FILE

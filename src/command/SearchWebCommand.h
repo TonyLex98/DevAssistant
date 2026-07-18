@@ -3,6 +3,8 @@
 #include <QStringList>
 #include <QString>
 
+class ModelAdapter;
+
 class SearchWebCommand : public Command
 {
 public:
@@ -22,7 +24,7 @@ public:
 
     // Переопределение метода для работы с LLM
     bool applyWithLLM(DevAssManager* devAss,
-                      void* adapter,
+                      ModelAdapter* adapter,
                       QString* errorOut = nullptr) override;
 
 private:
@@ -30,10 +32,10 @@ private:
     QString m_description;
     QStringList m_results;
     QStringList m_rawResults;  // Store raw results for potential LLM summarization
-    
+
     // Внутренняя функция для суммаризации контента
     QString summarizeContentInternal(const QString& content, const QString& query);
-    
+
     // Новый метод для LLM-суммаризации
-    QString generateLLMSummary(void* adapter, const QString& content, const QString& query);
+    QString generateLLMSummary(ModelAdapter* adapter, const QString& content, const QString& query);
 };

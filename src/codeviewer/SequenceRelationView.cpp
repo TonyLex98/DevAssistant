@@ -24,6 +24,7 @@
 #include <QDir>
 #include "SolutionTemplate.h"
 #include "SolutionTemplateManager.h"
+#include "utils/Logging.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -150,7 +151,7 @@ void SequenceNodeItem::setConnectionTargetHover(bool on)
 QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant &value)
 {
     if (change == ItemPositionHasChanged) {
-        qDebug() << "[SequenceNodeItem]" << m_name << "position changed to:" << value.toPointF();
+        qCDebug(logViewer) << "[SequenceNodeItem]" << m_name << "position changed to:" << value.toPointF();
         
         // When this node moves, we need to update all edges connected to it
         // Get only the edges that overlap with this item's movement to be more efficient
@@ -167,7 +168,7 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                 }
             }
         } else {
-            qDebug() << "[SequenceNodeItem] No scene available, skipping edge updates";
+            qCDebug(logViewer) << "[SequenceNodeItem] No scene available, skipping edge updates";
             return QGraphicsItem::itemChange(change, value);
         }
         
@@ -183,7 +184,7 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                     if (relationView) {
                         // Double-check that the relationView is still valid before calling methods
                         relationView->updateEdgesForNode(this);
-                        qDebug() << "[SequenceNodeItem] Calling savePositions for" << m_name;
+                        qCDebug(logViewer) << "[SequenceNodeItem] Calling savePositions for" << m_name;
                         relationView->savePositions();
                         
                         // If we have a current template directory set, save positions to that template as well
@@ -192,13 +193,13 @@ QVariant SequenceNodeItem::itemChange(GraphicsItemChange change, const QVariant 
                         }
                     }
                 } else {
-                    qDebug() << "[SequenceNodeItem] View is null, cannot cast";
+                    qCDebug(logViewer) << "[SequenceNodeItem] View is null, cannot cast";
                 }
             } else {
-                qDebug() << "[SequenceNodeItem] No views found for scene";
+                qCDebug(logViewer) << "[SequenceNodeItem] No views found for scene";
             }
         } else {
-            qDebug() << "[SequenceNodeItem] No scene available";
+            qCDebug(logViewer) << "[SequenceNodeItem] No scene available";
         }
     }
     return QGraphicsItem::itemChange(change, value);
@@ -369,7 +370,7 @@ SequenceRelationView::SequenceRelationView(QWidget *parent)
 
 void SequenceRelationView::setSequenceManager(PromptSequenceManager *seqMgr)
 {
-    qDebug() << "[SequenceRelationView] setSequenceManager called";
+    qCDebug(logViewer) << "[SequenceRelationView] setSequenceManager called";
     m_seqMgr = seqMgr;
     // Don't rebuild immediately - let the caller decide when to rebuild
     // This allows restoreLayout to happen before the graph is built
@@ -378,13 +379,13 @@ void SequenceRelationView::setSequenceManager(PromptSequenceManager *seqMgr)
 
 void SequenceRelationView::setTemplateManager(SolutionTemplateManager *tmplMgr)
 {
-    qDebug() << "[SequenceRelationView] setTemplateManager called";
+    qCDebug(logViewer) << "[SequenceRelationView] setTemplateManager called";
     m_templateMgr = tmplMgr;
 }
 
 void SequenceRelationView::rebuildGraph()
 {
-    qDebug() << "[SequenceRelationView] rebuildGraph() called";
+    qCDebug(logViewer) << "[SequenceRelationView] rebuildGraph() called";
     
     QTransform prevTransform = transform();
     QPointF prevCenter = mapToScene(viewport()->rect().center());
@@ -393,22 +394,22 @@ void SequenceRelationView::rebuildGraph()
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
     
-    qDebug() << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
+    qCDebug(logViewer) << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
     
     clearScenePreservingPositions();
     
     if (!m_seqMgr) {
-        qDebug() << "[SequenceRelationView] No sequence manager, returning";
+        qCDebug(logViewer) << "[SequenceRelationView] No sequence manager, returning";
         return;
     }
     
     const QMap<QString, PromptSequence>& sequences = m_seqMgr->sequences();
     if (sequences.isEmpty()) {
-        qDebug() << "[SequenceRelationView] No sequences, returning";
+        qCDebug(logViewer) << "[SequenceRelationView] No sequences, returning";
         return;
     }
     
-    qDebug() << "[SequenceRelationView] Adding nodes for sequences:" << sequences.keys();
+    qCDebug(logViewer) << "[SequenceRelationView] Adding nodes for sequences:" << sequences.keys();
     
     m_sequenceToBaseName.clear();
     // Add all nodes first
@@ -422,7 +423,7 @@ void SequenceRelationView::rebuildGraph()
     // Then find connections between sequences
     findSequenceConnections();
     
-    qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes";
+    qCDebug(logViewer) << "[SequenceRelationView] Restoring saved positions after adding nodes";
     
     // For non-template graphs, we only use the saved positions from the current session
     // since there's no template file to load positions from
@@ -434,16 +435,16 @@ void SequenceRelationView::rebuildGraph()
         if (m_nodeItems.contains(nodeName)) {
             m_nodeItems[nodeName]->setPos(pos);
             m_nodePositions[nodeName] = pos;  // Update our internal map
-            qDebug() << "[SequenceRelationView] Restored position (from internal) for node:" << nodeName << "at" << pos;
+            qCDebug(logViewer) << "[SequenceRelationView] Restored position (from internal) for node:" << nodeName << "at" << pos;
         }
     }
     
     // If still no positions found after both sources, use default layout
     if (m_nodePositions.isEmpty()) {
-        qDebug() << "[SequenceRelationView] No saved positions found, using default layout";
+        qCDebug(logViewer) << "[SequenceRelationView] No saved positions found, using default layout";
         positionNodes();
     } else {
-        qDebug() << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
+        qCDebug(logViewer) << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
     }
     
     // Update all edges to reflect current positions
@@ -465,12 +466,12 @@ void SequenceRelationView::rebuildGraph()
         fitToContents();
     }
     
-    qDebug() << "[SequenceRelationView] rebuildGraph() completed";
+    qCDebug(logViewer) << "[SequenceRelationView] rebuildGraph() completed";
 }
 
 void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPath)
 {
-    qDebug() << "[SequenceRelationView] rebuildGraphForTemplate called for:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceRelationView] rebuildGraphForTemplate called for:" << templateDirPath;
     QTransform prevTransform = transform();
     QPointF prevCenter = mapToScene(viewport()->rect().center());
     bool hadViewState = !m_scene->items().isEmpty();
@@ -478,7 +479,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     // Store current positions before clearing the scene
     QMap<QString, QPointF> savedPositions = m_nodePositions;
     
-    qDebug() << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
+    qCDebug(logViewer) << "[SequenceRelationView] Saved positions before clearing:" << savedPositions;
     
     clearScenePreservingPositions();
     
@@ -488,7 +489,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
     if (!dir.exists()) {
-        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        qCDebug(logViewer) << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
         return;
     }
     
@@ -502,14 +503,14 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
         
         QFile seqFile(seqPath);
         if (!seqFile.open(QIODevice::ReadOnly)) {
-            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Could not open sequence file:" << seqPath;
             continue;
         }
         
         QByteArray seqData = seqFile.readAll();
         QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
         if (!seqDoc.isObject()) {
-            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
             continue;
         }
         
@@ -521,7 +522,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
     // Find connections within this template
     findSequenceConnectionsForTemplate(templateDirPath);
     
-    qDebug() << "[SequenceRelationView] Restoring saved positions after adding nodes for template";
+    qCDebug(logViewer) << "[SequenceRelationView] Restoring saved positions after adding nodes for template";
     
     // Load positions from the template file instead of settings
     if (m_templateMgr) {
@@ -532,7 +533,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
             if (m_nodeItems.contains(nodeName)) {
                 m_nodeItems[nodeName]->setPos(pos);
                 m_nodePositions[nodeName] = pos;  // Update our internal map
-                qDebug() << "[SequenceRelationView] Loaded position from template for node:" << nodeName << "at" << pos;
+                qCDebug(logViewer) << "[SequenceRelationView] Loaded position from template for node:" << nodeName << "at" << pos;
             }
         }
     }
@@ -548,19 +549,19 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
             if (!m_nodePositions.contains(nodeName) || m_nodePositions[nodeName] != pos) {
                 m_nodeItems[nodeName]->setPos(pos);
                 m_nodePositions[nodeName] = pos;  // Update our internal map
-                qDebug() << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
+                qCDebug(logViewer) << "[SequenceRelationView] Restored position (from internal, possibly more recent) for node:" << nodeName << "at" << pos;
             } else {
-                qDebug() << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from template";
+                qCDebug(logViewer) << "[SequenceRelationView] Skipping internal position for node:" << nodeName << ", already loaded from template";
             }
         }
     }
     
     // If still no positions found after both sources, use default layout
     if (m_nodePositions.isEmpty()) {
-        qDebug() << "[SequenceRelationView] No saved positions found, using default layout";
+        qCDebug(logViewer) << "[SequenceRelationView] No saved positions found, using default layout";
         positionNodes();
     } else {
-        qDebug() << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
+        qCDebug(logViewer) << "[SequenceRelationView] Saved positions restored, nodes in scene:" << m_nodeItems.size();
     }
     
     // Update all edges to reflect current positions
@@ -582,7 +583,7 @@ void SequenceRelationView::rebuildGraphForTemplate(const QString &templateDirPat
         fitToContents();
     }
     
-    qDebug() << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceRelationView] rebuildGraphForTemplate() completed for:" << templateDirPath;
 }
 
 void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &templateDirPath)
@@ -593,7 +594,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     // Look for template.templ.json in the same directory
     QString mainTemplatePath = QDir(templateDirPath).filePath("template.templ.json");
     if (!QFile::exists(mainTemplatePath)) {
-        qDebug() << "[SequenceRelationView] Main template file does not exist in directory:" << templateDirPath;
+        qCDebug(logViewer) << "[SequenceRelationView] Main template file does not exist in directory:" << templateDirPath;
         // Fallback to old behavior if no template file exists
         findSequenceConnectionsForTemplateLegacy(templateDirPath);
         return;
@@ -602,7 +603,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     // Load the main template to get sequence targets
     QFile templateFile(mainTemplatePath);
     if (!templateFile.open(QIODevice::ReadOnly)) {
-        qDebug() << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
+        qCDebug(logViewer) << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
         findSequenceConnectionsForTemplateLegacy(templateDirPath);
         return;
     }
@@ -612,7 +613,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     templateFile.close();
     
     if (!templateDoc.isObject()) {
-        qDebug() << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
+        qCDebug(logViewer) << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
         findSequenceConnectionsForTemplateLegacy(templateDirPath);
         return;
     }
@@ -621,7 +622,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     
     // Get sequence targets from the template
     if (!templateObj.contains("sequenceTargets")) {
-        qDebug() << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
+        qCDebug(logViewer) << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
         findSequenceConnectionsForTemplateLegacy(templateDirPath);
         return;
     }
@@ -629,7 +630,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
     if (!dir.exists()) {
-        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        qCDebug(logViewer) << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
         return;
     }
     
@@ -643,14 +644,14 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
         
         QFile seqFile(seqPath);
         if (!seqFile.open(QIODevice::ReadOnly)) {
-            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Could not open sequence file:" << seqPath;
             continue;
         }
         
         QByteArray seqData = seqFile.readAll();
         QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
         if (!seqDoc.isObject()) {
-            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
             continue;
         }
         
@@ -659,7 +660,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplate(const QString &tem
         // Map base filename (without extension) to sequence name for lookup
         QString baseName = fileInfo.baseName();
         baseNameToSequenceNameMap[baseName] = seq.name();
-        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
+        qCDebug(logViewer) << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
     }
     
     QJsonObject sequenceTargets = templateObj.value("sequenceTargets").toObject();
@@ -677,7 +678,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QStrin
     // Get all available sequence files in the template directory
     QDir dir(templateDirPath);
     if (!dir.exists()) {
-        qDebug() << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
+        qCDebug(logViewer) << "[SequenceRelationView] Template directory does not exist:" << templateDirPath;
         return;
     }
     
@@ -692,14 +693,14 @@ void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QStrin
         
         QFile seqFile(seqPath);
         if (!seqFile.open(QIODevice::ReadOnly)) {
-            qDebug() << "[SequenceRelationView] Could not open sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Could not open sequence file:" << seqPath;
             continue;
         }
         
         QByteArray seqData = seqFile.readAll();
         QJsonDocument seqDoc = QJsonDocument::fromJson(seqData);
         if (!seqDoc.isObject()) {
-            qDebug() << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
+            qCDebug(logViewer) << "[SequenceRelationView] Invalid JSON in sequence file:" << seqPath;
             continue;
         }
         
@@ -709,7 +710,7 @@ void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QStrin
         // Map base filename (without extension) to sequence name for lookup
         QString baseName = fileInfo.baseName();
         fileToNameMap[baseName] = seq.name();
-        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
+        qCDebug(logViewer) << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << seq.name();
     }
     
     // Now find connections between sequences in the template
@@ -744,10 +745,10 @@ void SequenceRelationView::findSequenceConnectionsForTemplateLegacy(const QStrin
                 // CRITICAL: Check if the target sequence exists within the template sequences ONLY
                 if (tmplSequences.contains(actualTargetSeqName)) {
                     addEdge(seq.name(), actualTargetSeqName);
-                    qDebug() << "[SequenceRelationView] Found internal connection in template:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
+                    qCDebug(logViewer) << "[SequenceRelationView] Found internal connection in template:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
                 } else {
                     // This is an external reference that should not be shown in the template graph
-                    qDebug() << "[SequenceRelationView] External reference found but ignored in template graph:" << seq.name() << "->" << targetSequence;
+                    qCDebug(logViewer) << "[SequenceRelationView] External reference found but ignored in template graph:" << seq.name() << "->" << targetSequence;
                 }
             }
         }
@@ -776,7 +777,7 @@ void SequenceRelationView::findSequenceConnections()
     // Look for template.templ.json in the template directory
     QString mainTemplatePath = QDir(templateDir).filePath("template.templ.json");
     if (!QFile::exists(mainTemplatePath)) {
-        qDebug() << "[SequenceRelationView] Main template file does not exist:" << mainTemplatePath;
+        qCDebug(logViewer) << "[SequenceRelationView] Main template file does not exist:" << mainTemplatePath;
         // Fallback to old behavior if no template file exists
         findSequenceConnectionsLegacy();
         return;
@@ -785,7 +786,7 @@ void SequenceRelationView::findSequenceConnections()
     // Load the main template to get sequence targets
     QFile templateFile(mainTemplatePath);
     if (!templateFile.open(QIODevice::ReadOnly)) {
-        qDebug() << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
+        qCDebug(logViewer) << "[SequenceRelationView] Could not open template file:" << mainTemplatePath;
         findSequenceConnectionsLegacy();
         return;
     }
@@ -795,7 +796,7 @@ void SequenceRelationView::findSequenceConnections()
     templateFile.close();
     
     if (!templateDoc.isObject()) {
-        qDebug() << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
+        qCDebug(logViewer) << "[SequenceRelationView] Invalid JSON in template file:" << mainTemplatePath;
         findSequenceConnectionsLegacy();
         return;
     }
@@ -804,7 +805,7 @@ void SequenceRelationView::findSequenceConnections()
     
     // Get sequence targets from the template
     if (!templateObj.contains("sequenceTargets")) {
-        qDebug() << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
+        qCDebug(logViewer) << "[SequenceRelationView] No sequenceTargets in template file, using legacy method";
         findSequenceConnectionsLegacy();
         return;
     }
@@ -841,7 +842,7 @@ void SequenceRelationView::findSequenceConnectionsLegacy()
         QFileInfo fileInfo(filePath);
         QString baseName = fileInfo.baseName();  // Get the filename without extension
         fileToNameMap[baseName] = it.value().name();  // Map base name to sequence name
-        qDebug() << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << it.value().name();
+        qCDebug(logViewer) << "[SequenceRelationView] Mapped filename" << baseName << "to sequence name" << it.value().name();
     }
     
     for (auto it = sequences.constBegin(); it != sequences.constEnd(); ++it) {
@@ -890,9 +891,9 @@ void SequenceRelationView::findSequenceConnectionsLegacy()
                 
                 if (targetExists) {
                     addEdge(seq.name(), actualTargetSeqName);
-                    qDebug() << "[SequenceRelationView] Found legacy connection:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
+                    qCDebug(logViewer) << "[SequenceRelationView] Found legacy connection:" << seq.name() << "->" << actualTargetSeqName << "(from reference:" << targetSequence << ")";
                 } else {
-                    qDebug() << "[SequenceRelationView] Target sequence not found:" << targetSequence << "referenced from:" << seq.name();
+                    qCDebug(logViewer) << "[SequenceRelationView] Target sequence not found:" << targetSequence << "referenced from:" << seq.name();
                 }
             }
         }
@@ -901,10 +902,10 @@ void SequenceRelationView::findSequenceConnectionsLegacy()
 
 void SequenceRelationView::addNode(const QString &name, const QString &description)
 {
-    qDebug() << "[SequenceRelationView] addNode called for:" << name << "with current m_nodePositions size:" << m_nodePositions.size();
+    qCDebug(logViewer) << "[SequenceRelationView] addNode called for:" << name << "with current m_nodePositions size:" << m_nodePositions.size();
     
     if (m_nodeItems.contains(name)) {
-        qDebug() << "[SequenceRelationView] Node" << name << "already exists, skipping";
+        qCDebug(logViewer) << "[SequenceRelationView] Node" << name << "already exists, skipping";
         return; // Already exists
     }
     
@@ -916,9 +917,9 @@ void SequenceRelationView::addNode(const QString &name, const QString &descripti
     if (m_nodePositions.contains(name)) {
         QPointF pos = m_nodePositions[name];
         item->setPos(pos);
-        qDebug() << "[SequenceRelationView] Set position for node:" << name << "at" << pos;
+        qCDebug(logViewer) << "[SequenceRelationView] Set position for node:" << name << "at" << pos;
     } else {
-        qDebug() << "[SequenceRelationView] No saved position for node:" << name << ", keeping default position";
+        qCDebug(logViewer) << "[SequenceRelationView] No saved position for node:" << name << ", keeping default position";
     }
 }
 
@@ -1603,14 +1604,14 @@ bool SequenceRelationView::addDirectedConnection(const QString &sourceName, cons
     if (sourceName.isEmpty() || targetName.isEmpty() || sourceName == targetName)
         return false;
 
-    qDebug() << "[SequenceRelationView] Adding connection" << sourceName << "->" << targetName << "templateDir" << m_currentTemplateDirPath;
+    qCDebug(logViewer) << "[SequenceRelationView] Adding connection" << sourceName << "->" << targetName << "templateDir" << m_currentTemplateDirPath;
 
     QString sourceBase = resolveBaseName(sourceName);
     QString targetBase = resolveBaseName(targetName);
 
     SolutionTemplate tmpl;
     if (!loadCurrentTemplate(tmpl)) {
-        qDebug() << "[SequenceRelationView] Cannot load current template for connection";
+        qCDebug(logViewer) << "[SequenceRelationView] Cannot load current template for connection";
         return false;
     }
 
@@ -1639,7 +1640,7 @@ bool SequenceRelationView::addDirectedConnection(const QString &sourceName, cons
         return true;
     }
 
-    qDebug() << "[SequenceRelationView] Failed to save template when adding connection" << sourceName << "->" << targetName;
+    qCDebug(logViewer) << "[SequenceRelationView] Failed to save template when adding connection" << sourceName << "->" << targetName;
     return false;
 }
 
@@ -1683,7 +1684,7 @@ bool SequenceRelationView::removeDirectedConnection(const QString &sourceName, c
 
 void SequenceRelationView::saveNodePositions()
 {
-    qDebug() << "[SequenceRelationView] Saving node positions to internal map, number of nodes:" << m_nodeItems.size();
+    qCDebug(logViewer) << "[SequenceRelationView] Saving node positions to internal map, number of nodes:" << m_nodeItems.size();
     
     // Clear the internal positions map and rebuild it from current node positions
     m_nodePositions.clear();
@@ -1700,9 +1701,9 @@ void SequenceRelationView::saveNodePositions()
             // Update the internal map with current position
             m_nodePositions[nodeName] = pos;
             
-            qDebug() << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
+            qCDebug(logViewer) << "[SequenceRelationView] Saved position for node:" << nodeName << "at" << pos;
         } else {
-            qDebug() << "[SequenceRelationView] Node" << nodeName << "not found in scene, skipping";
+            qCDebug(logViewer) << "[SequenceRelationView] Node" << nodeName << "not found in scene, skipping";
         }
     }
 }
@@ -1710,7 +1711,7 @@ void SequenceRelationView::saveNodePositions()
 // New method to save positions to a specific template directory
 void SequenceRelationView::savePositionsToTemplate(const QString& templateDirPath)
 {
-    qDebug() << "[SequenceRelationView] Saving positions to template directory:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceRelationView] Saving positions to template directory:" << templateDirPath;
     
     // Update internal positions map
     saveNodePositions(); // This will update m_nodePositions with current positions
@@ -1719,7 +1720,7 @@ void SequenceRelationView::savePositionsToTemplate(const QString& templateDirPat
     if (m_templateMgr) {
         m_templateMgr->savePositionsToTemplate(templateDirPath, m_nodePositions);
     } else {
-        qDebug() << "[SequenceRelationView] No template manager available to save positions";
+        qCDebug(logViewer) << "[SequenceRelationView] No template manager available to save positions";
     }
 }
 
@@ -1747,22 +1748,22 @@ void SequenceRelationView::saveLayout()
 
 void SequenceRelationView::restoreLayout()
 {
-    qDebug() << "[SequenceRelationView] restoreLayout() called";
+    qCDebug(logViewer) << "[SequenceRelationView] restoreLayout() called";
     // For backward compatibility, we just load from internal map
     // When building a template graph, positions will be loaded from the template file
-    qDebug() << "[SequenceRelationView] restoreLayout() completed, positions in m_nodePositions:" << m_nodePositions.size();
+    qCDebug(logViewer) << "[SequenceRelationView] restoreLayout() completed, positions in m_nodePositions:" << m_nodePositions.size();
 }
 
 // Method to set the current template directory path
 void SequenceRelationView::setCurrentTemplateDir(const QString& templateDirPath)
 {
     m_currentTemplateDirPath = templateDirPath;
-    qDebug() << "[SequenceRelationView] Set current template directory to:" << templateDirPath;
+    qCDebug(logViewer) << "[SequenceRelationView] Set current template directory to:" << templateDirPath;
 }
 
 void SequenceRelationView::loadNodePositions()
 {
-    qDebug() << "[SequenceRelationView] Loading node positions";
+    qCDebug(logViewer) << "[SequenceRelationView] Loading node positions";
     
     // For now, we'll clear the position map and let individual templates load their position data
     // when they are loaded via SolutionTemplateManager
@@ -1786,9 +1787,9 @@ void SequenceRelationView::setEdgesFromTemplate(const QJsonObject &sequenceTarge
             if (baseNameToSequenceNameMap.contains(sourceBaseName) &&
                 baseNameToSequenceNameMap.contains(targetBaseName)) {
                 addEdge(sourceSequenceName, targetSequenceName);
-                qDebug() << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
+                qCDebug(logViewer) << "[SequenceRelationView] Found directed connection:" << sourceSequenceName << "->" << targetSequenceName;
             } else {
-                qDebug() << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
+                qCDebug(logViewer) << "[SequenceRelationView] Sequence not found for directed connection:" << sourceBaseName << "->" << targetBaseName;
             }
         }
     }
@@ -1874,7 +1875,7 @@ bool SequenceRelationView::saveTemplate(const SolutionTemplate &tmpl)
         if (m_templateMgr->save(tmpl, m_currentTemplateDirPath)) {
             return true;
         }
-        qDebug() << "[SequenceRelationView] TemplateManager save failed, fallback to manual write";
+        qCDebug(logViewer) << "[SequenceRelationView] TemplateManager save failed, fallback to manual write";
     }
 
     if (m_currentTemplateDirPath.isEmpty())

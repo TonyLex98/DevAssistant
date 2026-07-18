@@ -5,6 +5,7 @@
 #include <QDialogButtonBox>
 #include <QTextStream>
 #include "SolutionTemplateEditor.h"
+#include "utils/Logging.h"
 
 SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* templateManager, QWidget *parent)
     : QWidget(parent), m_templateManager(templateManager)
@@ -137,9 +138,9 @@ void SolutionTemplateViewer::setupUI()
     // Default sequence selection
     auto* seqLayout = new QHBoxLayout();
     auto* seqLabel = new QLabel(tr("Default Sequence:"), this);
-    qDebug() << "[SolutionTemplateViewer] Creating MemoryComboBox for defaultTemplateSequence";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Creating MemoryComboBox for defaultTemplateSequence";
     m_defaultSequenceCombo = new MemoryComboBox("defaultTemplateSequence", this);
-    qDebug() << "[SolutionTemplateViewer] Created MemoryComboBox for defaultTemplateSequence";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Created MemoryComboBox for defaultTemplateSequence";
     m_runTemplateBtn = new StyledButton(tr("Run Template"), this);
     seqLayout->addWidget(seqLabel);
     seqLayout->addWidget(m_defaultSequenceCombo, 1);
@@ -172,18 +173,18 @@ void SolutionTemplateViewer::onTemplateSelected(int index)
 
 void SolutionTemplateViewer::onEditTemplate()
 {
-    qDebug() << "[SolutionTemplateViewer] onEditTemplate called";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] onEditTemplate called";
     if (m_currentTemplateDir.isEmpty()) {
-        qDebug() << "[SolutionTemplateViewer] No template selected, showing info message";
+        qCDebug(logTemplate) << "[SolutionTemplateViewer] No template selected, showing info message";
         QMessageBox::information(this, "Edit Template", "Please select a template to edit.");
         return;
     }
     
-    qDebug() << "[SolutionTemplateViewer] Current template dir:" << m_currentTemplateDir;
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Current template dir:" << m_currentTemplateDir;
     
     // Get the template to edit
     SolutionTemplate tmpl = m_templateManager->templates().value(m_currentTemplateDir);
-    qDebug() << "[SolutionTemplateViewer] Got template, name:" << tmpl.name();
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Got template, name:" << tmpl.name();
     
     // Create the editor dialog
     QDialog *dialog = new QDialog(this);
@@ -194,21 +195,21 @@ void SolutionTemplateViewer::onEditTemplate()
     
     // Get sequence manager, with null check for safety
     PromptSequenceManager *seqMgr = m_templateManager->sequenceManager();
-    qDebug() << "[SolutionTemplateViewer] Sequence manager pointer:" << seqMgr;
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Sequence manager pointer:" << seqMgr;
     if (!seqMgr) {
-        qDebug() << "[SolutionTemplateViewer] Sequence manager is null, showing warning";
+        qCDebug(logTemplate) << "[SolutionTemplateViewer] Sequence manager is null, showing warning";
         QMessageBox::warning(this, "Edit Template", "Sequence manager is not available. Template editing requires a valid sequence manager.");
         dialog->deleteLater();
         return;
     }
     
-    qDebug() << "[SolutionTemplateViewer] Creating SolutionTemplateEditor with template manager:" << m_templateManager << "and sequence manager:" << seqMgr;
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Creating SolutionTemplateEditor with template manager:" << m_templateManager << "and sequence manager:" << seqMgr;
     
     // Create the editor widget
     SolutionTemplateEditor *editor = new SolutionTemplateEditor(m_templateManager, seqMgr, dialog);
-    qDebug() << "[SolutionTemplateViewer] Created editor, setting template";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Created editor, setting template";
     editor->setTemplate(tmpl);
-    qDebug() << "[SolutionTemplateViewer] Template set, continuing with UI setup";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Template set, continuing with UI setup";
     
     layout->addWidget(editor);
     
@@ -230,12 +231,12 @@ void SolutionTemplateViewer::onEditTemplate()
     });
     connect(buttonBox, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
     
-    qDebug() << "[SolutionTemplateViewer] Showing dialog";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Showing dialog";
     // Show the dialog
     dialog->exec();
-    qDebug() << "[SolutionTemplateViewer] Dialog closed, cleaning up";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Dialog closed, cleaning up";
     dialog->deleteLater();
-    qDebug() << "[SolutionTemplateViewer] Dialog cleanup complete";
+    qCDebug(logTemplate) << "[SolutionTemplateViewer] Dialog cleanup complete";
 }
 
 void SolutionTemplateViewer::onDeleteTemplate()

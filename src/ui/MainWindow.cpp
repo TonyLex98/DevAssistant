@@ -12,7 +12,6 @@
 #include <QMessageBox>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QDebug>
 #include <QTime>
 #include <QLabel>
 #include <QFrame>
@@ -42,55 +41,10 @@
 #include "../command/CommandDocs.h"
 #include "SolutionTemplateViewer.h"
 #include "../core/SolutionTemplateManager.h"
-
-static QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
-    QByteArray raw = text.toUtf8();
-    QList<QByteArray> parts;
-    const char* s = raw.constData();
-    int n = raw.size();
-    bool in_str=false, esc=false;
-    int depth=0, start=-1;
-    for (int i=0;i<n;i++){
-        char c = s[i];
-        if (in_str){
-            if (esc){ esc=false; continue; }
-            if (c=='\\') { esc=true; continue; }
-            if (c=='"') { in_str=false; continue; }
-            continue;
-        }
-        if (c=='"'){ in_str=true; continue; }
-        if (c=='{' || c=='['){
-            if (depth==0) start=i;
-            depth++;
-        } else if (c=='}' || c==']'){
-            depth--;
-            if (depth==0 && start!=-1){
-                parts.append(raw.mid(start, i-start+1));
-                start=-1;
-            }
-        }
-    }
-    return parts;
-}
-
-static QString normalizeContextPath(const QString& path, const QString& projectRoot)
-{
-    if (path.trimmed().isEmpty())
-        return QString();
-    QFileInfo info(path);
-    if (info.isAbsolute())
-        return QDir::cleanPath(info.absoluteFilePath());
-    return QDir(projectRoot).absoluteFilePath(path);
-}
-
-static QString displayContextPath(const QString& normalizedPath, const QString& projectRoot)
-{
-    QDir root(projectRoot);
-    QString rel = root.relativeFilePath(normalizedPath);
-    if (!rel.startsWith(".."))
-        return QDir::toNativeSeparators(rel);
-    return QDir::toNativeSeparators(normalizedPath);
-}
+#include "../utils/json_utils.h"
+#include "controllers/UIWidgets.h"
+#include "controllers/UiBuilder.h"
+#include "utils/Logging.h"
 
 static QVariantMap generationParamsFromConfig(const AppConfig& cfg)
 {
@@ -127,11 +81,17 @@ static QVariantMap generationParamsFromConfig(const AppConfig& cfg)
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    // Initialize controllers
+    // Initialize controllers (DI — inject service interfaces)
     m_statusController = new TaskStatusController(this);
     m_ttsController = new TtsController(this);
-    m_sequenceRunner = new SequenceRunner(this);
-    m_sequenceEditor = new SequenceEditorController(this);
+    m_sequenceRunner = new SequenceRunner(this, this, this, this, this, this, this, this, this);
+    m_sequenceEditor = new SequenceEditorController(this, this, this, this);
+    m_graphController = new GraphController(this); // IGraphService
+    m_descriptionController = new DescriptionController(this, this, this); // IModelService, IProjectService, IUIUpdater
+    m_modelConfigController = new ModelConfigController(this, this, this, this); // IModelService, ISettingsService, IUIUpdater, IProjectService
+    m_contextDisplayController = new ContextDisplayController(this, this); // IContextService, IUIUpdater
+    m_chatController = new ChatController(this, this, this, this); // IContextService, IModelService, ISequenceService, IUIUpdater
+    m_projectBrowserController = new ProjectBrowserController(this, this, this); // IProjectService, IContextService, IUIUpdater
 
     AppConfig startupCfg;
     startupCfg.load();
@@ -151,204 +111,57 @@ MainWindow::MainWindow(QWidget *parent)
     m_model.configure(startupModel, startupParams);
     m_agentModel.configure(startupModel, startupParams);
 
-    // --------  1. Заголовок и корневой виджет ----------
+    // --------  1. Build UI via UiBuilder (clean architecture) ----------
+    UIWidgets ui;
+    UiBuilder::build(ui, [this](const char* s) { return tr(s); },
+                     &m_model, &m_seqMgr, &m_templateMgr, m_ttsController, this);
+    ide_widget = ui.ide_widget; m_rootEdit = ui.m_rootEdit;
+    m_graphWindow = ui.m_graphWindow; m_seqGraphWindow = ui.m_seqGraphWindow;
+    browseBtn = ui.browseBtn; m_files = ui.m_files;
+    m_log = ui.m_log; m_chat = ui.m_chat; m_resultDisplayWidget = ui.m_resultDisplayWidget;
+    m_voskWidget = ui.m_voskWidget;
+    m_contextStatusWidget = ui.m_contextStatusWidget; m_contextCommandsList = ui.m_contextCommandsList;
+    m_contextGraphWidget = ui.m_contextGraphWidget; m_contextTabs = ui.m_contextTabs;
+    m_settingsPanel = ui.m_settingsPanel;
+    applyBtn = ui.applyBtn; undoBtn = ui.undoBtn; runSeqBtn = ui.runSeqBtn;
+    rescanBtn = ui.rescanBtn; descBtn = ui.descBtn;
+    settingsBtn = ui.settingsBtn; promptBtn = ui.promptBtn;
+    editSeqBtn = ui.editSeqBtn; newSeqBtn = ui.newSeqBtn;
+    runTemplateBtn = ui.runTemplateBtn; editTemplatesBtn = ui.editTemplatesBtn;
+    exportSequenceAsTemplateBtn = ui.exportSequenceAsTemplateBtn;
+    graphBtn = ui.graphBtn; seqGraphBtn = ui.seqGraphBtn;
+    chatToggleBtn = ui.chatToggleBtn; logToggleBtn = ui.logToggleBtn;
+    lightRagBtn = ui.lightRagBtn; confirmModeCombo = ui.confirmModeCombo;
+    m_centerSplitter = ui.m_centerSplitter; mainSplitter = ui.mainSplitter;
+    m_llmSettingsWindow = ui.m_llmSettingsWindow;
+
     setWindowTitle("DevAssistantQt");
+    m_chat->setMainWindow(this);
+    promptBtn->hide();
+    QTabWidget *rootTabs = new QTabWidget(this);
+    rootTabs->addTab(mainSplitter, tr("Assistant"));
+    rootTabs->addTab(m_settingsPanel, tr("Settings"));
+    setCentralWidget(rootTabs);
 
-    // --------  2. IDE‑виджет (верхняя часть) ----------
-    ide_widget = new IDEWidget("ideSplitter", Qt::Horizontal, this);          // <-- родитель `this`
-
-    // --------  3. Вспомогательные виджеты (нижняя часть) ----------
-    m_rootEdit  = new MemoryLineEdit("projectRoot", this);
-
-    m_graphWindow = new GraphWidget();
-    m_seqGraphWindow = nullptr;  // Will be created when needed
-    browseBtn   = new StyledButton("Browse...", this);
-
-    // 3.1   Верхняя строка (путь + Browse)
-    QWidget * top_widget = new QWidget(this);
-    auto top = new QHBoxLayout(top_widget);
-    top->addWidget(m_rootEdit, 1);
-    top->addWidget(browseBtn);
-
-    // 3.2   Список файлов
-    m_files = new QListWidget(this);
-
-    // 3.3   Settings tab content — sidebar + pages
-    m_settingsPanel = new QWidget(this);
-    m_settingsPanel->setWindowTitle(tr("Settings"));
-    m_settingsPanel->setAttribute(Qt::WA_DeleteOnClose, false);
-    m_settingsPanel->setAttribute(Qt::WA_StyledBackground, true);
-    m_settingsPanel->setObjectName("settingsPanel");
-    m_settingsPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    auto* settingsRoot = new QHBoxLayout(m_settingsPanel);
-    settingsRoot->setContentsMargins(12, 12, 12, 12);
-    settingsRoot->setSpacing(12);
-
-    // ---- Sidebar ----
-    auto* sidebar = new QListWidget(this);
-    sidebar->setMaximumWidth(180);
-    sidebar->setMinimumWidth(140);
-    sidebar->setStyleSheet(
-        "QListWidget { background: #fff; border: 1px solid #8ed9cf; border-radius: 8px; padding: 6px; }"
-        "QListWidget::item { padding: 8px 12px; border-radius: 6px; margin: 2px 0; font: 9pt \"Segoe UI Variable\"; color: #334155; }"
-        "QListWidget::item:selected { background: #dff8f3; color: #0f766e; font-weight: 600; }"
-        "QListWidget::item:hover { background: #e6f5f1; }"
-    );
-    sidebar->addItem("📁  Проект");
-    sidebar->addItem("🤖  Модель");
-    sidebar->addItem("📋  Последовательности");
-    sidebar->addItem("📊  Графики");
-    sidebar->addItem("🔊  Аудио");
-    sidebar->addItem("⚙️  Система");
-    settingsRoot->addWidget(sidebar, 0);
-
-    // ---- Pages stack ----
-    auto* pages = new QStackedWidget(this);
-    pages->setStyleSheet("QStackedWidget { background: transparent; }");
-    settingsRoot->addWidget(pages, 1);
-    connect(sidebar, &QListWidget::currentRowChanged, pages, &QStackedWidget::setCurrentIndex);
-    
-    // Helper: scrollable page
-    auto makePage = []() -> QWidget* {
-        auto* w = new QWidget();
-        w->setStyleSheet("QWidget { background: #f8fffd; }");
-        w->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        auto* l = new QVBoxLayout(w);
-        l->setContentsMargins(12, 12, 12, 12);
-        l->setSpacing(8);
-        l->addStretch();
-        return w;
-    };
-    auto pageLay = [](QWidget* w) -> QVBoxLayout* {
-        return static_cast<QVBoxLayout*>(w->layout());
-    };
-    auto addSection = [](const QString& t, QVBoxLayout* l) {
-        auto* lb = new QLabel(t);
-        lb->setStyleSheet("QLabel { color: #0f766e; font: 600 11pt \"Segoe UI Variable\"; padding: 4px 0; }");
-        l->addWidget(lb);
-    };
-    auto addDiv = [](QVBoxLayout* l) {
-        auto* ln = new QFrame();
-        ln->setFrameShape(QFrame::HLine);
-        ln->setStyleSheet("QFrame { background: #bdebe4; min-height: 1px; max-height: 1px; border: none; }");
-        l->addWidget(ln);
-    };
-
-    // -- Page 0: Project --
-    auto* p0 = makePage();
-    pages->addWidget(p0);
-    auto* projLay = pageLay(p0);
-    addSection(tr("Путь к проекту"), projLay);
-    projLay->addWidget(top_widget);
-    addDiv(projLay);
-    addSection(tr("Действия"), projLay);
-    rescanBtn = new StyledButton(tr("Обновить проект"), this);
-    descBtn = new StyledButton(tr("Сгенерировать описания"), this);
-    rescanBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    descBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    projLay->addWidget(rescanBtn);
-    projLay->addWidget(descBtn);
-    projLay->addStretch();
-
-    // -- Page 1: Model --
-    auto* p1 = makePage();
-    pages->addWidget(p1);
-    auto* llmLay = pageLay(p1);
-    addSection(tr("Настройки модели"), llmLay);
-    settingsBtn = new StyledButton(tr("Открыть настройки LLM"), this);
-    promptBtn = new StyledButton(tr("Редактировать базовый промпт"), this);
-    llmLay->addWidget(settingsBtn);
-    llmLay->addWidget(promptBtn);
-    addDiv(llmLay);
-    m_llmSettingsWindow = new OllamaSettingsDialog(this);
-    m_llmSettingsWindow->setVisible(false);
-    llmLay->addWidget(m_llmSettingsWindow);
-    llmLay->addStretch();
-
-    // -- Page 2: Sequences --
-    auto* p2 = makePage();
-    pages->addWidget(p2);
-    auto* seqLay = pageLay(p2);
-    addSection(tr("Последовательности"), seqLay);
-    editSeqBtn = new StyledButton(tr("Редактировать"), this);
-    newSeqBtn = new StyledButton(tr("Создать"), this);
-    runTemplateBtn = new StyledButton(tr("Запустить шаблон"), this);
-    editTemplatesBtn = new StyledButton(tr("Редактировать шаблоны"), this);
-    exportSequenceAsTemplateBtn = new StyledButton(tr("Экспорт как шаблон"), this);
-    seqLay->addWidget(editSeqBtn);
-    seqLay->addWidget(newSeqBtn);
-    seqLay->addWidget(runTemplateBtn);
-    seqLay->addWidget(editTemplatesBtn);
-    seqLay->addWidget(exportSequenceAsTemplateBtn);
-    seqLay->addStretch();
-
-    // -- Page 3: Graphs --
-    auto* p3 = makePage();
-    pages->addWidget(p3);
-    auto* graphLay = pageLay(p3);
-    addSection(tr("Визуализация"), graphLay);
-    graphBtn = new StyledButton(tr("Граф контекста"), this);
-    seqGraphBtn = new StyledButton(tr("Граф последовательностей"), this);
-    lightRagBtn = new StyledButton(tr("LightRAG"), this);
-    graphLay->addWidget(graphBtn);
-    graphLay->addWidget(seqGraphBtn);
-    graphLay->addWidget(lightRagBtn);
-    graphLay->addStretch();
+    // Signal connections (preserved from inline code)
+    connect(ui.m_settingsSidebar, &QListWidget::currentRowChanged, ui.m_settingsPages, &QStackedWidget::setCurrentIndex);
     connect(graphBtn, &StyledButton::clicked, this, &MainWindow::openGraph);
-    connect(seqGraphBtn, &StyledButton::clicked, this, &MainWindow::openSequenceGraph);
+    connect(seqGraphBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::openSequenceGraph);
     connect(lightRagBtn, &StyledButton::clicked, this, &MainWindow::openLightRag);
-
-    // -- Page 4: Audio --
-    auto* p4 = makePage();
-    pages->addWidget(p4);
-    auto* audioLay = pageLay(p4);
-    addSection(tr("Синтез речи (TTS)"), audioLay);
-    // Use TtsController for TTS management
-    audioLay->addWidget(m_ttsController->toggleButton());
-    audioLay->addStretch();
     connect(m_ttsController, &TtsController::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
     connect(m_ttsController, &TtsController::errorMessage, this, [this](const QString& e){ log("TTS Error: "+e); });
-
-    // -- Page 5: System --
-    auto* p5 = makePage();
-    pages->addWidget(p5);
-    auto* sysLay = pageLay(p5);
-    addSection(tr("Безопасность"), sysLay);
-    confirmModeCombo = new MemoryComboBox("confirmMode", this);
-    confirmModeCombo->addItem("Автоподтверждение команд", "auto");
-    confirmModeCombo->addItem("Спрашивать подтверждение", "ask");
-    confirmModeCombo->setCurrentIndex(0);
-    sysLay->addWidget(confirmModeCombo);
-    addDiv(sysLay);
-    addSection(tr("Интерфейс"), sysLay);
-    chatToggleBtn = new StyledButton(tr("Показать чат"), this);
-    logToggleBtn = new StyledButton(tr("Показать лог"), this);
-    chatToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    logToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    sysLay->addWidget(chatToggleBtn);
-    sysLay->addWidget(logToggleBtn);
-    sysLay->addStretch();
-   // Set Expanding policy for all buttons on settings pages so they stretch to fill width
-    for (int i = 0; i < pages->count(); ++i) {
-        auto* page = qobject_cast<QWidget*>(pages->widget(i));
-        if (page) {
-            for (auto* btn : page->findChildren<StyledButton*>())
-                btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        }
-    }
-
-    // Hidden buttons
-    applyBtn = new StyledButton("Apply", this);
-    undoBtn = new StyledButton("Undo", this);
-    applyBtn->hide();
-    undoBtn->hide();
-    runSeqBtn = new StyledButton(tr("Запустить"), this);
-    runSeqBtn->hide();
-
-    connect(newSeqBtn, &StyledButton::clicked, this, &MainWindow::createNewSequence);
-
-    // -- Connections for page buttons --
+    connect(newSeqBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::createNewSequence);
+    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, m_sequenceEditor,
+            &SequenceEditorController::openSequenceEditorForName);
+    connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
+        bool v = !m_chat->isChatLogVisible(); m_chat->setChatLogVisible(v);
+        chatToggleBtn->setText(v ? tr("Hide chat") : tr("Show chat"));
+    });
+    connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
+        bool v = !m_log->isVisible(); m_log->setVisible(v);
+        logToggleBtn->setText(v ? tr("Hide log") : tr("Show log"));
+    });
+    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
     connect(runTemplateBtn, &StyledButton::clicked, this, [this]() {
         refreshAllSequences(); ensureDefaultSequence();
         RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
@@ -358,234 +171,43 @@ MainWindow::MainWindow(QWidget *parent)
             QMessageBox::warning(this, "Ошибка", "Необходимо выбрать шаблон."); return;
         }
         QString sp = dlg.selectedDefaultSequencePath();
-        if (sp.isEmpty() || !QFile::exists(sp)) {
-            QMessageBox::warning(this, "Ошибка", "Последовательность не найдена."); return;
-        }
+        if (sp.isEmpty() || !QFile::exists(sp)) { QMessageBox::warning(this, "Ошибка", "Последовательность не найдена."); return; }
         PromptSequence seq; QFile sf(sp);
         if (sf.open(QIODevice::ReadOnly)) seq = PromptSequence::fromJson(QJsonDocument::fromJson(sf.readAll()).object());
         if (seq.name().isEmpty()) { QMessageBox::warning(this, "Ошибка", "Не удалось загрузить."); return; }
         m_currentSeq = seq; m_currentStepIdx = 0; m_sequenceMode = true;
-        updateSequenceGraphHighlight(); runNextStep();
+        m_sequenceEditor->updateSequenceGraphHighlight(); runNextStep();
     });
-
     connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
-        // Create and show the template viewer
         SolutionTemplateViewer *viewer = new SolutionTemplateViewer(&m_templateMgr, this);
-        QDialog dialog(this);
-        dialog.setWindowTitle(tr("Solution Templates"));
-        dialog.resize(800, 600);
-
-        QVBoxLayout *layout = new QVBoxLayout(&dialog);
-        layout->addWidget(viewer);
-
-        QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
-        connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-        layout->addWidget(buttonBox);
-
-        dialog.exec();
+        QDialog dialog(this); dialog.setWindowTitle(tr("Solution Templates")); dialog.resize(800, 600);
+        QVBoxLayout *layout = new QVBoxLayout(&dialog); layout->addWidget(viewer);
+        QDialogButtonBox *bb = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+        connect(bb, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        layout->addWidget(bb); dialog.exec();
     });
-
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
-        // First, refresh sequence manager
         refreshAllSequences();
-
-        // Get list of sequences
-        const QMap<QString, PromptSequence>& sequences = m_seqMgr.sequences();
-        if (sequences.isEmpty()) {
-            QMessageBox::information(this, "No Sequences", "No sequences found to export as templates.");
-            return;
-        }
-
-        // Let user choose a sequence
-        QStringList names;
-        QMap<QString, QString> pathByName;      // name → path
-        for (const QString &filePath : m_seqMgr.fileList()) {
-            QString name = QFileInfo(filePath).fileName();
-            names << name;
-            pathByName.insert(name, filePath);
-        }
-
+        const QMap<QString, PromptSequence>& seqs = m_seqMgr.sequences();
+        if (seqs.isEmpty()) { QMessageBox::information(this, "No Sequences", "No sequences found."); return; }
+        QStringList names; QMap<QString, QString> pb;
+        for (auto &fp : m_seqMgr.fileList()) { names << QFileInfo(fp).fileName(); pb.insert(QFileInfo(fp).fileName(), fp); }
         bool ok = false;
-        QString selectedName = QInputDialog::getItem(
-                    this, tr("Export Sequence as Template"),
-                    tr("Choose sequence to export:"), names, 0, false, &ok);
-
-        if (!ok || selectedName.isEmpty())
-            return;          // пользователь отменил
-
-        QString sequencePath = pathByName.value(selectedName);
-        PromptSequence seq = sequences.value(sequencePath);
-
-        // Ask for template name and description
-        QString templateName = QInputDialog::getText(this, "Template Name", "Enter template name:",
-            QLineEdit::Normal, seq.name(), &ok);
-        if (!ok || templateName.trimmed().isEmpty()) {
-            return;
-        }
-
-        QString description = QInputDialog::getMultiLineText(this, "Template Description",
-            "Enter template description (optional):", seq.description(), &ok);
-        if (!ok) { // User cancelled, allow empty description
-            description = seq.description();
-        }
-
-        // Create the template directory
-        QString templateDir = QDir(m_templateMgr.root()).absoluteFilePath(templateName.trimmed());
-        if (QDir().exists(templateDir)) {
-            QMessageBox::warning(this, "Import Failed",
-                QString("Template with name '%1' already exists. Please choose a different name.").arg(templateName));
-            return;
-        }
-
-        // Export the sequence as a template
-        if (m_templateMgr.exportSequenceAsTemplate(sequencePath, templateDir, templateName.trimmed(), description)) {
-            m_templateMgr.refresh();
-            QMessageBox::information(this, "Export Successful",
-                QString("Sequence '%1' exported as template '%2' successfully!").arg(
-                    QFileInfo(sequencePath).fileName(), templateName));
-        } else {
-            QMessageBox::warning(this, "Export Failed",
-                "Failed to export sequence as template. Check permissions and try again.");
-        }
+        QString sel = QInputDialog::getItem(this, tr("Export"), tr("Choose:"), names, 0, false, &ok);
+        if (!ok || sel.isEmpty()) return;
+        PromptSequence seq = seqs.value(pb[sel]);
+        QString tn = QInputDialog::getText(this, "Name", "Template name:", QLineEdit::Normal, seq.name(), &ok);
+        if (!ok || tn.trimmed().isEmpty()) return;
+        QString desc = QInputDialog::getMultiLineText(this, "Desc", "Description:", seq.description(), &ok);
+        if (!ok) desc = seq.description();
+        QString td = QDir(m_templateMgr.root()).absoluteFilePath(tn.trimmed());
+        if (QDir().exists(td)) { QMessageBox::warning(this, "Failed", "Already exists."); return; }
+        if (m_templateMgr.exportSequenceAsTemplate(pb[sel], td, tn.trimmed(), desc)) {
+            m_templateMgr.refresh(); QMessageBox::information(this, "OK", "Exported.");
+        } else { QMessageBox::warning(this, "Failed", "Export failed."); }
     });
 
-    promptBtn->hide();
-    applyBtn->hide();
-    undoBtn->hide();
 
-    // 3.4   Логи и чат
-    m_log = new StyleTextEdit(this);
-    m_log->setReadOnly(true);
-    m_log->setVisible(false);
-
-    m_chat = new ChatDialog(&m_model, this);
-    // Set the MainWindow reference in the ChatDialog so it can signal template stops
-    m_chat->setMainWindow(this);
-
-    // Initialize sequence graph widget so it can be embedded in the layout
-    m_seqGraphWindow = new SequenceGraphWidget(this);
-    m_seqGraphWindow->setSequenceManager(&m_seqMgr);
-    m_seqGraphWindow->setTemplateManager(&m_templateMgr);
-    m_seqGraphWindow->restoreLayout();
-    m_seqGraphWindow->rebuildGraph();
-    updateSequenceGraphTemplateSelection();
-    m_seqGraphWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    m_seqGraphWindow->setVisible(true);
-    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
-            [this](const QString &sequenceName) {
-                openSequenceEditorForName(sequenceName);
-            });
-
-    connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
-        const bool shouldShow = !m_chat->isChatLogVisible();
-        m_chat->setChatLogVisible(shouldShow);
-        chatToggleBtn->setText(shouldShow ? tr("Hide chat") : tr("Show chat"));
-    });
-    connect(logToggleBtn, &StyledButton::clicked, this, [this]() {
-        const bool shouldShow = !m_log->isVisible();
-        m_log->setVisible(shouldShow);
-        logToggleBtn->setText(shouldShow ? tr("Hide log") : tr("Show log"));
-    });
-
-    for (StyledButton *btn : m_settingsPanel->findChildren<StyledButton*>()) {
-        btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        btn->setMinimumHeight(32);
-    }
-
-    // 3.5 Result display widget
-    m_resultDisplayWidget = new ResultDisplayWidget(this);
-
-    // 3.5   (Опционально) виджет распознавания голоса
-    m_voskWidget = new VoskWidget(this);
-    connect(m_voskWidget, &VoskWidget::voiceRecognized,
-            this, &MainWindow::onVoskText);
-
-
-
-
-
-    // Initialize context status widget to display command context state
-    m_contextStatusWidget = new QWidget(this);
-    m_contextCommandsList = new QTreeWidget(m_contextStatusWidget);
-    m_contextCommandsList->setObjectName("contextCommandsList");
-    m_contextGraphWidget = new ContextGraphWidget(m_contextStatusWidget);
-    m_contextTabs = new QTabWidget(m_contextStatusWidget);
-    m_contextTabs->setDocumentMode(true);
-
-    QVBoxLayout* contextLayout = new QVBoxLayout(m_contextStatusWidget);
-    contextLayout->setContentsMargins(5, 5, 5, 5);
-
-    // Create header without toggle button
-    QHBoxLayout* headerLayout = new QHBoxLayout();
-    QLabel* titleLabel = new QLabel(tr("Context Commands:"), m_contextStatusWidget);
-    headerLayout->addWidget(titleLabel);
-    headerLayout->addStretch();
-
-    contextLayout->addLayout(headerLayout);
-    m_contextTabs->addTab(m_contextCommandsList, tr("Commands"));
-    m_contextTabs->addTab(m_contextGraphWidget, tr("Context Graph"));
-    contextLayout->addWidget(m_contextTabs);
-
-    // Set up the tree widget
-    m_contextCommandsList->setHeaderLabels(QStringList() << "Time" << "Description");
-    m_contextCommandsList->setColumnCount(2);
-    m_contextCommandsList->setHeaderHidden(false);  // Show the header for better UX
-    m_contextCommandsList->setRootIsDecorated(true); // Show expand/collapse icons
-    m_contextCommandsList->setColumnWidth(0, 80);  // Set reasonable width for time column
-
-    // Set size preference for the context status widget
-    m_contextStatusWidget->setMinimumWidth(260);
-    m_contextStatusWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-
-    // Set the MainWindow reference in the ChatDialog so it can signal template stops
-    m_chat->setMainWindow(this);
-
-    // --------  4. Верхняя часть layout (внутри rightPanel) ----------
-    /*QVBoxLayout *rightLayout = new QVBoxLayout;
-    rightLayout->addLayout(top);
-    rightLayout->addWidget(m_files, 1);
-    rightLayout->addLayout(btns);
-    rightLayout->addWidget(m_log, 1);
-    rightLayout->addWidget(m_chat, 1);*/
-    // Settings panel is its own scrollable container (pages have inner scroll)
-    m_settingsPanel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    // --------  5. Формируем layout: слева context, по центру основной контент, справа graph ----------
-    m_centerSplitter = new MemorySplitter("MainWindowsCenterSplitter", Qt::Vertical, this);
-    m_centerSplitter->addWidget(ide_widget);
-    m_centerSplitter->addWidget(m_log);
-    m_centerSplitter->addWidget(m_resultDisplayWidget);
-    m_centerSplitter->addWidget(m_chat);
-
-    mainSplitter = new MemorySplitter("MainWindowsMainSplitter", Qt::Horizontal, this);
-    mainSplitter->addWidget(m_contextStatusWidget);
-    mainSplitter->addWidget(m_centerSplitter);
-    mainSplitter->addWidget(m_seqGraphWindow);
-
-    m_centerSplitter->setStretchFactor(0, 5);
-    m_centerSplitter->setStretchFactor(1, 1);
-    m_centerSplitter->setStretchFactor(2, 3);
-    m_centerSplitter->setStretchFactor(3, 2);
-    mainSplitter->setStretchFactor(0, 1);
-    mainSplitter->setStretchFactor(1, 3);
-    mainSplitter->setStretchFactor(2, 2);
-
-    m_files->hide();
-
-
-
-    //QWidget *rightPanel = new QWidget(this);
-    //rightPanel->setLayout(rightLayout);    // нижняя часть
-    //mainSplitter->addWidget(rightPanel);
-
-    QTabWidget *rootTabs = new QTabWidget(this);
-    rootTabs->addTab(mainSplitter, tr("Assistant"));
-    rootTabs->addTab(m_settingsPanel, tr("Settings"));
-
-    // Задаём начальные размеры (опционально)
-    setCentralWidget(rootTabs);
-
-    // --------  6. Соединяем сигналы / слоты ----------
     connect(browseBtn,   &StyledButton::clicked, this, &MainWindow::browse);
     connect(rescanBtn,   &StyledButton::clicked, this, &MainWindow::rescan);
     connect(settingsBtn, &StyledButton::clicked, this, &MainWindow::openSettings);
@@ -673,14 +295,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_chat, &ChatDialog::runTemplateRequestedWithImages, this, &MainWindow::runTemplateRequestedWithImages);
     connect(m_chat, &ChatDialog::runSimpleChat, this, &MainWindow::runSimpleChat);
     connect(m_chat, &ChatDialog::runSimpleChatWithImages, this, &MainWindow::runSimpleChatWithImages);
-    connect(m_chat, &ChatDialog::templateSelectionChanged, this, &MainWindow::onChatTemplateSelectionChanged);
+    connect(m_chat, &ChatDialog::templateSelectionChanged, m_sequenceEditor, &SequenceEditorController::onChatTemplateSelectionChanged);
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
-    connect(&m_model, &OllamaAdapter::streamFinished, this, &MainWindow::handleAssistantFinished);
+    connect(&m_model, &OllamaAdapter::streamFinished, m_sequenceRunner, &SequenceRunner::handleAssistantFinished);
     connect(&m_model, &OllamaAdapter::streamError,
             this, [this](const QString &e){ log("Model error: " + e); });
 
-    connect(runSeqBtn, &StyledButton::clicked, this, &MainWindow::runSequenceDialog);
-    connect(editSeqBtn, &StyledButton::clicked, this, &MainWindow::editSequences);
+    connect(runSeqBtn, &StyledButton::clicked, m_sequenceRunner, &SequenceRunner::runSequenceDialog);
+    connect(editSeqBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::editSequences);
 
     connect(descBtn, &StyledButton::clicked, this, &MainWindow::generateDescriptions);
 
@@ -721,13 +343,92 @@ MainWindow::MainWindow(QWidget *parent)
     m_templateMgr.setSequenceManager(&m_seqMgr);  // Connect sequence manager to template manager
     m_templateMgr.refresh();
 
-    auto ensureUniversalAgentTemplate = [this]() {
+    ensureUniversalAgentTemplateInternal();
+    m_templateMgr.refresh();
+
+    // Update templates in ChatDialog after templates have been loaded
+    m_chat->setTemplateManager(&m_templateMgr);
+
+    // Initialize file system watcher to monitor external file changes
+    m_fileWatcher = new QFileSystemWatcher(this);
+    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileChanged);
+
+    // Initialize the new ContextManager
+    m_contextManager = new ContextManager(this);
+    m_contextManager->setDevAssManager(&m_dev_manager);
+    m_contextManager->setMainWindow(this);
+    connect(m_contextManager, &ContextManager::contextChanged, this, [this]() {
+        // When context changes, update the GUI display
+        updateContextStatusDisplay();
+    });
+    updateContextStatusDisplay();
+
+    connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
+
+
+    connect(ide_widget, &IDEWidget::signal_runSequenceDialog, m_sequenceRunner, &SequenceRunner::runSequenceDialog);
+
+    connect(ide_widget, &IDEWidget::signal_updatelastUserMessage,this, &MainWindow::slot_updatelastUserMessage);
+
+    connect(this, &MainWindow::missingFilesUpdated,
+                ide_widget, &IDEWidget::updateMissingFiles);
+
+
+    reOpenRootDir();
+
+    if (m_centerSplitter)
+        m_centerSplitter->loadState();
+    mainSplitter->loadState();
+
+    openSequenceGraph();
+    const QList<int> storedSizes = mainSplitter->sizes();
+    if (storedSizes.size() >= 3 && storedSizes.at(2) == 0) {
+        QList<int> fallbackSizes = storedSizes;
+        fallbackSizes[0] = qMax(200, fallbackSizes.at(0));
+        fallbackSizes[1] = qMax(400, fallbackSizes.at(1));
+        fallbackSizes[2] = 250;
+        mainSplitter->setSizes(fallbackSizes);
+    }
+
+    // Initialize task status controller (timer + status bar)
+    m_statusController->initStatusBar(statusBar());
+    m_statusController->setModel(&m_model);
+
+    //rescan();
+
+    // ------------ Управление последовательностями ----------------
+    // … (тот же код, что был ранее)
+}
+
+
+void MainWindow::openGraph()
+{
+    m_graphWindow->show();
+    m_graphWindow->raise();
+    m_graphWindow->activateWindow();
+}
+
+void MainWindow::openLightRag()
+{
+    if (!m_lightRagWidget) {
+        m_lightRagWidget = new LightRagWidget();
+        m_lightRagWidget->setAttribute(Qt::WA_DeleteOnClose, true);
+    }
+
+    m_lightRagWidget->show();
+    m_lightRagWidget->raise();
+    m_lightRagWidget->activateWindow();
+}
+
+void MainWindow::ensureUniversalAgentTemplateInternal()
+{
+
         const QString templateDir = QDir(m_templateMgr.root()).filePath("UniversalAgent");
         const QString versionFilePath = QDir(templateDir).filePath(".universal_agent.version");
         const QString desiredVersion = QStringLiteral("3");
 
         if (!QDir().mkpath(templateDir)) {
-            qWarning() << "[MainWindow] Could not create template directory:" << templateDir;
+            qCWarning(logUI) << "[MainWindow] Could not create template directory:" << templateDir;
             return;
         }
 
@@ -748,7 +449,7 @@ MainWindow::MainWindow(QWidget *parent)
             const QString path = QDir(templateDir).filePath(fileName);
             QFile file(path);
             if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-                qWarning() << "[MainWindow] Could not write universal template sequence file:" << path;
+                qCWarning(logUI) << "[MainWindow] Could not write universal template sequence file:" << path;
                 return false;
             }
             file.write(QJsonDocument(seq.toJson()).toJson(QJsonDocument::Indented));
@@ -920,121 +621,21 @@ MainWindow::MainWindow(QWidget *parent)
                                    QJsonArray{QStringLiteral("code-generation"), QStringLiteral("main")});
 
         if (!m_templateMgr.save(tmpl, templateDir)) {
-            qWarning() << "[MainWindow] Could not save universal template metadata:" << templateDir;
+            qCWarning(logUI) << "[MainWindow] Could not save universal template metadata:" << templateDir;
             return;
         }
 
         QFile versionFile(versionFilePath);
         if (!versionFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            qWarning() << "[MainWindow] Could not write universal template version file:" << versionFilePath;
+            qCWarning(logUI) << "[MainWindow] Could not write universal template version file:" << versionFilePath;
         } else {
             versionFile.write(desiredVersion.toUtf8());
             versionFile.close();
         }
 
-        qDebug() << "[MainWindow] UniversalAgent template upgraded to version" << desiredVersion;
-    };
-    ensureUniversalAgentTemplate();
-    m_templateMgr.refresh();
-
-    // Update templates in ChatDialog after templates have been loaded
-    m_chat->setTemplateManager(&m_templateMgr);
-
-    // Initialize file system watcher to monitor external file changes
-    m_fileWatcher = new QFileSystemWatcher(this);
-    connect(m_fileWatcher, &QFileSystemWatcher::fileChanged, this, &MainWindow::onFileChanged);
-
-    // Initialize the new ContextManager
-    m_contextManager = new ContextManager(this);
-    m_contextManager->setDevAssManager(&m_dev_manager);
-    m_contextManager->setMainWindow(this);
-    connect(m_contextManager, &ContextManager::contextChanged, this, [this]() {
-        // When context changes, update the GUI display
-        updateContextStatusDisplay();
-    });
-    updateContextStatusDisplay();
-
-    connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
-
-
-    connect(ide_widget, &IDEWidget::signal_runSequenceDialog, this, &MainWindow::runSequenceDialog);
-
-    connect(ide_widget, &IDEWidget::signal_updatelastUserMessage,this, &MainWindow::slot_updatelastUserMessage);
-
-    connect(this, &MainWindow::missingFilesUpdated,
-                ide_widget, &IDEWidget::updateMissingFiles);
-
-
-    reOpenRootDir();
-
-    if (m_centerSplitter)
-        m_centerSplitter->loadState();
-    mainSplitter->loadState();
-
-    openSequenceGraph();
-    const QList<int> storedSizes = mainSplitter->sizes();
-    if (storedSizes.size() >= 3 && storedSizes.at(2) == 0) {
-        QList<int> fallbackSizes = storedSizes;
-        fallbackSizes[0] = qMax(200, fallbackSizes.at(0));
-        fallbackSizes[1] = qMax(400, fallbackSizes.at(1));
-        fallbackSizes[2] = 250;
-        mainSplitter->setSizes(fallbackSizes);
-    }
-
-    // Initialize task status controller (timer + status bar)
-    m_statusController->initStatusBar(statusBar());
-    m_statusController->setModel(&m_model);
-
-    //rescan();
-
-    // ------------ Управление последовательностями ----------------
-    // … (тот же код, что был ранее)
+        qCDebug(logUI) << "[MainWindow] UniversalAgent template upgraded to version" << desiredVersion;
 }
 
-
-void MainWindow::openGraph()
-{
-    m_graphWindow->show();
-    m_graphWindow->raise();
-    m_graphWindow->activateWindow();
-}
-
-void MainWindow::openLightRag()
-{
-    if (!m_lightRagWidget) {
-        m_lightRagWidget = new LightRagWidget();
-        m_lightRagWidget->setAttribute(Qt::WA_DeleteOnClose, true);
-    }
-
-    m_lightRagWidget->show();
-    m_lightRagWidget->raise();
-    m_lightRagWidget->activateWindow();
-}
-
-void MainWindow::openSequenceGraph()
-{
-    m_sequenceEditor->openSequenceGraph();
-}
-
-void MainWindow::onChatTemplateSelectionChanged(const QString &templatePath)
-{
-    m_sequenceEditor->onChatTemplateSelectionChanged(templatePath);
-}
-
-void MainWindow::updateSequenceGraphHighlight()
-{
-    m_sequenceEditor->updateSequenceGraphHighlight();
-}
-
-void MainWindow::updateSequenceGraphTemplateSelection()
-{
-    m_sequenceEditor->updateSequenceGraphTemplateSelection();
-}
-
-void MainWindow::openSequenceEditorForName(const QString &sequenceName)
-{
-    m_sequenceEditor->openSequenceEditorForName(sequenceName);
-}
 
 void MainWindow::browse(){
     QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
@@ -1221,7 +822,7 @@ void MainWindow::sendUserMessage(const QString& text){
 
     m_lastUserMessage = text;
     resetSequenceStabilityState();
-    qDebug() << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
+    qCDebug(logUI) << "[sendUserMessage] updated last user message =" << m_lastUserMessage;
     appendUserQuestionToResultDisplay(text);
 
     // Add to main history
@@ -1233,17 +834,17 @@ void MainWindow::sendUserMessage(const QString& text){
         m_lastUserMessages.removeFirst();
     }
     // Debug info about LAST_USER_MESSAGES storage
-    qDebug() << "[sendUserMessage] Added message to LAST_USER_MESSAGES storage. Current count:" << m_lastUserMessages.size();
-    qDebug() << "[sendUserMessage] Last message in storage:" << (m_lastUserMessages.isEmpty() ? QString("empty") : m_lastUserMessages.last());
+    qCDebug(logUI) << "[sendUserMessage] Added message to LAST_USER_MESSAGES storage. Current count:" << m_lastUserMessages.size();
+    qCDebug(logUI) << "[sendUserMessage] Last message in storage:" << (m_lastUserMessages.isEmpty() ? QString("empty") : m_lastUserMessages.last());
 
     // Debug info about managers before running sequence
-    qDebug() << "[sendUserMessage] About to call runSequenceDialog";
-    qDebug() << "[sendUserMessage] Template manager root:" << m_templateMgr.root();
-    qDebug() << "[sendUserMessage] Sequence manager root:" << m_seqMgr.root();
+    qCDebug(logUI) << "[sendUserMessage] About to call runSequenceDialog";
+    qCDebug(logUI) << "[sendUserMessage] Template manager root:" << m_templateMgr.root();
+    qCDebug(logUI) << "[sendUserMessage] Sequence manager root:" << m_seqMgr.root();
 
     runSequenceDialog();
 
-    qDebug() << "[sendUserMessage] runSequenceDialog completed";
+    qCDebug(logUI) << "[sendUserMessage] runSequenceDialog completed";
 
 }
 
@@ -1272,25 +873,6 @@ QByteArray MainWindow::extractJsonPart(const QByteArray& txt) const
     }
     joined += "]";
     return joined;
-}
-
-void MainWindow::editSequences()
-{
-    m_sequenceEditor->editSequences();
-}
-
-void MainWindow::runSequenceDialog()
-{
-    m_sequenceRunner->runSequenceDialog();
-}
-
-void MainWindow::runNextStep()
-{
-    m_sequenceRunner->runNextStep();
-}
-void MainWindow::handleAssistantFinished()
-{
-    m_sequenceRunner->handleAssistantFinished();
 }
 
 void MainWindow::handleOpenCommand(Command* cmd)
@@ -1498,12 +1080,12 @@ void MainWindow::handleSearchResults(Command* cmd)
         QString query = cmd->params().value("query").toString();
         QString title = QString("==== SEARCH_WEB: %1 ====").arg(query);
         QString body = web->results().join("\n\n");
-        qDebug() << "[MainWindow] SEARCH_WEB results count:" << web->results().size();
-        qDebug() << "[MainWindow] SEARCH_WEB result body length:" << body.length();
+        qCDebug(logUI) << "[MainWindow] SEARCH_WEB results count:" << web->results().size();
+        qCDebug(logUI) << "[MainWindow] SEARCH_WEB result body length:" << body.length();
         if (!body.isEmpty()) {
-            qDebug() << "[MainWindow] SEARCH_WEB first 200 chars of result:" << body.left(200);
+            qCDebug(logUI) << "[MainWindow] SEARCH_WEB first 200 chars of result:" << body.left(200);
         } else {
-            qDebug() << "[MainWindow] SEARCH_WEB result body is empty";
+            qCDebug(logUI) << "[MainWindow] SEARCH_WEB result body is empty";
         }
 
         // Проверяем, содержит ли результат пометку о необходимости суммаризации
@@ -1519,10 +1101,10 @@ void MainWindow::handleSearchResults(Command* cmd)
 
         // Add to context manager
         if (m_contextManager) {
-            qDebug() << "[MainWindow] Adding SEARCH_WEB command to context manager";
+            qCDebug(logUI) << "[MainWindow] Adding SEARCH_WEB command to context manager";
             addCommandToContext(cmd, QString("%1\n%2").arg(title, resultBody));
         } else {
-            qDebug() << "[MainWindow] Context manager is null, skipping context addition";
+            qCDebug(logUI) << "[MainWindow] Context manager is null, skipping context addition";
         }
         return;
     }
@@ -1599,11 +1181,6 @@ void MainWindow::appendExternalContext(const QString& block)
     }
 }
 
-void MainWindow::resetSequenceStabilityState()
-{
-    m_sequenceRunner->resetSequenceStabilityState();
-}
-
 QString MainWindow::commandBatchSignature(const QList<Command*>& commands) const
 {
     return m_sequenceRunner->commandBatchSignature(commands);
@@ -1614,43 +1191,9 @@ bool MainWindow::isReadOnlyCommandBatch(const QList<Command*>& commands) const
     return m_sequenceRunner->isReadOnlyCommandBatch(commands);
 }
 
-void MainWindow::appendResultToUi(const QString& title, const QString& content)
-{
-    m_sequenceRunner->appendResultToUi(title, content);
-}
-
-void MainWindow::autoFinalizeSequenceWithResult(const QString& reason, const QList<Command*>& recentCommands)
-{
-    m_sequenceRunner->autoFinalizeSequenceWithResult(reason, recentCommands);
-}
-
-void MainWindow::retryCurrentSequenceStep()
-{
-    m_sequenceRunner->retryCurrentSequenceStep();
-}
-bool MainWindow::ensureAgentModelConfigured()
-{
-    return m_sequenceRunner->ensureAgentModelConfigured();
-}
-
-QStringList MainWindow::buildAllowedCommandsDocsCompact(const PromptStep& step) const
-{
-    return m_sequenceRunner->buildAllowedCommandsDocsCompact(step);
-}
-
-QByteArray MainWindow::repairToJsonArrayIfNeeded(const QByteArray& rawText, const PromptStep& step)
-{
-    return m_sequenceRunner->repairToJsonArrayIfNeeded(rawText, step);
-}
-
 bool MainWindow::isImplementationIntentText(const QString& text)
 {
     return SequenceRunner::isImplementationIntentText(text);
-}
-
-bool MainWindow::didAnyAffectedPathChangeSince(const QDateTime& since, const QList<Command*>& executedCommands) const
-{
-    return m_sequenceRunner->didAnyAffectedPathChangeSince(since, executedCommands);
 }
 
 bool MainWindow::maybeAutoRepairAfterExecution(const PromptStep& step,
@@ -1660,16 +1203,6 @@ bool MainWindow::maybeAutoRepairAfterExecution(const PromptStep& step,
                                               const QString& lastError)
 {
     return m_sequenceRunner->maybeAutoRepairAfterExecution(step, execStartedAt, executedCommands, applyFailed, lastError);
-}
-
-void MainWindow::runNextSequence()
-{
-    m_sequenceRunner->runNextSequence();
-}
-
-void MainWindow::addSequenceTransitionToHistory(const QString& sequenceName)
-{
-    m_sequenceRunner->addSequenceTransitionToHistory(sequenceName);
 }
 
 void MainWindow::generateDescriptions()
@@ -1752,15 +1285,10 @@ void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
     if (lastUserMessage.trimmed().isEmpty())
         return;
     m_lastUserMessage = lastUserMessage;
-    qDebug()<<"m_lastUserMessage = "<<m_lastUserMessage;
+    qCDebug(logUI)<<"m_lastUserMessage = "<<m_lastUserMessage;
 }
 
 /* ────────────────────────────────────────────────────── */
-void MainWindow::ensureDefaultSequence()
-{
-    m_sequenceEditor->ensureDefaultSequence();
-}
-
 void MainWindow::reOpenRootDir(){
     if(m_projectRoot.isEmpty()){
         return;
@@ -1780,13 +1308,13 @@ void MainWindow::reOpenRootDir(){
 
     if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {
-        qCritical() << "Не удалось подготовить DevelopersAssistant / .dapro";
+        qCritical(logUI) << "Не удалось подготовить DevelopersAssistant / .dapro";
         //return -1;
     }
 
     if (!m_dev_manager.generateDescrFiles())
     {
-        qCritical() << "Ошибка при создании .dadescr файлов";
+        qCritical(logUI) << "Ошибка при создании .dadescr файлов";
     }
 
     rescan();
@@ -1911,11 +1439,6 @@ QString MainWindow::getAllCommandsText() const
     return QString();
 }
 
-void MainWindow::createNewSequence()
-{
-    m_sequenceEditor->createNewSequence();
-}
-
 // Вспомогательная функция для суммаризации результатов поиска
 QString MainWindow::summarizeSearchResults(const QString& content, const QString& query)
 {
@@ -1925,7 +1448,7 @@ QString MainWindow::summarizeSearchResults(const QString& content, const QString
     }
 
     if (m_model.selectedModel().isEmpty()) {
-        qWarning() << "[MainWindow] Summarization skipped: LLM model not configured";
+        qCWarning(logUI) << "[MainWindow] Summarization skipped: LLM model not configured";
         return QStringLiteral("LLM не настроен, суммаризация недоступна.");
     }
 
@@ -1951,16 +1474,16 @@ QString MainWindow::summarizeSearchResults(const QString& content, const QString
         "Выведи итоговое резюме (3–4 тезиса или коротких абзаца) с указанием ключевых фактов, ссылок и возможных действий."
     ).arg(effectiveQuery, contentForPrompt, truncationNote);
 
-    qDebug() << "[MainWindow] Summarizing SEARCH_WEB results for query:" << effectiveQuery
+    qCDebug(logUI) << "[MainWindow] Summarizing SEARCH_WEB results for query:" << effectiveQuery
              << "context length:" << contentForPrompt.size();
 
     QString summary = m_model.generateWithSystem(userPrompt, systemPrompt).trimmed();
     const QString errorPrefix = QStringLiteral("[Ollama error]");
     if (summary.startsWith(errorPrefix)) {
-        qWarning() << "[MainWindow] LLM error during search summary:" << summary;
+        qCWarning(logUI) << "[MainWindow] LLM error during search summary:" << summary;
         summary = QStringLiteral("LLM вернул ошибку: %1").arg(summary.mid(errorPrefix.length()).trimmed());
     } else if (summary.isEmpty()) {
-        qWarning() << "[MainWindow] LLM returned an empty summary for SEARCH_WEB";
+        qCWarning(logUI) << "[MainWindow] LLM returned an empty summary for SEARCH_WEB";
         summary = QStringLiteral("LLM не вернула ответ на суммаризацию.");
     }
 
@@ -1971,10 +1494,10 @@ QString MainWindow::summarizeSearchResults(const QString& content, const QString
 QString MainWindow::getLastUserMessages() const
 {
     QString result = m_lastUserMessages.join("\n");
-    qDebug() << "[getLastUserMessages] Returning" << m_lastUserMessages.size() << "messages, total length:" << result.length();
+    qCDebug(logUI) << "[getLastUserMessages] Returning" << m_lastUserMessages.size() << "messages, total length:" << result.length();
     if (m_lastUserMessages.size() > 0) {
-        qDebug() << "[getLastUserMessages] First message:" << m_lastUserMessages.first();
-        qDebug() << "[getLastUserMessages] Last message:" << m_lastUserMessages.last();
+        qCDebug(logUI) << "[getLastUserMessages] First message:" << m_lastUserMessages.first();
+        qCDebug(logUI) << "[getLastUserMessages] Last message:" << m_lastUserMessages.last();
     }
     return result;
 }
@@ -1982,26 +1505,21 @@ QString MainWindow::getLastUserMessages() const
 void MainWindow::addCommandToContext(Command* cmd, const QString& result)
 {
     if (!m_contextManager || !cmd) {
-        qDebug() << "[MainWindow] Context manager is null or cmd is null, skipping context addition";
+        qCDebug(logUI) << "[MainWindow] Context manager is null or cmd is null, skipping context addition";
         return;
     }
 
-    qDebug() << "[MainWindow] Adding command" << cmd->name() << "to context with result length:" << result.length();
+    qCDebug(logUI) << "[MainWindow] Adding command" << cmd->name() << "to context with result length:" << result.length();
 
     // If we're in a sequence mode, add to the current sequence, otherwise add directly
     if (m_sequenceMode && !m_currentSeqId.isEmpty()) {
-        qDebug() << "[MainWindow] Adding command to sequence" << m_currentSeqId;
+        qCDebug(logUI) << "[MainWindow] Adding command to sequence" << m_currentSeqId;
         m_contextManager->addCommandToSequence(cmd, m_currentSeqId, result);
     } else {
-        qDebug() << "[MainWindow] Adding command directly to context manager";
+        qCDebug(logUI) << "[MainWindow] Adding command directly to context manager";
         // The ContextManager will handle duplicate detection internally
         m_contextManager->addCommand(cmd, result);
     }
-}
-
-void MainWindow::refreshAllSequences()
-{
-    m_sequenceEditor->refreshAllSequences();
 }
 
 void MainWindow::updateContextStatusDisplay()
@@ -2214,7 +1732,7 @@ void MainWindow::updateContextStatusDisplay()
 
 void MainWindow::onFileChanged(const QString &path)
 {
-    qDebug() << "[MainWindow] File changed externally:" << path;
+    qCDebug(logUI) << "[MainWindow] File changed externally:" << path;
 
     // Remove the file from the watcher to avoid immediate re-triggering
     m_fileWatcher->removePath(path);
@@ -2228,7 +1746,7 @@ void MainWindow::onFileChanged(const QString &path)
 
         // Check if this file has context in our tracking
         if (m_fileToContextCommands.contains(path)) {
-            qDebug() << "[MainWindow] Clearing context for file due to external change:" << path;
+            qCDebug(logUI) << "[MainWindow] Clearing context for file due to external change:" << path;
 
             // Clear contexts related to this file
             m_contextCache.clearContextForPath(path);
@@ -2249,8 +1767,8 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     // This method is called when a specific template is selected from the combobox
     // We need to run the selected template with the provided text as the user query
 
-    qDebug() << "[runTemplateRequested] Template path:" << templatePath;
-    qDebug() << "[runTemplateRequested] Text:" << text;
+    qCDebug(logUI) << "[runTemplateRequested] Template path:" << templatePath;
+    qCDebug(logUI) << "[runTemplateRequested] Text:" << text;
     resetSequenceStabilityState();
     if (!m_preserveActiveImagesForNextRun) {
         m_activeImagesBase64.clear();
@@ -2347,8 +1865,8 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_agentRepairSeqId.clear();
     m_lastUserMessage = text; // Save the user's query for resolution in prompts
 
-    updateSequenceGraphHighlight();  // Update the graph highlighting
-    qDebug() << "[runTemplateRequested] About to start task timer for template execution";
+    m_sequenceEditor->updateSequenceGraphHighlight();  // Update the graph highlighting
+    qCDebug(logUI) << "[runTemplateRequested] About to start task timer for template execution";
     m_statusController->startTask();
     runNextStep();  // Start the sequence immediately
 }
@@ -2359,7 +1877,7 @@ void MainWindow::runSimpleChat(const QString &text)
     // This method is called when "Простой чат" is selected - direct chat mode
     // Send the message directly to the model in streaming mode without templates/sequences
 
-    qDebug() << "[runSimpleChat] Text:" << text;
+    qCDebug(logUI) << "[runSimpleChat] Text:" << text;
     resetSequenceStabilityState();
 
     if (m_contextManager)
@@ -2490,7 +2008,7 @@ void MainWindow::runSimpleChatWithImages(const QString &text,
                                         const QStringList &imagesBase64,
                                         const QStringList &imageSummaries)
 {
-    qDebug() << "[runSimpleChatWithImages] Text:" << text << "images:" << imagePaths.size();
+    qCDebug(logUI) << "[runSimpleChatWithImages] Text:" << text << "images:" << imagePaths.size();
 
     addImagesToContextManager(m_contextManager, imagePaths, imageSummaries);
 
@@ -2514,11 +2032,6 @@ void MainWindow::runSimpleChatWithImages(const QString &text,
 
     int tokens = m_promptMgr.tokenCount(historyText);
     log(QString("Sending simple chat request (%1 tokens) -> %2").arg(tokens).arg(historyText));
-}
-
-void MainWindow::appendUserQuestionToResultDisplay(const QString& question)
-{
-    m_sequenceRunner->appendUserQuestionToResultDisplay(question);
 }
 
 ResultDisplayWidget::ResultEntryMetadata MainWindow::collectContextMetadataSince(const QDateTime &since) const
@@ -2560,21 +2073,16 @@ ResultDisplayWidget::ResultEntryMetadata MainWindow::collectContextMetadataSince
 }
 
 
-void MainWindow::stopTemplateExecution()
-{
-    m_sequenceRunner->stopExecution();
-}
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    qDebug() << "[MainWindow] closeEvent called";
+    qCDebug(logUI) << "[MainWindow] closeEvent called";
 
     // Save sequence graph layout before closing if it exists and is initialized
     if (m_seqGraphWindow) {
-        qDebug() << "[MainWindow] Saving sequence graph layout";
+        qCDebug(logUI) << "[MainWindow] Saving sequence graph layout";
         m_seqGraphWindow->saveLayout();
     } else {
-        qDebug() << "[MainWindow] No sequence graph window to save";
+        qCDebug(logUI) << "[MainWindow] No sequence graph window to save";
     }
 
     // Clean up the sequence graph window
@@ -2607,4 +2115,209 @@ void MainWindow::updateChatToggleButton(bool visible)
         chatToggleBtn->setText(visible ? tr("Hide chat") : tr("Show chat"));
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Service interface implementations (delegation to existing members)
+// ═══════════════════════════════════════════════════════════════════════
+
+// ─── IContextService ──────────────────────────────────────────────────
+void MainWindow::setFullFileContext(const QString& path, const QStringList& lines) { m_contextCache.setFullFileContext(path, lines); }
+void MainWindow::addRegionContext(const QString& path, int startLine, const QStringList& lines) { m_contextCache.addRegionContext(path, startLine, lines); }
+void MainWindow::clearContextForPath(const QString& path) { m_contextCache.clearContextForPath(path); }
+void MainWindow::clearAll() { m_contextCache.clearAll(); }
+QString MainWindow::contextContent() const { return m_contextCache.contextContent(); }
+void MainWindow::appendConsoleLog(const QString& log) { m_contextCache.appendConsoleLog(log); }
+void MainWindow::removeConsoleLogsWithPrefix(const QString& prefix) { m_contextCache.removeConsoleLogsWithPrefix(prefix); }
+void MainWindow::appendExternalSource(const QString& source) { m_contextCache.appendExternalSource(source); }
+void MainWindow::clearConsoleLogs() { m_contextCache.clearConsoleLogs(); }
+void MainWindow::clearExternalSources() { m_contextCache.clearExternalSources(); }
+QStringList MainWindow::consoleLogs() const { return m_contextCache.consoleLogs(); }
+QStringList MainWindow::externalSources() const { return m_contextCache.externalSources(); }
+QString MainWindow::formatNumberedLines(const QStringList& lines, int startLine) const { return m_contextCache.formatNumberedLines(lines, startLine); }
+
+bool MainWindow::hasContextManager() const { return m_contextManager != nullptr; }
+void MainWindow::observeUserQuery(const QString& query) { if (m_contextManager) m_contextManager->observeUserQuery(query); }
+void MainWindow::addCommandToContext(int cmdIndex, const QString& description, const QString& result) { Q_UNUSED(cmdIndex) Q_UNUSED(description) Q_UNUSED(result) }
+QString MainWindow::generateContextText() const { return m_contextManager ? m_contextManager->generateContextText() : QString(); }
+
+QList<IContextService::SeqInfo> MainWindow::getCommandSequences() const {
+    if (!m_contextManager) return {};
+    QList<IContextService::SeqInfo> result;
+    for (const auto& s : m_contextManager->getCommandSequences()) {
+        result.append({s.id, s.name, s.description, s.timestamp});
+    }
+    return result;
+}
+IContextService::SeqInfo MainWindow::getSequenceInfo(const QString& id) const {
+    if (!m_contextManager) return {};
+    auto s = m_contextManager->getSequenceInfo(id);
+    return {s.id, s.name, s.description, s.timestamp};
+}
+QList<IContextService::CmdInfo> MainWindow::getAllCommands() const {
+    if (!m_contextManager) return {};
+    QList<IContextService::CmdInfo> result;
+    for (const auto& c : m_contextManager->getAllCommands()) {
+        result.append({c.id, c.description, c.result, c.sequenceId, static_cast<int>(c.state), c.reason, c.timestamp});
+    }
+    return result;
+}
+QList<IContextService::CmdInfo> MainWindow::getCommandsInSequence(const QString& seqId) const {
+    if (!m_contextManager) return {};
+    QList<IContextService::CmdInfo> result;
+    for (const auto& c : m_contextManager->getCommandsInSequence(seqId)) {
+        result.append({c.id, c.description, c.result, c.sequenceId, static_cast<int>(c.state), c.reason, c.timestamp});
+    }
+    return result;
+}
+
+bool MainWindow::fileHasContextCommands(const QString& path) const { return m_fileToContextCommands.contains(path); }
+QSet<QString> MainWindow::getContextCommandsForFile(const QString& path) const { return m_fileToContextCommands.value(path); }
+void MainWindow::clearFileToContextCommands() { m_fileToContextCommands.clear(); }
+void MainWindow::insertFileContextCommand(const QString& path, const QString& cmd) { m_fileToContextCommands[path].insert(cmd); }
+void MainWindow::clearShellCommandOutputs() { m_shellCommandOutputs.clear(); }
+void MainWindow::clearPythonScriptOutputs() { m_pythonScriptOutputs.clear(); }
+void MainWindow::removeShellOutput(const QString& key) { m_shellCommandOutputs.remove(key); }
+void MainWindow::removePythonOutput(const QString& key) { m_pythonScriptOutputs.remove(key); }
+QFileSystemWatcher* MainWindow::fileWatcher() { return m_fileWatcher; }
+
+// ─── IModelService ────────────────────────────────────────────────────
+void MainWindow::configure(const QString& model, const QVariantMap& params) { m_model.configure(model, params); }
+void MainWindow::setProvider(int provider) { m_model.setProvider(static_cast<OllamaAdapter::Provider>(provider)); }
+void MainWindow::setEndpoint(const QUrl& url) { m_model.setEndpoint(url); }
+QString MainWindow::selectedModel() const { return m_model.selectedModel(); }
+int MainWindow::provider() const { return static_cast<int>(m_model.provider()); }
+QString MainWindow::providerName() const { return m_model.providerName(); }
+void MainWindow::appendAssistantChunk(const QString& chunk) { if (m_chat) m_chat->appendAssistantChunk(chunk); }
+void MainWindow::refreshModelList() { if (m_chat) m_chat->refreshModelList(); }
+bool MainWindow::hasChat() const { return m_chat != nullptr; }
+QString& MainWindow::streamBuf() { return m_streamBuf; }
+void MainWindow::appendHistory(const QString& role, const QString& content) { m_history.push_back(qMakePair(role, content)); }
+void MainWindow::appendLastUserMessage(const QString& msg) {
+    m_lastUserMessages.append(msg);
+    while (m_lastUserMessages.size() > MAX_USER_MESSAGES) m_lastUserMessages.removeFirst();
+}
+int MainWindow::maxUserMessages() const { return MAX_USER_MESSAGES; }
+OllamaAdapter* MainWindow::modelPtr() { return &m_model; }
+void MainWindow::setLastUserMessage(const QString& msg) { m_lastUserMessage = msg; }
+QString MainWindow::lastUserMessage() const { return m_lastUserMessage; }
+QString MainWindow::selectedAgentModel() const { return m_agentModel.selectedModel(); }
+void MainWindow::configureAgentModel(const QString& model, const QVariantMap& params) { m_agentModel.configure(model, params); }
+void MainWindow::setAgentProvider(int provider) { m_agentModel.setProvider(static_cast<OllamaAdapter::Provider>(provider)); }
+void MainWindow::setAgentEndpoint(const QUrl& url) { m_agentModel.setEndpoint(url); }
+
+// ─── IProjectService ──────────────────────────────────────────────────
+QString MainWindow::projectRoot() const { return m_projectRoot; }
+void MainWindow::setProjectRoot(const QString& path) { m_projectRoot = path; }
+QStringList MainWindow::indexedFiles() const { return m_index.files(); }
+void MainWindow::setIndexRoot(const QString& path) { m_index.setRoot(path); }
+void MainWindow::loadDevManager() { m_dev_manager.load(); }
+QString MainWindow::devAssDirPath() const { return m_dev_manager.devAssDir().absolutePath(); }
+FileDescription* MainWindow::findFileDescription(const QString& path) { return m_dev_manager.findFileDescription(path); }
+void MainWindow::setDevProjectRoot(const QString& path) { m_dev_manager.setProjectRoot(path); }
+bool MainWindow::createFolder() { return m_dev_manager.createFolder(); }
+bool MainWindow::createDaproFile() { return m_dev_manager.createDaproFile(); }
+bool MainWindow::generateDescrFiles() { return m_dev_manager.generateDescrFiles(); }
+void MainWindow::setPromptProjectRoot(const QString& path) { m_promptMgr.setProjectRoot(path); }
+void* MainWindow::promptMgr() { return static_cast<void*>(&m_promptMgr); }
+QListWidget* MainWindow::filesList() { return m_files; }
+void MainWindow::openProjectInIDE(const QString& path) { ide_widget->openProjectbyPath(path); }
+void MainWindow::setRootEditText(const QString& path) { m_rootEdit->setText(path); }
+void MainWindow::emitMissingFilesUpdated(const QSet<QString>& paths) { emit MainWindow::missingFilesUpdated(paths); }
+// rescan() already implemented at line 1005 (serves as slot + interface impl)
+DevAssManager* MainWindow::devManagerPtr() { return &m_dev_manager; }
+
+// ─── IUIUpdater ───────────────────────────────────────────────────────
+// log() already implemented at line 1700
+void MainWindow::statusBarMessage(const QString& msg) { statusBar()->showMessage(msg); }
+// appendUserQuestionToResultDisplay() already implemented at line 2477
+void MainWindow::appendConsoleToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi("Console", block); }
+void MainWindow::appendExternalToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi("External", block); }
+QTreeWidget* MainWindow::contextCommandsList() { return m_contextCommandsList; }
+
+// ─── ISequenceService ─────────────────────────────────────────────────
+bool MainWindow::isStopRequested() const { return m_stopRequested; }
+void MainWindow::setStopRequested(bool v) { m_stopRequested = v; }
+bool MainWindow::isSequenceMode() const { return m_sequenceMode; }
+// resetSequenceStabilityState() already implemented at line 1560
+// runSequenceDialog() already implemented earlier (serves as slot + interface impl)
+void MainWindow::stopTask() { if (m_statusController) m_statusController->stopTask(); }
+PromptSequenceManager* MainWindow::seqMgrPtr() { return &m_seqMgr; }
+PromptSequence* MainWindow::currentSequencePtr() { return &m_currentSeq; }
+int MainWindow::currentStepIndex() const { return m_currentStepIdx; }
+void MainWindow::setCurrentStepIndex(int idx) { m_currentStepIdx = idx; }
+QString MainWindow::currentSeqPath() const { return m_currentSeqPath; }
+void MainWindow::setCurrentSeqPath(const QString& path) { m_currentSeqPath = path; }
+QString MainWindow::currentSeqId() const { return m_currentSeqId; }
+void MainWindow::setCurrentSeqId(const QString& id) { m_currentSeqId = id; }
+QString MainWindow::currentTemplatePath() const { return m_currentTemplatePath; }
+void MainWindow::setCurrentTemplatePath(const QString& path) { m_currentTemplatePath = path; }
+bool MainWindow::useAgentPipeline() const { return m_useAgentPipeline; }
+void MainWindow::setUseAgentPipeline(bool v) { m_useAgentPipeline = v; }
+int MainWindow::agentRepairCount() const { return m_agentRepairCountThisStep; }
+void MainWindow::setAgentRepairCount(int v) { m_agentRepairCountThisStep = v; }
+int MainWindow::agentMaxRepairs() const { return m_agentMaxRepairsPerStep; }
+bool MainWindow::inAgentAutoRepair() const { return m_inAgentAutoRepair; }
+void MainWindow::setInAgentAutoRepair(bool v) { m_inAgentAutoRepair = v; }
+int MainWindow::agentRepairStepIdx() const { return m_agentRepairStepIdx; }
+void MainWindow::setAgentRepairStepIdx(int v) { m_agentRepairStepIdx = v; }
+QString MainWindow::agentRepairSeqId() const { return m_agentRepairSeqId; }
+void MainWindow::setAgentRepairSeqId(const QString& id) { m_agentRepairSeqId = id; }
+QList<Change>& MainWindow::pendingChanges() { return m_pending; }
+ChangeApplier* MainWindow::applierPtr() { return &m_applier; }
+// collectContextMetadataSince() already implemented at line 2482
+
+// ─── IGraphService ────────────────────────────────────────────────────
+void MainWindow::showGraphWindow() {
+    m_graphWindow->show(); m_graphWindow->raise(); m_graphWindow->activateWindow();
+}
+void MainWindow::showLightRagWindow() {
+    if (!m_lightRagWidget) { m_lightRagWidget = new LightRagWidget(); m_lightRagWidget->setAttribute(Qt::WA_DeleteOnClose, true); }
+    m_lightRagWidget->show(); m_lightRagWidget->raise(); m_lightRagWidget->activateWindow();
+}
+SequenceGraphWidget* MainWindow::sequenceGraphWindow() { return m_seqGraphWindow; }
+
+// ─── ISettingsService ─────────────────────────────────────────────────
+void MainWindow::showSettings() { if (m_llmSettingsWindow) m_llmSettingsWindow->show(); }
+void MainWindow::hideSettings() { if (m_llmSettingsWindow) m_llmSettingsWindow->hide(); }
+bool MainWindow::isSettingsVisible() const { return m_llmSettingsWindow && m_llmSettingsWindow->isVisible(); }
+void MainWindow::reloadSettingsFromConfig() { if (m_llmSettingsWindow) m_llmSettingsWindow->reloadFromConfig(); }
+void MainWindow::setSettingsButtonText(const QString& text) { if (settingsBtn) settingsBtn->setText(text); }
+QString MainWindow::providerString() const { return m_llmSettingsWindow ? m_llmSettingsWindow->provider() : QString(); }
+QString MainWindow::endpointString() const { return m_llmSettingsWindow ? m_llmSettingsWindow->endpoint() : QString(); }
+QVariantMap MainWindow::paramsMap() const { return m_llmSettingsWindow ? m_llmSettingsWindow->params() : QVariantMap(); }
+
+// ─── IContextService additional accessors ─────────────────────────────
+ContextManager* MainWindow::contextManagerPtr() { return m_contextManager; }
+ContextCacheManager* MainWindow::contextCachePtr() { return &m_contextCache; }
+QMap<QString, QSet<QString>>& MainWindow::fileToContextCommands() { return m_fileToContextCommands; }
+QMap<QString, QString>& MainWindow::shellCommandOutputs() { return m_shellCommandOutputs; }
+QMap<QString, QString>& MainWindow::pythonScriptOutputs() { return m_pythonScriptOutputs; }
+
+// ─── IModelService additional accessors ────────────────────────────────
+QList<QPair<QString, QString>>& MainWindow::history() { return m_history; }
+QList<QString>& MainWindow::lastUserMessages() { return m_lastUserMessages; }
+QString& MainWindow::lastAssistantMessage() { return m_lastAssistantMessage; }
+QString& MainWindow::currentPrompt() { return m_currentPrompt; }
+QStringList& MainWindow::activeImagesBase64() { return m_activeImagesBase64; }
+OllamaAdapter* MainWindow::agentModelPtr() { return &m_agentModel; }
+
+// ─── IUIUpdater additional accessors ───────────────────────────────────
+ResultDisplayWidget* MainWindow::resultDisplayWidget() { return m_resultDisplayWidget; }
+QDateTime& MainWindow::lastQuestionTimestamp() { return m_lastQuestionTimestamp; }
+QComboBox* MainWindow::confirmModeComboBox() { return confirmModeCombo; }
+
+// ─── ISequenceService additional accessors ─────────────────────────────
+PromptSequence& MainWindow::currentSeq() { return m_currentSeq; }
+QStringList& MainWindow::prevSteps() { return m_prevSteps; }
+void MainWindow::setSequenceMode(bool v) { m_sequenceMode = v; }
+int& MainWindow::agentRepairCountThisStep() { return m_agentRepairCountThisStep; }
+
+// ─── ITemplateService ──────────────────────────────────────────────────
+SolutionTemplateManager* MainWindow::templateMgrPtr() { return &m_templateMgr; }
+
+// ─── IStatusControllerService ──────────────────────────────────────────
+TaskStatusController* MainWindow::statusControllerPtr() { return m_statusController; }
+
+// ─── ITTSService ───────────────────────────────────────────────────────
+TtsController* MainWindow::ttsControllerPtr() { return m_ttsController; }
 

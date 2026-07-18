@@ -4,7 +4,6 @@
 #include "../ui/MainWindow.h"
 #include <QDateTime>
 #include <QFileInfo>
-#include <QDebug>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -13,6 +12,7 @@
 #include <QQueue>
 #include <QHash>
 #include <algorithm>
+#include "utils/Logging.h"
 
 namespace {
 constexpr int kMaxActiveContextChars = 18000;
@@ -1014,12 +1014,12 @@ void ContextManager::saveContextGraph() const
 
     QSaveFile out(m_contextGraphFilePath);
     if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "[ContextManager] Failed to write context graph:" << m_contextGraphFilePath << out.errorString();
+        qCWarning(logCore) << "[ContextManager] Failed to write context graph:" << m_contextGraphFilePath << out.errorString();
         return;
     }
     out.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     if (!out.commit())
-        qWarning() << "[ContextManager] Failed to commit context graph:" << m_contextGraphFilePath << out.errorString();
+        qCWarning(logCore) << "[ContextManager] Failed to commit context graph:" << m_contextGraphFilePath << out.errorString();
 }
 
 void ContextManager::clearContextGraph()
@@ -1165,12 +1165,12 @@ void ContextManager::saveArchive() const
 
     QSaveFile out(m_archiveFilePath);
     if (!out.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qWarning() << "[ContextManager] Failed to write archive file:" << m_archiveFilePath << out.errorString();
+        qCWarning(logCore) << "[ContextManager] Failed to write archive file:" << m_archiveFilePath << out.errorString();
         return;
     }
     out.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     if (!out.commit())
-        qWarning() << "[ContextManager] Failed to commit archive file:" << m_archiveFilePath << out.errorString();
+        qCWarning(logCore) << "[ContextManager] Failed to commit archive file:" << m_archiveFilePath << out.errorString();
 }
 
 void ContextManager::pruneArchive()

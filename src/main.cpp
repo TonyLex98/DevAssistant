@@ -119,39 +119,29 @@ int main(int argc, char** argv)
         return runPrintCommandDocsMode(argc, argv);
 
     QApplication app(argc, argv);
-    app.setStyleSheet(
-        "QMainWindow, QDialog, QWidget {"
-        "  background: #f2fbf9;"
-        "  color: #0f172a;"
-        "  font: 10pt \"Segoe UI Variable\";"
-        "}"
-        "QLabel { color: #0f172a; }"
-        "QListWidget, QTreeWidget, QTreeView, QTableView, QPlainTextEdit, QTextEdit, QTextBrowser, QGraphicsView {"
-        "  background: #ffffff;"
-        "  border: 1px solid #bfeee6;"
-        "  border-radius: 6px;"
-        "}"
-        "QScrollArea { border: none; background: transparent; }"
-        "QHeaderView::section {"
-        "  background: #e6fffa;"
-        "  border: none;"
-        "  border-bottom: 1px solid #bfeee6;"
-        "  padding: 4px 8px;"
-        "  font: 600 9pt \"Segoe UI Variable\";"
-        "}"
-        "QTabWidget::pane { border: 1px solid #bfeee6; border-radius: 6px; }"
-        "QTabBar::tab {"
-        "  background: #ccfbf1;"
-        "  color: #134e4a;"
-        "  border: 1px solid #8ed9cf;"
-        "  border-bottom: none;"
-        "  border-top-left-radius: 6px;"
-        "  border-top-right-radius: 6px;"
-        "  padding: 5px 10px;"
-        "  margin-right: 1px;"
-        "}"
-        "QTabBar::tab:selected { background: #ffffff; color: #0f766e; }"
-    );
+
+    // Load global stylesheet from .qss file
+    {
+        QString stylePath = QCoreApplication::applicationDirPath() + "/../src/resources/styles.qss";
+        QFile styleFile(stylePath);
+        if (!styleFile.exists()) {
+            // Fallback: try relative to executable
+            stylePath = QDir(QCoreApplication::applicationDirPath()).filePath("styles.qss");
+            styleFile.setFileName(stylePath);
+        }
+        if (styleFile.exists() && styleFile.open(QFile::ReadOnly | QFile::Text)) {
+            app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
+            styleFile.close();
+        } else {
+            // Hardcoded fallback if file not found
+            app.setStyleSheet(
+                "QMainWindow, QDialog, QWidget { background: #f2fbf9; color: #0f172a; font: 10pt \"Segoe UI Variable\"; }"
+                "QLabel { color: #0f172a; }"
+                "QListWidget, QTreeWidget, QTreeView, QTableView, QPlainTextEdit, QTextEdit, QTextBrowser, QGraphicsView {"
+                "  background: #ffffff; border: 1px solid #bfeee6; border-radius: 6px; }"
+            );
+        }
+    }
 
     qRegisterMetaType<QList<int>>();
 
