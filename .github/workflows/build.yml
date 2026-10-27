@@ -39,7 +39,7 @@ jobs:
         run: qmake DevAssistantQt.pro CONFIG+=release
 
       - name: Build
-        run: mingw32-make -j4
+        run: mingw32-make -k -j4
 
       - name: Upload binary
         uses: actions/upload-artifact@v4

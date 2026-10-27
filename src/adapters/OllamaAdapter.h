@@ -86,7 +86,7 @@ public:
     bool isAvailable(QString* errorOut = nullptr) override;
     QStringList listModels();
 
-    QString selectedModel() const { return m_model; }
+    QString selectedModel() const override { return m_model; }
     QJsonObject lastRequestBody() const { return m_lastBody; }
     
     // Методы для управления параметрами генерации

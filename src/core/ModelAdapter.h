@@ -21,4 +21,5 @@ public:
 
     virtual int estimateTokens(const QString& text) const = 0;
     virtual bool isAvailable(QString* errorOut = nullptr) = 0;
+    virtual QString selectedModel() const = 0;
 };
