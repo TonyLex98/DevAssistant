@@ -13,6 +13,25 @@ Makefile.Debug
 Makefile.Release
 object_script.*
 .qmake.stash
+/debug
+/dist
+build-*/
+ui_*.h
+moc_*.cpp
+qrc_*.cpp
+*.o
+*.obj
+*.exe
+*.dll
+
+# IDE and editor files
+*.pro.user
+*.pro.user.*
+*.tmp
+~$*
+
+# Local backups
+*.zip
 
 # Local configs
 .qwen/settings.json
