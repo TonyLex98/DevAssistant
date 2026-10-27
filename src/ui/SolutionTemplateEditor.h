@@ -42,7 +42,7 @@ public:
     void setTemplate(const SolutionTemplate &templateValue);
     SolutionTemplate templateValue() const;
 
-    // РћР±РЅРѕРІР»РµРЅРёРµ СЃРїРёСЃРєР° РґРѕСЃС‚СѓРїРЅС‹С… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
+    // Обновление списка доступных последовательностей
     void updateAvailableSequences();
 
 signals:
@@ -74,9 +74,9 @@ private:
     StyledButton *m_setMainSequenceBtn;
     StyledButton *m_selectImageBtn;
     
-    // Р”Р»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІСЃРµС… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№ РёР· РїСЂРѕРµРєС‚Р°
-    QMap<QString, QString> m_seqPathByName;  // name -> fullPath РґР»СЏ РґРѕСЃС‚СѓРїРЅС‹С… РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
-    QString m_imagePath; // РџСѓС‚СЊ Рє РІС‹Р±СЂР°РЅРЅРѕРјСѓ РёР·РѕР±СЂР°Р¶РµРЅРёСЋ
+    // Для отображения всех последовательностей из проекта
+    QMap<QString, QString> m_seqPathByName;  // name -> fullPath для доступных последовательностей
+    QString m_imagePath; // Путь к выбранному изображению
     
     // Graph visualization
     TemplateSequenceGraphWidget *m_graphWidget;

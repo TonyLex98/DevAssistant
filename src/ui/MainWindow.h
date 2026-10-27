@@ -12,7 +12,7 @@
 #include <StyledButton.h>
 #include <DevAssManager.h>
 #include <QProgressDialog>
-#include "DescriptionDialog.h"      // в†ђ РЅРѕРІС‹Р№ РґРёР°Р»РѕРі
+#include "DescriptionDialog.h"      // ← новый диалог
 #include <CommandParser.h>
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
@@ -305,8 +305,8 @@ private slots:
     void applyChanges();
     void undoLast();
 
-    void generateDescriptions();      // <вЂ‘вЂ‘ РЅРѕРІС‹Р№ СЃР»РѕС‚
-    void onVoskText(const QString&);  // <вЂ‘вЂ‘ РЅРѕРІС‹Р№ СЃР»РѕС‚
+    void generateDescriptions();      // <‑‑ новый слот
+    void onVoskText(const QString&);  // <‑‑ новый слот
     void onOmniAsrText(const QString&);
 
     void openGraph();
@@ -407,20 +407,20 @@ private:
     StyledButton *exportSequenceAsTemplateBtn;
     MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
-    StyledButton* descBtn = nullptr;   // <вЂ‘вЂ‘ РЅРѕРІР°СЏ РєРЅРѕРїРєР°
-    VoskWidget* m_voskWidget = nullptr;  // <вЂ‘вЂ‘ РІРёРґР¶РµС‚ Vosk
+    StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
+    VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
 
     QStringList m_prevSteps;
 
-    // ... СѓР¶Рµ РµСЃС‚СЊ
-    PromptSequenceManager m_seqMgr;          // РјРµРЅРµРґР¶РµСЂ РЅР°Р±РѕСЂРѕРІ
-    SolutionTemplateManager m_templateMgr;   // РјРµРЅРµРґР¶РµСЂ С€Р°Р±Р»РѕРЅРѕРІ
-    PromptSequence        m_currentSeq;     // С‚РµРєСѓС‰Р°СЏ РІС‹Р±СЂР°РЅРЅР°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ
+    // ... уже есть
+    PromptSequenceManager m_seqMgr;          // менеджер наборов
+    SolutionTemplateManager m_templateMgr;   // менеджер шаблонов
+    PromptSequence        m_currentSeq;     // текущая выбранная последовательность
     bool                  m_sequenceMode = false;
     bool                  m_stopRequested = false; // Flag to indicate that the sequence execution should be stopped
-    int                   m_currentStepIdx = -1; // -1 = РЅРµ Р·Р°РїСѓС‰РµРЅРѕ  // Run the next sequence specified by OPEN_SEQUENCE
+    int                   m_currentStepIdx = -1; // -1 = не запущено  // Run the next sequence specified by OPEN_SEQUENCE
     void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
     
     /* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ NEW в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */    void ensureUniversalAgentTemplateInternal(); // Write UniversalAgent template v3 if missing/outdated
@@ -446,14 +446,14 @@ private:
     QTabWidget *project_view_tabs = new QTabWidget();
     ProjectRelationView *project_view = new ProjectRelationView;
 
-    StyledButton *graphBtn{nullptr};    // РєРЅРѕРїРєР° В«Show GraphВ»
-    StyledButton *seqGraphBtn{nullptr}; // РєРЅРѕРїРєР° В«Show Sequence GraphВ»
+    StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
+    StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
-    StyledButton *lightRagBtn{nullptr}; // РєРЅРѕРїРєР° В«LightRAGВ»
+    StyledButton *lightRagBtn{nullptr}; // кнопка «LightRAG»
     QWidget *m_settingsPanel{nullptr};
-    GraphWidget  *m_graphWindow{nullptr};   // РѕРєРЅРѕ-РІРёРґР¶РµС‚ РіСЂР°С„Р°
-    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // РѕРєРЅРѕ-РІРёРґР¶РµС‚ РіСЂР°С„Р° РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚РµР№
+    GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
+    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
     LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
     SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages

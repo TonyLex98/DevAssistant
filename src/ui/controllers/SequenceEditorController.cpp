@@ -25,7 +25,7 @@ SequenceEditorController::SequenceEditorController(ISequenceService* seq, ITempl
 {
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::openSequenceGraph()
 {
     qCDebug(logSeq) << "[MainWindow] openSequenceGraph called";
@@ -46,7 +46,7 @@ void SequenceEditorController::openSequenceGraph()
     }
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::onChatTemplateSelectionChanged(const QString &templatePath)
 {
     QString normalizedPath = templatePath;
@@ -60,7 +60,7 @@ void SequenceEditorController::onChatTemplateSelectionChanged(const QString &tem
     updateSequenceGraphTemplateSelection();
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::updateSequenceGraphHighlight()
 {
     auto* graphWin = m_graph->sequenceGraphWindow();
@@ -69,7 +69,7 @@ void SequenceEditorController::updateSequenceGraphHighlight()
     }
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::updateSequenceGraphTemplateSelection()
 {
     auto* graphWin = m_graph->sequenceGraphWindow();
@@ -78,10 +78,10 @@ void SequenceEditorController::updateSequenceGraphTemplateSelection()
     }
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::openSequenceEditorForName(const QString &sequenceName)
 {
-    // РћР±РЅРѕРІРёРј РєСЌС€, С‡С‚РѕР±С‹ РІРєР»СЋС‡РёС‚СЊ РІСЃРµ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё РёР· РїР°РїРѕРє С€Р°Р±Р»РѕРЅРѕРІ
+    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
     refreshAllSequences();
 
     // Find the sequence by name using the new method
@@ -99,7 +99,7 @@ void SequenceEditorController::openSequenceEditorForName(const QString &sequence
         for (const QString& templateDir : templateDirs) {
             QDir dir(templateDir);
             if (dir.exists()) {
-                // РёС‰РµРј *.seq.json РІ РїР°РїРєРµ С€Р°Р±Р»РѕРЅР°
+                // ищем *.seq.json в папке шаблона
                 QStringList filters = {"*.seq.json"};
                 QFileInfoList files = dir.entryInfoList(filters,
                                                         QDir::Files | QDir::NoSymLinks,
@@ -178,10 +178,10 @@ void SequenceEditorController::openSequenceEditorForName(const QString &sequence
         m_ui->log(QStringLiteral("DEBUG: Successfully found sequence '") + sequenceName + QStringLiteral("' at path: ") + filePath);
     }
 
-    openSequenceEditorWindow(QStringLiteral("Р РµРґР°РєС‚РѕСЂ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё") + ": " + sequenceName, filePath, seq);
+    openSequenceEditorWindow(QStringLiteral("Редактор последовательности") + ": " + sequenceName, filePath, seq);
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::openSequenceEditorWindow(const QString& title, const QString& filePath, const PromptSequence& seq)
 {
     auto *win = new QWidget(nullptr);
@@ -202,8 +202,8 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
     lay->addWidget(editor, 1);
 
     auto *btnRow = new QHBoxLayout();
-    auto *saveBtn = new StyledButton(QStringLiteral("РЎРѕС…СЂР°РЅРёС‚СЊ"), win);
-    auto *closeBtn = new StyledButton(QStringLiteral("Р—Р°РєСЂС‹С‚СЊ"), win);
+    auto *saveBtn = new StyledButton(QStringLiteral("Сохранить"), win);
+    auto *closeBtn = new StyledButton(QStringLiteral("Закрыть"), win);
     saveBtn->setEnabled(false);
     btnRow->addStretch(1);
     btnRow->addWidget(saveBtn);
@@ -226,17 +226,17 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
 
     QObject::connect(editor, &PromptSequenceEditor::sequenceChanged, win, [win, saveBtn](const PromptSequence& edited) {
         saveBtn->setEnabled(true);
-        win->setWindowTitle(QStringLiteral("Р РµРґР°РєС‚РѕСЂ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё") + ": " + edited.name());
+        win->setWindowTitle(QStringLiteral("Редактор последовательности") + ": " + edited.name());
     });
 
     QObject::connect(saveBtn, &QPushButton::clicked, win, [this, editor, filePath, saveBtn, refreshAfterSave, win]() {
         const PromptSequence edited = editor->sequence();
         if (m_seq->seqMgrPtr()->save(edited, filePath)) {
-            QMessageBox::information(win, QStringLiteral("РЎРѕС…СЂР°РЅРµРЅРѕ"), QStringLiteral("РџРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ СЃРѕС…СЂР°РЅРµРЅР°."));
+            QMessageBox::information(win, QStringLiteral("Сохранено"), QStringLiteral("Последовательность сохранена."));
             saveBtn->setEnabled(false);
             refreshAfterSave();
         } else {
-            QMessageBox::warning(win, QStringLiteral("РћС€РёР±РєР°"), QStringLiteral("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ."));
+            QMessageBox::warning(win, QStringLiteral("Ошибка"), QStringLiteral("Не удалось сохранить."));
         }
     });
 
@@ -245,46 +245,46 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
     win->show();
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::editSequences()
 {
-    // РћР±РЅРѕРІРёРј РєСЌС€, С‡С‚РѕР±С‹ РІРєР»СЋС‡РёС‚СЊ РІСЃРµ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё РёР· РїР°РїРѕРє С€Р°Р±Р»РѕРЅРѕРІ
+    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
     refreshAllSequences();
 
-    // 1. РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РµСЃС‚СЊ РЅР°Р±РѕСЂС‹
+    // 1. Проверяем, что есть наборы
     if (m_seq->seqMgrPtr()->sequences().isEmpty()) {
-        QMessageBox::information(nullptr, QStringLiteral("РќРµС‚ РЅР°Р±РѕСЂРѕРІ"),
-                                 QStringLiteral("Р’ РїР°РїРєРµ РЅРµС‚ РЅРё РѕРґРЅРѕРіРѕ *.seq.json"));
+        QMessageBox::information(nullptr, QStringLiteral("Нет наборов"),
+                                 QStringLiteral("В папке нет ни одного *.seq.json"));
         return;
     }
 
-    // 2. Р¤РѕСЂРјРёСЂСѓРµРј СЃРїРёСЃРѕРє РЅР°Р·РІР°РЅРёР№ С„Р°Р№Р»РѕРІ (Р±РµР· РїСѓС‚Рё)
+    // 2. Формируем список названий файлов (без пути)
     QStringList names;
-    QMap<QString, QString> pathByName;      // РёРјСЏ в†’ РїСѓС‚СЊ
+    QMap<QString, QString> pathByName;      // имя → путь
     for (const QString &filePath : m_seq->seqMgrPtr()->fileList()) {
         QString name = QFileInfo(filePath).fileName();
         names << name;
         pathByName.insert(name, filePath);
     }
 
-    // 3. РџРѕРїСЂРѕСЃРёРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІС‹Р±СЂР°С‚СЊ С„Р°Р№Р»
+    // 3. Попросим пользователя выбрать файл
     bool ok = false;
     QString selectedName = QInputDialog::getItem(
-                nullptr, QStringLiteral("Р’С‹Р±РµСЂРёС‚Рµ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ"),
-                QStringLiteral("Р¤Р°Р№Р»:"), names, 0, false, &ok);
+                nullptr, QStringLiteral("Выберите последовательность"),
+                QStringLiteral("Файл:"), names, 0, false, &ok);
 
     if (!ok || selectedName.isEmpty())
-        return;          // РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РјРµРЅРёР»
+        return;          // пользователь отменил
 
     QString filePath = pathByName.value(selectedName);
 
-    // 4. Р—Р°РіСЂСѓР¶Р°РµРј РІС‹Р±СЂР°РЅРЅСѓСЋ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ
+    // 4. Загружаем выбранную последовательность
     PromptSequence seq = m_seq->seqMgrPtr()->sequences().value(filePath);
 
-    openSequenceEditorWindow(QStringLiteral("Р РµРґР°РєС‚РѕСЂ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚Рё") + ": " + selectedName, filePath, seq);
+    openSequenceEditorWindow(QStringLiteral("Редактор последовательности") + ": " + selectedName, filePath, seq);
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::createNewSequence()
 {
     // Ask user for name
@@ -354,7 +354,7 @@ void SequenceEditorController::createNewSequence()
     }
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::refreshAllSequences()
 {
     qCDebug(logSeq) << "[refreshAllSequences] Starting refresh of all sequences";
@@ -371,7 +371,7 @@ void SequenceEditorController::refreshAllSequences()
     for (const QString& templateDir : templateDirs) {
         QDir dir(templateDir);
         if (dir.exists()) {
-            // РёС‰РµРј *.seq.json РІ РїР°РїРєРµ С€Р°Р±Р»РѕРЅР°
+            // ищем *.seq.json в папке шаблона
             QStringList filters = {"*.seq.json"};
             QFileInfoList files = dir.entryInfoList(filters,
                                                     QDir::Files | QDir::NoSymLinks,
@@ -422,82 +422,82 @@ void SequenceEditorController::refreshAllSequences()
     m_ui->log(QStringLiteral("=== END SEQUENCE DEBUG INFO ==="));
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 void SequenceEditorController::ensureDefaultSequence()
 {
-    // РџСѓС‚СЊ Рє С„Р°Р№Р»Сѓ default.seq.json
+    // Путь к файлу default.seq.json
     QString defaultFile = QDir(m_seq->seqMgrPtr()->root()).filePath("default.seq.json");
 
     if (QFile::exists(defaultFile))
-        return;        // СѓР¶Рµ РµСЃС‚СЊ вЂ“ РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµРј
+        return;        // уже есть – ничего не делаем
 
-    // РЎРѕР·РґР°С‘Рј РѕР±СЉРµРєС‚-С€Р°Р±Р»РѕРЅ
+    // Создаём объект-шаблон
     PromptSequence seq = defaultSequenceTemplate();
 
-    // РЎРѕС…СЂР°РЅСЏРµРј
+    // Сохраняем
     if (!m_seq->seqMgrPtr()->save(seq, defaultFile))
-        qCWarning(logSeq) << "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ С„Р°Р№Р» default.seq.json";
+        qCWarning(logSeq) << "Не удалось создать файл default.seq.json";
 }
 
-/* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ────────────────────────────────────────────────────── */
 PromptSequence SequenceEditorController::defaultSequenceTemplate()
 {
     // Step 1: Clarify the task if needed
     PromptStep s1;
     s1.setTemplate(
-        "РўС‹ вЂ” РР-РїРѕРјРѕС‰РЅРёРє РїРѕ СЂРµС„Р°РєС‚РѕСЂРёРЅРіСѓ Рё РїСЂР°РІРєР°Рј РєРѕРґР°.\n"
-        "РљРѕРЅС‚РµРєСЃС‚ РїСЂРѕРµРєС‚Р°:\n{{PROJECT_ROOT}}"
-        "Р’РѕС‚ СЃРїРёСЃРѕРє С„Р°Р№Р»РѕРІ:\n{{FILE_LIST}}\n"
+        "Ты — ИИ-помощник по рефакторингу и правкам кода.\n"
+        "Контекст проекта:\n{{PROJECT_ROOT}}"
+        "Вот список файлов:\n{{FILE_LIST}}\n"
         "\n{{HISTORY}}\n"
-        "Р•СЃР»Рё Р·Р°РґР°С‡Р° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅРµ РґРѕ РєРѕРЅС†Р° СЏСЃРЅР° вЂ” Р·Р°РґР°Р№ РґРѕ 3 СѓС‚РѕС‡РЅСЏСЋС‰РёС… РІРѕРїСЂРѕСЃРѕРІ, РёСЃРїРѕР»СЊР·СѓСЏ РєРѕРјР°РЅРґСѓ ASK_USER (РѕРґРёРЅ JSON РЅР° РІРѕРїСЂРѕСЃ)."
-        "РџСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё РјРѕР¶РµС€СЊ СЃСЂР°Р·Сѓ РІС‹Р·С‹РІР°С‚СЊ SEARCH_PROJECT (РїРѕРёСЃРє РїРѕ РїСЂРѕРµРєС‚Сѓ) РёР»Рё SEARCH_WEB (РІРЅРµС€РЅРёРµ РёСЃС‚РѕС‡РЅРёРєРё), РїСЂРµР¶РґРµ С‡РµРј С„РѕСЂРјРёСЂРѕРІР°С‚СЊ РїР»Р°РЅ."
-        "Р”РѕСЃС‚СѓРїРЅС‹Рµ РєРѕРјР°РЅРґС‹: {{SUPPORTED_COMMANDS}}"
-        "Р—Р°С‚РµРј РѕРїРёС€Рё РєСЂР°С‚РєРёР№ РїР»Р°РЅ РґРµР№СЃС‚РІРёР№."
+        "Если задача пользователя не до конца ясна — задай до 3 уточняющих вопросов, используя команду ASK_USER (один JSON на вопрос)."
+        "При необходимости можешь сразу вызывать SEARCH_PROJECT (поиск по проекту) или SEARCH_WEB (внешние источники), прежде чем формировать план."
+        "Доступные команды: {{SUPPORTED_COMMANDS}}"
+        "Затем опиши краткий план действий."
     );
     s1.setAllowedCommands(QStringList{ "ASK_USER", "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
     // Step 2: Gather minimal relevant context (snippets only)
     PromptStep s2;
     s2.setTemplate(
-        "РќР° РѕСЃРЅРѕРІРµ Р·Р°РїСЂРѕСЃР° Рё РїР»Р°РЅР° РІС‹Р±РµСЂРё РјРёРЅРёРјР°Р»СЊРЅС‹Рµ РЅРµРѕР±С…РѕРґРёРјС‹Рµ СѓС‡Р°СЃС‚РєРё РєРѕРґР°."
-        "РСЃРїРѕР»СЊР·СѓР№ OPEN_FILE_REGION (Р¶РµР»Р°С‚РµР»СЊРЅРѕ c startLine/endLine РёР»Рё СЂРµРіСѓР»СЏСЂРєРѕР№) РґР»СЏ С‚РѕС‡РµС‡РЅС‹С… С„СЂР°РіРјРµРЅС‚РѕРІ."
-        "Р•СЃР»Рё РЅСѓР¶РµРЅ С†РµР»С‹Р№ С„Р°Р№Р» (СЂРµРґРєРѕ) вЂ” РёСЃРїРѕР»СЊР·СѓР№ OPEN_FILE."
-        "Р”Р»СЏ РїРѕР»РЅРѕС‚РµРєСЃС‚РѕРІРѕРіРѕ РїРѕРёСЃРєР° РїРѕ РїСЂРѕРµРєС‚Сѓ РёСЃРїРѕР»СЊР·СѓР№ SEARCH_PROJECT (СѓРєР°Р¶Рё maxMatches Рё, РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё, include)."
-        "Р•СЃР»Рё С‚СЂРµР±СѓСЋС‚СЃСЏ РІРЅРµС€РЅРёРµ СЃРІРµРґРµРЅРёСЏ вЂ” РІС‹Р·РѕРІРё SEARCH_WEB Рё РєСЂР°С‚РєРѕ РїРµСЂРµСЃРєР°Р¶Рё РЅР°Р№РґРµРЅРЅС‹Рµ РјР°С‚РµСЂРёР°Р»С‹."
-        "Р’С‹РІРµРґРё С‚РѕР»СЊРєРѕ РєРѕРјР°РЅРґС‹."
+        "На основе запроса и плана выбери минимальные необходимые участки кода."
+        "Используй OPEN_FILE_REGION (желательно c startLine/endLine или регуляркой) для точечных фрагментов."
+        "Если нужен целый файл (редко) — используй OPEN_FILE."
+        "Для полнотекстового поиска по проекту используй SEARCH_PROJECT (укажи maxMatches и, при необходимости, include)."
+        "Если требуются внешние сведения — вызови SEARCH_WEB и кратко перескажи найденные материалы."
+        "Выведи только команды."
     );
     s2.setAllowedCommands(QStringList{ "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
-    // Step 3: Propose concrete edits as commands (dryвЂ‘run)
+    // Step 3: Propose concrete edits as commands (dry‑run)
     PromptStep s3;
     s3.setTemplate(
-        "РЎС„РѕСЂРјРёСЂСѓР№ РЅР°Р±РѕСЂ РїСЂР°РІРѕРє."
-        "вЂў Р”Р»СЏ Р·Р°РјРµРЅС‹ вЂ” REPLACE_IN_FILE"
-        "вЂў Р”Р»СЏ РїСЂР°РІРєРё РґРёР°РїР°Р·РѕРЅР° вЂ” EDIT_IN_RANGE"
-        "вЂў Р”Р»СЏ СЃРѕР·РґР°РЅРёСЏ вЂ” CREATE_FILE"
-        "вЂў Р”Р»СЏ РїРµСЂРµРёРјРµРЅРѕРІР°РЅРёСЏ/СѓРґР°Р»РµРЅРёСЏ вЂ” RENAME_FILE/DELETE_FILE"
-        "РџРѕРєР°Р¶Рё С‚РѕР»СЊРєРѕ СЃРїРёСЃРѕРє JSON-РєРѕРјР°РЅРґ Р±РµР· РїРѕСЏСЃРЅРµРЅРёР№.\n"
-        "РљРѕРЅС‚РµРєСЃС‚:\n{{OPEN_FILES}}\n"
+        "Сформируй набор правок."
+        "• Для замены — REPLACE_IN_FILE"
+        "• Для правки диапазона — EDIT_IN_RANGE"
+        "• Для создания — CREATE_FILE"
+        "• Для переименования/удаления — RENAME_FILE/DELETE_FILE"
+        "Покажи только список JSON-команд без пояснений.\n"
+        "Контекст:\n{{OPEN_FILES}}\n"
     );
     s3.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE" });
 
     // Step 4: If compilation hints are needed, ask short questions (optional)
     PromptStep s4;
     s4.setTemplate(
-        "Р•СЃР»Рё РґР»СЏ С‚РѕС‡РЅРѕСЃС‚Рё РїСЂР°РІРѕРє РЅРµ С…РІР°С‚Р°РµС‚ 1-2 РґРµС‚Р°Р»РµР№ вЂ” Р·Р°РґР°Р№ РІРѕРїСЂРѕСЃС‹ С‡РµСЂРµР· ASK_USER, РёРЅР°С‡Рµ РІРµСЂРЅРё РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє."
+        "Если для точности правок не хватает 1-2 деталей — задай вопросы через ASK_USER, иначе верни пустой список."
     );
     s4.setAllowedCommands(QStringList{ "ASK_USER" });
 
     // Step 5: Finalize edits
     PromptStep s5;
     s5.setTemplate(
-        "Р’С‹РІРµРґРё РѕРєРѕРЅС‡Р°С‚РµР»СЊРЅС‹Рµ РєРѕРјР°РЅРґС‹ РґР»СЏ РїСЂРёРјРµРЅРµРЅРёСЏ РёР·РјРµРЅРµРЅРёР№ (РїРѕРІС‚РѕСЂРё РІРµСЃСЊ РЅР°Р±РѕСЂ Р±РµР· РїРѕСЏСЃРЅРµРЅРёР№)."
-        "Р•СЃР»Рё РЅСѓР¶РЅРѕ РїРѕРєР°Р·Р°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ СЂРµР·СѓР»СЊС‚Р°С‚ РёР»Рё РёРЅСЃС‚СЂСѓРєС†РёСЋ вЂ” РґРѕР±Р°РІСЊ РєРѕРјР°РЅРґСѓ SHOW_RESULT СЃ title/content."
+        "Выведи окончательные команды для применения изменений (повтори весь набор без пояснений)."
+        "Если нужно показать пользователю результат или инструкцию — добавь команду SHOW_RESULT с title/content."
     );
     s5.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE", "SHOW_RESULT" });
 
     PromptSequence seq("Default");
-    seq.setDescription("РџРѕСЌС‚Р°РїРЅР°СЏ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕСЃС‚СЊ РїСЂР°РІРѕРє: СѓС‚РѕС‡РЅРµРЅРёРµ в†’ СЃР±РѕСЂ РјРёРЅРёРјР°Р»СЊРЅРѕРіРѕ РєРѕРЅС‚РµРєСЃС‚Р° в†’ С‡РµСЂРЅРѕРІРёРє РїСЂР°РІРѕРє в†’ СѓС‚РѕС‡РЅРµРЅРёСЏ в†’ С„РёРЅР°Р»СЊРЅС‹Рµ РєРѕРјР°РЅРґС‹.");
+    seq.setDescription("Поэтапная последовательность правок: уточнение → сбор минимального контекста → черновик правок → уточнения → финальные команды.");
     seq.addStep(s1);
     seq.addStep(s2);
     seq.addStep(s3);

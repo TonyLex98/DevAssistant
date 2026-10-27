@@ -244,7 +244,7 @@ static bool executeRequest(QNetworkReply* reply,
 
     if (timedOut) {
         if (err)
-            *err = QStringLiteral("SEARCH_WEB: Р·Р°РїСЂРѕСЃ РїСЂРµРІС‹СЃРёР» С‚Р°Р№Рј-Р°СѓС‚");
+            *err = QStringLiteral("SEARCH_WEB: запрос превысил тайм-аут");
         reply->deleteLater();
         return false;
     }
@@ -962,14 +962,14 @@ SearchWebCommand::SearchWebCommand(const QString& query,
 
 bool SearchWebCommand::apply(DevAssManager* devAss, QString* err)
 {
-    // Р’С‹Р·С‹РІР°РµРј applyWithLLM СЃ РїСѓСЃС‚С‹Рј Р°РґР°РїС‚РµСЂРѕРј, С‡С‚РѕР±С‹ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ РєР»Р°СЃСЃРёС‡РµСЃРєСѓСЋ СЃСѓРјРјР°СЂРёР·Р°С†РёСЋ
+    // Вызываем applyWithLLM с пустым адаптером, чтобы использовать только классическую суммаризацию
     return applyWithLLM(devAss, nullptr, err);
 }
 
 bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter, QString* errorOut)
 {
     (void)devAss;
-    // Р’С‹Р·С‹РІР°РµРј РѕСЃРЅРѕРІРЅСѓСЋ Р»РѕРіРёРєСѓ, РЅРѕ СЃ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊСЋ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ LLM РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё
+    // Вызываем основную логику, но с возможностью использовать LLM для суммаризации
     m_results.clear();
     m_rawResults.clear();
     const QString originalQuery = m_params.value("query").toString().trimmed();
@@ -979,7 +979,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
              << "original:" << originalQuery;
 
     if (query.isEmpty()) {
-        if (errorOut) *errorOut = QStringLiteral("SEARCH_WEB: РїСѓСЃС‚РѕР№ Р·Р°РїСЂРѕСЃ");
+        if (errorOut) *errorOut = QStringLiteral("SEARCH_WEB: пустой запрос");
         qCDebug(logCmd) << "[SearchWebCommand] Empty query error";
         return false;
     }
@@ -1019,7 +1019,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
     QVector<SearchHit> hits;
 
     try {
-        // 1. РџРѕРїС‹С‚РєР° С‡РµСЂРµР· JSON API DuckDuckGo
+        // 1. Попытка через JSON API DuckDuckGo
         static QHash<QString, TimedCacheEntry<QVector<SearchHit>>> queryCache;
         static constexpr int kMaxQueryCacheEntries = 48;
 
@@ -1232,7 +1232,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
                         qCDebug(logCmd) << "  Hit" << i+1 << ":" << hits[i].title << "at" << hits[i].url;
                     }
                 } else {
-                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo API РІРµСЂРЅСѓР» %1").arg(status);
+                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo API вернул %1").arg(status);
                     qCDebug(logCmd) << "[SearchWebCommand] API request failed with status:" << status;
                 }
             } else {
@@ -1241,7 +1241,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
             }
         }
 
-        // 2. Fallback вЂ” HTML-СЃС‚СЂР°РЅРёС†Р°
+        // 2. Fallback — HTML-страница
         if (hits.isEmpty()) {
             qCDebug(logCmd) << "[SearchWebCommand] API returned no results, trying HTML fallback";
             QUrl htmlUrl(QStringLiteral("https://html.duckduckgo.com/html/"));
@@ -1260,7 +1260,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
                 if (status >= 200 && status < 300) {
                     const QString html = QString::fromUtf8(body);
                     if (html.contains(QStringLiteral("select all squares containing a duck"), Qt::CaseInsensitive)) {
-                        lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo Р·Р°РїСЂРѕСЃ С‚СЂРµР±СѓРµС‚ РїСЂРѕС…РѕР¶РґРµРЅРёСЏ РєР°РїС‡Рё");
+                        lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo запрос требует прохождения капчи");
                         qCDebug(logCmd) << "[SearchWebCommand] CAPTCHA required";
                     } else {
                         hits = parseDuckHtml(html, maxResults, &seen);
@@ -1269,14 +1269,14 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
                             qCDebug(logCmd) << "  HTML Hit" << i+1 << ":" << hits[i].title << "at" << hits[i].url;
                         }
                         if (hits.isEmpty()) {
-                            lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML РЅРµ РІРµСЂРЅСѓР» СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ");
+                            lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML не вернул результатов");
                             qCDebug(logCmd) << "[SearchWebCommand] HTML parsing returned no results";
                         } else {
                             qCDebug(logCmd) << "[SearchWebCommand] Successfully parsed HTML results";
                         }
                     }
                 } else {
-                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML РІРµСЂРЅСѓР» %1").arg(status);
+                    lastError = QStringLiteral("SEARCH_WEB: DuckDuckGo HTML вернул %1").arg(status);
                     qCDebug(logCmd) << "[SearchWebCommand] HTML request failed with status:" << status;
                 }
             } else {
@@ -1293,13 +1293,13 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
             const bool returnDiagnostics = m_params.value("returnDiagnostics").toBool(false);
             if (!returnDiagnostics) {
                 QStringList msg;
-                msg << QString("Р РµР·СѓР»СЊС‚Р°С‚ РїРѕРёСЃРєР° РІ РёРЅС‚РµСЂРЅРµС‚Рµ РїРѕ Р·Р°РїСЂРѕСЃСѓ: '%1'").arg(query);
-                msg << QStringLiteral("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЂРµР·СѓР»СЊС‚Р°С‚С‹ РёР· РґРѕСЃС‚СѓРїРЅС‹С… РёСЃС‚РѕС‡РЅРёРєРѕРІ.");
-                msg << QStringLiteral("РџРѕРїСЂРѕР±СѓР№С‚Рµ СѓС‚РѕС‡РЅРёС‚СЊ Р·Р°РїСЂРѕСЃ РёР»Рё СѓРєР°Р·Р°С‚СЊ РёСЃС‚РѕС‡РЅРёРє (РЅР°РїСЂРёРјРµСЂ: \"site:ria.ru\", \"site:bbc.com\").");
+                msg << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                msg << QStringLiteral("Не удалось получить результаты из доступных источников.");
+                msg << QStringLiteral("Попробуйте уточнить запрос или указать источник (например: \"site:ria.ru\", \"site:bbc.com\").");
                 m_results = msg;
                 return true;
             }
-            // Р•СЃР»Рё Р±С‹Р»Р° TLS РѕС€РёР±РєР°, С‚Р°Р№РјР°СѓС‚ РёР»Рё РґСЂСѓРіР°СЏ РѕС€РёР±РєР° СЃРµС‚Рё, РІСЃС‘ СЂР°РІРЅРѕ СЃРѕС…СЂР°РЅРёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ
+            // Если была TLS ошибка, таймаут или другая ошибка сети, всё равно сохранить информацию
             if (!lastError.isEmpty() &&
                 (lastError.contains("TLS", Qt::CaseInsensitive) ||
                  lastError.contains("SSL", Qt::CaseInsensitive) ||
@@ -1308,36 +1308,36 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
                  lastError.contains("network", Qt::CaseInsensitive) ||
                  lastError.contains("connection", Qt::CaseInsensitive) ||
                  lastError.contains("timeout", Qt::CaseInsensitive) ||
-                 lastError.contains("РїСЂРµРІС‹СЃРёР» С‚Р°Р№Рј-Р°СѓС‚", Qt::CaseInsensitive) ||
+                 lastError.contains("превысил тайм-аут", Qt::CaseInsensitive) ||
                  lastError.contains("timed out", Qt::CaseInsensitive))) {
 
-                // РЎРѕС…СЂР°РЅСЏРµРј РёРЅС„РѕСЂРјР°С†РёСЋ РѕР± РѕС€РёР±РєРµ РєР°Рє СЂРµР·СѓР»СЊС‚Р°С‚
+                // Сохраняем информацию об ошибке как результат
                 QStringList errorResult;
-                errorResult << QString("Р РµР·СѓР»СЊС‚Р°С‚ РїРѕРёСЃРєР° РІ РёРЅС‚РµСЂРЅРµС‚Рµ РїРѕ Р·Р°РїСЂРѕСЃСѓ: '%1'").arg(query);
-                errorResult << QString("РћС€РёР±РєР° РїРѕРёСЃРєР°: %1").arg(lastError);
-                errorResult << "Р’РѕР·РјРѕР¶РЅС‹Рµ РїСЂРёС‡РёРЅС‹:";
-                errorResult << "- РџСЂРѕР±Р»РµРјС‹ СЃ SSL/TLS СЃРµСЂС‚РёС„РёРєР°С‚Р°РјРё";
-                errorResult << "- Р‘Р»РѕРєРёСЂРѕРІРєР° СЃРѕРµРґРёРЅРµРЅРёР№ Р°РЅС‚РёРІРёСЂСѓСЃРѕРј/Р±СЂР°РЅРґРјР°СѓСЌСЂРѕРј";
-                errorResult << "- РћРіСЂР°РЅРёС‡РµРЅРёСЏ СЃРµС‚РµРІС‹С… РЅР°СЃС‚СЂРѕРµРє";
-                errorResult << "- РџСЂРµРІС‹С€РµРЅРёРµ РІСЂРµРјРµРЅРё РѕР¶РёРґР°РЅРёСЏ РѕС‚РІРµС‚Р° РѕС‚ СЃРµСЂРІРµСЂР°";
+                errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                errorResult << QString("Ошибка поиска: %1").arg(lastError);
+                errorResult << "Возможные причины:";
+                errorResult << "- Проблемы с SSL/TLS сертификатами";
+                errorResult << "- Блокировка соединений антивирусом/брандмауэром";
+                errorResult << "- Ограничения сетевых настроек";
+                errorResult << "- Превышение времени ожидания ответа от сервера";
                 errorResult << "";
-                errorResult << "Р РµРєРѕРјРµРЅРґР°С†РёРё:";
-                errorResult << "- РџСЂРѕРІРµСЂРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё Р±СЂР°РЅРґРјР°СѓСЌСЂР° Рё Р°РЅС‚РёРІРёСЂСѓСЃР°";
-                errorResult << "- РЈР±РµРґРёС‚СЊСЃСЏ РІ РЅР°Р»РёС‡РёРё СЃС‚Р°Р±РёР»СЊРЅРѕРіРѕ РґРѕСЃС‚СѓРїР° Рє РёРЅС‚РµСЂРЅРµС‚Сѓ";
-                errorResult << "- РџРѕРІС‚РѕСЂРёС‚СЊ Р·Р°РїСЂРѕСЃ РїРѕР·Р¶Рµ";
+                errorResult << "Рекомендации:";
+                errorResult << "- Проверить настройки брандмауэра и антивируса";
+                errorResult << "- Убедиться в наличии стабильного доступа к интернету";
+                errorResult << "- Повторить запрос позже";
 
                 m_results = errorResult;
                 qCDebug(logCmd) << "[SearchWebCommand] Saved error results to m_results, count:" << m_results.size();
-                return true; // РЈСЃРїРµС€РЅРѕ РІС‹РїРѕР»РЅРµРЅРѕ СЃ РёРЅС„РѕСЂРјР°С†РёРµР№ РѕР± РѕС€РёР±РєРµ
+                return true; // Успешно выполнено с информацией об ошибке
             } else {
                 if (errorOut)
                     *errorOut = lastError.isEmpty()
-                        ? QStringLiteral("SEARCH_WEB: СЃРѕРІРїР°РґРµРЅРёСЏ РЅРµ РЅР°Р№РґРµРЅС‹")
+                        ? QStringLiteral("SEARCH_WEB: совпадения не найдены")
                         : lastError;
                 QStringList noResults;
-                noResults << QString("Р РµР·СѓР»СЊС‚Р°С‚ РїРѕРёСЃРєР° РІ РёРЅС‚РµСЂРЅРµС‚Рµ РїРѕ Р·Р°РїСЂРѕСЃСѓ: '%1'").arg(query);
-                noResults << QStringLiteral("РЎРѕРІРїР°РґРµРЅРёСЏ РЅРµ РЅР°Р№РґРµРЅС‹.");
-                noResults << QStringLiteral("РџРѕРїСЂРѕР±СѓР№С‚Рµ СѓС‚РѕС‡РЅРёС‚СЊ Р·Р°РїСЂРѕСЃ РёР»Рё СѓРєР°Р·Р°С‚СЊ РёСЃС‚РѕС‡РЅРёРє (РЅР°РїСЂРёРјРµСЂ: \"site:github.com\", \"site:stackoverflow.com\").");
+                noResults << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+                noResults << QStringLiteral("Совпадения не найдены.");
+                noResults << QStringLiteral("Попробуйте уточнить запрос или указать источник (например: \"site:github.com\", \"site:stackoverflow.com\").");
                 m_results = noResults;
                 qCDebug(logCmd) << "[SearchWebCommand] No results (non-network), returning informational result";
                 return true;
@@ -1382,7 +1382,7 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
         const QString combinedFromSnippets = snippetContents.join(QStringLiteral("\n")).trimmed();
         const QString summarySource = !combinedFromPages.isEmpty() ? combinedFromPages : combinedFromSnippets;
 
-        // РџРѕРґРіРѕС‚РѕРІРєР° СЂРµР·СѓР»СЊС‚Р°С‚Р° - РµСЃР»Рё РґРѕСЃС‚СѓРїРµРЅ LLM, РёСЃРїРѕР»СЊР·СѓРµРј РµРіРѕ РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё
+        // Подготовка результата - если доступен LLM, используем его для суммаризации
         QStringList resultBlocks;
         resultBlocks << QString("=== Р Р•Р—РЈР›Р¬РўРђРўР« РџРћРРЎРљРђ РџРћ Р—РђРџР РћРЎРЈ '%1' ===").arg(query);
 
@@ -1392,19 +1392,19 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
         if (!summarySource.isEmpty() && adapter) {
             QString llmSummary = generateLLMSummary(adapter, summarySource, query);
             const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
-            resultBlocks << QString("LLM-СЃСѓРјРјР°СЂРёР·Р°С†РёСЏ РїРѕ %1 РёСЃС‚РѕС‡РЅРёРєР°Рј:").arg(sourceCount);
+            resultBlocks << QString("LLM-суммаризация по %1 источникам:").arg(sourceCount);
             resultBlocks << llmSummary;
         } else if (!summarySource.isEmpty()) {
             const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
-            resultBlocks << QString("РЎСѓРјРјР°СЂРёР·Р°С†РёСЏ РїРѕ %1 РёСЃС‚РѕС‡РЅРёРєР°Рј:").arg(sourceCount);
+            resultBlocks << QString("Суммаризация по %1 источникам:").arg(sourceCount);
             resultBlocks << summarizeContentInternal(summarySource, query);
         } else {
-            resultBlocks << QString("РќР°Р№РґРµРЅРѕ %1 СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ, РЅРѕ РєРѕРЅС‚РµРЅС‚ РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚.").arg(hits.size());
+            resultBlocks << QString("Найдено %1 результатов, но контент для суммаризации отсутствует.").arg(hits.size());
         }
 
         resultBlocks << QString("\n=== Р’РЎР• РќРђР™Р”Р•РќРќР«Р• РЎРЎР«Р›РљР ===");
 
-        // Р”РѕР±Р°РІР»СЏРµРј РІСЃРµ РЅР°Р№РґРµРЅРЅС‹Рµ СЃСЃС‹Р»РєРё
+        // Добавляем все найденные ссылки
         for (const SearchHit& hit : hits.mid(0, maxResults)) {
             QString linkBlock = hit.title + QLatin1Char('\n') + hit.url;
             if (!hit.snippet.isEmpty())
@@ -1422,26 +1422,26 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
         return true;
     }
     catch (const std::exception& e) {
-        // РћР±СЂР°Р±РѕС‚РєР° РёСЃРєР»СЋС‡РµРЅРёР№, РєРѕС‚РѕСЂС‹Рµ РјРѕРіСѓС‚ РІРѕР·РЅРёРєРЅСѓС‚СЊ РїСЂРё TLS РѕС€РёР±РєР°С…
+        // Обработка исключений, которые могут возникнуть при TLS ошибках
         qCDebug(logCmd) << "[SearchWebCommand] Exception caught:" << QString::fromStdString(e.what());
         QStringList errorResult;
-        errorResult << QString("Р РµР·СѓР»СЊС‚Р°С‚ РїРѕРёСЃРєР° РІ РёРЅС‚РµСЂРЅРµС‚Рµ РїРѕ Р·Р°РїСЂРѕСЃСѓ: '%1'").arg(query);
-        errorResult << QString("РћС€РёР±РєР° РІС‹РїРѕР»РЅРµРЅРёСЏ Р·Р°РїСЂРѕСЃР°: %1").arg(QString::fromStdString(e.what()));
-        errorResult << "Р’РѕР·РјРѕР¶РЅР°СЏ РїСЂРёС‡РёРЅР°: РїСЂРѕР±Р»РµРјР° СЃ TLS/SSL СЃРѕРµРґРёРЅРµРЅРёРµРј РёР»Рё СЃРµС‚РµРІС‹РјРё РЅР°СЃС‚СЂРѕР№РєР°РјРё";
+        errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+        errorResult << QString("Ошибка выполнения запроса: %1").arg(QString::fromStdString(e.what()));
+        errorResult << "Возможная причина: проблема с TLS/SSL соединением или сетевыми настройками";
         m_results = errorResult;
         qCDebug(logCmd) << "[SearchWebCommand] Saved exception results to m_results, count:" << m_results.size();
-        return true; // РЈСЃРїРµС€РЅРѕ РІС‹РїРѕР»РЅРµРЅРѕ, РЅРѕ СЃ РёРЅС„РѕСЂРјР°С†РёРµР№ РѕР± РѕС€РёР±РєРµ
+        return true; // Успешно выполнено, но с информацией об ошибке
     }
     catch (...) {
-        // РћР±СЂР°Р±РѕС‚РєР° РІСЃРµС… РѕСЃС‚Р°Р»СЊРЅС‹С… РёСЃРєР»СЋС‡РµРЅРёР№
+        // Обработка всех остальных исключений
         qCDebug(logCmd) << "[SearchWebCommand] Unknown exception caught";
         QStringList errorResult;
-        errorResult << QString("Р РµР·СѓР»СЊС‚Р°С‚ РїРѕРёСЃРєР° РІ РёРЅС‚РµСЂРЅРµС‚Рµ РїРѕ Р·Р°РїСЂРѕСЃСѓ: '%1'").arg(query);
-        errorResult << "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР° РїСЂРё РІС‹РїРѕР»РЅРµРЅРёРё РїРѕРёСЃРєРѕРІРѕРіРѕ Р·Р°РїСЂРѕСЃР°";
-        errorResult << "Р’РѕР·РјРѕР¶РЅР°СЏ РїСЂРёС‡РёРЅР°: РїСЂРѕР±Р»РµРјР° СЃ TLS/SSL СЃРѕРµРґРёРЅРµРЅРёРµРј РёР»Рё СЃРµС‚РµРІС‹РјРё РЅР°СЃС‚СЂРѕР№РєР°РјРё";
+        errorResult << QString("Результат поиска в интернете по запросу: '%1'").arg(query);
+        errorResult << "Неизвестная ошибка при выполнении поискового запроса";
+        errorResult << "Возможная причина: проблема с TLS/SSL соединением или сетевыми настройками";
         m_results = errorResult;
         qCDebug(logCmd) << "[SearchWebCommand] Saved unknown exception results to m_results, count:" << m_results.size();
-        return true; // РЈСЃРїРµС€РЅРѕ РІС‹РїРѕР»РЅРµРЅРѕ, РЅРѕ СЃ РёРЅС„РѕСЂРјР°С†РёРµР№ РѕР± РѕС€РёР±РєРµ
+        return true; // Успешно выполнено, но с информацией об ошибке
     }
 }
 
@@ -1449,7 +1449,7 @@ QString SearchWebCommand::summarizeContentInternal(const QString& content, const
 {
     const QString trimmedContent = content.trimmed();
     if (trimmedContent.isEmpty())
-        return QStringLiteral("РўРµРєСЃС‚ РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚.");
+        return QStringLiteral("Текст для суммаризации отсутствует.");
 
     QStringList sentences = splitIntoSentences(trimmedContent);
     if (sentences.isEmpty())
@@ -1520,8 +1520,8 @@ QString SearchWebCommand::summarizeContentInternal(const QString& content, const
     if (summary.isEmpty())
         summary = sentences.first();
 
-    const QString effectiveQuery = query.trimmed().isEmpty() ? QStringLiteral("РїРѕРёСЃРєРѕРІС‹Р№ Р·Р°РїСЂРѕСЃ") : query.trimmed();
-    return QString("РЎСѓРјРјР°СЂРёР·Р°С†РёСЏ РїРѕ Р·Р°РїСЂРѕСЃСѓ '%1':\n%2").arg(effectiveQuery, summary.trimmed());
+    const QString effectiveQuery = query.trimmed().isEmpty() ? QStringLiteral("поисковый запрос") : query.trimmed();
+    return QString("Суммаризация по запросу '%1':\n%2").arg(effectiveQuery, summary.trimmed());
 }
 
 QJsonObject SearchWebCommand::toJson() const
@@ -1536,44 +1536,44 @@ QJsonObject SearchWebCommand::toJson() const
 QString SearchWebCommand::generateLLMSummary(ModelAdapter* adapter, const QString& content, const QString& query)
 {
     if (!adapter) {
-        return QStringLiteral("РћС€РёР±РєР°: OllamaAdapter РЅРµ РїСЂРµРґРѕСЃС‚Р°РІР»РµРЅ РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё.");
+        return QStringLiteral("Ошибка: OllamaAdapter не предоставлен для суммаризации.");
     }
 
-    // РџСЂРёРІРµРґРµРЅРёРµ void* Рє OllamaAdapter*
+    // Приведение void* к OllamaAdapter*
     
 
     if (adapter->selectedModel().isEmpty()) {
-        return QStringLiteral("LLM РјРѕРґРµР»СЊ РЅРµ РІС‹Р±СЂР°РЅР°, СЃСѓРјРјР°СЂРёР·Р°С†РёСЏ РЅРµРІРѕР·РјРѕР¶РЅР°.");
+        return QStringLiteral("LLM модель не выбрана, суммаризация невозможна.");
     }
 
     QString effectiveQuery = query.trimmed();
     if (effectiveQuery.isEmpty())
-        effectiveQuery = QStringLiteral("РїРѕРёСЃРєРѕРІС‹Р№ Р·Р°РїСЂРѕСЃ Р±РµР· С‚РµРєСЃС‚Р°");
+        effectiveQuery = QStringLiteral("поисковый запрос без текста");
 
     QString contentForPrompt = content.trimmed();
     QString truncationNote;
     constexpr int kMaxContextChars = 12000;
     if (contentForPrompt.size() > kMaxContextChars) {
         contentForPrompt = contentForPrompt.left(kMaxContextChars);
-        truncationNote = QStringLiteral("\n[РљРѕРЅС‚РµРЅС‚ РѕР±СЂРµР·Р°РЅ РґРѕ %1 СЃРёРјРІРѕР»РѕРІ]").arg(kMaxContextChars);
+        truncationNote = QStringLiteral("\n[Контент обрезан до %1 символов]").arg(kMaxContextChars);
     }
 
     const QString systemPrompt = QStringLiteral(
-        "РўС‹ Р°СЃСЃРёСЃС‚РµРЅС‚-СЂР°Р·СЂР°Р±РѕС‚С‡РёРєР°. РЎС„РѕСЂРјРёСЂСѓР№ РЅР° РѕСЃРЅРѕРІРµ РЅР°Р№РґРµРЅРЅРѕРіРѕ РѕР±Р·РѕСЂР° РєСЂР°С‚РєСѓСЋ, СЃС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРЅСѓСЋ СЃСѓРјРјР°СЂРёР·Р°С†РёСЋ. "
-        "РЈРєР°Р¶Рё РєР»СЋС‡РµРІС‹Рµ РІС‹РІРѕРґС‹, СЃСЃС‹Р»РєРё РЅР° РёСЃС‚РѕС‡РЅРёРєРё Рё СЂРµРєРѕРјРµРЅРґСѓРµРјС‹Рµ РґРµР№СЃС‚РІРёСЏ. РћС‚РІРµС‡Р°Р№ РЅР° СЂСѓСЃСЃРєРѕРј СЏР·С‹РєРµ, РЅРµ РІС‹РґСѓРјС‹РІР°Р№ С„Р°РєС‚РѕРІ."
+        "Ты ассистент-разработчика. Сформируй на основе найденного обзора краткую, структурированную суммаризацию. "
+        "Укажи ключевые выводы, ссылки на источники и рекомендуемые действия. Отвечай на русском языке, не выдумывай фактов."
     );
     const QString userPrompt = QStringLiteral(
-        "Р—Р°РїСЂРѕСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: %1\n"
-        "РќР°Р№РґРµРЅРЅС‹Р№ РєРѕРЅС‚РµРЅС‚ РґР»СЏ СЃСѓРјРјР°СЂРёР·Р°С†РёРё:\n%2%3\n\n"
-        "РЎС„РѕСЂРјРёСЂСѓР№ РёС‚РѕРіРѕРІРѕРµ СЂРµР·СЋРјРµ (3вЂ“4 С‚РµР·РёСЃР° РёР»Рё РєРѕСЂРѕС‚РєРёС… Р°Р±Р·Р°С†Р°) СЃ СѓРєР°Р·Р°РЅРёРµРј РєР»СЋС‡РµРІС‹С… С„Р°РєС‚РѕРІ, СЃСЃС‹Р»РѕРє Рё РІРѕР·РјРѕР¶РЅС‹С… РґРµР№СЃС‚РІРёР№."
+        "Запрос пользователя: %1\n"
+        "Найденный контент для суммаризации:\n%2%3\n\n"
+        "Сформируй итоговое резюме (3–4 тезиса или коротких абзаца) с указанием ключевых фактов, ссылок и возможных действий."
     ).arg(effectiveQuery, contentForPrompt, truncationNote);
 
     QString summary = adapter->generateWithSystem(userPrompt, systemPrompt).trimmed();
     const QString errorPrefix = QStringLiteral("[Ollama error]");
     if (summary.startsWith(errorPrefix)) {
-        return QStringLiteral("LLM РІРµСЂРЅСѓР»Р° РѕС€РёР±РєСѓ: %1").arg(summary.mid(errorPrefix.length()).trimmed());
+        return QStringLiteral("LLM вернула ошибку: %1").arg(summary.mid(errorPrefix.length()).trimmed());
     } else if (summary.isEmpty()) {
-        return QStringLiteral("LLM РЅРµ РІРµСЂРЅСѓР»Р° РѕС‚РІРµС‚ РЅР° СЃСѓРјРјР°СЂРёР·Р°С†РёСЋ.");
+        return QStringLiteral("LLM не вернула ответ на суммаризацию.");
     }
 
     return summary;
