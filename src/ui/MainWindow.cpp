@@ -176,7 +176,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (sf.open(QIODevice::ReadOnly)) seq = PromptSequence::fromJson(QJsonDocument::fromJson(sf.readAll()).object());
         if (seq.name().isEmpty()) { QMessageBox::warning(this, "Ошибка", "Не удалось загрузить."); return; }
         m_currentSeq = seq; m_currentStepIdx = 0; m_sequenceMode = true;
-        m_sequenceEditor->updateSequenceGraphHighlight(); runNextStep();
+        m_sequenceEditor->updateSequenceGraphHighlight(); m_sequenceRunner->runNextStep();
     });
     connect(editTemplatesBtn, &StyledButton::clicked, this, [this]() {
         SolutionTemplateViewer *viewer = new SolutionTemplateViewer(&m_templateMgr, this);
@@ -380,7 +380,7 @@ MainWindow::MainWindow(QWidget *parent)
         m_centerSplitter->loadState();
     mainSplitter->loadState();
 
-    openSequenceGraph();
+    m_sequenceEditor->openSequenceGraph();
     const QList<int> storedSizes = mainSplitter->sizes();
     if (storedSizes.size() >= 3 && storedSizes.at(2) == 0) {
         QList<int> fallbackSizes = storedSizes;
@@ -1776,7 +1776,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
         m_activeImageSummaries.clear();
     }
     m_preserveActiveImagesForNextRun = false;
-    onChatTemplateSelectionChanged(templatePath);
+    m_sequenceEditor->onChatTemplateSelectionChanged(templatePath);
     if (m_contextManager)
         m_contextManager->observeUserQuery(text);
     appendUserQuestionToResultDisplay(text);
@@ -1868,7 +1868,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     m_sequenceEditor->updateSequenceGraphHighlight();  // Update the graph highlighting
     qCDebug(logUI) << "[runTemplateRequested] About to start task timer for template execution";
     m_statusController->startTask();
-    runNextStep();  // Start the sequence immediately
+    m_sequenceRunner->runNextStep();  // Start the sequence immediately
 }
 
 

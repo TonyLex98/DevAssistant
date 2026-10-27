@@ -207,25 +207,25 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
 {
     QVector<ResolverInfo> vec;
 
-    vec.append({"PROJECT_ROOT",    "Корневая папка проекта"});
-    vec.append({"FILE_LIST",       "Список файлов проекта"});
-    vec.append({"HISTORY",         "Последние 20 сообщений из чата"});
-    vec.append({"LAST_USER_MESSAGES", "Последние 100 пользовательских сообщений из чата"});
-    vec.append({"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
-    vec.append({"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
-    vec.append({"USER_QUERY",      "Текущий запрос пользователя"});
-    vec.append({"CURRENT_DATE",    "Текущая дата (YYYY-MM-DD)"});
-    vec.append({"TODAY",           "Синоним текущей даты (YYYY-MM-DD)"});
-    vec.append({"CURRENT_DATETIME","Текущие дата/время с UTC-смещением"});
-    vec.append({"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистент"});
-    vec.append({"OPEN_FILES",      "Открытые файлы"});
-    vec.append({"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
-    vec.append({"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
-    vec.append({"TOKEN_COUNT", "Число токенов текущего контекста"});
-    vec.append({"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
-    vec.append({"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
-    vec.append({"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
-    vec.append({"PROJECT_STRUCTURE", "Древовидное представление структуры папок проекта"});
+    vec.append(ResolverInfo{"PROJECT_ROOT",    "Корневая папка проекта"});
+    vec.append(ResolverInfo{"FILE_LIST",       "Список файлов проекта"});
+    vec.append(ResolverInfo{"HISTORY",         "Последние 20 сообщений из чата"});
+    vec.append(ResolverInfo{"LAST_USER_MESSAGES", "Последние 100 пользовательских сообщений из чата"});
+    vec.append(ResolverInfo{"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
+    vec.append(ResolverInfo{"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
+    vec.append(ResolverInfo{"USER_QUERY",      "Текущий запрос пользователя"});
+    vec.append(ResolverInfo{"CURRENT_DATE",    "Текущая дата (YYYY-MM-DD)"});
+    vec.append(ResolverInfo{"TODAY",           "Синоним текущей даты (YYYY-MM-DD)"});
+    vec.append(ResolverInfo{"CURRENT_DATETIME","Текущие дата/время с UTC-смещением"});
+    vec.append(ResolverInfo{"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистент"});
+    vec.append(ResolverInfo{"OPEN_FILES",      "Открытые файлы"});
+    vec.append(ResolverInfo{"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
+    vec.append(ResolverInfo{"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
+    vec.append(ResolverInfo{"TOKEN_COUNT", "Число токенов текущего контекста"});
+    vec.append(ResolverInfo{"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
+    vec.append(ResolverInfo{"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
+    vec.append(ResolverInfo{"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
+    vec.append(ResolverInfo{"PROJECT_STRUCTURE", "Древовидное представление структуры папок проекта"});
 
     return vec;
 }

@@ -111,7 +111,7 @@ public:
 
     void updateChatToggleButton(bool visible);
 
-    // в”Ђв”Ђв”Ђ IContextService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── IContextService ──────────────────────────────────────────────
     void setFullFileContext(const QString& path, const QStringList& lines) override;
     void addRegionContext(const QString& path, int startLine, const QStringList& lines) override;
     void clearContextForPath(const QString& path) override;
@@ -157,7 +157,7 @@ public:
     void appendConsoleContext(const QString& title, const QString& stdOut, const QString& stdErr, int exitCode) override;
     void appendExternalContext(const QString& block) override;
 
-    // в”Ђв”Ђв”Ђ IModelService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── IModelService ────────────────────────────────────────────────
     void configure(const QString& model, const QVariantMap& params) override;
     void setProvider(int provider) override;
     void setEndpoint(const QUrl& url) override;
@@ -190,7 +190,7 @@ public:
     QByteArray extractJsonPart(const QByteArray& txt) const override;
     QString summarizeSearchResults(const QString& content, const QString& query) override;
 
-    // в”Ђв”Ђв”Ђ IProjectService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── IProjectService ──────────────────────────────────────────────
     QString projectRoot() const override;
     void setProjectRoot(const QString& path) override;
     QStringList indexedFiles() const override;
@@ -214,7 +214,7 @@ public:
     // IProjectService - additional
     bool applyGroupedEditInRange(const QList<Command*>& commands, QString* err) override;
 
-    // в”Ђв”Ђв”Ђ IUIUpdater в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── IUIUpdater ───────────────────────────────────────────────────
     void log(const QString& msg) override;
     void statusBarMessage(const QString& msg) override;
     void appendUserQuestionToResultDisplay(const QString& question) override;
@@ -227,7 +227,7 @@ public:
     QDateTime& lastQuestionTimestamp() override;
     QComboBox* confirmModeComboBox() override;
 
-    // в”Ђв”Ђв”Ђ ISequenceService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── ISequenceService ─────────────────────────────────────────────
     bool isStopRequested() const override;
     void setStopRequested(bool v) override;
     bool isSequenceMode() const override;
@@ -235,6 +235,9 @@ public:
     void runSequenceDialog() override;
     void stopTask() override;
     PromptSequenceManager* seqMgrPtr() override;
+    // Sequence editing and execution now live in SequenceEditorController and SequenceRunner.
+    void refreshAllSequences() override { if (m_sequenceEditor) m_sequenceEditor->refreshAllSequences(); }
+    void stopTemplateExecution() { if (m_sequenceRunner) m_sequenceRunner->stopExecution(); }
     PromptSequence* currentSequencePtr() override;
     int currentStepIndex() const override;
     void setCurrentStepIndex(int idx) override;
@@ -265,12 +268,12 @@ public:
     void setSequenceMode(bool v) override;
     int& agentRepairCountThisStep() override;
 
-    // в”Ђв”Ђв”Ђ IGraphService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── IGraphService ────────────────────────────────────────────────
     void showGraphWindow() override;
     void showLightRagWindow() override;
     SequenceGraphWidget* sequenceGraphWindow() override;
 
-    // в”Ђв”Ђв”Ђ ISettingsService в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    // ─── ISettingsService ─────────────────────────────────────────────
     void showSettings() override;
     void hideSettings() override;
     bool isSettingsVisible() const override;
@@ -423,8 +426,8 @@ private:
     int                   m_currentStepIdx = -1; // -1 = не запущено  // Run the next sequence specified by OPEN_SEQUENCE
     void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
     
-    /* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ NEW в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */    void ensureUniversalAgentTemplateInternal(); // Write UniversalAgent template v3 if missing/outdated
-    /* в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ END в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+    /* ────── NEW ────── */    void ensureUniversalAgentTemplateInternal(); // Write UniversalAgent template v3 if missing/outdated
+    /* ────── END ────── */
 
     void reOpenRootDir();
 
