@@ -217,7 +217,7 @@ public:
     // ─── IUIUpdater ───────────────────────────────────────────────────
     void log(const QString& msg) override;
     void statusBarMessage(const QString& msg) override;
-    void appendUserQuestionToResultDisplay(const QString& question) override;
+    void appendUserQuestionToResultDisplay(const QString& question) override { if (m_sequenceRunner) m_sequenceRunner->appendUserQuestionToResultDisplay(question); }
     void appendConsoleToResultDisplay(const QString& block) override;
     void appendExternalToResultDisplay(const QString& block) override;
     QTreeWidget* contextCommandsList() override;
@@ -231,8 +231,8 @@ public:
     bool isStopRequested() const override;
     void setStopRequested(bool v) override;
     bool isSequenceMode() const override;
-    void resetSequenceStabilityState() override;
-    void runSequenceDialog() override;
+    void resetSequenceStabilityState() override { if (m_sequenceRunner) m_sequenceRunner->resetSequenceStabilityState(); }
+    void runSequenceDialog() override { if (m_sequenceRunner) m_sequenceRunner->runSequenceDialog(); }
     void stopTask() override;
     PromptSequenceManager* seqMgrPtr() override;
     // Sequence editing and execution now live in SequenceEditorController and SequenceRunner.
