@@ -1,5 +1,7 @@
 # DevAssistant
 
+[![Build](https://github.com/TonyLex98/DevAssistant/actions/workflows/build.yml/badge.svg)](https://github.com/TonyLex98/DevAssistant/actions/workflows/build.yml)
+
 Desktop AI assistant for programmers, built with Qt / C++ and running on local language models.
 
 Десктопный ИИ-ассистент программиста на Qt / C++, который работает с локальными языковыми моделями. Модель видит ваш проект, читает и правит файлы через набор команд, а каждое действие вы подтверждаете сами.
