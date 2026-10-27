@@ -237,6 +237,8 @@ public:
     PromptSequenceManager* seqMgrPtr() override;
     // Sequence editing and execution now live in SequenceEditorController and SequenceRunner.
     void refreshAllSequences() override { if (m_sequenceEditor) m_sequenceEditor->refreshAllSequences(); }
+    void ensureDefaultSequence() override { if (m_sequenceEditor) m_sequenceEditor->ensureDefaultSequence(); }
+    void updateSequenceGraphHighlight() override { if (m_sequenceEditor) m_sequenceEditor->updateSequenceGraphHighlight(); }
     void stopTemplateExecution() { if (m_sequenceRunner) m_sequenceRunner->stopExecution(); }
     PromptSequence* currentSequencePtr() override;
     int currentStepIndex() const override;

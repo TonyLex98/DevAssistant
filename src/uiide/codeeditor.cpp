@@ -1,5 +1,6 @@
 #include "codeeditor.h"
 #include <QTextBlock>
+#include <QPainterPath>
 #include <QScrollBar>
 #include <QDebug>
 

@@ -146,13 +146,13 @@ MainWindow::MainWindow(QWidget *parent)
     // Signal connections (preserved from inline code)
     connect(ui.m_settingsSidebar, &QListWidget::currentRowChanged, ui.m_settingsPages, &QStackedWidget::setCurrentIndex);
     connect(graphBtn, &StyledButton::clicked, this, &MainWindow::openGraph);
-    connect(seqGraphBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::openSequenceGraph);
+    connect(seqGraphBtn, &StyledButton::clicked, this, [this]() { m_sequenceEditor->openSequenceGraph(); });
     connect(lightRagBtn, &StyledButton::clicked, this, &MainWindow::openLightRag);
     connect(m_ttsController, &TtsController::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
     connect(m_ttsController, &TtsController::errorMessage, this, [this](const QString& e){ log("TTS Error: "+e); });
-    connect(newSeqBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::createNewSequence);
-    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, m_sequenceEditor,
-            &SequenceEditorController::openSequenceEditorForName);
+    connect(newSeqBtn, &StyledButton::clicked, this, [this]() { m_sequenceEditor->createNewSequence(); });
+    connect(m_seqGraphWindow, &SequenceGraphWidget::sequenceSelected, this,
+            [this](const QString& name) { m_sequenceEditor->openSequenceEditorForName(name); });
     connect(chatToggleBtn, &StyledButton::clicked, this, [this]() {
         bool v = !m_chat->isChatLogVisible(); m_chat->setChatLogVisible(v);
         chatToggleBtn->setText(v ? tr("Hide chat") : tr("Show chat"));
@@ -295,14 +295,14 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_chat, &ChatDialog::runTemplateRequestedWithImages, this, &MainWindow::runTemplateRequestedWithImages);
     connect(m_chat, &ChatDialog::runSimpleChat, this, &MainWindow::runSimpleChat);
     connect(m_chat, &ChatDialog::runSimpleChatWithImages, this, &MainWindow::runSimpleChatWithImages);
-    connect(m_chat, &ChatDialog::templateSelectionChanged, m_sequenceEditor, &SequenceEditorController::onChatTemplateSelectionChanged);
+    connect(m_chat, &ChatDialog::templateSelectionChanged, this, [this](const QString& path) { m_sequenceEditor->onChatTemplateSelectionChanged(path); });
     connect(&m_model, &OllamaAdapter::streamChunk, this, &MainWindow::onModelChunk);
-    connect(&m_model, &OllamaAdapter::streamFinished, m_sequenceRunner, &SequenceRunner::handleAssistantFinished);
+    connect(&m_model, &OllamaAdapter::streamFinished, this, [this]() { m_sequenceRunner->handleAssistantFinished(); });
     connect(&m_model, &OllamaAdapter::streamError,
             this, [this](const QString &e){ log("Model error: " + e); });
 
-    connect(runSeqBtn, &StyledButton::clicked, m_sequenceRunner, &SequenceRunner::runSequenceDialog);
-    connect(editSeqBtn, &StyledButton::clicked, m_sequenceEditor, &SequenceEditorController::editSequences);
+    connect(runSeqBtn, &StyledButton::clicked, this, [this]() { m_sequenceRunner->runSequenceDialog(); });
+    connect(editSeqBtn, &StyledButton::clicked, this, [this]() { m_sequenceEditor->editSequences(); });
 
     connect(descBtn, &StyledButton::clicked, this, &MainWindow::generateDescriptions);
 
@@ -366,7 +366,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_chat, &ChatDialog::signal_updatelastUserMessage, this, &MainWindow::slot_updatelastUserMessage);
 
 
-    connect(ide_widget, &IDEWidget::signal_runSequenceDialog, m_sequenceRunner, &SequenceRunner::runSequenceDialog);
+    connect(ide_widget, &IDEWidget::signal_runSequenceDialog, this, [this]() { m_sequenceRunner->runSequenceDialog(); });
 
     connect(ide_widget, &IDEWidget::signal_updatelastUserMessage,this, &MainWindow::slot_updatelastUserMessage);
 
