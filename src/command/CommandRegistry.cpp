@@ -504,7 +504,7 @@ static QHash<QString, FactoryFn>& registry()
             QJsonArray excludePathsArr = p.value("excludePaths").toArray();
             for (const QJsonValue& v : excludePathsArr) excludePaths << v.toString();
             QString description = obj["description"].toString();
-            return new SearchProjectCommand(query, includePaths, excludePaths, includes, maxMatches, caseSensitive, useRegex, contextLines, description);
+            return new SearchProjectCommand(query, maxMatches, caseSensitive, includes, useRegex, contextLines, includePaths, excludePaths, description);
         });
 
         REGISTER_COMMAND(SEARCH_PROJECT_CASE_INSENSITIVE, [](const QJsonObject& obj) {
