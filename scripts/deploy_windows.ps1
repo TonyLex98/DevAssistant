@@ -30,8 +30,16 @@ Copy-Item $ExePath $exeOut -Force
 
 # Qt libraries, plugins (platforms, styles, image formats, audio, sqldrivers), MinGW runtime
 # and Qt's own Russian strings for standard dialogs.
-& $windeployqt.Source --release --compiler-runtime --no-opengl-sw --translations ru $exeOut
+# No --release: with MinGW builds of Qt 5.15 it makes windeployqt reject the platform plugin
+# ("Unable to find the platform plugin", QTBUG-84567). The build type is detected from the exe.
+& $windeployqt.Source --compiler-runtime --no-opengl-sw --translations ru $exeOut
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
+
+# Without these the program does not start, so check rather than trust the tool.
+foreach ($required in @("Qt5Core.dll", "Qt5Widgets.dll", "Qt5Sql.dll", "platforms\qwindows.dll",
+                        "sqldrivers\qsqlite.dll", "libstdc++-6.dll", "libwinpthread-1.dll")) {
+    if (-not (Test-Path (Join-Path $outAbs $required))) { throw "windeployqt did not deploy $required" }
+}
 
 # Qt 5.15 loads OpenSSL 1.1 at run time for HTTPS (web search, remote model servers).
 if ($OpenSslDir -and (Test-Path $OpenSslDir)) {
