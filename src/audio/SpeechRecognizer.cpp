@@ -1,9 +1,9 @@
-#include "SpeechRecognizer.h"
+#include "audio/SpeechRecognizer.h"
 
-#include "FasterWhisperRunner.h"
-#include "MicTranscriber.h"
-#include "OmniAsrRunner.h"
-#include "VoskRunner.h"
+#include "audio/FasterWhisperRunner.h"
+#include "audio/MicTranscriber.h"
+#include "audio/OmniAsrRunner.h"
+#include "audio/VoskRunner.h"
 
 #include <QFileInfo>
 #include <QSettings>

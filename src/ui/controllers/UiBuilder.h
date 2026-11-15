@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UIWidgets.h"
+#include "ui/controllers/UIWidgets.h"
 #include <QString>
 #include <functional>
 #include <QVBoxLayout>

@@ -1,4 +1,4 @@
-#include "ContextGraphWidget.h"
+#include "ui/ContextGraphWidget.h"
 
 #include <QGraphicsScene>
 #include <QGraphicsView>

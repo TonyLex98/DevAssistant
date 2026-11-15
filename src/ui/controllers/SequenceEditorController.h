@@ -1,10 +1,10 @@
 #pragma once
 
 #include <QString>
-#include <PromptSequence.h>
-#include <PromptSequenceManager.h>
-#include <SolutionTemplateManager.h>
-#include "../../services/IService.h"
+#include "core/workflow/PromptSequence.h"
+#include "core/workflow/PromptSequenceManager.h"
+#include "core/workflow/SolutionTemplateManager.h"
+#include "ui/controllers/IService.h"
 
 // Sequence editor controller:
 //  - creates, edits and saves sequences

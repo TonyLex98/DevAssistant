@@ -2,10 +2,10 @@
 #include <QJsonDocument>
 #include <QSet>
 
-#include "CommandDocs.h"
-#include "CommandParser.h"
-#include "CommandRegistry.h"
-#include "EditInRangeCommand.h"
+#include "core/commands/CommandDocs.h"
+#include "core/commands/CommandParser.h"
+#include "core/commands/CommandRegistry.h"
+#include "core/commands/EditInRangeCommand.h"
 
 namespace {
 

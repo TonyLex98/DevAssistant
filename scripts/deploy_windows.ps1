@@ -2,10 +2,10 @@
 # the program, the Qt libraries and plugins it needs (windeployqt), the MinGW runtime,
 # OpenSSL for HTTPS, Qt's Russian translation and the Python helper scripts for voice.
 #
-#   .\scripts\deploy_windows.ps1 [-ExePath release\DevAssistantQt.exe] [-OutDir dist\DevAssistant]
+#   .\scripts\deploy_windows.ps1 [-ExePath bin\DevAssistantQt.exe] [-OutDir dist\DevAssistant]
 #                                [-OpenSslDir <folder with libssl-1_1-x64.dll>] [-Zip <file.zip>]
 param(
-    [string]$ExePath = "release\DevAssistantQt.exe",
+    [string]$ExePath = "bin\DevAssistantQt.exe",
     [string]$OutDir = "dist\DevAssistant",
     [string]$OpenSslDir = "",
     [string]$Zip = ""

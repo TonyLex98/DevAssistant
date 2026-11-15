@@ -1,5 +1,5 @@
-#include "TtsRunner.h"
-#include "PythonScripts.h"
+#include "audio/TtsRunner.h"
+#include "audio/PythonScripts.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>

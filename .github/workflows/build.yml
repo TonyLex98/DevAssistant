@@ -50,30 +50,23 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force translations | Out-Null
-          lupdate DevAssistantQt.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none -tr-function-alias tr+=tr_fn
+          lupdate DevAssistant.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none -tr-function-alias tr+=tr_fn
           & "$env:pythonLocation\python.exe" scripts/fill_translations.py translations/devassistant_ru.ts translations/ru
 
-      - name: Configure
-        run: qmake DevAssistantQt.pro CONFIG+=release
-
-      - name: Build
-        run: mingw32-make -k -j4
-
-      # The tests build and run even if the app build failed, so both kinds of breakage show up.
+      # One shadow build of everything: the core library, the program and the tests.
       # Folders with sh.exe (Git) are dropped from PATH: with sh.exe found, mingw32-make runs
       # commands through it, while qmake's MinGW makefiles are written for cmd.exe.
-      - name: Build tests
-        if: ${{ !cancelled() }}
+      # -k: a broken file does not hide the errors in the others.
+      - name: Build
         shell: pwsh
         run: |
           $dirs = $env:PATH -split ';' | Where-Object { $_ }
           $withSh = $dirs | Where-Object { Test-Path (Join-Path $_ 'sh.exe') }
           if ($withSh) { Write-Host "Left out of PATH: $($withSh -join '; ')" }
           $env:PATH = ($dirs | Where-Object { $withSh -notcontains $_ }) -join ';'
-          Write-Host "qmake: $((Get-Command qmake).Source); make: $((Get-Command mingw32-make).Source)"
-          New-Item -ItemType Directory -Force build-tests | Out-Null
-          Set-Location build-tests
-          qmake ../tests/tests.pro CONFIG+=release
+          New-Item -ItemType Directory -Force build | Out-Null
+          Set-Location build
+          qmake ../DevAssistant.pro CONFIG+=release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           mingw32-make -k -j4
           exit $LASTEXITCODE
@@ -91,7 +84,7 @@ jobs:
           $failed = @()
           foreach ($dir in Get-ChildItem tests -Directory -Filter 'tst_*') {
             $name = $dir.Name
-            $exe = Get-ChildItem build-tests -Recurse -Filter "$name.exe" | Select-Object -First 1
+            $exe = Get-ChildItem build/tests -Recurse -Filter "$name.exe" | Select-Object -First 1
             if (-not $exe) {
               Write-Host "::error::$name was not built"
               $failed += $name
@@ -112,7 +105,7 @@ jobs:
         shell: pwsh
         run: |
           $version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0,7))" }
-          ./scripts/deploy_windows.ps1 -OutDir dist/DevAssistant -OpenSslDir openssl -Zip "DevAssistant-$version-windows-x64.zip"
+          ./scripts/deploy_windows.ps1 -ExePath build/bin/DevAssistantQt.exe -OutDir dist/DevAssistant -OpenSslDir openssl -Zip "DevAssistant-$version-windows-x64.zip"
           "PACKAGE=DevAssistant-$version-windows-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Smoke test and screenshots
@@ -127,7 +120,7 @@ jobs:
           git clone --quiet "$PWD" "$env:RUNNER_TEMP/DevAssistant"
           $exe = "dist/DevAssistant/DevAssistantQt.exe"
           foreach ($lang in @("en", "ru")) {
-            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang", "--project", "$env:RUNNER_TEMP/DevAssistant", "--open", "src/command/CommandPolicy.cpp" -PassThru
+            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang", "--project", "$env:RUNNER_TEMP/DevAssistant", "--open", "src/core/commands/CommandPolicy.cpp" -PassThru
             if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "The program did not finish the screenshot run in 60 s ($lang)" }
             if ($p.ExitCode -ne 0) { throw "The program exited with code $($p.ExitCode) ($lang)" }
           }

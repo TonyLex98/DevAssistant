@@ -5,7 +5,7 @@
 #include <QFile>
 #include <QTimer>
 #include <QVector>
-#include "WavWriter.h"
+#include "audio/WavWriter.h"
 
 class FasterWhisperRunner : public QObject {
     Q_OBJECT

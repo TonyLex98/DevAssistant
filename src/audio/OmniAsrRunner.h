@@ -3,7 +3,7 @@
 #include <QAudioInput>
 #include <QFile>
 #include <QProcess>
-#include "WavWriter.h"
+#include "audio/WavWriter.h"
 
 class OmniAsrRunner : public QObject {
     Q_OBJECT

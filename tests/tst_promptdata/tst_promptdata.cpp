@@ -4,9 +4,9 @@
 #include <QJsonDocument>
 #include <QStandardPaths>
 
-#include "PromptSequence.h"
-#include "PromptStep.h"
-#include "SolutionTemplate.h"
+#include "core/workflow/PromptSequence.h"
+#include "core/workflow/PromptStep.h"
+#include "core/workflow/SolutionTemplate.h"
 
 namespace {
 

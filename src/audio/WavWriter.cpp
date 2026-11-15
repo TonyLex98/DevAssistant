@@ -1,4 +1,4 @@
-#include "WavWriter.h"
+#include "audio/WavWriter.h"
 #include <QtEndian>
 
 static void put32(char* dst, quint32 v) {

@@ -4,18 +4,18 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 
-#include "DevAssManager.h"
-#include "AppendToFileCommand.h"
-#include "ApplyPatchCommand.h"
-#include "CreateFileCommand.h"
-#include "DeleteDirCommand.h"
-#include "DeleteFileCommand.h"
-#include "EditInRangeCommand.h"
-#include "InsertAtLineCommand.h"
-#include "OpenFileRegionCommand.h"
-#include "RenameFileCommand.h"
-#include "SearchProjectCommand.h"
-#include "UndoLastChangeCommand.h"
+#include "core/project/DevAssManager.h"
+#include "core/commands/AppendToFileCommand.h"
+#include "core/commands/ApplyPatchCommand.h"
+#include "core/commands/CreateFileCommand.h"
+#include "core/commands/DeleteDirCommand.h"
+#include "core/commands/DeleteFileCommand.h"
+#include "core/commands/EditInRangeCommand.h"
+#include "core/commands/InsertAtLineCommand.h"
+#include "core/commands/OpenFileRegionCommand.h"
+#include "core/commands/RenameFileCommand.h"
+#include "core/commands/SearchProjectCommand.h"
+#include "core/commands/UndoLastChangeCommand.h"
 #include "TestFiles.h"
 
 // Commands run against a temporary project through DevAssManager, as the app runs them.

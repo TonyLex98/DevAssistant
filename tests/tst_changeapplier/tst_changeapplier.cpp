@@ -3,7 +3,7 @@
 #include <QScopedPointer>
 #include <QTemporaryDir>
 
-#include "ChangeApplier.h"
+#include "core/project/ChangeApplier.h"
 #include "TestFiles.h"
 
 class TestChangeApplier : public QObject

@@ -1,5 +1,5 @@
-﻿#include "MainWindow.h"
-#include "../utils/DescriptionGenerator.h"
+﻿#include "ui/MainWindow.h"
+#include "core/project/DescriptionGenerator.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFileDialog>
@@ -17,12 +17,12 @@
 #include <QTime>
 #include <QLabel>
 #include <QFrame>
-#include "../ui/ChatDialog.h"
-#include "../ui/OllamaSettingsDialog.h"
-#include "../utils/AppConfig.h"
-#include "../ui/PromptEditorDialog.h"
-#include "../ui/ChangesDialog.h"
-#include "../ui/RunTemplateOrSequenceDialog.h"
+#include "ui/ChatDialog.h"
+#include "ui/dialogs/OllamaSettingsDialog.h"
+#include "core/util/AppConfig.h"
+#include "ui/dialogs/PromptEditorDialog.h"
+#include "ui/dialogs/ChangesDialog.h"
+#include "ui/dialogs/RunTemplateOrSequenceDialog.h"
 #include <QDir>
 #include <QFile>
 #include <QInputDialog>
@@ -32,20 +32,20 @@
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <algorithm>
-#include "../command/EditInRangeCommand.h"
-#include "../command/RunShellCommand.h"
-#include "../command/RunPythonCommand.h"
-#include "../command/SearchWebCommand.h"
-#include "../command/SearchProjectCommand.h"
-#include "../command/ShowResultCommand.h"
-#include "../command/Command.h"
-#include "../command/CommandDocs.h"
-#include "SolutionTemplateViewer.h"
-#include "../core/SolutionTemplateManager.h"
-#include "../utils/json_utils.h"
-#include "controllers/UIWidgets.h"
-#include "controllers/UiBuilder.h"
-#include "utils/Logging.h"
+#include "core/commands/EditInRangeCommand.h"
+#include "core/commands/RunShellCommand.h"
+#include "core/commands/RunPythonCommand.h"
+#include "core/commands/SearchWebCommand.h"
+#include "core/commands/SearchProjectCommand.h"
+#include "core/commands/ShowResultCommand.h"
+#include "core/commands/Command.h"
+#include "core/commands/CommandDocs.h"
+#include "ui/dialogs/SolutionTemplateViewer.h"
+#include "core/workflow/SolutionTemplateManager.h"
+#include "core/util/json_utils.h"
+#include "ui/controllers/UIWidgets.h"
+#include "ui/controllers/UiBuilder.h"
+#include "core/util/Logging.h"
 
 static QVariantMap generationParamsFromConfig(const AppConfig& cfg)
 {
@@ -354,7 +354,6 @@ MainWindow::MainWindow(QWidget *parent)
     // Initialize the new ContextManager
     m_contextManager = new ContextManager(this);
     m_contextManager->setDevAssManager(&m_dev_manager);
-    m_contextManager->setMainWindow(this);
     connect(m_contextManager, &ContextManager::contextChanged, this, [this]() {
         // When context changes, update the GUI display
         updateContextStatusDisplay();

@@ -4,8 +4,8 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 
-#include "Command.h"
-#include "CommandPolicy.h"
+#include "core/commands/Command.h"
+#include "core/commands/CommandPolicy.h"
 
 using CommandPolicy::Risk;
 

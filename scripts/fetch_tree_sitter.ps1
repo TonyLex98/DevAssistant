@@ -1,10 +1,10 @@
-# Downloads tree-sitter and the grammars that DevAssistantQt.pro compiles into the app.
-# They are not stored in the repository (see .gitignore) and land in src/uiide/.
+# Downloads tree-sitter and the grammars that the core library compiles in (src/core/core.pro).
+# They are not stored in the repository (see .gitignore) and land in third_party/.
 # Versions are pinned to exact commits so every build uses the same sources.
 # Usage:  powershell -ExecutionPolicy Bypass -File scripts/fetch_tree_sitter.ps1
 
 $ErrorActionPreference = 'Stop'
-$root = Join-Path $PSScriptRoot '..\src\uiide'
+$root = Join-Path $PSScriptRoot '..\third_party'
 
 $repos = @(
     @{ Name = 'tree-sitter';        Url = 'https://github.com/tree-sitter/tree-sitter';        Commit = 'dfe770858e3cfd8e8b29a79ea17da390a6f60319' },

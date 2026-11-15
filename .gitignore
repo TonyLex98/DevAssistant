@@ -7,6 +7,9 @@ src/uiide/tree-sitter/
 /release
 /models
 
+# Downloaded by scripts/fetch_tree_sitter.ps1
+/third_party/tree-sitter*/
+
 # Build artifacts
 Makefile
 Makefile.Debug
@@ -14,6 +17,9 @@ Makefile.Release
 object_script.*
 .qmake.stash
 /debug
+/bin
+/lib
+/build
 /dist
 build-*/
 ui_*.h

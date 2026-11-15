@@ -2,7 +2,7 @@
 #include <QDir>
 #include <QTemporaryDir>
 
-#include "PathGuard.h"
+#include "core/project/PathGuard.h"
 #include "TestFiles.h"
 
 class TestPathGuard : public QObject

@@ -2,8 +2,8 @@
 #include <QDir>
 #include <QTemporaryDir>
 
-#include "CodePatcher.h"
-#include "ProjectIndexer.h"
+#include "core/code/CodePatcher.h"
+#include "core/code/ProjectIndexer.h"
 #include "TestFiles.h"
 
 namespace {

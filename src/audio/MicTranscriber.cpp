@@ -1,4 +1,4 @@
-#include "MicTranscriber.h"
+#include "audio/MicTranscriber.h"
 #include <QStandardPaths>
 #include <QDir>
 #include <QDateTime>

@@ -4,7 +4,7 @@
 #include <QTimer>
 #include <QAudioFormat>
 #include <QAudioInput>   // Qt5; for Qt6: #include <QAudioSource>
-#include "WavWriter.h"
+#include "audio/WavWriter.h"
 
 class MicTranscriber : public QObject {
     Q_OBJECT

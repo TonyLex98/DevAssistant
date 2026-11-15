@@ -1,7 +1,7 @@
 #include <QtTest>
 #include <QTemporaryDir>
 
-#include "TextFileLines.h"
+#include "core/project/TextFileLines.h"
 #include "TestFiles.h"
 
 class TestTextFileLines : public QObject

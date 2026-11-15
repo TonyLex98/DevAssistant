@@ -1,4 +1,4 @@
-#include "UiBuilder.h"
+#include "ui/controllers/UiBuilder.h"
 #include <QObject>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -24,26 +24,26 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSettings>
-#include "../../audio/SpeechRecognizer.h"
-#include "MemoryLineEdit.h"
-#include "StyledButton.h"
-#include "MemoryComboBox.h"
-#include "MemorySplitter.h"
-#include "StyleTextEdit.h"
-#include "IDEWidget.h"
-#include "ChatDialog.h"
-#include "GraphWidget.h"
-#include "SequenceGraphWidget.h"
-#include "ContextGraphWidget.h"
-#include "ResultDisplayWidget.h"
-#include "OllamaSettingsDialog.h"
-#include "PromptEditorDialog.h"
-#include "SolutionTemplateViewer.h"
-#include "RunTemplateOrSequenceDialog.h"
-#include "TtsController.h"
-#include "../../adapters/OllamaAdapter.h"
-#include "../../core/PromptSequenceManager.h"
-#include "../../core/SolutionTemplateManager.h"
+#include "audio/SpeechRecognizer.h"
+#include "ui/widgets/MemoryLineEdit.h"
+#include "ui/widgets/StyledButton.h"
+#include "ui/widgets/MemoryComboBox.h"
+#include "ui/widgets/MemorySplitter.h"
+#include "ui/widgets/StyleTextEdit.h"
+#include "ui/editor/IDEWidget.h"
+#include "ui/ChatDialog.h"
+#include "ui/graph/GraphWidget.h"
+#include "ui/graph/SequenceGraphWidget.h"
+#include "ui/ContextGraphWidget.h"
+#include "ui/ResultDisplayWidget.h"
+#include "ui/dialogs/OllamaSettingsDialog.h"
+#include "ui/dialogs/PromptEditorDialog.h"
+#include "ui/dialogs/SolutionTemplateViewer.h"
+#include "ui/dialogs/RunTemplateOrSequenceDialog.h"
+#include "ui/controllers/TtsController.h"
+#include "core/model/OllamaAdapter.h"
+#include "core/workflow/PromptSequenceManager.h"
+#include "core/workflow/SolutionTemplateManager.h"
 
 void UiBuilder::build(UIWidgets& ui,
                       std::function<QString(const char*)> tr_fn,

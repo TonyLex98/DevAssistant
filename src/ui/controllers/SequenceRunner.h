@@ -5,7 +5,7 @@
 #include <QMap>
 #include <QSet>
 #include <QDateTime>
-#include "../../services/IService.h"
+#include "ui/controllers/IService.h"
 
 class PromptSequence;
 class PromptStep;

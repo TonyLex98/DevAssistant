@@ -2,7 +2,7 @@
 #include <QDir>
 #include <QTemporaryDir>
 
-#include "json_utils.h"
+#include "core/util/json_utils.h"
 
 using ByteArrayList = QList<QByteArray>;
 

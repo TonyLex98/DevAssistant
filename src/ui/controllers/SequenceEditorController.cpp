@@ -1,4 +1,4 @@
-﻿#include "SequenceEditorController.h"
+﻿#include "ui/controllers/SequenceEditorController.h"
 #include <QCoreApplication>
 #include <QMessageBox>
 #include <QInputDialog>
@@ -14,10 +14,10 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QObject>
-#include <PromptSequenceEditor.h>
-#include "../../codeviewer/SequenceGraphWidget.h"
-#include "../../ui/customWidgets/StyledButton.h"
-#include "utils/Logging.h"
+#include "ui/dialogs/PromptSequenceEditor.h"
+#include "ui/graph/SequenceGraphWidget.h"
+#include "ui/widgets/StyledButton.h"
+#include "core/util/Logging.h"
 
 using namespace std::literals;
 

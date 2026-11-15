@@ -1,6 +1,6 @@
-#include "TaskStatusController.h"
-#include "OllamaAdapter.h"
-#include "ContextManager.h"
+#include "ui/controllers/TaskStatusController.h"
+#include "core/model/OllamaAdapter.h"
+#include "core/context/ContextManager.h"
 #include <QStatusBar>
 #include <QDebug>
 

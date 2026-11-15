@@ -7,7 +7,7 @@
 #include <QGraphicsView>
 #include <QWheelEvent>
 
-#include "../core/ContextManager.h"
+#include "core/context/ContextManager.h"
 
 class ContextGraphView : public QGraphicsView
 {

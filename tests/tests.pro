@@ -1,10 +1,6 @@
-# Unit tests for DevAssistant. Build out of source, for example:
-#   mkdir build-tests && cd build-tests
-#   qmake ../tests/tests.pro CONFIG+=release && mingw32-make && mingw32-make check
-# The code viewer test needs the tree-sitter sources (scripts/fetch_tree_sitter.ps1).
-
+# Unit tests for DevAssistant (QtTest). They are built with the rest of the project
+# (DevAssistant.pro) and run with "mingw32-make check".
 TEMPLATE = subdirs
-
 SUBDIRS += \
     tst_pathguard \
     tst_textfilelines \

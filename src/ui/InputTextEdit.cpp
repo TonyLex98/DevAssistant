@@ -1,4 +1,4 @@
-#include "InputTextEdit.h"
+#include "ui/InputTextEdit.h"
 #include <QBuffer>
 #include <QDateTime>
 #include <QFileInfo>

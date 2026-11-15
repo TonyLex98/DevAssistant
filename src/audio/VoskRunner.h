@@ -5,7 +5,7 @@
 #include <QAudioInput> // Qt5; for Qt6 use QAudioSource
 #include <QScopedPointer>
 #include <QIODevice>
-#include "VoskDyn.h"
+#include "audio/VoskDyn.h"
 
 class VoskRunner : public QObject {
     Q_OBJECT

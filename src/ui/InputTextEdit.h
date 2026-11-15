@@ -3,9 +3,9 @@
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QPushButton>
-#include "../adapters/OllamaAdapter.h"
+#include "core/model/OllamaAdapter.h"
 #include <QKeyEvent>
-#include <StyleTextEdit.h>
+#include "ui/widgets/StyleTextEdit.h"
 #include <QMimeData>
 #include <QStringList>
 

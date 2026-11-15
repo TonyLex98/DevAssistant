@@ -1,11 +1,11 @@
-#include "OmniAsrRunner.h"
-#include "PythonScripts.h"
+#include "audio/OmniAsrRunner.h"
+#include "audio/PythonScripts.h"
 #include <QTemporaryFile>
 #include <QTimer>
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
-#include "utils/Logging.h"
+#include "core/util/Logging.h"
 
 OmniAsrRunner::OmniAsrRunner(QObject* parent) : QObject(parent), m_audioInput(nullptr), m_audioDevice(nullptr), m_process(nullptr) {
     m_format.setSampleRate(16000);

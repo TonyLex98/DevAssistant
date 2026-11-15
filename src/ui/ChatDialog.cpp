@@ -1,4 +1,4 @@
-#include "ChatDialog.h"
+#include "ui/ChatDialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
@@ -13,10 +13,10 @@
 #include <QImageReader>
 #include <QRegularExpression>
 #include <QJsonArray>
-#include "../core/SolutionTemplateManager.h"
-#include "../core/SolutionTemplate.h"
-#include "../utils/AppConfig.h"
-#include "MainWindow.h"
+#include "core/workflow/SolutionTemplateManager.h"
+#include "core/workflow/SolutionTemplate.h"
+#include "core/util/AppConfig.h"
+#include "ui/MainWindow.h"
 
 // Spoken words that send the message, in Russian and English. Matched against the end of
 // the recognized text, so they stay in both languages whatever the interface language is.

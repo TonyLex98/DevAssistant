@@ -1,4 +1,4 @@
-#include "PythonScripts.h"
+#include "audio/PythonScripts.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>

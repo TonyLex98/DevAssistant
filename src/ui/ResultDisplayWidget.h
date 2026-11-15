@@ -4,7 +4,7 @@
 #include <QString>
 #include <QTreeWidget>
 
-#include "../core/ContextManager.h"
+#include "core/context/ContextManager.h"
 
 class QScrollArea;
 class QVBoxLayout;

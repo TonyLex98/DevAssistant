@@ -1,7 +1,7 @@
-#include "TtsController.h"
-#include "TtsRunner.h"
-#include "StyledButton.h"
-#include "ChatDialog.h"
+#include "ui/controllers/TtsController.h"
+#include "audio/TtsRunner.h"
+#include "ui/widgets/StyledButton.h"
+#include "ui/ChatDialog.h"
 
 TtsController::TtsController(QObject* parent)
     : QObject(parent)

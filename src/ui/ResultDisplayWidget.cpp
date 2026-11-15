@@ -1,5 +1,5 @@
-#include "ResultDisplayWidget.h"
-#include "../../src/md4c/src/md4c-html.h"
+#include "ui/ResultDisplayWidget.h"
+#include "md4c-html.h"
 
 #include <QAbstractItemView>
 #include <QAbstractScrollArea>

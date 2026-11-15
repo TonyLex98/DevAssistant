@@ -1,12 +1,12 @@
-#include "FasterWhisperRunner.h"
-#include "PythonScripts.h"
+#include "audio/FasterWhisperRunner.h"
+#include "audio/PythonScripts.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
 #include <QtMath>
 #include <QDateTime>
 #include <QSettings>
-#include "utils/Logging.h"
+#include "core/util/Logging.h"
 
 FasterWhisperRunner::FasterWhisperRunner(QObject* parent) 
     : QObject(parent)
