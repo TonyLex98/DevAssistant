@@ -83,7 +83,7 @@ jobs:
           if (-not (Test-Path screenshots/en/main.png)) { throw "No screenshot was written" }
           # The command reference, generated from the descriptions the model is given.
           $docs = Start-Process $exe -ArgumentList "--print-command-docs", "--markdown", "--out", "$PWD/generated/COMMANDS.md" -PassThru -Wait
-          if (-not (Test-Path generated/COMMANDS.md)) { throw "The command reference was not generated" }
+          if ($docs.ExitCode -ne 0 -or -not (Test-Path generated/COMMANDS.md)) { throw "The command reference was not generated (exit code $($docs.ExitCode))" }
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -93,6 +93,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload screenshots and translation
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots-and-translation

@@ -86,18 +86,19 @@ static int runParseCommandsMode(int argc, char** argv)
 static int runPrintCommandDocsMode(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
+    // A relative --out is taken from the current folder; without --out the file goes to temp.
     QString outPath = argValue(argc, argv, "--out").trimmed();
-    const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     if (outPath.isEmpty()) {
+        const QString tempDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
         outPath = QDir(tempDir).absoluteFilePath("DevAssistantQt_command_docs.txt");
-    } else {
-        QFileInfo info(outPath);
-        if (info.isRelative()) {
-            outPath = QDir(tempDir).absoluteFilePath(outPath);
-        }
     }
+    outPath = QFileInfo(outPath).absoluteFilePath();
+    QDir().mkpath(QFileInfo(outPath).absolutePath());
     QFile f(outPath);
-    f.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QTextStream(stderr) << "Cannot write " << QDir::toNativeSeparators(outPath) << ": " << f.errorString() << "\n";
+        return 1;
+    }
 
     QTextStream o(stdout, QIODevice::WriteOnly);
     QTextStream fo(&f);
