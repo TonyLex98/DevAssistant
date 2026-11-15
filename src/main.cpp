@@ -16,6 +16,7 @@
 #include <QTranslator>
 
 #include "command/CommandConfirmDialog.h"
+#include "command/CommandPolicy.h"
 #include "command/CommandParser.h"
 #include "command/CommandRegistry.h"
 #include "command/CommandDocs.h"
@@ -100,15 +101,53 @@ static int runPrintCommandDocsMode(int argc, char** argv)
 
     QTextStream o(stdout, QIODevice::WriteOnly);
     QTextStream fo(&f);
+    fo.setCodec("UTF-8");
 
     const auto all = CommandRegistry::all();
-    for (Command* c : all) {
-        const CommandDoc doc = CommandDocs::doc(c->name());
-        const QString rendered = CommandDocs::renderForLLM(doc) + "\n\n";
-        o << rendered;
+    if (hasArg(argc, argv, "--markdown")) {
+        // docs/COMMANDS.md: generated from the same descriptions the model is given.
+        QString md = QStringLiteral(
+            "# Command reference\n\n"
+            "The model answers with JSON commands; DevAssistant checks each one (project folder, the step's "
+            "allowed commands), shows the ones that change something for confirmation, and runs them. "
+            "This file is generated from the program: `DevAssistantQt.exe --print-command-docs --markdown --out COMMANDS.md`.\n\n"
+            "| Command | Risk | What it does |\n|---|---|---|\n");
+        QString details;
+        for (Command* c : all) {
+            const CommandDoc doc = CommandDocs::doc(c->name());
+            const QString risk = CommandPolicy::riskLabel(CommandPolicy::riskOf(c->name()));
+            md += QStringLiteral("| [`%1`](#%2) | %3 | %4 |\n")
+                    .arg(doc.name, doc.name.toLower(), risk, QString(doc.summary).replace('|', "\\|"));
+            details += QStringLiteral("\n## %1\n\n%2\n\n").arg(doc.name, doc.summary);
+            if (!doc.params.isEmpty()) {
+                details += QStringLiteral("| Parameter | Type | Required | Description |\n|---|---|---|---|\n");
+                for (const CommandParamDoc& p : doc.params)
+                    details += QStringLiteral("| `%1` | %2 | %3 | %4 |\n")
+                            .arg(p.name, p.type, p.required ? QStringLiteral("yes") : QStringLiteral("no"),
+                                 QString(p.description).replace('|', "\\|"));
+                details += "\n";
+            }
+            for (const QString& note : doc.notes)
+                details += QStringLiteral("- %1\n").arg(note);
+            if (!doc.notes.isEmpty())
+                details += "\n";
+            details += QStringLiteral("```json\n%1\n```\n")
+                    .arg(QString::fromUtf8(QJsonDocument(doc.example).toJson(QJsonDocument::Indented)).trimmed());
+            delete c;
+        }
+        md += details;
+        o << md;
         if (f.isOpen())
-            fo << rendered;
-        delete c;
+            fo << md;
+    } else {
+        for (Command* c : all) {
+            const CommandDoc doc = CommandDocs::doc(c->name());
+            const QString rendered = CommandDocs::renderForLLM(doc) + "\n\n";
+            o << rendered;
+            if (f.isOpen())
+                fo << rendered;
+            delete c;
+        }
     }
     o.flush();
     if (f.isOpen())

@@ -73,6 +73,9 @@ jobs:
           }
           Get-ChildItem -Recurse screenshots | ForEach-Object { "$($_.FullName) $($_.Length)" }
           if (-not (Test-Path screenshots/en/main.png)) { throw "No screenshot was written" }
+          # The command reference, generated from the descriptions the model is given.
+          $docs = Start-Process $exe -ArgumentList "--print-command-docs", "--markdown", "--out", "$PWD/generated/COMMANDS.md" -PassThru -Wait
+          if (-not (Test-Path generated/COMMANDS.md)) { throw "The command reference was not generated" }
 
       - name: Upload package
         uses: actions/upload-artifact@v4
@@ -87,6 +90,7 @@ jobs:
           name: screenshots-and-translation
           path: |
             screenshots/
+            generated/
             translations/devassistant_ru.ts
 
       - name: Publish release
