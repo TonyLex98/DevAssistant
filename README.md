@@ -2,53 +2,75 @@
 
 [![Build](https://github.com/TonyLex98/DevAssistant/actions/workflows/build.yml/badge.svg)](https://github.com/TonyLex98/DevAssistant/actions/workflows/build.yml)
 
-Desktop AI assistant for programmers, built with Qt / C++ and running on local language models.
+**English** · [Русский](README.ru.md)
 
-Десктопный ИИ-ассистент программиста на Qt / C++, который работает с локальными языковыми моделями. Модель видит ваш проект, читает и правит файлы через набор команд, а каждое действие вы подтверждаете сами.
+A desktop AI assistant for programmers that runs on **local models** and works on your
+project through a fixed set of commands, so you always see what it is about to change.
+Qt 5.15 / C++17, Windows.
 
-## Что умеет
+![Main window](docs/screenshots/main.png)
 
-- **Работа с проектом через команды.** Модель отвечает не только текстом, но и командами в формате JSON: открыть файл или его фрагмент, найти по проекту, создать, переименовать или удалить файл, заменить строки в диапазоне, применить патч. Всего 35 команд.
-- **Подтверждение и откат.** Перед выполнением команды показывается диалог подтверждения; последнюю правку можно отменить.
-- **Git, Python и консоль.** Статус и diff репозитория, откат файла, запуск Python-кода и команд оболочки, поиск в интернете, буфер обмена.
-- **Локальные модели.** Подключение к Ollama или к любому серверу с OpenAI-совместимым API; список моделей подтягивается с сервера.
-- **Свой RAG на C++.** Модуль `ragmodule`: фрагменты документов хранятся в SQLite, эмбеддинги считаются через Ollama, поиск по косинусной близости, индексация в пуле потоков. Есть экспериментальный клиент LightRAG.
-- **Индекс и граф проекта.** Исходники на C / C++, Python и Dart разбираются через tree-sitter; по индексу строятся граф связей между файлами и классами, диаграммы последовательностей вызовов и дерево разбора.
-- **Встроенный редактор.** Подсветка C++, Python и Dart, переход к методам, правка выбранного метода.
-- **Сценарии и шаблоны.** Многошаговые последовательности промптов (`default.seq.json`) и шаблоны решений под разные роли.
-- **Голос.** Ввод голосом через Vosk, faster-whisper или Omni ASR и озвучка ответов через edge-tts или pyttsx3.
+## What it does
 
-## Как модель управляет проектом
+- **Works on the project through commands, not free-form edits.** The model answers with
+  JSON commands — open a file region, edit a line range, apply a unified diff, search the
+  project, run a shell command, ask the user — and DevAssistant executes them. 36 commands,
+  see [docs/COMMANDS.md](docs/COMMANDS.md).
+- **Safe by default.** Every path must stay inside the project folder; each step of a
+  workflow lists the commands it may use; read-only commands run at once, and anything that
+  changes files, runs a program or deletes is shown first with the exact command line, paths
+  and line ranges. Changes are applied all-or-nothing and can be undone.
+- **Local models.** Ollama or any OpenAI-compatible server (llama.cpp, LM Studio, vLLM).
+- **Questions about your documents (RAG), written in C++.** Index a folder (code, notes,
+  Markdown, PDF): chunks and their embeddings are stored in SQLite next to the project and
+  updated incrementally; answers cite the excerpts they use. The agent can search the index
+  itself with `SEARCH_DOCS`.
+- **LightRAG client.** Upload documents to a LightRAG server, ask in its graph or vector
+  modes and explore the knowledge graph.
+- **Code insight.** Built-in editor with highlighting, the syntax tree from tree-sitter, and
+  a project graph of classes, methods and calls across files (C/C++, Python, Dart).
+- **Workflows.** Multi-step prompt sequences with per-step commands, grouped into solution
+  templates; an optional agent mode plans each step with a separate model call.
+- **Voice.** Dictate to the chat with faster-whisper, Vosk, whisper.cpp or a wav2vec2 model;
+  have answers read aloud.
+- **English and Russian interface.**
 
-Пример ответа модели, который DevAssistant разбирает и выполняет после подтверждения:
+| Confirmation of the model's commands | Questions about documents |
+|---|---|
+| ![Command confirmation](docs/screenshots/confirm.png) | ![Documents](docs/screenshots/documents.png) |
 
-```json
-{"command": "OPEN_FILE_REGION", "params": {"path": "src/core/ContextManager.cpp", "startLine": 10, "endLine": 50}}
-{"command": "EDIT_IN_RANGE", "params": {"path": "src/core/ContextManager.cpp", "startLine": 24, "endLine": 26, "content": "..."}}
-{"command": "SHOW_RESULT", "params": {"title": "Готово", "content": "Исправил проверку пустого контекста"}}
+## Quick start
+
+1. Download `DevAssistant-…-windows-x64.zip` from
+   [Releases](https://github.com/TonyLex98/DevAssistant/releases), unpack it and run
+   `DevAssistantQt.exe`. Nothing to install.
+2. Install [Ollama](https://ollama.com) and get a model, for example
+   `ollama pull qwen2.5-coder:7b` (and `ollama pull nomic-embed-text` for document search).
+   Another OpenAI-compatible server can be chosen in **Settings › Model**.
+3. Open a project folder, pick the model in the chat and describe the task.
+
+Voice input and text to speech are optional: they need Python 3.10+ and
+`pip install -r scripts/requirements.txt`, then **Settings › Audio**.
+
+## How a step works
+
+```mermaid
+flowchart LR
+    Q[Request] --> P[Prompt with the step's<br/>allowed commands]
+    P --> M[Local model]
+    M --> J[JSON commands]
+    J --> G{Policy:<br/>inside the project?<br/>allowed in this step?}
+    G -->|no| B[Reason back to the model]
+    G -->|yes| C[Confirmation<br/>for changes]
+    C --> A[Apply as one batch<br/>with undo]
+    A --> R[Results back<br/>to the model]
 ```
 
-Полный список команд с параметрами и примерами — в [`docs/COMMANDS_REFERENCE.md`](docs/COMMANDS_REFERENCE.md), краткая шпаргалка — в [`docs/COMMANDS_QUICK_REF.md`](docs/COMMANDS_QUICK_REF.md).
+More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Устройство
+## Building from source
 
-| Папка | Что внутри |
-|---|---|
-| `src/core` | менеджер ассистента, контекст и цепочки контекста, индекс проекта, применение изменений, сценарии промптов и шаблоны решений |
-| `src/command` | разбор ответа модели, реестр и фабрика команд, реализация 35 команд, диалог подтверждения |
-| `src/adapters` | адаптер к Ollama и OpenAI-совместимому API |
-| `src/codeviewer` | индексация через tree-sitter, граф проекта, диаграммы последовательностей, применение патчей |
-| `src/uiide` | встроенный редактор с подсветкой и просмотр дерева разбора |
-| `src/audio` | распознавание и синтез речи |
-| `src/ui` | окна, виджеты и контроллеры интерфейса, клиент LightRAG |
-| `ragmodule` | модуль RAG: хранилище в SQLite, эмбеддинги, поиск |
-| `src/md4c` | сторонний разборщик Markdown для ответов модели |
-| `scripts` | серверы распознавания и синтеза речи на Python, загрузка моделей, развёртывание |
-| `docs` | документация по командам и интеграции |
-
-## Сборка
-
-Нужны Qt 5.12–5.15 с компилятором MinGW 64-bit и Git. Основная сборка проверялась на Qt 5.12.12 MinGW 64-bit.
+Requirements: Qt 5.15 with MinGW 8.1 64-bit, Git, PowerShell.
 
 ```powershell
 git clone https://github.com/TonyLex98/DevAssistant.git
@@ -58,16 +80,36 @@ qmake DevAssistantQt.pro CONFIG+=release
 mingw32-make -j4
 ```
 
-Скрипт `fetch_tree_sitter.ps1` скачивает tree-sitter и грамматики C++, Python и Dart в `src/uiide`: их исходники компилируются в приложение, но в репозитории не хранятся. Версии закреплены точными коммитами в самом скрипте. Можно открыть `DevAssistantQt.pro` в Qt Creator, предварительно запустив тот же скрипт.
+`fetch_tree_sitter.ps1` downloads tree-sitter and the C++, Python and Dart grammars at pinned
+commits. To build the Windows package: `scripts/deploy_windows.ps1 -Zip DevAssistant.zip`.
 
-## Запуск
+Tests (QtTest, 9 suites: path sandbox, command parser and policy, file commands, change
+batches with undo, line-ending-preserving edits, prompt data, the code indexer):
 
-1. Установите [Ollama](https://ollama.com) и скачайте модель, например `ollama pull qwen2.5-coder:7b`. Подойдёт и другой сервер с OpenAI-совместимым API.
-2. Запустите DevAssistant, выберите сервер и модель в настройках.
-3. Откройте папку проекта и задайте вопрос или задачу.
+```powershell
+mkdir build-tests; cd build-tests
+qmake ../tests/tests.pro CONFIG+=release
+mingw32-make -j4
+mingw32-make check
+```
 
-Голосовой ввод и озвучка необязательны. Python-зависимости для них — в `scripts/requirements.txt`, серверы запускаются скриптами из `scripts`.
+CI (GitHub Actions) builds, runs the tests, updates the Russian translation, packages the
+zip, starts the program headless to take the screenshots above, and publishes releases.
 
-## Лицензия
+## Project layout
 
-MIT, см. [`LICENSE`](LICENSE). Сторонние компоненты и их лицензии — в [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+| Folder | Contents |
+|---|---|
+| `src/command` | commands, parser, registry, policy and confirmation dialog |
+| `src/core` | project and change management, context, prompt resolution, sequences |
+| `src/adapters` | model server client (Ollama, OpenAI-compatible) |
+| `ragmodule` | document search: SQLite store, chunking, embeddings, Q&A window |
+| `src/codeviewer`, `src/uiide` | tree-sitter project graph, editor |
+| `src/audio` | speech recognition engines, text to speech |
+| `src/ui` | main window, chat, settings, LightRAG client |
+| `tests` | unit tests |
+| `translations` | Russian translation |
+
+## License
+
+MIT, see [LICENSE](LICENSE). Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
