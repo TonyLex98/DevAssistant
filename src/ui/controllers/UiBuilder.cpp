@@ -153,12 +153,13 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
         "QListWidget::item:selected { background: #dff8f3; color: #0f766e; font-weight: 600; }"
         "QListWidget::item:hover { background: #e6f5f1; }"
     );
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("📁  ") + tr_fn("Project"));
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("🤖  ") + tr_fn("Model"));
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("📋  ") + tr_fn("Sequences"));
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("📊  ") + tr_fn("Graphs"));
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("🔊  ") + tr_fn("Audio"));
-    ui.m_settingsSidebar->addItem(QString::fromUtf8("⚙️  ") + tr_fn("System"));
+    ui.m_settingsSidebar->addItem(tr_fn("Project"));
+    ui.m_settingsSidebar->addItem(tr_fn("Model"));
+    ui.m_settingsSidebar->addItem(tr_fn("Sequences"));
+    ui.m_settingsSidebar->addItem(tr_fn("Graphs"));
+    ui.m_settingsSidebar->addItem(tr_fn("Audio"));
+    ui.m_settingsSidebar->addItem(tr_fn("System"));
+    ui.m_settingsSidebar->setCurrentRow(0);
     settingsRoot->addWidget(ui.m_settingsSidebar, 0);
 
     // Pages stack
@@ -180,6 +181,7 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
     for (int i = 0; i < ui.m_settingsPages->count(); ++i) {
         auto* page = qobject_cast<QWidget*>(ui.m_settingsPages->widget(i));
         if (page) {
+            pageLay(page)->addStretch();   // content from the top, free space below
             for (auto* btn : page->findChildren<StyledButton*>())
                 btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         }
@@ -202,7 +204,6 @@ QWidget* UiBuilder::makePage()
     auto* l = new QVBoxLayout(w);
     l->setContentsMargins(12, 12, 12, 12);
     l->setSpacing(8);
-    l->addStretch();
     return w;
 }
 

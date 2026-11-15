@@ -15,7 +15,7 @@ public:
 
     // red = path exists; green = parent of a missing path
     void setMarkSets(const QSet<QString>& red, const QSet<QString>& green,
-                     int greenAlpha = 90, int redAlpha = 70) {
+                     int greenAlpha = 40, int redAlpha = 40) {
         m_markRed   = red;
         m_markGreen = green;
         m_greenAlpha = greenAlpha;
@@ -36,9 +36,9 @@ public:
 
         QColor overlay;
         if (m_markRed.contains(path)) {
-            overlay = QColor(255, 0, 0, m_redAlpha);      // exists: red
+            overlay = QColor(245, 158, 11, m_redAlpha);   // exists, no description yet: amber
         } else if (m_markGreen.contains(path)) {
-            overlay = QColor(0, 255, 0, m_greenAlpha);    // missing: green
+            overlay = QColor(16, 185, 129, m_greenAlpha); // missing: green
         } else {
             return;
         }
@@ -60,6 +60,6 @@ private:
     QFileSystemModel* m_fsModel = nullptr;
     QSet<QString> m_markRed;
     QSet<QString> m_markGreen;
-    int m_greenAlpha = 90;
-    int m_redAlpha   = 70;
+    int m_greenAlpha = 40;
+    int m_redAlpha   = 40;
 };

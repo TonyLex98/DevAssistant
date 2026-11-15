@@ -41,6 +41,8 @@ public:
 
     void setKey(const QString &key) { m_key = key; }
     void loadState() { load(); }
+    // False on the first run: the caller then sets the default proportions.
+    bool hasSavedState() const { return QSettings().contains(keyPath()); }
     ~MemorySplitter() override { store(); }
 
 private:

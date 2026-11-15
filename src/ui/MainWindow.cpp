@@ -374,9 +374,14 @@ MainWindow::MainWindow(QWidget *parent)
 
     reOpenRootDir();
 
-    if (m_centerSplitter)
+    if (m_centerSplitter) {
         m_centerSplitter->loadState();
+        if (!m_centerSplitter->hasSavedState())
+            m_centerSplitter->setSizes({430, 120, 230, 190});
+    }
     mainSplitter->loadState();
+    if (!mainSplitter->hasSavedState())
+        mainSplitter->setSizes({280, 780, 380});
 
     m_sequenceEditor->openSequenceGraph();
     const QList<int> storedSizes = mainSplitter->sizes();
@@ -1273,6 +1278,11 @@ void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
         return;
     m_lastUserMessage = lastUserMessage;
     qCDebug(logUI)<<"m_lastUserMessage = "<<m_lastUserMessage;
+}
+
+void MainWindow::openFileInEditor(const QString& path)
+{
+    ide_widget->openFile(QDir(m_projectRoot).absoluteFilePath(path));
 }
 
 void MainWindow::openProject(const QString& path)

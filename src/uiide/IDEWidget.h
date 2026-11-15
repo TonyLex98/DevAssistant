@@ -33,6 +33,8 @@ public:
     ~IDEWidget();
 
     void openProjectbyPath(const QString &path);
+    // Shows the file in the editor and selects it in the tree.
+    void openFile(const QString& filePath);
 
 
 public slots:

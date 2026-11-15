@@ -123,9 +123,11 @@ jobs:
         run: |
           # windeployqt ships only the Windows platform plugin; the headless run needs offscreen.
           Copy-Item "$env:QT_ROOT_DIR\plugins\platforms\qoffscreen.dll" dist/DevAssistant/platforms/
+          # The project shown in the screenshots: this repository without build output.
+          git clone --quiet "$PWD" "$env:RUNNER_TEMP/DevAssistant"
           $exe = "dist/DevAssistant/DevAssistantQt.exe"
           foreach ($lang in @("en", "ru")) {
-            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang", "--project", "$PWD" -PassThru
+            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang", "--project", "$env:RUNNER_TEMP/DevAssistant", "--open", "src/command/CommandPolicy.cpp" -PassThru
             if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "The program did not finish the screenshot run in 60 s ($lang)" }
             if ($p.ExitCode -ne 0) { throw "The program exited with code $($p.ExitCode) ($lang)" }
           }

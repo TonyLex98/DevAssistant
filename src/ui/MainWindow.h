@@ -95,6 +95,8 @@ public:
 
     // Opens a project folder, as choosing it in the window does.
     void openProject(const QString& path);
+    // Opens a project file (absolute, or relative to the project) in the editor.
+    void openFileInEditor(const QString& path);
 
     const QString& projectRootPath() const { return m_projectRoot; }
     PromptManager*  promptManager() { return &m_promptMgr; }

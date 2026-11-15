@@ -43,6 +43,8 @@ IDEWidget::IDEWidget(const QString &key,
     dirView->setModel(dirModel);
     dirView->setRootIndex(dirModel->index(QDir::homePath()));
     dirView->setHeaderHidden(true);
+    for (int column = 1; column < dirModel->columnCount(); ++column)   // size, type, date
+        dirView->hideColumn(column);
     connect(dirView, &QTreeView::clicked, this, &IDEWidget::onFileClicked);
     this->addWidget(dirView);
 
@@ -99,7 +101,19 @@ IDEWidget::IDEWidget(const QString &key,
 
 
     this->loadState();
+    if (!hasSavedState())
+        setSizes({240, 480, 240});
+}
 
+void IDEWidget::openFile(const QString& filePath)
+{
+    const QModelIndex index = dirModel->index(filePath);
+    if (index.isValid()) {
+        dirView->setCurrentIndex(index);
+        dirView->scrollTo(index);
+    }
+    if (QFileInfo(filePath).isFile())
+        parseFile(filePath);
 }
 
 IDEWidget::~IDEWidget() {}

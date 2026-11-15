@@ -68,7 +68,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     )");
 
     m_attachBtn = new StyledButton(tr("Image"), this);
-    m_attachBtn->setFixedSize(44, 36);
+    m_attachBtn->setFixedHeight(36);
     m_attachBtn->setToolTip(tr("Attach image (png/jpg/webp)"));
     
     // Left column: input + image attachments bar
