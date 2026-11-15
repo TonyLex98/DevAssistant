@@ -2,9 +2,14 @@ name: Build
 
 on:
   push:
+    branches: [ '**' ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write   # publishing the release on a v* tag
 
 jobs:
   windows-mingw:
@@ -19,7 +24,7 @@ jobs:
         shell: pwsh
         run: ./scripts/fetch_tree_sitter.ps1
 
-      - name: Install Qt and MinGW
+      - name: Install Qt, MinGW and OpenSSL
         uses: jurplel/install-qt-action@v4
         with:
           version: '5.15.2'
@@ -27,12 +32,18 @@ jobs:
           target: desktop
           arch: win64_mingw81
           modules: ''
-          tools: 'tools_mingw,qt.tools.win64_mingw810'
+          tools: 'tools_mingw,qt.tools.win64_mingw810 tools_openssl_x64,qt.tools.openssl.win_x64'
           cache: true
 
       - name: Put MinGW on PATH
         shell: pwsh
         run: Add-Content $env:GITHUB_PATH "$env:IQTA_TOOLS\mingw810_64\bin"
+
+      - name: Update the Russian translation
+        shell: pwsh
+        run: |
+          lupdate DevAssistantQt.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none
+          python scripts/fill_translations.py translations/devassistant_ru.ts translations/ru
 
       - name: Configure
         run: qmake DevAssistantQt.pro CONFIG+=release
@@ -40,9 +51,47 @@ jobs:
       - name: Build
         run: mingw32-make -k -j4
 
-      - name: Upload binary
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0,7))" }
+          ./scripts/deploy_windows.ps1 -OutDir dist/DevAssistant -OpenSslDir "$env:IQTA_TOOLS\OpenSSL\Win_x64\bin" -Zip "DevAssistant-$version-windows-x64.zip"
+          "PACKAGE=DevAssistant-$version-windows-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Smoke test and screenshots
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          # windeployqt ships only the Windows platform plugin; the headless run needs offscreen.
+          Copy-Item "$env:QT_ROOT_DIR\plugins\platforms\qoffscreen.dll" dist/DevAssistant/platforms/
+          $exe = "dist/DevAssistant/DevAssistantQt.exe"
+          foreach ($lang in @("en", "ru")) {
+            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang" -PassThru
+            if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "The program did not finish the screenshot run in 60 s ($lang)" }
+            if ($p.ExitCode -ne 0) { throw "The program exited with code $($p.ExitCode) ($lang)" }
+          }
+          Get-ChildItem -Recurse screenshots | ForEach-Object { "$($_.FullName) $($_.Length)" }
+          if (-not (Test-Path screenshots/en/main.png)) { throw "No screenshot was written" }
+
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: DevAssistantQt-windows-mingw
-          path: release/DevAssistantQt.exe
+          name: DevAssistant-windows-x64
+          path: ${{ env.PACKAGE }}
           if-no-files-found: error
+
+      - name: Upload screenshots and translation
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-and-translation
+          path: |
+            screenshots/
+            translations/devassistant_ru.ts
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PACKAGE }}
+          body_path: RELEASE_NOTES.md

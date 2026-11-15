@@ -309,3 +309,11 @@ HEADERS += $$PWD/src/utils/Logging.h
 SOURCES += $$PWD/src/utils/Logging.cpp
 
 RESOURCES += src/resources/resources.qrc
+
+# Russian translation. The build generates translations/devassistant_ru.ts with lupdate and
+# fills it from translations/ru/*.json (scripts/fill_translations.py); qmake then compiles
+# it into the program, available as :/i18n/devassistant_ru.qm.
+exists($$PWD/translations/devassistant_ru.ts) {
+    TRANSLATIONS += translations/devassistant_ru.ts
+    CONFIG += lrelease embed_translations
+}

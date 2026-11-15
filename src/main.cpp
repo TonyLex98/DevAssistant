@@ -2,16 +2,25 @@
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QSettings>
 #include <QStandardPaths>
+#include <QTabWidget>
 #include <QTextStream>
+#include <QTimer>
+#include <QTranslator>
 
+#include "command/CommandConfirmDialog.h"
 #include "command/CommandParser.h"
 #include "command/CommandRegistry.h"
 #include "command/CommandDocs.h"
 #include "ui/MainWindow.h"
+#include "RagWidget.h"
 
 static bool hasArg(int argc, char** argv, const char* arg)
 {
@@ -107,6 +116,80 @@ static int runPrintCommandDocsMode(int argc, char** argv)
     return 0;
 }
 
+// Interface language: --lang en|ru, else the "ui/language" setting (auto, en, ru); auto
+// follows the system. The Russian translation is compiled in (translations/*.ts).
+static void installTranslations(QApplication& app, const QString& requested)
+{
+    QString lang = requested;
+    if (lang.isEmpty())
+        lang = QSettings().value(QStringLiteral("ui/language"), QStringLiteral("auto")).toString();
+    if (lang == QLatin1String("auto"))
+        lang = QLocale::system().name().left(2);
+    if (lang != QLatin1String("ru"))
+        return;
+
+    static QTranslator appTranslator;
+    if (appTranslator.load(QStringLiteral(":/i18n/devassistant_ru.qm")))
+        app.installTranslator(&appTranslator);
+    // Qt's own strings (standard buttons, file dialogs): next to the program in a release,
+    // in the Qt installation when run from a build tree.
+    static QTranslator qtTranslator;
+    if (qtTranslator.load(QStringLiteral("qtbase_ru"), QCoreApplication::applicationDirPath() + "/translations")
+            || qtTranslator.load(QStringLiteral("qtbase_ru"), QLibraryInfo::location(QLibraryInfo::TranslationsPath)))
+        app.installTranslator(&qtTranslator);
+}
+
+// --screenshots <dir>: opens the main windows, saves them as PNG and exits. CI runs it with
+// QT_QPA_PLATFORM=offscreen to keep the README pictures up to date.
+static void scheduleScreenshots(MainWindow& window, const QString& dir)
+{
+    QDir().mkpath(dir);
+    QTimer::singleShot(2500, &window, [&window, dir]() {
+        window.grab().save(dir + "/main.png");
+        if (auto* tabs = qobject_cast<QTabWidget*>(window.centralWidget())) {
+            tabs->setCurrentIndex(1);
+            QCoreApplication::processEvents();
+            window.grab().save(dir + "/settings.png");
+            tabs->setCurrentIndex(0);
+        }
+
+        // The confirmation dialog with a typical batch, as the model would send it.
+        const QList<QJsonObject> sample = {
+            QJsonObject{{"command", "OPEN_FILE_REGION"},
+                        {"params", QJsonObject{{"path", "src/core/ContextManager.cpp"}, {"startLine", 80}, {"endLine", 140}}}},
+            QJsonObject{{"command", "EDIT_IN_RANGE"},
+                        {"params", QJsonObject{{"path", "src/core/ContextManager.cpp"}, {"startLine", 112}, {"endLine", 114},
+                                               {"content", "if (path.trimmed().isEmpty())
+    return QString();
+"}}}},
+            QJsonObject{{"command", "RUN_SHELL"},
+                        {"params", QJsonObject{{"command", "cmake --build build --target tests && ctest --test-dir build"}}}},
+            QJsonObject{{"command", "DELETE_FILE"}, {"params", QJsonObject{{"path", "build/old_report.txt"}}}},
+        };
+        QList<Command*> commands;
+        for (const QJsonObject& o : sample) {
+            if (Command* c = CommandRegistry::create(o))
+                commands << c;
+        }
+        {
+            CommandConfirmDialog dialog(commands, QStringLiteral("C:/Projects/demo"));
+            dialog.resize(900, 330);
+            dialog.show();
+            QCoreApplication::processEvents();
+            dialog.grab().save(dir + "/confirm.png");
+        }
+        qDeleteAll(commands);
+
+        Rag::RagWidget documents;
+        documents.setFolder(QStringLiteral("C:/Projects/demo"));
+        documents.show();
+        QCoreApplication::processEvents();
+        documents.grab().save(dir + "/documents.png");
+
+        QCoreApplication::quit();
+    });
+}
+
 int main(int argc, char** argv)
 {
     QCoreApplication::setOrganizationName("Anton");
@@ -119,6 +202,7 @@ int main(int argc, char** argv)
         return runPrintCommandDocsMode(argc, argv);
 
     QApplication app(argc, argv);
+    installTranslations(app, argValue(argc, argv, "--lang"));
 
     // The stylesheet is compiled into the program (src/resources/resources.qrc). A styles.qss
     // next to the executable overrides it, for trying out a theme without rebuilding.
@@ -134,6 +218,9 @@ int main(int argc, char** argv)
 
     MainWindow w;
     w.show();
+    const QString screenshotDir = argValue(argc, argv, "--screenshots");
+    if (!screenshotDir.isEmpty())
+        scheduleScreenshots(w, screenshotDir);
     return app.exec();
 }
 
