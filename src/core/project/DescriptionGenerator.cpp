@@ -1,27 +1,22 @@
-// DescriptionGenerator.cpp
 #include "core/project/DescriptionGenerator.h"
-#include <QFile>
+#include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
-#include <QTextStream>
+#include "core/model/ModelClient.h"
+#include "core/project/DevAssManager.h"
 #include "core/util/Logging.h"
 
-DescriptionGenerator::DescriptionGenerator(OllamaAdapter* model,
-                                         DevAssManager* devAss,
-                                         QObject* parent)
-    : QObject(parent), m_model(model), m_devAss(devAss)
+DescriptionGenerator::DescriptionGenerator(ModelClient& model, DevAssManager& files, QObject* parent)
+    : QObject(parent)
+    , m_model(model)
+    , m_devAss(files)
 {
 }
 
-QString DescriptionGenerator::relativePath(const QString& absPath)
+QString DescriptionGenerator::prompt(const QString& fileContent)
 {
-    return QDir(m_devAss->projectRoot().absolutePath())
-                .relativeFilePath(absPath);
-}
-
-QString DescriptionGenerator::createPrompt(const QString& content)
-{
-    return QString(
+    return QStringLiteral(
         "Write a formal but very short description of the file contents. Write in English and follow the format below strictly.\n"
         "\n"
         "If the file contains code, analyze it statically and output Markdown:\n"
@@ -50,70 +45,73 @@ QString DescriptionGenerator::createPrompt(const QString& content)
         "Do not invent facts; rely only on the text below.\n"
         "\n"
         "-----\n"
-        "%1"
-    ).arg(content);
+        "%1").arg(fileContent);
 }
 
-
-QString DescriptionGenerator::writeDescription(const QString& relPath,
-                                              const QString& description)
+void DescriptionGenerator::start(const QStringList& absolutePaths)
 {
-    // *.dadescr path inside the DevAss folder
-    QString descrPath = m_devAss->devAssDir().filePath(relPath + ".dadescr");
+    cancel();
+    m_files = absolutePaths;
+    m_index = 0;
+    m_described = 0;
+    m_failed = 0;
+    next();
+}
 
-    QDir().mkpath(QFileInfo(descrPath).absolutePath());
+void DescriptionGenerator::cancel()
+{
+    m_index = m_files.size();
+    if (m_reply)
+        m_reply->abort();
+}
 
-    QFile f(descrPath);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qCWarning(logUtils) << "Failed to write the descriptor:" << descrPath;
-        return QString();
+void DescriptionGenerator::next()
+{
+    if (m_index >= m_files.size()) {
+        emit finished(m_described, m_failed);
+        return;
     }
+    const QString path = m_files.at(m_index);
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        ++m_failed;
+        emit progress(++m_index, m_files.size(), path, false);
+        next();
+        return;
+    }
+    ModelRequest request;
+    request.user = prompt(QString::fromUtf8(file.readAll()));
+    request.timeoutMs = 300000;  // a local model may take minutes for a large file
+    ModelReply* reply = m_model.send(request);
+    m_reply = reply;
+    connect(reply, &ModelReply::finished, this, [this, reply, path]() {
+        reply->deleteLater();
+        if (reply->isCancelled())
+            return;
+        const QString text = reply->text().trimmed();
+        const bool ok = !reply->hasError() && !text.isEmpty() && save(path, text);
+        if (!ok)
+            qCWarning(logUtils) << "No description for" << path << reply->errorString();
+        if (ok)
+            ++m_described;
+        else
+            ++m_failed;
+        emit progress(++m_index, m_files.size(), path, ok);
+        next();
+    });
+}
+
+bool DescriptionGenerator::save(const QString& path, const QString& description)
+{
+    const QString rel = QDir(m_devAss.projectRoot().absolutePath()).relativeFilePath(path);
+    const QString descrPath = m_devAss.devAssDir().filePath(rel + QStringLiteral(".dadescr"));
+    QDir().mkpath(QFileInfo(descrPath).absolutePath());
+    QFile f(descrPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+        return false;
     f.write(description.toUtf8());
     f.close();
-
-    return descrPath;
-}
-
-QString DescriptionGenerator::generateAndSave(const QString& filePath)
-{
-    QFileInfo fi(filePath);
-    if (!fi.exists() || !fi.isFile())
-        return QString();
-
-    // --- 1. Is the description up to date? ---
-    FileDescription* fd = m_devAss->findFileDescription(filePath);
-    QDateTime fileMod = fi.lastModified();
-    if (fd && fd->isDescriptionUpToDate && fileMod <= fd->lastModTime)
-        return QString(); // already up to date, nothing to do
-
-    // --- 2. Read the file ---
-    QFile f(filePath);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qCWarning(logUtils) << "Failed to open the file:" << filePath;
-        return QString();
-    }
-    QString content = QString::fromUtf8(f.readAll());
-    f.close();
-
-    // --- 3. Generate with the model ---
-    QString prompt = createPrompt(content);
-    QString description = m_model->generate(prompt);
-    if (description.isEmpty()) {
-        qCWarning(logUtils) << "The LLM returned an empty description for:" << filePath;
-        return QString();
-    }
-
-    // --- 4. Write the *.dadescr file ---
-    QString relPath = relativePath(filePath);
-    QString descrPath = writeDescription(relPath, description);
-    if (descrPath.isEmpty())
-        return QString(); // write error
-
-    // --- 5. Update .dapro ---
-    m_devAss->updateFileDescription(filePath,
-                                    QDateTime::currentDateTime(),
-                                    true);
-    m_devAss->save();
-
-    return description;
+    m_devAss.updateFileDescription(path, QDateTime::currentDateTime(), true);
+    m_devAss.save();
+    return true;
 }

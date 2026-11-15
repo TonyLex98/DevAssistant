@@ -5,8 +5,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 
-class OllamaAdapter;
-class ContextManager;
+class LlmClient;
 class QStatusBar;
 
 /*
@@ -25,11 +24,9 @@ public:
     void initStatusBar(QStatusBar* bar);
 
     // Dependencies
-    void setModel(OllamaAdapter* model);
-    void setContextManager(ContextManager* mgr);
+    void setModel(LlmClient* model);
+    // The last prompt sent: its size is shown against the context window.
     void setCurrentPrompt(const QString& prompt);
-    void setContextContent(const QString& content);
-    void setStreamBuf(const QString& buf);
 
     // Timer control
     void startTask();
@@ -54,9 +51,6 @@ private:
     bool      m_timerActive;
 
     // Dependencies (weak refs)
-    OllamaAdapter* m_model;
-    ContextManager* m_contextManager;
-    QString         m_currentPrompt;
-    QString         m_contextContent;
-    QString         m_streamBuf;
+    LlmClient* m_model;
+    QString    m_currentPrompt;
 };

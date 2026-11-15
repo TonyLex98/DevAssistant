@@ -1,2 +1,2 @@
 #include "core/commands/OpenFileRegionCommand.h"
-// no-op implementation; handled by MainWindow to collect context
+// apply() does nothing: the agent engine puts the lines into the context (WorkingContext::open).

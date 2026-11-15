@@ -5,31 +5,17 @@
 #include <functional>
 #include <QVBoxLayout>
 
-class OllamaAdapter;
-class PromptSequenceManager;
-class SolutionTemplateManager;
+class Session;
 class TtsController;
 
-/*
- * UiBuilder — static helper that constructs all widgets/layouts for MainWindow.
- *
- * Takes a UIWidgets struct (by reference) and populates it with created widgets.
- * Dependencies are passed explicitly — no MainWindow* or friend-class access.
- */
+// Builds the widgets and layouts of the main window into a UIWidgets struct, the way a
+// Qt Designer form would; the window then connects them to the session and the agent.
 class UiBuilder {
 public:
-    // Main entry point — builds all widgets and layouts
-    // ui: struct to populate with widget pointers
-    // tr_fn: translation function (the "UiBuilder" translation context)
-    // model: OllamaAdapter for ChatDialog
-    // seqMgr: PromptSequenceManager for SequenceGraphWidget
-    // tmplMgr: SolutionTemplateManager for SequenceGraphWidget
-    // tts: TtsController for audio page
+    // tr_fn translates in the "UiBuilder" context (lupdate: -tr-function-alias tr+=tr_fn).
     static void build(UIWidgets& ui,
                       std::function<QString(const char*)> tr_fn,
-                      OllamaAdapter* model,
-                      PromptSequenceManager* seqMgr,
-                      SolutionTemplateManager* tmplMgr,
+                      Session& session,
                       TtsController* tts,
                       QWidget* parent);
 

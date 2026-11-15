@@ -22,7 +22,7 @@ public:
             if (err) *err = "OPEN_SEQUENCE: sequenceName is empty";
             return false;
         }
-        // This command is handled specially in MainWindow, not through normal apply
+        // The agent engine handles this command; apply() does nothing
         return true; 
     }
     

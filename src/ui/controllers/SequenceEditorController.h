@@ -1,51 +1,43 @@
 #pragma once
-
+#include <QCoreApplication>
+#include <QPointer>
 #include <QString>
 #include "core/workflow/PromptSequence.h"
-#include "core/workflow/PromptSequenceManager.h"
-#include "core/workflow/SolutionTemplateManager.h"
-#include "ui/controllers/IService.h"
 
-// Sequence editor controller:
-//  - creates, edits and saves sequences
-//  - drives the sequence graph
-//  - refreshes the sequence cache from the sequences folder and the template folders
+class QWidget;
+class SequenceGraphWidget;
+class Session;
+
+// Creating and editing prompt sequences, and the sequence graph: which template it shows and
+// which sequence is running.
 class SequenceEditorController
 {
+    Q_DECLARE_TR_FUNCTIONS(SequenceEditorController)
 public:
-    SequenceEditorController(ISequenceService* seq, ITemplateService* tmpl, IGraphService* graph, IUIUpdater* ui);
+    SequenceEditorController(Session& session, SequenceGraphWidget* graph, QWidget* dialogParent);
 
-    void openSequenceGraph();
+    // Reloads the sequences and templates and redraws the graph.
+    void refreshGraph();
+    // The template chosen in the chat; the graph shows it.
+    void setSelectedTemplate(const QString& templatePath);
+    // Highlights the running sequence.
+    void highlightRunningSequence();
 
-    // Highlights the running sequence in the graph.
-    void updateSequenceGraphHighlight();
-
-    void updateSequenceGraphTemplateSelection();
-
-    void openSequenceEditorForName(const QString& sequenceName);
-
+    void openEditorFor(const QString& sequenceName);
     // Lets the user pick a sequence file and opens it in the editor.
     void editSequences();
-
     void createNewSequence();
-
-    // Reloads all sequences: the main folder plus the template folders.
-    void refreshAllSequences();
-
-    // Writes default.seq.json if it does not exist.
-    void ensureDefaultSequence();
-
-    void onChatTemplateSelectionChanged(const QString& templatePath);
-
-    static PromptSequence defaultSequenceTemplate();
+    // The solution templates in a window.
+    void showTemplates();
+    // Makes a template from one of the sequences.
+    void exportSequenceAsTemplate();
 
 private:
-    ISequenceService* m_seq;
-    ITemplateService* m_tmpl;
-    IGraphService* m_graph;
-    IUIUpdater* m_ui;
+    void openEditorWindow(const QString& title, const QString& filePath, const PromptSequence& seq);
+    void redrawGraph();
 
-    void openSequenceEditorWindow(const QString& title,
-                                  const QString& filePath,
-                                  const PromptSequence& seq);
+    Session& m_session;
+    QPointer<SequenceGraphWidget> m_graph;
+    QWidget* m_dialogParent;
+    QString m_templatePath;
 };

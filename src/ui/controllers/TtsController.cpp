@@ -1,14 +1,12 @@
 #include "ui/controllers/TtsController.h"
 #include "audio/TtsRunner.h"
 #include "ui/widgets/StyledButton.h"
-#include "ui/ChatDialog.h"
 
 TtsController::TtsController(QObject* parent)
     : QObject(parent)
     , m_enabled(true)
     , m_runner(nullptr)
     , m_toggleBtn(nullptr)
-    , m_chat(nullptr)
 {
     // Off until the user turns it on: it starts a Python server that downloads voices.
     // (A new key, so the old on-by-default value does not carry over.)
@@ -25,18 +23,6 @@ TtsController::TtsController(QObject* parent)
 TtsController::~TtsController()
 {
     cleanupRunner();
-}
-
-void TtsController::setChatDialog(ChatDialog* chat)
-{
-    m_chat = chat;
-    if (m_runner) {
-        disconnect(m_runner, nullptr, this, nullptr);
-        connect(m_runner, &TtsRunner::speakingFinished, this, [this]() {
-            if (m_chat && m_chat->isRecording())
-                m_chat->resumeRecordingAfterResponse();
-        });
-    }
 }
 
 void TtsController::onToggleClicked()
@@ -60,10 +46,6 @@ void TtsController::initRunner()
     m_runner = new TtsRunner(this);
     connect(m_runner, &TtsRunner::statusMessage, this, &TtsController::statusMessage);
     connect(m_runner, &TtsRunner::errorOccurred, this, &TtsController::errorMessage);
-    connect(m_runner, &TtsRunner::speakingFinished, this, [this]() {
-        if (m_chat && m_chat->isRecording())
-            m_chat->resumeRecordingAfterResponse();
-    });
 }
 
 void TtsController::cleanupRunner()

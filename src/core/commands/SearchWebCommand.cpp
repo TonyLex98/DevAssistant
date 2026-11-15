@@ -1,6 +1,5 @@
 ﻿#include "core/commands/SearchWebCommand.h"
 #include "core/project/DevAssManager.h"
-#include "core/model/OllamaAdapter.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -960,17 +959,12 @@ SearchWebCommand::SearchWebCommand(const QString& query,
     m_rawResults.clear();
 }
 
-bool SearchWebCommand::apply(DevAssManager* devAss, QString* err)
-{
-    // No adapter: only the extractive (non-LLM) summary is used.
-    return applyWithLLM(devAss, nullptr, err);
-}
-
-bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter, QString* errorOut)
+bool SearchWebCommand::apply(DevAssManager* devAss, QString* errorOut)
 {
     (void)devAss;
     m_results.clear();
     m_rawResults.clear();
+    m_summarySource.clear();
     const QString originalQuery = m_params.value("query").toString().trimmed();
     QString queryNormalizationNote;
     const QString query = normalizeRecencyQuery(originalQuery, &queryNormalizationNote);
@@ -1379,19 +1373,16 @@ bool SearchWebCommand::applyWithLLM(DevAssManager* devAss, ModelAdapter* adapter
         const QString combinedFromSnippets = snippetContents.join(QStringLiteral("\n")).trimmed();
         const QString summarySource = !combinedFromPages.isEmpty() ? combinedFromPages : combinedFromSnippets;
 
-        // Build the result; summarize with the LLM when one is available.
+        // The result with an extractive summary; the agent asks the model for a better one
+        // afterwards (summarySource()), off this worker thread.
+        m_summarySource = summarySource;
         QStringList resultBlocks;
         resultBlocks << QString("=== SEARCH RESULTS FOR THE QUERY '%1' ===").arg(query);
 
         if (!queryNormalizationNote.isEmpty())
             resultBlocks << QString("Query note: %1").arg(queryNormalizationNote);
 
-        if (!summarySource.isEmpty() && adapter) {
-            QString llmSummary = generateLLMSummary(adapter, summarySource, query);
-            const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
-            resultBlocks << QString("LLM summary of %1 source(s):").arg(sourceCount);
-            resultBlocks << llmSummary;
-        } else if (!summarySource.isEmpty()) {
+        if (!summarySource.isEmpty()) {
             const int sourceCount = !articleContents.isEmpty() ? articleContents.size() : snippetContents.size();
             resultBlocks << QString("Summary of %1 source(s):").arg(sourceCount);
             resultBlocks << summarizeContentInternal(summarySource, query);
@@ -1526,48 +1517,4 @@ QJsonObject SearchWebCommand::toJson() const
     obj["params"] = m_params;
     obj["description"] = m_description;
     return obj;
-}
-
-QString SearchWebCommand::generateLLMSummary(ModelAdapter* adapter, const QString& content, const QString& query)
-{
-    if (!adapter) {
-        return QStringLiteral("Error: no OllamaAdapter was provided for summarization.");
-    }
-    
-
-    if (adapter->selectedModel().isEmpty()) {
-        return QStringLiteral("No LLM model is selected; cannot summarize.");
-    }
-
-    QString effectiveQuery = query.trimmed();
-    if (effectiveQuery.isEmpty())
-        effectiveQuery = QStringLiteral("search query without text");
-
-    QString contentForPrompt = content.trimmed();
-    QString truncationNote;
-    constexpr int kMaxContextChars = 12000;
-    if (contentForPrompt.size() > kMaxContextChars) {
-        contentForPrompt = contentForPrompt.left(kMaxContextChars);
-        truncationNote = QStringLiteral("\n[Content truncated to %1 characters]").arg(kMaxContextChars);
-    }
-
-    const QString systemPrompt = QStringLiteral(
-        "You are a developer's assistant. Based on the material found, write a short, structured summary. "
-        "Give the key findings, links to the sources and recommended actions. Answer in the language of the user's request; do not invent facts."
-    );
-    const QString userPrompt = QStringLiteral(
-        "User request: %1\n"
-        "Content found for summarization:\n%2%3\n\n"
-        "Write the final summary (3-4 points or short paragraphs) with the key facts, links and possible actions."
-    ).arg(effectiveQuery, contentForPrompt, truncationNote);
-
-    QString summary = adapter->generateWithSystem(userPrompt, systemPrompt).trimmed();
-    const QString errorPrefix = QStringLiteral("[Ollama error]");
-    if (summary.startsWith(errorPrefix)) {
-        return QStringLiteral("The LLM returned an error: %1").arg(summary.mid(errorPrefix.length()).trimmed());
-    } else if (summary.isEmpty()) {
-        return QStringLiteral("The LLM returned no summary.");
-    }
-
-    return summary;
 }

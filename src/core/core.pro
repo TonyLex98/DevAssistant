@@ -21,12 +21,6 @@ DESTDIR = $$DEVASS_LIB_DIR
 
 HEADERS += $$files($$PWD/*.h, true)
 SOURCES += $$files($$PWD/*.cpp, true)
-# Still read the main window; built with the app until they move onto the session (next step).
-TRANSITIONAL = \
-    $$PWD/context/PromptResolver.cpp \
-    $$PWD/context/ProjectStructureResolver.cpp \
-    $$PWD/context/ContextChainResolver.cpp
-SOURCES -= $$TRANSITIONAL
 
 # tree-sitter and the grammars of the code index, downloaded by scripts/fetch_tree_sitter.ps1.
 TS = $$DEVASS_THIRD_PARTY

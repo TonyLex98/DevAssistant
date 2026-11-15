@@ -16,7 +16,7 @@ ShowResultCommand::ShowResultCommand(const QString& content,
 
 bool ShowResultCommand::apply(DevAssManager*, QString*)
 {
-    return true; // no filesystem changes; handled by MainWindow hook
+    return true; // nothing on disk: the agent engine shows the result
 }
 
 QJsonObject ShowResultCommand::toJson() const

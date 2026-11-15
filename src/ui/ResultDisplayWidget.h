@@ -4,7 +4,7 @@
 #include <QString>
 #include <QTreeWidget>
 
-#include "core/context/ContextManager.h"
+#include "core/context/WorkingContext.h"
 
 class QScrollArea;
 class QVBoxLayout;
@@ -22,10 +22,8 @@ public:
         UserQuestion
     };
 
-    struct ResultEntryMetadata {
-        QList<CommandContextInfo> commands;
-        QList<CommandSequenceInfo> sequences;
-    };
+    // The commands and sequences behind an answer, shown under it.
+    using ResultEntryMetadata = WorkingContext::Snapshot;
 
     explicit ResultDisplayWidget(QWidget *parent = nullptr);
 

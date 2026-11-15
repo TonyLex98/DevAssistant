@@ -11,7 +11,7 @@ public:
     QJsonObject params() const override { return m_params; }
     QString description() const override { return m_description; }
 
-    // Handled in UI (MainWindow); apply is a no-op fallback.
+    // Handled by the agent engine; apply() does nothing.
     bool apply(DevAssManager* devAss, QString* err) override;
 
     QJsonObject toJson() const override;

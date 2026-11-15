@@ -1,47 +1,32 @@
-// PromptResolver.h
 #pragma once
 #include <QString>
 #include <QStringList>
 #include <QVector>
 #include "core/workflow/PromptStep.h"
 
-class MainWindow;   // forward
+class Session;
 
+// Turns a step's template into the prompts sent to the model by filling its placeholders
+// ({{USER_QUERY}}, {{OPEN_FILES}}, {{SUPPORTED_COMMANDS}}...) from the session.
 class PromptResolver
 {
 public:
     struct ResolvedPrompt
     {
-        QString systemPrompt;
-        QString userPrompt;
+        QString systemPrompt;  // the filled template
+        QString userPrompt;    // the user's request
     };
 
-    /* Fills the template placeholders and returns both the system prompt and user query. */
-    static ResolvedPrompt resolve(const QString& tmpl,
-                           const PromptStep& step,
-                           MainWindow* ctx);
+    static ResolvedPrompt resolve(const PromptStep& step, Session& session);
 
-    /* A placeholder resolver available in templates.
-     *  token: text inserted into the template, e.g. "PROJECT_ROOT".
-     *  description: translated label shown in the insert list/combo. */
+    // A placeholder the step editor offers: the token (e.g. "PROJECT_ROOT") and what it inserts.
     struct ResolverInfo
     {
         QString token;
         QString description;
     };
-
-    /* All available resolvers. */
     static QVector<ResolverInfo> availableResolvers();
-    
-    /* Set context for next sequence */
-    static void setNextSequence(const QString& sequenceName, const QString& description);
-    static QString getNextSequence();
-    static void clearNextSequence();
 
-private:
-    static QString m_nextSequenceName;
-    static QString m_nextSequenceDescription;
-    
-    /* Generate sequence info list for OPEN_SEQUENCE_INFO resolver */
-    static QString generateSequenceInfoList(MainWindow* ctx);
+    // The documentation of the given commands, as the model is shown it.
+    static QString commandDocs(const QStringList& commandNames);
 };

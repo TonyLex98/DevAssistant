@@ -3,7 +3,6 @@
 #include <QStringList>
 #include <QString>
 
-class ModelAdapter;
 
 class SearchWebCommand : public Command
 {
@@ -22,18 +21,19 @@ public:
     const QStringList& rawResults() const { return m_rawResults; }
     QString query() const { return m_params.value("query").toString(); }
 
-    bool applyWithLLM(DevAssManager* devAss,
-                      ModelAdapter* adapter,
-                      QString* errorOut = nullptr) override;
+    // Waits on the network: run in a worker thread.
+    bool runsInBackground() const override { return true; }
+    // The text found on the pages (or the snippets), for a summary by the model; empty if none.
+    QString summarySource() const { return m_summarySource; }
 
 private:
     QJsonObject m_params;
     QString m_description;
     QStringList m_results;
-    QStringList m_rawResults;  // Store raw results for potential LLM summarization
+    QStringList m_rawResults;  // the links found, one block per hit
+    QString m_summarySource;
 
     // Extractive summary without the LLM.
     QString summarizeContentInternal(const QString& content, const QString& query);
 
-    QString generateLLMSummary(ModelAdapter* adapter, const QString& content, const QString& query);
 };

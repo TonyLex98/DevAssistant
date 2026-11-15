@@ -1,8 +1,7 @@
 #include "ui/controllers/TaskStatusController.h"
-#include "core/model/OllamaAdapter.h"
-#include "core/context/ContextManager.h"
+#include "core/model/LlmClient.h"
 #include <QStatusBar>
-#include <QDebug>
+#include <QTime>
 
 TaskStatusController::TaskStatusController(QObject* parent)
     : QObject(parent)
@@ -12,7 +11,6 @@ TaskStatusController::TaskStatusController(QObject* parent)
     , m_taskRunning(false)
     , m_timerActive(false)
     , m_model(nullptr)
-    , m_contextManager(nullptr)
 {
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this, &TaskStatusController::onUpdateTick);
@@ -34,34 +32,19 @@ void TaskStatusController::initStatusBar(QStatusBar* bar)
     onUpdateTick();
 }
 
-void TaskStatusController::setModel(OllamaAdapter* model)
+void TaskStatusController::setModel(LlmClient* model)
 {
     m_model = model;
-}
-
-void TaskStatusController::setContextManager(ContextManager* mgr)
-{
-    m_contextManager = mgr;
 }
 
 void TaskStatusController::setCurrentPrompt(const QString& prompt)
 {
     m_currentPrompt = prompt;
-}
-
-void TaskStatusController::setContextContent(const QString& content)
-{
-    m_contextContent = content;
-}
-
-void TaskStatusController::setStreamBuf(const QString& buf)
-{
-    m_streamBuf = buf;
+    onUpdateTick();
 }
 
 void TaskStatusController::startTask()
 {
-    qDebug() << "[TaskStatusController] startTask. m_taskRunning:" << m_taskRunning << "m_timerActive:" << m_timerActive;
     if (!m_taskRunning) {
         m_elapsedTime.start();
         m_taskRunning = true;
@@ -75,7 +58,6 @@ void TaskStatusController::startTask()
 
 void TaskStatusController::stopTask()
 {
-    qDebug() << "[TaskStatusController] stopTask. m_timerActive:" << m_timerActive << "m_taskRunning:" << m_taskRunning;
     if (m_taskRunning) {
         m_totalElapsedTimeMs += m_elapsedTime.elapsed();
     }
@@ -107,25 +89,11 @@ QString TaskStatusController::buildStatusText() const
         timeStr = "00:00:00";
     }
 
-    // Tokens
-    quint64 usedTokens = 0;
-    quint64 totalTokens = m_model->generationParams().num_ctx;
-
-    if (!m_currentPrompt.isEmpty()) {
-        usedTokens = m_model->estimateTokens(m_currentPrompt);
-    } else if (m_contextManager) {
-        usedTokens = m_model->estimateTokens(m_contextManager->generateContextText());
-    } else {
-        usedTokens = m_model->estimateTokens(m_contextContent);
-    }
-
-    if (!m_streamBuf.isEmpty())
-        usedTokens += m_model->estimateTokens(m_streamBuf);
-
-    if (usedTokens > totalTokens)
-        usedTokens = totalTokens;
-
-    double pers = 100.0 - (double)usedTokens / totalTokens * 100.0;
+    // Tokens: the last prompt against the model's context window (num_ctx in the settings).
+    const quint64 totalTokens = qMax(1, m_model->options().value(QStringLiteral("num_ctx"), 4096).toInt());
+    const quint64 usedTokens = m_currentPrompt.isEmpty()
+            ? 0 : qMin<quint64>(totalTokens, m_model->estimateTokens(m_currentPrompt));
+    const double pers = 100.0 - double(usedTokens) / double(totalTokens) * 100.0;
 
     return tr("Time: %1 | Context left: %2/%3 (%4%)")
         .arg(timeStr)

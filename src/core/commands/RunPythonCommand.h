@@ -23,6 +23,7 @@ public:
     bool apply(DevAssManager* devAss, QString* err) override;
 
     QJsonObject toJson() const override;
+    bool runsInBackground() const override { return true; }  // waits on a process, the network or the disk
 
     QString stdoutText() const { return m_stdout; }
     QString stderrText() const { return m_stderr; }

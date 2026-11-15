@@ -15,17 +15,15 @@ class StyleTextEdit;
 class StyledButton;
 class MemoryComboBox;
 class MemorySplitter;
-class ChatDialog;
+class ChatPanel;
+class QCheckBox;
 class GraphWidget;
 class SequenceGraphWidget;
 class ResultDisplayWidget;
 class ContextGraphWidget;
-class OllamaSettingsDialog;
+class ModelSettingsPanel;
 
-/*
- * Holds all UI widget pointers for MainWindow.
- * Passed to UiBuilder for population — avoids friend-class access.
- */
+// The widgets of the main window, filled in by UiBuilder.
 struct UIWidgets {
     // Main widgets
     IDEWidget* ide_widget = nullptr;
@@ -39,7 +37,7 @@ struct UIWidgets {
 
     // Log & Chat
     StyleTextEdit* m_log = nullptr;
-    ChatDialog* m_chat = nullptr;
+    ChatPanel* m_chat = nullptr;
 
     // Result display
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
@@ -56,13 +54,11 @@ struct UIWidgets {
     QListWidget* m_settingsSidebar = nullptr;    // sidebar
 
     // Buttons
-    StyledButton* applyBtn = nullptr;
     StyledButton* undoBtn = nullptr;
     StyledButton* runSeqBtn = nullptr;
     StyledButton* rescanBtn = nullptr;
     StyledButton* descBtn = nullptr;
     StyledButton* settingsBtn = nullptr;
-    StyledButton* promptBtn = nullptr;
     StyledButton* editSeqBtn = nullptr;
     StyledButton* newSeqBtn = nullptr;
     StyledButton* runTemplateBtn = nullptr;
@@ -77,13 +73,14 @@ struct UIWidgets {
 
     // Combo boxes
     MemoryComboBox* confirmModeCombo = nullptr;
+    QCheckBox* agentModeCheck = nullptr;
 
     // Splitters
     MemorySplitter* m_centerSplitter = nullptr;
     MemorySplitter* mainSplitter = nullptr;
 
     // Settings dialog
-    OllamaSettingsDialog* m_llmSettingsWindow = nullptr;
+    ModelSettingsPanel* m_llmSettingsWindow = nullptr;
 
     // Top widget (path + browse)
     QWidget* top_widget = nullptr;

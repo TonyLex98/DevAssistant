@@ -6,12 +6,8 @@
 
 class TtsRunner;
 class StyledButton;
-class ChatDialog;
 
-/*
- * Encapsulates TTS (text-to-speech) toggle and runner management.
- * Handles persistence of enabled/disabled state in QSettings.
- */
+// Reading answers aloud: the on/off button (saved in the settings) and the TTS server.
 class TtsController : public QObject
 {
     Q_OBJECT
@@ -23,10 +19,8 @@ public:
     // Returns the toggle button to add to a layout
     StyledButton* toggleButton() const { return m_toggleBtn; }
 
-    // Set chat dialog reference for resumeRecordingAfterResponse
-    void setChatDialog(ChatDialog* chat);
 
-    // Speak text if TTS is enabled and runner is ready
+    // Reads the text aloud if speech is on and the server is ready; otherwise does nothing.
     void speak(const QString& text);
 
     bool isEnabled() const { return m_enabled; }
@@ -46,5 +40,4 @@ private:
     bool        m_enabled;
     TtsRunner*  m_runner;
     StyledButton* m_toggleBtn;
-    ChatDialog* m_chat; // weak ref for resumeRecordingAfterResponse
 };

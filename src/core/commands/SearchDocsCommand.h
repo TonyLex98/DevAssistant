@@ -14,6 +14,7 @@ public:
 
     bool apply(DevAssManager* devAss, QString* err) override;
     QJsonObject toJson() const override;
+    bool runsInBackground() const override { return true; }  // waits on a process, the network or the disk
     QString getResult() const override { return m_result; }
 
 private:

@@ -3,7 +3,7 @@
 #include "core/rag/RagEmbedder.h"
 #include "core/rag/RagStore.h"
 #include "core/rag/RagText.h"
-#include "core/model/OllamaAdapter.h"
+#include "core/model/LlmClient.h"
 #include "core/util/AppConfig.h"
 
 #include <QCoreApplication>
@@ -44,7 +44,7 @@ Settings Settings::current()
     out.provider = cfg.provider;
     out.endpoint = cfg.endpoint.isValid() && !cfg.endpoint.isEmpty()
             ? cfg.endpoint
-            : OllamaAdapter::defaultEndpointForProvider(OllamaAdapter::providerFromString(cfg.provider));
+            : LlmClient::defaultEndpoint(LlmClient::providerFromString(cfg.provider));
     out.apiKey = s.value(QStringLiteral("model/apiKey")).toString();
     out.chatModel = cfg.selectedModel;
     out.embeddingModel = s.value(QStringLiteral("rag/embeddingModel"), QStringLiteral("nomic-embed-text")).toString().trimmed();
@@ -243,22 +243,26 @@ void Index::startAsking(const QString& folder, const QString& question)
             return;
         }
 
-        OllamaAdapter model;  // lives in this worker thread
-        model.setProvider(settings.provider);
+        // This is a worker thread: the client lives here and waiting for the answer is fine.
+        LlmClient model;
+        model.setProvider(LlmClient::providerFromString(settings.provider));
         model.setEndpoint(settings.endpoint);
-        QVariantMap options;
-        options.insert(QStringLiteral("temperature"), 0.1);
-        model.configure(settings.chatModel, options);
-        const QString system = QStringLiteral(
+        model.setApiKey(settings.apiKey);
+        model.configure(settings.chatModel, {{QStringLiteral("temperature"), 0.1}});
+        ModelRequest request;
+        request.system = QStringLiteral(
                 "You answer questions about the user's documents using only the excerpts given. "
                 "Cite the excerpts you use as [1], [2] and so on. If the excerpts do not contain "
                 "the answer, say so plainly. Answer in the language of the question.");
-        QVariantMap callOptions;
-        callOptions.insert(QStringLiteral("timeoutMs"), 300000);
-        const QString answer = model.generateWithSystem(buildAnswerPrompt(question, hits), system, callOptions);
-        post([answer, hits](Index* i) {
-            if (answer.startsWith(QLatin1String("[Ollama error]")))
-                emit i->failed(answer);
+        request.user = buildAnswerPrompt(question, hits);
+        request.timeoutMs = 300000;
+        ModelReply* reply = model.send(request);
+        reply->waitForFinished();
+        const QString answer = reply->text();
+        const QString error = reply->errorString();
+        post([answer, error, hits](Index* i) {
+            if (!error.isEmpty())
+                emit i->failed(error);
             else
                 emit i->answerReady(answer, hits);
         });

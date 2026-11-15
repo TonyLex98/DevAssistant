@@ -30,6 +30,12 @@ public:
 
     void load();
     void save() const;
+
+    // The generation options sent with every request: the saved map if there is one,
+    // otherwise the individual fields above.
+    QVariantMap generationParams() const;
+    // Stores the options both as the map and in the individual fields.
+    void setGenerationParams(const QVariantMap& options);
     const QVariantMap &getParams() const;
     void setParams(const QVariantMap &newParams);
 };

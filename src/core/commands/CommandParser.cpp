@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QSet>
 #include "core/util/Logging.h"
+#include "core/util/json_utils.h"
 
 /* Turns an object with path/content into a command */
 static QByteArray convertToObjectCommand(const QByteArray& rawObj);
@@ -329,6 +330,26 @@ static QJsonArray toCommandArray(const QJsonDocument& doc)
         out.append(doc.object());
     }
     return out;
+}
+
+QByteArray CommandParser::extractJson(const QByteArray& answer)
+{
+    const QList<QByteArray> parts = splitConcatenatedJson_fromText(QString::fromUtf8(answer));
+    if (parts.isEmpty())
+        return QByteArray();
+    if (parts.size() == 1) {
+        const QByteArray trimmed = parts.first().trimmed();
+        if (trimmed.startsWith('['))
+            return trimmed;
+    }
+    QByteArray joined = "[";
+    for (int i = 0; i < parts.size(); ++i) {
+        if (i)
+            joined += ',';
+        joined += parts.at(i);
+    }
+    joined += ']';
+    return joined;
 }
 
 QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)

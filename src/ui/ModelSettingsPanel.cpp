@@ -1,4 +1,4 @@
-#include "ui/dialogs/OllamaSettingsDialog.h"
+#include "ui/ModelSettingsPanel.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -12,10 +12,10 @@
 #include <QTabWidget>
 #include <QVBoxLayout>
 
-#include "core/model/OllamaAdapter.h"
+#include "core/model/LlmClient.h"
 #include "core/util/AppConfig.h"
 
-OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
+ModelSettingsPanel::ModelSettingsPanel(QWidget* parent)
     : QWidget(parent)
 {
     setObjectName(QStringLiteral("llmSettingsWidget"));
@@ -248,8 +248,8 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     buttonRow->addWidget(resetBtn);
     buttonRow->addWidget(saveBtn);
     root->addLayout(buttonRow);
-    connect(resetBtn, &QPushButton::clicked, this, &OllamaSettingsDialog::applyDefaults);
-    connect(saveBtn, &QPushButton::clicked, this, &OllamaSettingsDialog::saveRequested);
+    connect(resetBtn, &QPushButton::clicked, this, &ModelSettingsPanel::applyDefaults);
+    connect(saveBtn, &QPushButton::clicked, this, &ModelSettingsPanel::saveRequested);
 
     connect(m_provider, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
         const QString endpointText = m_endpoint->text().trimmed();
@@ -267,12 +267,12 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     loadFromConfig();
 }
 
-void OllamaSettingsDialog::reloadFromConfig()
+void ModelSettingsPanel::reloadFromConfig()
 {
     loadFromConfig();
 }
 
-void OllamaSettingsDialog::applyDefaults()
+void ModelSettingsPanel::applyDefaults()
 {
     const int providerIdx = m_provider->findData(QStringLiteral("ollama"));
     if (providerIdx >= 0)
@@ -297,7 +297,7 @@ void OllamaSettingsDialog::applyDefaults()
     m_stopWords->clear();
 }
 
-void OllamaSettingsDialog::loadFromConfig()
+void ModelSettingsPanel::loadFromConfig()
 {
     AppConfig cfg;
     cfg.load();
@@ -312,8 +312,8 @@ void OllamaSettingsDialog::loadFromConfig()
     if (cfg.endpoint.isValid() && !cfg.endpoint.toString().trimmed().isEmpty()) {
         m_endpoint->setText(cfg.endpoint.toString());
     } else {
-        m_endpoint->setText(OllamaAdapter::defaultEndpointForProvider(
-                                OllamaAdapter::providerFromString(provider)).toString());
+        m_endpoint->setText(LlmClient::defaultEndpoint(
+                                LlmClient::providerFromString(provider)).toString());
     }
 
     m_temperature->setValue(cfg.temperature);
@@ -342,7 +342,7 @@ void OllamaSettingsDialog::loadFromConfig()
         m_stopWords->setPlainText(cfg.stopWords.join("\n"));
 }
 
-QVariantMap OllamaSettingsDialog::params() const
+QVariantMap ModelSettingsPanel::params() const
 {
     QVariantMap o;
     o["temperature"] = m_temperature->value();

@@ -4,22 +4,12 @@
 #include <QStringList>
 #include <QMap>
 #include <QVector>
+#include <functional>
 
-/*
- * ContextCacheManager — cache of the file slices that are in the model's context.
- *
- * Holds:
- *  - m_contextSlices (QMap<QString, FileContextSlice>)
- *  - m_contextContent (the generated context text)
- *  - m_consoleLogs (console output)
- *  - m_externalSources (external sources)
- *  - rebuildContextCache()
- *  - formatNumberedLines()
- *  - setFullFileContext()
- *  - addRegionContext()
- *  - clearContextForPath()
- */
-class ContextCacheManager
+// The text the model is shown besides the prompt: whole files and line ranges it opened
+// (with line numbers), console output of the programs it ran and search results.
+// contextContent() is that text, rebuilt after every change.
+class FileContext
 {
 public:
     struct ContextRange {
@@ -34,7 +24,7 @@ public:
         QVector<ContextRange> regions;
     };
 
-    ContextCacheManager();
+    FileContext();
 
     // Get the generated context text
     const QString& contextContent() const { return m_contextContent; }
@@ -69,10 +59,10 @@ public:
     // Number of tracked files
     int fileCount() const { return m_contextSlices.size(); }
 
-    // Format lines with line numbers (public for MainWindow usage)
+    // Lines with their numbers, as the model sees them.
     QString formatNumberedLines(const QStringList& lines, int startLine) const;
 
-    // Rebuild cache (public for explicit calls from MainWindow)
+    // Rebuilds contextContent().
     void rebuildContextCache();
 
 private:
@@ -82,7 +72,7 @@ private:
     QStringList m_consoleLogs;
     QStringList m_externalSources;
 
-    // Callbacks for path normalization and display (provided by MainWindow)
+    // How paths are normalized and shown (set by WorkingContext).
     std::function<QString(const QString&, const QString&)> m_normalizePath;
     std::function<QString(const QString&, const QString&)> m_displayPath;
     QString m_projectRoot;

@@ -8,11 +8,11 @@
 
 #include "ui/widgets/MemoryLineEdit.h"
 
-class OllamaSettingsDialog : public QWidget
+class ModelSettingsPanel : public QWidget
 {
     Q_OBJECT
 public:
-    explicit OllamaSettingsDialog(QWidget* parent = nullptr);
+    explicit ModelSettingsPanel(QWidget* parent = nullptr);
     void reloadFromConfig();
     QString provider() const { return m_provider ? m_provider->currentData().toString() : QStringLiteral("ollama"); }
     QString endpoint() const { return m_endpoint->text(); }

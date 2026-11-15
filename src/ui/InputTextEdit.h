@@ -3,7 +3,6 @@
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QPushButton>
-#include "core/model/OllamaAdapter.h"
 #include <QKeyEvent>
 #include "ui/widgets/StyleTextEdit.h"
 #include <QMimeData>

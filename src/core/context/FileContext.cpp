@@ -1,17 +1,17 @@
-#include "core/context/ContextCacheManager.h"
+#include "core/context/FileContext.h"
 #include <algorithm>
 #include <QFileInfo>
 
-ContextCacheManager::ContextCacheManager()
+FileContext::FileContext()
 {
 }
 
-void ContextCacheManager::setProjectRoot(const QString& root)
+void FileContext::setProjectRoot(const QString& root)
 {
     m_projectRoot = root;
 }
 
-void ContextCacheManager::setPathCallbacks(
+void FileContext::setPathCallbacks(
         std::function<QString(const QString&, const QString&)> normalize,
         std::function<QString(const QString&, const QString&)> display)
 {
@@ -19,7 +19,7 @@ void ContextCacheManager::setPathCallbacks(
     m_displayPath = display;
 }
 
-void ContextCacheManager::setFullFileContext(const QString& path, const QStringList& lines)
+void FileContext::setFullFileContext(const QString& path, const QStringList& lines)
 {
     QString normalized = path;
     if (m_normalizePath)
@@ -34,7 +34,7 @@ void ContextCacheManager::setFullFileContext(const QString& path, const QStringL
     rebuildContextCache();
 }
 
-void ContextCacheManager::addRegionContext(const QString& path, int startLine, const QStringList& lines)
+void FileContext::addRegionContext(const QString& path, int startLine, const QStringList& lines)
 {
     QString normalized = path;
     if (m_normalizePath)
@@ -69,7 +69,7 @@ void ContextCacheManager::addRegionContext(const QString& path, int startLine, c
     rebuildContextCache();
 }
 
-void ContextCacheManager::clearContextForPath(const QString& path)
+void FileContext::clearContextForPath(const QString& path)
 {
     QString normalized = path;
     if (m_normalizePath)
@@ -82,7 +82,7 @@ void ContextCacheManager::clearContextForPath(const QString& path)
     }
 }
 
-void ContextCacheManager::clearAll()
+void FileContext::clearAll()
 {
     m_contextSlices.clear();
     m_consoleLogs.clear();
@@ -90,14 +90,14 @@ void ContextCacheManager::clearAll()
     rebuildContextCache();
 }
 
-void ContextCacheManager::clearContextForFiles(const QStringList& paths)
+void FileContext::clearContextForFiles(const QStringList& paths)
 {
     for (const QString& path : paths) {
         clearContextForPath(path);
     }
 }
 
-void ContextCacheManager::appendConsoleLog(const QString& log)
+void FileContext::appendConsoleLog(const QString& log)
 {
     if (!log.isEmpty()) {
         m_consoleLogs << log;
@@ -105,7 +105,7 @@ void ContextCacheManager::appendConsoleLog(const QString& log)
     }
 }
 
-void ContextCacheManager::appendConsoleContext(const QString& title, const QString& stdOut, const QString& stdErr, int exitCode)
+void FileContext::appendConsoleContext(const QString& title, const QString& stdOut, const QString& stdErr, int exitCode)
 {
     QString block = QString("==== %1 ====").arg(title);
     if (!stdOut.isEmpty())
@@ -118,13 +118,13 @@ void ContextCacheManager::appendConsoleContext(const QString& title, const QStri
     rebuildContextCache();
 }
 
-void ContextCacheManager::clearConsoleLogs()
+void FileContext::clearConsoleLogs()
 {
     m_consoleLogs.clear();
     rebuildContextCache();
 }
 
-void ContextCacheManager::removeConsoleLogsWithPrefix(const QString& prefix)
+void FileContext::removeConsoleLogsWithPrefix(const QString& prefix)
 {
     auto it = std::remove_if(m_consoleLogs.begin(), m_consoleLogs.end(),
         [&prefix](const QString& log) {
@@ -134,7 +134,7 @@ void ContextCacheManager::removeConsoleLogsWithPrefix(const QString& prefix)
     rebuildContextCache();
 }
 
-void ContextCacheManager::appendExternalSource(const QString& source)
+void FileContext::appendExternalSource(const QString& source)
 {
     if (!source.isEmpty()) {
         m_externalSources << source;
@@ -142,13 +142,13 @@ void ContextCacheManager::appendExternalSource(const QString& source)
     }
 }
 
-void ContextCacheManager::clearExternalSources()
+void FileContext::clearExternalSources()
 {
     m_externalSources.clear();
     rebuildContextCache();
 }
 
-const ContextCacheManager::FileContextSlice* ContextCacheManager::getSlice(const QString& path) const
+const FileContext::FileContextSlice* FileContext::getSlice(const QString& path) const
 {
     QString normalized = path;
     if (m_normalizePath)
@@ -162,7 +162,7 @@ const ContextCacheManager::FileContextSlice* ContextCacheManager::getSlice(const
     return nullptr;
 }
 
-void ContextCacheManager::rebuildContextCache()
+void FileContext::rebuildContextCache()
 {
     QStringList blocks;
     for (auto it = m_contextSlices.cbegin(); it != m_contextSlices.cend(); ++it) {
@@ -206,7 +206,7 @@ void ContextCacheManager::rebuildContextCache()
     }
 }
 
-QString ContextCacheManager::formatNumberedLines(const QStringList& lines, int startLine) const
+QString FileContext::formatNumberedLines(const QStringList& lines, int startLine) const
 {
     if (lines.isEmpty())
         return QString();

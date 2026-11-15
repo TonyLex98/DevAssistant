@@ -31,25 +31,20 @@
 #include "ui/widgets/MemorySplitter.h"
 #include "ui/widgets/StyleTextEdit.h"
 #include "ui/editor/IDEWidget.h"
-#include "ui/ChatDialog.h"
+#include "ui/ChatPanel.h"
 #include "ui/graph/GraphWidget.h"
 #include "ui/graph/SequenceGraphWidget.h"
 #include "ui/ContextGraphWidget.h"
 #include "ui/ResultDisplayWidget.h"
-#include "ui/dialogs/OllamaSettingsDialog.h"
-#include "ui/dialogs/PromptEditorDialog.h"
+#include "ui/ModelSettingsPanel.h"
 #include "ui/dialogs/SolutionTemplateViewer.h"
 #include "ui/dialogs/RunTemplateOrSequenceDialog.h"
 #include "ui/controllers/TtsController.h"
-#include "core/model/OllamaAdapter.h"
-#include "core/workflow/PromptSequenceManager.h"
-#include "core/workflow/SolutionTemplateManager.h"
+#include "core/session/Session.h"
 
 void UiBuilder::build(UIWidgets& ui,
                       std::function<QString(const char*)> tr_fn,
-                      OllamaAdapter* model,
-                      PromptSequenceManager* seqMgr,
-                      SolutionTemplateManager* tmplMgr,
+                      Session& session,
                       TtsController* tts,
                       QWidget* parent)
 {
@@ -79,12 +74,12 @@ void UiBuilder::build(UIWidgets& ui,
     ui.m_log->setReadOnly(true);
     ui.m_log->setVisible(false);
 
-    ui.m_chat = new ChatDialog(model, parent);
+    ui.m_chat = new ChatPanel(session.model(), session.workflows().templates(), parent);
 
     // Sequence graph widget
     ui.m_seqGraphWindow = new SequenceGraphWidget(parent);
-    ui.m_seqGraphWindow->setSequenceManager(seqMgr);
-    ui.m_seqGraphWindow->setTemplateManager(tmplMgr);
+    ui.m_seqGraphWindow->setSequenceManager(&session.workflows().sequences());
+    ui.m_seqGraphWindow->setTemplateManager(&session.workflows().templates());
     ui.m_seqGraphWindow->restoreLayout();
     ui.m_seqGraphWindow->rebuildGraph();
     ui.m_seqGraphWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -187,10 +182,8 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
         }
     }
 
-    // Hidden buttons
-    ui.applyBtn = new StyledButton(tr_fn("Apply"), parent);
+    // Placed by the main window (the status bar) or not shown
     ui.undoBtn = new StyledButton(tr_fn("Undo"), parent);
-    ui.applyBtn->hide();
     ui.undoBtn->hide();
     ui.runSeqBtn = new StyledButton(tr_fn("Run"), parent);
     ui.runSeqBtn->hide();
@@ -256,12 +249,10 @@ void UiBuilder::buildModelPage(UIWidgets& ui,
     addSection(tr_fn("Model settings"), llmLay);
 
     ui.settingsBtn = new StyledButton(tr_fn("Open LLM settings"), parent);
-    ui.promptBtn = new StyledButton(tr_fn("Edit base prompt"), parent);
     llmLay->addWidget(ui.settingsBtn);
-    llmLay->addWidget(ui.promptBtn);
     addDiv(llmLay);
 
-    ui.m_llmSettingsWindow = new OllamaSettingsDialog(parent);
+    ui.m_llmSettingsWindow = new ModelSettingsPanel(parent);
     ui.m_llmSettingsWindow->setVisible(false);
     llmLay->addWidget(ui.m_llmSettingsWindow);
     llmLay->addStretch();
@@ -399,6 +390,7 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
                                 "It uses the model selected in the chat."));
     QObject::connect(agentMode, &QCheckBox::toggled, [](bool on) { QSettings().setValue("agent/enabled", on); });
     sysLay->addWidget(agentMode);
+    ui.agentModeCheck = agentMode;
 
     addDiv(sysLay);
     addSection(tr_fn("Interface"), sysLay);

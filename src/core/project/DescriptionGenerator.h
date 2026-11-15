@@ -1,38 +1,42 @@
-#include  <QString>
-#include  "core/model/OllamaAdapter.h"
-#include "core/project/DevAssManager.h"
+#pragma once
+#include <QObject>
+#include <QPointer>
+#include <QString>
+#include <QStringList>
 
-/**
- * @brief Generates and saves file descriptions.
- *
- * Uses:
- *   - `OllamaAdapter::generate()` to produce the text
- *   - `DevAssManager` to compute the relative path, create
- *     `DevAss/<rel>.dadescr` and update .dapro
- *
- * @note A single instance is used (created in `MainWindow` and reused
- *       in `DescriptionDialog`).
- */
+class DevAssManager;
+class ModelClient;
+class ModelReply;
+
+// Writes a short description of each project file with the model, into
+// <project>/DevelopersAssistant/<file>.dadescr, one file after another without blocking.
+// The prompts can include the descriptions ({{FILE_DESCRIPTIONS}}).
 class DescriptionGenerator : public QObject
 {
     Q_OBJECT
 public:
-    explicit DescriptionGenerator(OllamaAdapter* model, DevAssManager* devAss, QObject* parent = nullptr);
+    DescriptionGenerator(ModelClient& model, DevAssManager& files, QObject* parent = nullptr);
 
-    /**
-     * @brief Generates a file description and saves it to .dadescr.
-     * @param filePath Absolute path to the source file.
-     * @return The generated text, or an empty string on error.
-     * @note If the description is already up to date, does nothing
-     *       and returns an empty string.
-     */
-    QString generateAndSave(const QString& filePath);
+    void start(const QStringList& absolutePaths);
+    void cancel();
+    bool isRunning() const { return m_index < m_files.size(); }
+
+    // The prompt for one file (public for tests).
+    static QString prompt(const QString& fileContent);
+
+signals:
+    void progress(int done, int total, const QString& file, bool described);
+    void finished(int described, int failed);
 
 private:
-    QString createPrompt(const QString& content);
-    QString writeDescription(const QString& relPath, const QString& description);
-    QString relativePath(const QString& absPath);
+    void next();
+    bool save(const QString& path, const QString& description);
 
-    OllamaAdapter* m_model;
-    DevAssManager* m_devAss;
+    ModelClient& m_model;
+    DevAssManager& m_devAss;
+    QStringList m_files;
+    int m_index = 0;
+    int m_described = 0;
+    int m_failed = 0;
+    QPointer<ModelReply> m_reply;
 };

@@ -20,12 +20,6 @@ SOURCES += \
 FORMS += $$UI_SRC/editor/IDEWidget.ui
 RESOURCES += $$PWD/resources.qrc
 
-# Still read the main window; they move into the core library onto the session (next step).
-SOURCES += \
-    $$DEVASS_SRC/core/context/PromptResolver.cpp \
-    $$DEVASS_SRC/core/context/ProjectStructureResolver.cpp \
-    $$DEVASS_SRC/core/context/ContextChainResolver.cpp
-
 # md4c renders the model's Markdown answers.
 INCLUDEPATH += $$DEVASS_THIRD_PARTY/md4c/src
 SOURCES += \

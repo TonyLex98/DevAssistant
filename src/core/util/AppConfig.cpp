@@ -1,6 +1,7 @@
 #include "core/util/AppConfig.h"
 #include <QSettings>
 #include <QCoreApplication>
+#include <QJsonArray>
 
 const QVariantMap &AppConfig::getParams() const
 {
@@ -10,6 +11,60 @@ const QVariantMap &AppConfig::getParams() const
 void AppConfig::setParams(const QVariantMap &newParams)
 {
     params = newParams;
+}
+
+QVariantMap AppConfig::generationParams() const
+{
+    if (!params.isEmpty())
+        return params;
+
+    QVariantMap p;
+    p["temperature"] = temperature;
+    p["top_p"] = topP;
+    p["top_k"] = topK;
+    p["repeat_penalty"] = repeatPenalty;
+    p["presence_penalty"] = presencePenalty;
+    p["frequency_penalty"] = frequencyPenalty;
+    p["num_predict"] = numPredict;
+    p["num_ctx"] = numCtx;
+    p["mirostat"] = mirostat;
+    p["mirostat_tau"] = mirostatTau;
+    p["mirostat_eta"] = mirostatEta;
+    p["seed"] = seed;
+    if (!stopWords.isEmpty())
+        p["stop"] = stopWords;
+    p["reasoning_effort"] = reasoningEffort;
+    p["temperature_decay"] = temperatureDecay;
+    p["repeat_last_n"] = repeatLastN;
+    return p;
+}
+
+void AppConfig::setGenerationParams(const QVariantMap& o)
+{
+    params = o;
+    temperature = o.value("temperature", 1).toDouble();
+    topP = o.value("top_p", 0.9).toDouble();
+    topK = o.value("top_k", 40).toInt();
+    repeatPenalty = o.value("repeat_penalty", 1.1).toDouble();
+    presencePenalty = o.value("presence_penalty", 0.0).toDouble();
+    frequencyPenalty = o.value("frequency_penalty", 0.0).toDouble();
+    numPredict = o.value("num_predict", -1).toInt();
+    numCtx = o.value("num_ctx", 4096).toInt();
+    mirostat = o.value("mirostat", 0).toInt();
+    mirostatTau = o.value("mirostat_tau", 5.0).toDouble();
+    mirostatEta = o.value("mirostat_eta", 0.1).toDouble();
+    seed = o.value("seed", 0).toULongLong();
+    stopWords.clear();
+    const QVariant stop = o.value("stop");
+    const QStringList words = stop.canConvert<QJsonArray>() && stop.type() != QVariant::StringList
+            ? QVariant(stop.toJsonArray().toVariantList()).toStringList()
+            : stop.toStringList();
+    for (const QString& w : words)
+        if (!w.trimmed().isEmpty())
+            stopWords << w.trimmed();
+    reasoningEffort = o.value("reasoning_effort", "medium").toString();
+    temperatureDecay = o.value("temperature_decay", 0.0).toDouble();
+    repeatLastN = o.value("repeat_last_n", 64).toInt();
 }
 
 void AppConfig::load(){

@@ -1,60 +1,47 @@
-// Command.h
 #pragma once
-#include <QString>
-#include <QJsonObject>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QList>
-#include <QDateTime>
+#include <QString>
 #include "core/project/DevAssManager.h"
 
-class DevAssManager;   // forward
-class ModelAdapter;    // forward - LLM adapter interface
-
+// One action the model asks for: open a file, edit lines, run a program, search... The parser
+// builds commands from the model's answer; the policy decides whether they may run; the agent
+// runs them and gives their results back to the model.
 class Command
 {
 public:
     virtual ~Command() = default;
 
-    /* command name, e.g. "CREATE_FILE" */
+    // The command's name, e.g. "CREATE_FILE".
     virtual QString name() const = 0;
-
-    /* command parameters, usable as is */
+    // Its parameters, as the model gave them (after normalization).
     virtual QJsonObject params() const = 0;
-
-    /* short description of what the command does */
+    // What it does, in a sentence.
     virtual QString description() const = 0;
 
-    /* apply the command to the file system.
-       `devAss` - description manager, needed to update .dapro.
-       `errorOut` - error message (if false). */
-    virtual bool apply(DevAssManager* devAss,
-                       QString* errorOut = nullptr) = 0;
+    // Does the work. File changes go through `devAss`, which checks the paths and records them
+    // for undo. On failure returns false and explains why in `errorOut`.
+    virtual bool apply(DevAssManager* devAss, QString* errorOut = nullptr) = 0;
 
-    /* apply command using LLM (optional).
-       This method can be overridden by commands that require LLM.
-       `devAss` - description manager.
-       `adapter` - ModelAdapter for LLM-based generation.
-       `errorOut` - error message (if false). */
-    virtual bool applyWithLLM(DevAssManager* devAss,
-                              ModelAdapter* adapter,
-                              QString* errorOut = nullptr) {
-        Q_UNUSED(adapter)
-        return apply(devAss, errorOut);
-    }
+    // True for commands that wait on the network or on another program (searching the web,
+    // running a shell command): the agent runs them in a worker thread, so the window stays
+    // responsive. Such commands must not touch the file system through `devAss`.
+    virtual bool runsInBackground() const { return false; }
 
-    /* serialize to JSON (also usable for *.dadescr) */
+    // The command as JSON (also used for the .dadescr files).
     virtual QJsonObject toJson() const = 0;
 
-    /* command result (shown to the user and passed to the LLM) */
+    // The result shown to the user and given to the model.
     virtual QString getResult() const { return QString(); }
 
-    /* execution status */
-    void setExecutionResult(bool success, const QString& error = QString()) {
+    void setExecutionResult(bool success, const QString& error = QString())
+    {
         m_executionSuccess = success;
         m_errorMessage = error;
     }
-
     bool wasSuccessful() const { return m_executionSuccess; }
     QString getErrorMessage() const { return m_errorMessage; }
 
