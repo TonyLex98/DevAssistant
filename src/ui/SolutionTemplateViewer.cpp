@@ -26,10 +26,10 @@ SolutionTemplateViewer::SolutionTemplateViewer(SolutionTemplateManager* template
             QString selectedSeq = m_defaultSequenceCombo->currentData().toString();
             if (!selectedSeq.isEmpty()) {
                 // Here we would run the selected sequence, but for now just show a message
-                QMessageBox::information(this, "Run Template",
-                    QString("Would run template with sequence: %1").arg(selectedSeq));
+                QMessageBox::information(this, tr("Run Template"),
+                    tr("Would run template with sequence: %1").arg(selectedSeq));
             } else {
-                QMessageBox::warning(this, "No Sequence", "No sequence selected for this template.");
+                QMessageBox::warning(this, tr("No Sequence"), tr("No sequence selected for this template."));
             }
         }
     });
@@ -48,13 +48,10 @@ QString SolutionTemplateViewer::wrapTextByCharacterCount(const QString& text, in
         QChar ch = text.at(i);
         currentLine += ch;
 
-        // Если текущая строка достигла максимальной длины
         if (currentLine.length() >= maxCharsPerLine) {
-            // Проверяем, не разбиваем ли мы слово посередине
-            // Пытаемся найти последний пробел в пределах maxCharsPerLine
+            // Prefer breaking at the last space so words are not split
             int lastSpaceIndex = -1;
 
-            // Ищем последний пробел в currentLine
             for (int j = currentLine.length() - 1; j >= 0; --j) {
                 if (currentLine.at(j).isSpace()) {
                     lastSpaceIndex = j;
@@ -63,21 +60,19 @@ QString SolutionTemplateViewer::wrapTextByCharacterCount(const QString& text, in
             }
 
             if (lastSpaceIndex > 0) {
-                // Разбиваем по последнему пробелу, чтобы не рвать слова
                 QString lineToAdd = currentLine.left(lastSpaceIndex);
                 wrappedText += lineToAdd + "\n";
 
-                // Оставшуюся часть строки переносим в начало следующей строки
+                // The remainder starts the next line
                 currentLine = currentLine.mid(lastSpaceIndex + 1);
             } else {
-                // Если слово слишком длинное и не содержит пробелов, разбиваем жестко
+                // No space to break at: hard-wrap the long word
                 wrappedText += currentLine + "\n";
                 currentLine.clear();
             }
         }
     }
 
-    // Добавляем оставшуюся часть строки, если она есть
     if (!currentLine.isEmpty()) {
         wrappedText += currentLine;
     }
@@ -176,7 +171,7 @@ void SolutionTemplateViewer::onEditTemplate()
     qCDebug(logTemplate) << "[SolutionTemplateViewer] onEditTemplate called";
     if (m_currentTemplateDir.isEmpty()) {
         qCDebug(logTemplate) << "[SolutionTemplateViewer] No template selected, showing info message";
-        QMessageBox::information(this, "Edit Template", "Please select a template to edit.");
+        QMessageBox::information(this, tr("Edit Template"), tr("Please select a template to edit."));
         return;
     }
     
@@ -198,7 +193,7 @@ void SolutionTemplateViewer::onEditTemplate()
     qCDebug(logTemplate) << "[SolutionTemplateViewer] Sequence manager pointer:" << seqMgr;
     if (!seqMgr) {
         qCDebug(logTemplate) << "[SolutionTemplateViewer] Sequence manager is null, showing warning";
-        QMessageBox::warning(this, "Edit Template", "Sequence manager is not available. Template editing requires a valid sequence manager.");
+        QMessageBox::warning(this, tr("Edit Template"), tr("Sequence manager is not available. Template editing requires a valid sequence manager."));
         dialog->deleteLater();
         return;
     }
@@ -226,7 +221,7 @@ void SolutionTemplateViewer::onEditTemplate()
             loadTemplateInfo(m_currentTemplateDir);
             dialog->accept();
         } else {
-            QMessageBox::warning(dialog, "Save Template", "Failed to save template.");
+            QMessageBox::warning(dialog, tr("Save Template"), tr("Failed to save template."));
         }
     });
     connect(buttonBox, &QDialogButtonBox::rejected, dialog, &QDialog::reject);
@@ -242,12 +237,12 @@ void SolutionTemplateViewer::onEditTemplate()
 void SolutionTemplateViewer::onDeleteTemplate()
 {
     if (m_currentTemplateDir.isEmpty()) {
-        QMessageBox::information(this, "Delete Template", "Please select a template to delete.");
+        QMessageBox::information(this, tr("Delete Template"), tr("Please select a template to delete."));
         return;
     }
     
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "Delete Template", 
-        QString("Are you sure you want to delete the template '%1'?").arg(
+    QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Delete Template"), 
+        tr("Are you sure you want to delete the template '%1'?").arg(
             QFileInfo(m_currentTemplateDir).fileName()),
         QMessageBox::Yes | QMessageBox::No);
         
@@ -256,7 +251,7 @@ void SolutionTemplateViewer::onDeleteTemplate()
             refreshTemplates();
             m_currentTemplateDir.clear();
         } else {
-            QMessageBox::warning(this, "Delete Template", "Failed to delete template.");
+            QMessageBox::warning(this, tr("Delete Template"), tr("Failed to delete template."));
         }
     }
 }
@@ -264,7 +259,7 @@ void SolutionTemplateViewer::onDeleteTemplate()
 void SolutionTemplateViewer::onAddTemplate()
 {
     bool ok;
-    QString name = QInputDialog::getText(this, "New Template", "Template name:", QLineEdit::Normal, QString(), &ok);
+    QString name = QInputDialog::getText(this, tr("New Template"), tr("Template name:"), QLineEdit::Normal, QString(), &ok);
     if (!ok || name.trimmed().isEmpty()) {
         return;
     }
@@ -272,7 +267,7 @@ void SolutionTemplateViewer::onAddTemplate()
     // Create new template directory
     QString templateDir = QDir(m_templateManager->root()).absoluteFilePath(name.trimmed());
     if (QDir().exists(templateDir)) {
-        QMessageBox::warning(this, "New Template", "Template with this name already exists.");
+        QMessageBox::warning(this, tr("New Template"), tr("Template with this name already exists."));
         return;
     }
     
@@ -288,7 +283,7 @@ void SolutionTemplateViewer::onAddTemplate()
             m_templateList->setCurrentRow(index);
         }
     } else {
-        QMessageBox::warning(this, "New Template", "Failed to create template.");
+        QMessageBox::warning(this, tr("New Template"), tr("Failed to create template."));
     }
 }
 
@@ -305,7 +300,7 @@ void SolutionTemplateViewer::updateTemplateList()
 void SolutionTemplateViewer::loadTemplateInfo(const QString& templateDir)
 {
     if (templateDir.isEmpty()) {
-        m_templateNameLabel->setText("No template selected");
+        m_templateNameLabel->setText(tr("No template selected"));
         m_templateDescriptionLabel->clear();
         m_templateImageLabel->clear();
         m_defaultSequenceCombo->clear();
@@ -337,10 +332,10 @@ void SolutionTemplateViewer::loadTemplateInfo(const QString& templateDir)
             if (!pixmap.isNull()) {
                 m_templateImageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
             } else {
-                m_templateImageLabel->setText("Image not found");
+                m_templateImageLabel->setText(tr("Image not found"));
             }
         } else {
-            m_templateImageLabel->setText("Image not found");
+            m_templateImageLabel->setText(tr("Image not found"));
         }
     } else {
         m_templateImageLabel->clear();
@@ -368,7 +363,7 @@ void SolutionTemplateViewer::loadTemplateInfo(const QString& templateDir)
 void SolutionTemplateViewer::onExportTemplate()
 {
     if (m_currentTemplateDir.isEmpty()) {
-        QMessageBox::information(this, "Export Template", "Please select a template to export.");
+        QMessageBox::information(this, tr("Export Template"), tr("Please select a template to export."));
         return;
     }
     
@@ -383,11 +378,11 @@ void SolutionTemplateViewer::onExportTemplate()
     }
     
     if (m_templateManager->exportTemplate(m_currentTemplateDir, exportPath)) {
-        QMessageBox::information(this, "Export Successful", 
-            QString("Template '%1' exported successfully to:\n%2").arg(templateName, exportPath));
+        QMessageBox::information(this, tr("Export Successful"), 
+            tr("Template '%1' exported successfully to:\n%2").arg(templateName, exportPath));
     } else {
-        QMessageBox::warning(this, "Export Failed", 
-            "Failed to export template. Check permissions and try again.");
+        QMessageBox::warning(this, tr("Export Failed"), 
+            tr("Failed to export template. Check permissions and try again."));
     }
 }
 
@@ -404,14 +399,14 @@ void SolutionTemplateViewer::onImportSequenceAsTemplate()
     
     // Ask for template name and description
     bool ok;
-    QString templateName = QInputDialog::getText(this, "Template Name", "Enter template name:", 
+    QString templateName = QInputDialog::getText(this, tr("Template Name"), tr("Enter template name:"), 
         QLineEdit::Normal, QFileInfo(sequencePath).baseName(), &ok);
     if (!ok || templateName.trimmed().isEmpty()) {
         return;
     }
     
-    QString description = QInputDialog::getMultiLineText(this, "Template Description", 
-        "Enter template description (optional):", QString(), &ok);
+    QString description = QInputDialog::getMultiLineText(this, tr("Template Description"), 
+        tr("Enter template description (optional):"), QString(), &ok);
     if (!ok) { // User cancelled, allow empty description
         description = QString();
     }
@@ -419,19 +414,19 @@ void SolutionTemplateViewer::onImportSequenceAsTemplate()
     // Create the template directory
     QString templateDir = QDir(m_templateManager->root()).absoluteFilePath(templateName.trimmed());
     if (QDir().exists(templateDir)) {
-        QMessageBox::warning(this, "Import Failed", 
-            QString("Template with name '%1' already exists. Please choose a different name.").arg(templateName));
+        QMessageBox::warning(this, tr("Import Failed"), 
+            tr("Template with name '%1' already exists. Please choose a different name.").arg(templateName));
         return;
     }
     
     // Export the sequence as a template
     if (m_templateManager->exportSequenceAsTemplate(sequencePath, templateDir, templateName.trimmed(), description)) {
         refreshTemplates();
-        QMessageBox::information(this, "Import Successful", 
-            QString("Sequence '%1' imported as template '%2' successfully!").arg(
+        QMessageBox::information(this, tr("Import Successful"), 
+            tr("Sequence '%1' imported as template '%2' successfully!").arg(
                 QFileInfo(sequencePath).fileName(), templateName));
     } else {
-        QMessageBox::warning(this, "Import Failed", 
-            "Failed to import sequence as template. Check permissions and try again.");
+        QMessageBox::warning(this, tr("Import Failed"), 
+            tr("Failed to import sequence as template. Check permissions and try again."));
     }
 }

@@ -29,7 +29,7 @@ signals:
 
 
 private slots:
-    void onInsertClicked();    // слот «Вставить»
+    void onInsertClicked();
     void onAddSequenceInfo();  // New slot for adding sequence info resolver
     void loadAvailableSequences(); // Load and display available sequences
     void onSequenceItemChanged(QListWidgetItem *item); // Handle sequence item state changes
@@ -45,18 +45,18 @@ private:
     QString m_templateDir; // Directory of the current template for filtering
     QString m_currentSequenceName; // Name of the current sequence being edited
 
-    /* --- UI для резолверов --- */
+    /* --- Resolver insertion --- */
     QListWidget *m_insertList = nullptr;
     MemoryLineEdit *m_insertFilter = nullptr;
     StyledButton *m_insertBtn      = nullptr;
 
-    /* --- UI для зацикливания --- */
+    /* --- Loop option --- */
     QCheckBox   *m_loopCheck      = nullptr;
     
-    /* --- UI для саммаризации --- */
+    /* --- Summarization option --- */
     QCheckBox   *m_summarizeCheck = nullptr;
     
-    /* --- UI для резолвера информации о последовательностях --- */
+    /* --- Sequence info resolver --- */
     StyledButton *m_addSequenceInfoBtn = nullptr;
     QListWidget *m_sequenceListWidget = nullptr;
     MemoryLineEdit *m_seqFilter = nullptr;

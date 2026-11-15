@@ -19,14 +19,14 @@ private:
     struct Rule { QRegularExpression pattern; QTextCharFormat format; };
     QVector<Rule> rules;
 
-    // Форматы
+    // Formats
     QTextCharFormat keywordFormat;
     QTextCharFormat classFormat;
     QTextCharFormat stringFormat;
     QTextCharFormat commentFormat;
     QTextCharFormat numberFormat;
 
-    // Regex для многострочных строк и комментариев
-    QRegularExpression tripleQuotePattern;   // '''  или  """  (три одиночные/двойные кавычки)
-    QRegularExpression commentStart;          // #  (однострочный)
+    // Patterns for multi-line strings and comments
+    QRegularExpression tripleQuotePattern;   // ''' or """
+    QRegularExpression commentStart;          // # (single-line)
 };

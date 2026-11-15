@@ -6,7 +6,7 @@
 DartHighlighter::DartHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
-    // ── ключевые слова Dart ────────────────────────────────
+    // ── Dart keywords ──────────────────────────────────────
     keywordFormat.setForeground(QColor(86,0,179));
     keywordFormat.setFontWeight(QFont::Bold);
 
@@ -22,21 +22,20 @@ DartHighlighter::DartHighlighter(QTextDocument *parent)
         rules.append({ QRegularExpression(QString("\\b%1\\b").arg(kw)), keywordFormat });
     }
 
-    // ── строки ─────────────────────────────────────────────
+    // ── strings ────────────────────────────────────────────
     stringFormat.setForeground(QColor(196,26,22));
-    // обычные кавычки
     rules.append({ QRegularExpression(R"("([^"\\]|\\.)*")"), stringFormat });
     rules.append({ QRegularExpression(R"('([^'\\]|\\.)*')"), stringFormat });
 
-    // ── числа ─────────────────────────────────────────────
+    // ── numbers ───────────────────────────────────────────
     numberFormat.setForeground(QColor(153,0,0));
     rules.append({ QRegularExpression(R"(\b\d+(\.\d+)?\b)"), numberFormat });
 
-    // ── однострочные комментарии // … ─────────────────────
+    // ── single-line comments // … ─────────────────────────
     commentFormat.setForeground(QColor(120,120,120));
     rules.append({ QRegularExpression(R"(//.*)"), commentFormat });
 
-    // ── многострочные комментарии /* … */ ────────────────
+    // ── multi-line comments /* … */ ───────────────────────
     multilineCommentStart = QRegularExpression(R"(/\*)");
     multilineCommentEnd   = QRegularExpression(R"(\*/)");
     commentStart          = QRegularExpression(R"(//)");
@@ -44,7 +43,7 @@ DartHighlighter::DartHighlighter(QTextDocument *parent)
 
 void DartHighlighter::highlightBlock(const QString &text)
 {
-    // 1️⃣ Поиск обычных шаблонов (ключевые слова, строки, числа, однострочные комментарии)
+    // Single-line rules (keywords, strings, numbers, // comments)
     for (const auto &r : rules) {
         QRegularExpressionMatchIterator i = r.pattern.globalMatch(text);
         while (i.hasNext()) {
@@ -53,21 +52,21 @@ void DartHighlighter::highlightBlock(const QString &text)
         }
     }
 
-    // 2️⃣ Многострочные комментарии
+    // Multi-line comments
     int startIndex = 0;
     if (previousBlockState() == 1) {
-        startIndex = 0;          // продолжаем комментарий из предыдущего блока
+        startIndex = 0;          // comment continues from the previous block
     } else {
         startIndex = text.indexOf(multilineCommentStart);
     }
 
     while (startIndex >= 0) {
         int endIndex = text.indexOf(multilineCommentEnd, startIndex + 2);
-        if (endIndex < 0) {      // комментарий не закрыт в этом блоке
+        if (endIndex < 0) {      // not closed in this block
             setFormat(startIndex, text.length() - startIndex, commentFormat);
-            setCurrentBlockState(1);   // помечаем, что комментарий открыт
+            setCurrentBlockState(1);   // comment still open
             break;
-        } else {                 // закрыт
+        } else {                 // closed
             setFormat(startIndex, endIndex - startIndex + 2, commentFormat);
             startIndex = text.indexOf(multilineCommentStart, endIndex + 2);
         }

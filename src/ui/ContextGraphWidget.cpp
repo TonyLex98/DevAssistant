@@ -62,9 +62,9 @@ QString ContextGraphWidget::buildNodeLabel(const ContextGraphNodeInfo& node) con
     lines << QStringLiteral("[%1] %2").arg(node.category, node.title);
     if (!node.summary.trimmed().isEmpty())
         lines << node.summary.simplified();
-    lines << QStringLiteral("Actions: %1").arg(node.actions.size());
+    lines << tr("Actions: %1").arg(node.actions.size());
     if (node.milestone)
-        lines << QStringLiteral("Milestone");
+        lines << tr("Milestone");
     return lines.join(QStringLiteral("\n"));
 }
 

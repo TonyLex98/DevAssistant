@@ -7,8 +7,8 @@ class CppHighlighter;
 
 
 // -----------------------------------------------------
-//  MethodEditDialog – диалог редактирования кода с
-//  кнопкой “Run sequence” и полем ввода сообщения
+//  MethodEditDialog – code editor window with a message
+//  input field and a "Run sequence" button
 // -----------------------------------------------------
 class MethodEditDialog : public QWidget
 {
@@ -19,8 +19,8 @@ public:
     QString getCode() const;
 
 signals:
-    void signal_runSequenceDialog();                      // Кнопка Run / Enter в InputTextEdit
-    void signal_updatelastUserMessage(const QString& lastUserMessage); // Текст последнего сообщения
+    void signal_runSequenceDialog();                      // Run button / Enter in InputTextEdit
+    void signal_updatelastUserMessage(const QString& lastUserMessage); // text of the last user message
     void signal_saveMethod();
 
 private:

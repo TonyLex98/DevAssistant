@@ -93,7 +93,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
     QLabel *snippetLabel = nullptr;
     QPushButton *reasoningToggle = nullptr;
     if (type == EntryType::Reasoning) {
-        reasoningToggle = new QPushButton(tr("Показать рассуждение"), entry);
+        reasoningToggle = new QPushButton(tr("Show reasoning"), entry);
         reasoningToggle->setCheckable(true);
         reasoningToggle->setChecked(false);
         reasoningToggle->setFlat(true);
@@ -141,7 +141,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         "  border-radius: 4px;"
         "}"
     );
-    browser->setHtml(htmlContent.isEmpty() ? tr("<i>Нет содержимого</i>") : htmlContent);
+    browser->setHtml(htmlContent.isEmpty() ? tr("<i>No content</i>") : htmlContent);
     browser->document()->adjustSize();
     const int docHeight = static_cast<int>(browser->document()->size().height());
     browser->setMinimumHeight(docHeight + browser->document()->documentMargin() * 2 + 12);
@@ -152,13 +152,13 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         QObject::connect(reasoningToggle, &QPushButton::toggled, entry, [browser, reasoningToggle, snippetLabel](bool checked) {
             browser->setVisible(checked);
             snippetLabel->setVisible(!checked);
-            reasoningToggle->setText(checked ? QObject::tr("Скрыть рассуждение")
-                                              : QObject::tr("Показать рассуждение"));
+            reasoningToggle->setText(checked ? ResultDisplayWidget::tr("Hide reasoning")
+                                              : ResultDisplayWidget::tr("Show reasoning"));
         });
     }
 
     if (!metadata.commands.isEmpty() || !metadata.sequences.isEmpty()) {
-        QPushButton *contextToggle = new QPushButton(tr("Показать команды и последовательности"), entry);
+        QPushButton *contextToggle = new QPushButton(tr("Show commands and sequences"), entry);
         contextToggle->setCheckable(true);
         contextToggle->setChecked(false);
         contextToggle->setFlat(true);
@@ -166,7 +166,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         layout->addWidget(contextToggle);
 
         QTreeWidget *contextTree = new QTreeWidget(entry);
-        contextTree->setHeaderLabels(QStringList() << tr("Время") << tr("Описание"));
+        contextTree->setHeaderLabels(QStringList() << tr("Time") << tr("Description"));
         contextTree->setRootIsDecorated(true);
         contextTree->setItemsExpandable(true);
         contextTree->setIndentation(12);
@@ -191,8 +191,8 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
 
         QObject::connect(contextToggle, &QPushButton::toggled, entry, [contextTree, contextToggle](bool checked) {
             contextTree->setVisible(checked);
-            contextToggle->setText(checked ? QObject::tr("Скрыть команды и последовательности")
-                                            : QObject::tr("Показать команды и последовательности"));
+            contextToggle->setText(checked ? ResultDisplayWidget::tr("Hide commands and sequences")
+                                            : ResultDisplayWidget::tr("Show commands and sequences"));
         });
     }
 
@@ -217,13 +217,13 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
     };
 
     if (type == EntryType::UserQuestion) {
-        addCopyButton(tr("Копировать вопрос"), trimmedSource);
+        addCopyButton(tr("Copy question"), trimmedSource);
     } else {
-        addCopyButton(tr("Копировать ответ"), plainText);
+        addCopyButton(tr("Copy answer"), plainText);
     }
 
     if (type == EntryType::Reasoning) {
-        addCopyButton(tr("Копировать рассуждение"), trimmedSource);
+        addCopyButton(tr("Copy reasoning"), trimmedSource);
     }
 
     if (buttonLayout->count() > 0) {
@@ -247,7 +247,7 @@ void ResultDisplayWidget::populateContextTree(QTreeWidget *tree, const ResultEnt
     for (const auto &seq : metadata.sequences) {
         QTreeWidgetItem *seqItem = new QTreeWidgetItem(tree);
         seqItem->setText(0, seq.timestamp.toString("hh:mm:ss"));
-        seqItem->setText(1, seq.name.isEmpty() ? tr("Последовательность без имени") : seq.name);
+        seqItem->setText(1, seq.name.isEmpty() ? tr("Unnamed sequence") : seq.name);
         seqItem->setBackground(0, QColor(255, 235, 205));
         seqItem->setBackground(1, QColor(255, 235, 205));
 
@@ -270,7 +270,7 @@ void ResultDisplayWidget::populateContextTree(QTreeWidget *tree, const ResultEnt
     if (tree->topLevelItemCount() == 0) {
         QTreeWidgetItem *empty = new QTreeWidgetItem(tree);
         empty->setText(0, "");
-        empty->setText(1, tr("Нет применённых команд"));
+        empty->setText(1, tr("No commands applied"));
         empty->setDisabled(true);
     } else {
         tree->expandToDepth(0);
@@ -327,7 +327,7 @@ void ResultDisplayWidget::addCommandItem(QTreeWidget *tree,
 
     if (!cmd.result.isEmpty()) {
         QTreeWidgetItem *resultItem = new QTreeWidgetItem(item);
-        resultItem->setText(0, tr("Результат"));
+        resultItem->setText(0, tr("Result"));
         resultItem->setText(1, cmd.result);
         resultItem->setBackground(0, QColor(245, 245, 245));
         resultItem->setBackground(1, QColor(245, 245, 245));

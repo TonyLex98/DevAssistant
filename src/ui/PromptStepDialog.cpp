@@ -1,6 +1,6 @@
 #include "PromptStepDialog.h"
 #include "CommandRegistry.h"
-#include "PromptResolver.h"   // ← новый заголовок
+#include "PromptResolver.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -29,7 +29,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     : QWidget(parent)
 {
     if (!parent) {
-        setWindowTitle(QStringLiteral("Редактирование шага"));
+        setWindowTitle(tr("Edit Step"));
         resize(900, 650);
         setMinimumSize(600, 450);
     }
@@ -105,7 +105,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     rightLay->setContentsMargins(6, 6, 6, 6);
     rightLay->setSpacing(6);
 
-    auto *editorTitle = new QLabel(QStringLiteral("Шаблон шага"), rightPanel);
+    auto *editorTitle = new QLabel(tr("Step template"), rightPanel);
     editorTitle->setStyleSheet("QLabel { font: 13px \"Segoe UI Variable\", sans-serif; font-weight: 600; color: #0f172a; }");
     rightLay->addWidget(editorTitle);
 
@@ -139,16 +139,16 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     insertLay->setContentsMargins(6, 6, 6, 6);
     insertLay->setSpacing(6);
 
-    auto *insertHint = new QLabel(QStringLiteral("Вставка переменных в шаблон (формат: {{TOKEN}})."), insertTab);
+    auto *insertHint = new QLabel(tr("Insert variables into the template (format: {{TOKEN}})."), insertTab);
     insertHint->setWordWrap(true);
     insertLay->addWidget(insertHint);
 
     m_insertFilter = new MemoryLineEdit("promptStepInsertFilter", insertTab);
-    m_insertFilter->setPlaceholderText(QStringLiteral("Фильтр вставок…"));
+    m_insertFilter->setPlaceholderText(tr("Filter inserts…"));
     insertLay->addWidget(m_insertFilter);
 
     auto *insertButtons = new QHBoxLayout();
-    m_insertBtn = new StyledButton(QStringLiteral("Вставить"), insertTab);
+    m_insertBtn = new StyledButton(tr("Insert"), insertTab);
     insertButtons->addWidget(m_insertBtn);
     insertButtons->addStretch(1);
     insertLay->addLayout(insertButtons);
@@ -163,7 +163,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
         it->setToolTip(QString("{{%1}}").arg(token));
     };
 
-    addInsertItem(QStringLiteral("OPEN_SEQUENCE_INFO — переходы/связи"), QStringLiteral("OPEN_SEQUENCE_INFO"));
+    addInsertItem(tr("OPEN_SEQUENCE_INFO — transitions/links"), QStringLiteral("OPEN_SEQUENCE_INFO"));
     for (const auto &info : PromptResolver::availableResolvers())
         addInsertItem(info.description, info.token);
     m_insertList->sortItems(Qt::AscendingOrder);
@@ -195,7 +195,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
         m_insertList->setCurrentRow(0);
         m_insertBtn->setEnabled(true);
     }
-    tabs->addTab(insertTab, QStringLiteral("Вставки"));
+    tabs->addTab(insertTab, tr("Inserts"));
 
     // ========== Tab: Commands ==========
     auto *cmdTab = new QWidget(tabs);
@@ -203,17 +203,17 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     cmdLay->setContentsMargins(6, 6, 6, 6);
     cmdLay->setSpacing(6);
 
-    auto *cmdTitle = new QLabel(QStringLiteral("Разрешённые команды для этого шага (попадают в {{SUPPORTED_COMMANDS}})."), cmdTab);
+    auto *cmdTitle = new QLabel(tr("Commands allowed in this step (listed in {{SUPPORTED_COMMANDS}})."), cmdTab);
     cmdTitle->setWordWrap(true);
     cmdLay->addWidget(cmdTitle);
 
     m_cmdFilter = new MemoryLineEdit("promptStepCommandFilter", cmdTab);
-    m_cmdFilter->setPlaceholderText(QStringLiteral("Фильтр команд…"));
+    m_cmdFilter->setPlaceholderText(tr("Filter commands…"));
     cmdLay->addWidget(m_cmdFilter);
 
     auto *cmdButtons = new QHBoxLayout();
-    auto *cmdSelectAll = new StyledButton(QStringLiteral("Выбрать все"), cmdTab);
-    auto *cmdClearAll = new StyledButton(QStringLiteral("Снять все"), cmdTab);
+    auto *cmdSelectAll = new StyledButton(tr("Select All"), cmdTab);
+    auto *cmdClearAll = new StyledButton(tr("Clear All"), cmdTab);
     cmdButtons->addWidget(cmdSelectAll);
     cmdButtons->addWidget(cmdClearAll);
     cmdButtons->addStretch(1);
@@ -251,7 +251,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
             m_cmdList->item(i)->setCheckState(Qt::Unchecked);
     });
 
-    tabs->addTab(cmdTab, QStringLiteral("Команды"));
+    tabs->addTab(cmdTab, tr("Commands"));
 
     // ========== Tab: Sequences ==========
     auto *seqTab = new QWidget(tabs);
@@ -259,12 +259,12 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     seqLay->setContentsMargins(6, 6, 6, 6);
     seqLay->setSpacing(6);
 
-    auto *seqTitle = new QLabel(QStringLiteral("Доступные последовательности в шаблоне (связи для {{OPEN_SEQUENCE_INFO}})."), seqTab);
+    auto *seqTitle = new QLabel(tr("Sequences available in the template (links for {{OPEN_SEQUENCE_INFO}})."), seqTab);
     seqTitle->setWordWrap(true);
     seqLay->addWidget(seqTitle);
 
     m_seqFilter = new MemoryLineEdit("promptStepSequenceFilter", seqTab);
-    m_seqFilter->setPlaceholderText(QStringLiteral("Фильтр последовательностей…"));
+    m_seqFilter->setPlaceholderText(tr("Filter sequences…"));
     seqLay->addWidget(m_seqFilter);
 
     m_sequenceListWidget = new StyledListWidget(seqTab);
@@ -287,18 +287,18 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     loadAvailableSequences();
     applySeqFilter(m_seqFilter->text());
 
-    tabs->addTab(seqTab, QStringLiteral("Переходы"));
+    tabs->addTab(seqTab, tr("Transitions"));
 
     // ---------- Options (bottom) ----------
-    auto *options = new QGroupBox(QStringLiteral("Параметры шага"), this);
+    auto *options = new QGroupBox(tr("Step Options"), this);
     auto *optLay = new QVBoxLayout(options);
     optLay->setContentsMargins(8, 8, 8, 8);
     optLay->setSpacing(4);
 
-    m_loopCheck = new QCheckBox(QStringLiteral("Зациклить шаг (повторять до остановки)"), options);
+    m_loopCheck = new QCheckBox(tr("Loop step (repeat until stopped)"), options);
     optLay->addWidget(m_loopCheck);
 
-    m_summarizeCheck = new QCheckBox(QStringLiteral("Сделать саммаризацию перед переходом (резюме выполненной работы)"), options);
+    m_summarizeCheck = new QCheckBox(tr("Summarize before transition (recap of completed work)"), options);
     m_summarizeCheck->setChecked(true);
     optLay->addWidget(m_summarizeCheck);
 
@@ -309,21 +309,21 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     connect(m_cmdList, &QListWidget::itemChanged, this, [this](QListWidgetItem*) { emitEdited(); });
 
 #if 0
-    setWindowTitle("Редактирование шага");
+    setWindowTitle(tr("Edit Step"));
     resize(600, 460);
 
     auto *v = new QVBoxLayout(this);
 
-    /* ---------- Кнопка вставки резолвера ---------- */
+    /* ---------- Resolver insert button ---------- */
     auto *hRes = new QHBoxLayout();
     m_resolverCombo = new MemoryComboBox("promptStepResolver", this);
-    m_insertBtn = new StyledButton("Вставить", this);
+    m_insertBtn = new StyledButton(tr("Insert"), this);
     hRes->addWidget(m_resolverCombo);
     hRes->addWidget(m_insertBtn);
     hRes->addStretch();
     v->addLayout(hRes);
 
-    /* Заполняем список доступных резолверов (описания) */
+    /* Fill the combo with resolver descriptions */
     for (const auto &info : PromptResolver::availableResolvers()) {
         m_resolverCombo->addItem(info.description, info.token);
     }
@@ -334,48 +334,48 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     m_templateEdit = new StyleTextEdit(this);
     v->addWidget(m_templateEdit, 2);
 
-    /* Список команд с чек‑боксами */
+    /* Command list with checkboxes */
     m_cmdList = new QListWidget(this);
     m_cmdList->setSelectionMode(QAbstractItemView::NoSelection);
     v->addWidget(m_cmdList, 1);
 
-    /* Заполняем списком всех известных команд */
+    /* Fill with all known commands */
     for (Command *c : CommandRegistry::all()) {
         QListWidgetItem *it = new QListWidgetItem(c->name(), m_cmdList);
         it->setCheckState(Qt::Unchecked);
         it->setData(Qt::UserRole, c->name());
-        delete c; // шаблон нам больше не нужен
+        delete c; // prototype no longer needed
     }
 
-    /* ---------- чек‑бокс «Зациклить шаг» ---------- */
-    m_loopCheck = new QCheckBox("Зациклить шаг (повторять до остановки)", this);
+    /* ---------- "Loop step" checkbox ---------- */
+    m_loopCheck = new QCheckBox(tr("Loop step (repeat until stopped)"), this);
     v->addWidget(m_loopCheck);
 
-    /* ---------- чек‑бокс «Сделать саммаризацию» ---------- */
-    m_summarizeCheck = new QCheckBox("Сделать саммаризацию перед переходом (резюме выполненной работы)", this);
+    /* ---------- "Summarize" checkbox ---------- */
+    m_summarizeCheck = new QCheckBox(tr("Summarize before transition (recap of completed work)"), this);
     m_summarizeCheck->setChecked(true); // Default to checked
     v->addWidget(m_summarizeCheck);
 
-    /* ---------- Кнопка добавления резолвера OPEN_SEQUENCE_INFO ---------- */
-    m_addSequenceInfoBtn = new StyledButton("Вставить {{OPEN_SEQUENCE_INFO}}", this);
+    /* ---------- OPEN_SEQUENCE_INFO resolver button ---------- */
+    m_addSequenceInfoBtn = new StyledButton(tr("Insert {{OPEN_SEQUENCE_INFO}}"), this);
     v->addWidget(m_addSequenceInfoBtn);
     connect(m_addSequenceInfoBtn, &StyledButton::clicked, this, &PromptStepDialog::onAddSequenceInfo);
     
-    /* ---------- Добавляем список доступных последовательностей с чекбоксами ---------- */
-    QLabel *seqLabel = new QLabel("Доступные последовательности в шаблоне:", this);
+    /* ---------- Available sequences with checkboxes ---------- */
+    QLabel *seqLabel = new QLabel(tr("Sequences available in the template:"), this);
     v->addWidget(seqLabel);
     
     m_sequenceListWidget = new QListWidget(this);
     m_sequenceListWidget->setSelectionMode(QAbstractItemView::NoSelection);
     v->addWidget(m_sequenceListWidget, 0); // Small stretch factor so it doesn't take too much space
     
-    /* ---------- Загружаем доступные последовательности ---------- */
+    /* ---------- Load available sequences ---------- */
     loadAvailableSequences();
     
-    /* ---------- Подключаем сигнал для отслеживания изменений в списке ---------- */
+    /* ---------- Track list changes ---------- */
     connect(m_sequenceListWidget, &QListWidget::itemChanged, this, &PromptStepDialog::onSequenceItemChanged);
 
-    /* Кнопки ОК/Отмена */
+    /* OK/Cancel buttons */
     auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     v->addWidget(bb);
     connect(bb, &QDialogButtonBox::accepted, this, &PromptStepDialog::onOk);
@@ -404,7 +404,7 @@ void PromptStepDialog::setStep(const PromptStep &step)
     m_step = step;
     m_templateEdit->setPlainText(step.tmpl());
 
-    /* Ставим чек‑боксы согласно списку разрешённых команд */
+    /* Check the allowed commands */
     for (int i = 0; i < m_cmdList->count(); ++i) {
         QListWidgetItem *it = m_cmdList->item(i);
         QString name = it->data(Qt::UserRole).toString();
@@ -412,10 +412,10 @@ void PromptStepDialog::setStep(const PromptStep &step)
                           Qt::Checked : Qt::Unchecked);
     }
 
-    /* флаг зацикливания */
+    /* Loop flag */
     m_loopCheck->setChecked(step.loop());
     
-    /* По умолчанию включаем саммаризацию (если не указано иное в шаблоне) */
+    /* Summarization is on by default unless the template says otherwise */
     m_summarizeCheck->setChecked(true);
     // TODO: Parse template to check if summarize flag is set in CALL_SEQUENCE command
 

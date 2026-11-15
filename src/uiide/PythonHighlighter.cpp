@@ -5,7 +5,7 @@
 PythonHighlighter::PythonHighlighter(QTextDocument *parent)
     : QSyntaxHighlighter(parent)
 {
-    // ── форматирование ключевых слов ─────────────────────
+    // ── keywords ─────────────────────────────────────────
     keywordFormat.setForeground(QColor(86,0,179));
     keywordFormat.setFontWeight(QFont::Bold);
 
@@ -23,32 +23,31 @@ PythonHighlighter::PythonHighlighter(QTextDocument *parent)
         rules.append({ QRegularExpression(QString("\\b%1\\b").arg(kw)), keywordFormat });
     }
 
-    // ── форматирование строк ───────────────────────────────
+    // ── strings ────────────────────────────────────────────
     stringFormat.setForeground(QColor(196,26,22));
-    // двойные кавычки
+    // double quotes
     rules.append({ QRegularExpression(R"("([^"\\]|\\.)*")"), stringFormat });
-    // одинарные кавычки
+    // single quotes
     rules.append({ QRegularExpression(R"('([^'\\]|\\.)*')"), stringFormat });
 
-    // ── форматирование чисел ───────────────────────────────
+    // ── numbers ────────────────────────────────────────────
     numberFormat.setForeground(QColor(153,0,0));
     rules.append({ QRegularExpression(R"(\b\d+(\.\d+)?\b)"), numberFormat });
 
-    // ── форматирование комментариев ────────────────────────
+    // ── comments ───────────────────────────────────────────
     commentFormat.setForeground(QColor(120,120,120));
-    // однострочный
     rules.append({ QRegularExpression(R"(#.*)"), commentFormat });
 
-    // ── многострочные строки ('''  и  """) ───────────────
+    // ── triple-quoted strings (''' and """) ──────────────
     tripleQuotePattern = QRegularExpression(R"(('''|"""[\s\S]*?(?:'''|""")))");
-    // комментарий (не нужен для Python, но оставим для совместимости)
+    // comment start (unused for Python, kept for symmetry with other highlighters)
     commentStart = QRegularExpression(R"(#)");
 }
 
 
 void PythonHighlighter::highlightBlock(const QString &text)
 {
-    // 1️⃣ Поиск обычных шаблонов
+    // Single-line rules
     for (const auto &r : rules) {
         QRegularExpressionMatchIterator i = r.pattern.globalMatch(text);
         while (i.hasNext()) {
@@ -57,25 +56,25 @@ void PythonHighlighter::highlightBlock(const QString &text)
         }
     }
 
-    // 2️⃣ Многострочные строки ('''  и  """) – они могут пересекаться со строками
+    // Triple-quoted strings (''' and """); may span several blocks
     int startIndex = 0;
     if (previousBlockState() == 1) {
-        startIndex = 0;   // продолжаем с начала блока
+        startIndex = 0;   // continue from the start of the block
     } else {
         startIndex = text.indexOf(tripleQuotePattern);
     }
 
     while (startIndex >= 0) {
         QRegularExpressionMatch m = tripleQuotePattern.match(text, startIndex);
-        int endIndex = m.capturedStart();   // начало закрывающего тега
+        int endIndex = m.capturedStart();
         int length   = m.capturedLength();
         if (endIndex < 0) {
-            // открытая строка до конца блока – продолжаем в следующем блоке
+            // unterminated: highlight to the end and continue in the next block
             setFormat(startIndex, text.length() - startIndex, stringFormat);
             setCurrentBlockState(1);
             break;
         } else {
-            // закрытая строка внутри блока – окрашиваем полностью
+            // terminated inside this block
             setFormat(startIndex, endIndex + length - startIndex, stringFormat);
         }
         startIndex = text.indexOf(tripleQuotePattern, endIndex + length);

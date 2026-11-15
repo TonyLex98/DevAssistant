@@ -7,8 +7,8 @@
 #include <tree_sitter/api.h>
 
 extern "C" const TSLanguage *tree_sitter_cpp();
-extern "C" const TSLanguage *tree_sitter_python();   // <-- добавлено
-extern "C" const TSLanguage *tree_sitter_dart();     // <-- добавлено
+extern "C" const TSLanguage *tree_sitter_python();
+extern "C" const TSLanguage *tree_sitter_dart();
 
 
 ProjectRelationView::ProjectRelationView(QWidget *parent): QGraphicsView(parent){
@@ -18,11 +18,11 @@ ProjectRelationView::ProjectRelationView(QWidget *parent): QGraphicsView(parent)
     setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
     setDragMode(QGraphicsView::ScrollHandDrag);
 
-    m_toolbar = new QToolBar("Graph", this);
+    m_toolbar = new QToolBar(tr("Graph"), this);
     addActions(m_toolbar->actions());
-    m_toolbar->addAction("Rebuild", this, &ProjectRelationView::rebuildGraph);
-    m_toolbar->addAction("Validate", this, &ProjectRelationView::validateLostEdges);
-    m_toolbar->addAction("Auto-Layout", [this]{ m_layout->applyAutoLayout(m_scene, m_classItems.values()); saveLayout(); });
+    m_toolbar->addAction(tr("Rebuild"), this, &ProjectRelationView::rebuildGraph);
+    m_toolbar->addAction(tr("Validate"), this, &ProjectRelationView::validateLostEdges);
+    m_toolbar->addAction(tr("Auto-Layout"), [this]{ m_layout->applyAutoLayout(m_scene, m_classItems.values()); saveLayout(); });
 
     m_layout = new GraphLayout(this);
     m_indexer = new ProjectIndexer(this);
@@ -229,35 +229,35 @@ void ProjectRelationView::contextMenuEvent(QContextMenuEvent *e){
 void ProjectRelationView::showContextMenuForItem(QGraphicsItem* item, const QPoint &globalPos){
     QMenu menu;
     if(auto *mc = dynamic_cast<MethodChip*>(item)){
-        QAction *open = menu.addAction("Открыть в редакторе");
-        QAction *rename = menu.addAction("Переименовать метод...");
+        QAction *open = menu.addAction(tr("Open in Editor"));
+        QAction *rename = menu.addAction(tr("Rename Method..."));
         QAction *restore = nullptr;
-        if(!mc->data().loc.file.isEmpty()) restore = menu.addAction("Откатить файл из stash");
+        if(!mc->data().loc.file.isEmpty()) restore = menu.addAction(tr("Restore File from Stash"));
 
         QAction *sel = menu.exec(globalPos);
         if(sel==open){
             emit openInEditor(mc->data().loc.file, mc->data().loc.line);
         } else if(sel==rename){
-            bool ok=false; QString newName = QInputDialog::getText(this, "Переименование", "Новое имя метода:", QLineEdit::Normal, mc->data().canonicalName, &ok);
+            bool ok=false; QString newName = QInputDialog::getText(this, tr("Rename"), tr("New method name:"), QLineEdit::Normal, mc->data().canonicalName, &ok);
             if(ok && !newName.isEmpty()){
                 if(m_patcher->renameMethod(mc->data(), newName)) rebuildGraph();
-                else QMessageBox::warning(this, "Rename", "Не удалось переименовать метод.");
+                else QMessageBox::warning(this, tr("Rename"), tr("Could not rename the method."));
             }
         } else if(restore && sel==restore){
             if(m_patcher->restoreFromStash(mc->data().loc.file)) rebuildGraph();
         }
     } else if(auto *cc = dynamic_cast<ClassItem*>(item)){
-        QAction *addM = menu.addAction("Добавить заглушку метода...");
+        QAction *addM = menu.addAction(tr("Add Method Stub..."));
         QAction *restore = nullptr;
-        if(!cc->data().loc.file.isEmpty()) restore = menu.addAction("Откатить файл класса из stash");
+        if(!cc->data().loc.file.isEmpty()) restore = menu.addAction(tr("Restore Class File from Stash"));
         QAction *sel = menu.exec(globalPos);
         if(sel==addM){
             bool ok=false;
-            QString ret = QInputDialog::getText(this, "Новый метод", "Тип возврата:", QLineEdit::Normal, "void", &ok); if(!ok) return;
-            QString name = QInputDialog::getText(this, "Новый метод", "Имя метода:", QLineEdit::Normal, "newMethod", &ok); if(!ok) return;
+            QString ret = QInputDialog::getText(this, tr("New Method"), tr("Return type:"), QLineEdit::Normal, "void", &ok); if(!ok) return;
+            QString name = QInputDialog::getText(this, tr("New Method"), tr("Method name:"), QLineEdit::Normal, "newMethod", &ok); if(!ok) return;
             QVector<ParamInfo> params; // For MVP, no params dialog
             if(m_patcher->addMethodStub(cc->data(), ret, name, params)) rebuildGraph();
-            else QMessageBox::warning(this, "Add method", "Не удалось добавить метод.");
+            else QMessageBox::warning(this, tr("New Method"), tr("Could not add the method."));
         } else if(restore && sel==restore){
             if(m_patcher->restoreFromStash(cc->data().loc.file)) rebuildGraph();
         }

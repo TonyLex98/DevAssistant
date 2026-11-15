@@ -31,7 +31,7 @@ void SolutionTemplateEditor::setupUI()
     QWidget *basicInfoWidget = new QWidget(this);
     auto *basicInfoLayout = new QVBoxLayout(basicInfoWidget);
 
-    // Основная информация о шаблоне
+    // Template information
     auto *infoGroupBox = new QGroupBox(tr("Template Information"));
     auto *infoLayout = new QGridLayout(infoGroupBox);
 
@@ -54,7 +54,7 @@ void SolutionTemplateEditor::setupUI()
     infoLayout->addWidget(imageLabel, 2, 0);
     infoLayout->addLayout(imageLayout, 2, 1);
 
-    // Просмотр изображения
+    // Image preview
     m_imageLabel = new QLabel(this);
     m_imageLabel->setMinimumSize(200, 200);
     m_imageLabel->setStyleSheet("border: 1px solid gray;");
@@ -63,13 +63,13 @@ void SolutionTemplateEditor::setupUI()
 
     basicInfoLayout->addWidget(infoGroupBox);
 
-    // Список последовательностей в шаблоне
+    // Sequences in the template
     auto *sequencesGroupBox = new QGroupBox(tr("Sequences in Template"));
     auto *sequencesLayout = new QVBoxLayout(sequencesGroupBox);
 
     auto *topLayout = new QHBoxLayout();
     
-    // Список доступных последовательностей (вне шаблона)
+    // Available sequences (not yet in the template)
     m_availableSequencesList = new QListWidget(this);
     m_availableSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
     auto *availableGroup = new QGroupBox(tr("Available Sequences"));
@@ -77,7 +77,6 @@ void SolutionTemplateEditor::setupUI()
     availableLayout->addWidget(m_availableSequencesList);
     topLayout->addWidget(availableGroup);
 
-    // Кнопки управления
     auto *btnLayout = new QVBoxLayout();
     m_addSequenceBtn = new StyledButton(tr("-> Add to Template"), this);
     m_removeSequenceBtn = new StyledButton(tr("Remove from Template <-"), this);
@@ -88,7 +87,7 @@ void SolutionTemplateEditor::setupUI()
     btnLayout->addStretch();
     topLayout->addLayout(btnLayout);
 
-    // Список последовательностей в шаблоне
+    // Sequences already in the template
     m_templateSequencesList = new QListWidget(this);
     m_templateSequencesList->setSelectionMode(QAbstractItemView::SingleSelection);
     auto *templateGroup = new QGroupBox(tr("Template Sequences"));

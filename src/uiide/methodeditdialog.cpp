@@ -12,27 +12,27 @@ MethodEditDialog::MethodEditDialog(QWidget *parent)
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-    // 1. Кодовый редактор
+    // 1. Code editor
     editor = new CodeEditor(this);
     highlighter = new CppHighlighter(editor->document());
     mainLayout->addWidget(editor);
 
-    // 2. Поле ввода + кнопка Run
+    // 2. Message input + Run button
     QHBoxLayout *inputRow = new QHBoxLayout;
     inputTextEdit = new InputTextEdit(this);
-    inputTextEdit->setPlaceholderText("Введите сообщение...");
+    inputTextEdit->setPlaceholderText(tr("Type a message..."));
     inputRow->addWidget(inputTextEdit);
 
-    runButton = new StyledButton("Задать вопрос", this);
+    runButton = new StyledButton(tr("Ask"), this);
 
     mainLayout->addLayout(inputRow);
 
-    // 3. Строка кнопок «Save / Cancel»
+    // 3. Save / Cancel buttons
     QHBoxLayout *btnRow = new QHBoxLayout;
     btnRow->addStretch(1);
 
-    cancelButton = new StyledButton("Cancel", this);
-    saveButton   = new StyledButton("Save",   this);
+    cancelButton = new StyledButton(tr("Cancel"), this);
+    saveButton   = new StyledButton(tr("Save"),   this);
 
     connect(cancelButton, &StyledButton::clicked,
             this, &QWidget::hide);
@@ -48,25 +48,24 @@ MethodEditDialog::MethodEditDialog(QWidget *parent)
     mainLayout->addLayout(btnRow);
 
     // -----------------------------------------------------------------
-    //  Соединения сигналов
+    //  Signal connections
     // -----------------------------------------------------------------
-    // 1. Кнопка Run → signal_runSequenceDialog()
+    // 1. Run button → signal_runSequenceDialog()
     connect(runButton, &StyledButton::clicked,
             this, &MethodEditDialog::signal_runSequenceDialog);
 
-    // 2. Enter в InputTextEdit → signal_runSequenceDialog()
+    // 2. Enter in InputTextEdit → signal_runSequenceDialog()
     connect(inputTextEdit, &InputTextEdit::sendMessage,
             this, &MethodEditDialog::signal_runSequenceDialog);
 
-    // 3. При каждом изменении текста в InputTextEdit → signal_updatelastUserMessage()
+    // 3. Every text change in InputTextEdit → signal_updatelastUserMessage()
     connect(inputTextEdit, &InputTextEdit::signal_textEdited,
             this, &MethodEditDialog::signal_updatelastUserMessage);
 
 
 
 
-    // Настройки окна
-    setWindowTitle("Edit Block");
+    setWindowTitle(tr("Edit Block"));
     resize(800, 500);
 }
 

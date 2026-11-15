@@ -17,11 +17,6 @@ namespace Rag {
 
 namespace {
 
-QString trc(const char* text)
-{
-    return QCoreApplication::translate("Rag", text);
-}
-
 bool isSkippedPath(const QString& path)
 {
     static const QStringList skipped = {
@@ -119,7 +114,7 @@ void Index::startIndexing(const QString& folder)
         Store store(databasePathFor(folder));
         if (!store.isOpen()) {
             const QString error = store.lastError();
-            post([error](Index* i) { emit i->failed(trc("Cannot open the index: %1").arg(error)); });
+            post([error](Index* i) { emit i->failed(QCoreApplication::translate("Rag", "Cannot open the index: %1").arg(error)); });
             return;
         }
         const Embedder embedder(settings.endpoint, Embedder::apiForProvider(settings.provider),
@@ -168,7 +163,7 @@ void Index::startIndexing(const QString& folder)
             }
             if (!store.replaceDocument(path, modified, fi.size(), embedder.model(), chunks)) {
                 const QString dbError = store.lastError();
-                post([dbError](Index* i) { emit i->failed(trc("Cannot write the index: %1").arg(dbError)); });
+                post([dbError](Index* i) { emit i->failed(QCoreApplication::translate("Rag", "Cannot write the index: %1").arg(dbError)); });
                 return;
             }
             ++indexed;
@@ -177,8 +172,8 @@ void Index::startIndexing(const QString& folder)
 
         const int removed = m_cancel ? 0 : store.removeMissing(QSet<QString>(files.begin(), files.end()));
         QString summary = m_cancel
-                ? trc("Stopped. Indexed %1 files (%2 chunks).").arg(indexed).arg(chunksTotal)
-                : trc("Indexed %1 files (%2 chunks), %3 unchanged, %4 skipped, %5 removed. "
+                ? QCoreApplication::translate("Rag", "Stopped. Indexed %1 files (%2 chunks).").arg(indexed).arg(chunksTotal)
+                : QCoreApplication::translate("Rag", "Indexed %1 files (%2 chunks), %3 unchanged, %4 skipped, %5 removed. "
                       "The index has %6 files and %7 chunks.")
                           .arg(indexed).arg(chunksTotal).arg(unchanged).arg(skipped).arg(removed)
                           .arg(store.documentCount()).arg(store.chunkCount());
@@ -196,7 +191,7 @@ QVector<Hit> Index::search(const QString& folder, const QString& query, int k, Q
     const QString dbPath = databasePathFor(folder);
     if (folder.isEmpty() || !QFileInfo::exists(dbPath)) {
         if (error)
-            *error = trc("These documents are not indexed yet. Open Settings > Documents and index the project.");
+            *error = QCoreApplication::translate("Rag", "These documents are not indexed yet. Open Settings > Documents and index the project.");
         return {};
     }
     const Settings settings = Settings::current();
@@ -239,12 +234,12 @@ void Index::startAsking(const QString& folder, const QString& question)
         const QVector<Hit> hits = search(folder, question, settings.topK, &error);
         if (hits.isEmpty()) {
             post([error](Index* i) {
-                emit i->failed(error.isEmpty() ? trc("Nothing relevant was found in the index.") : error);
+                emit i->failed(error.isEmpty() ? QCoreApplication::translate("Rag", "Nothing relevant was found in the index.") : error);
             });
             return;
         }
         if (settings.chatModel.isEmpty()) {
-            post([](Index* i) { emit i->failed(trc("Select a chat model first.")); });
+            post([](Index* i) { emit i->failed(QCoreApplication::translate("Rag", "Select a chat model first.")); });
             return;
         }
 

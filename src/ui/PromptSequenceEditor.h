@@ -18,14 +18,14 @@ public:
     void setSequenceManager(class PromptSequenceManager *seqMgr);  // Set sequence manager for reference selection
     void setCurrentSequencePath(const QString& sequencePath);  // Set path of current sequence for filtering sequences
 
-    /* Инициализируем редактор конкретной последовательностью */
+    /* Load a sequence into the editor */
     void setSequence(const PromptSequence &seq);
 
-    /* Возвращаем текущую последовательность (с учётом изменений имени/описания) */
+    /* Current sequence, including name/description edits */
     PromptSequence sequence() const;
 
 signals:
-    void sequenceChanged(const PromptSequence &seq);   // сигнал, чтобы MainWindow мог сохранить
+    void sequenceChanged(const PromptSequence &seq);   // lets MainWindow save the sequence
 
 private slots:
     void onAddStep();
@@ -34,7 +34,7 @@ private slots:
     void onMoveUp();
     void onMoveDown();
 
-    /* Сигналы из полей имени/описания */
+    /* Name/description field changes */
     void onNameChanged();
     void onDescriptionChanged();
 
@@ -43,7 +43,7 @@ private:
     void loadStepToEditor(int idx);
     void updateCurrentStepTitle();
 
-    PromptSequence m_seq;                     // объект‑заглушка
+    PromptSequence m_seq;                     // sequence being edited
     QListWidget     *m_list   = nullptr;
     StyledButton     *m_addBtn  = nullptr,
                     *m_editBtn = nullptr,
@@ -51,7 +51,6 @@ private:
                     *m_upBtn   = nullptr,
                     *m_downBtn = nullptr;
 
-    /* Новые виджеты */
     QLineEdit          *m_nameEdit  = nullptr;
     StyleTextEdit      *m_descEdit  = nullptr;
     PromptStepDialog   *m_stepEditor = nullptr;

@@ -12,23 +12,23 @@ public:
         // Consistent styling with other custom widgets
         setStyleSheet(
             "QCheckBox {"
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  spacing: 8px;"                        // расстояние между чекбоксом и текстом
-            "  color: #000000;"                      // черный текст
+            "  font: 18px \"Arial\", sans-serif;"
+            "  spacing: 8px;"
+            "  color: #000000;"
             "}"
             "QCheckBox::indicator {"
             "  width: 18px;"
             "  height: 18px;"
-            "  border: 2px solid #5A9;"              // светло-синий контур
-            "  border-radius: 4px;"                  // слегка закругленные углы
-            "  background-color: #ffffff;"           // белый фон
+            "  border: 2px solid #5A9;"
+            "  border-radius: 4px;"
+            "  background-color: #ffffff;"
             "}"
             "QCheckBox::indicator:checked {"
-            "  background-color: #5A9;"              // синий фон при выборе
+            "  background-color: #5A9;"
             "  image: url(:/checked.png);"
             "}"
             "QCheckBox::indicator:unchecked {"
-            "  background-color: #ffffff;"           // белый фон при отмене выбора
+            "  background-color: #ffffff;"
             "}"
         );
     }

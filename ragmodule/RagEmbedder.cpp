@@ -16,11 +16,6 @@ namespace Rag {
 
 namespace {
 
-QString trc(const char* text)
-{
-    return QCoreApplication::translate("Rag", text);
-}
-
 QVector<float> toVector(const QJsonArray& values)
 {
     QVector<float> v;
@@ -59,7 +54,7 @@ QVector<QVector<float>> Embedder::embed(const QStringList& texts, QString* error
     if (texts.isEmpty())
         return {};
     if (m_model.trimmed().isEmpty()) {
-        if (error) *error = trc("No embedding model is set.");
+        if (error) *error = QCoreApplication::translate("Rag", "No embedding model is set.");
         return {};
     }
 
@@ -86,7 +81,7 @@ QVector<QVector<float>> Embedder::embed(const QStringList& texts, QString* error
     if (!reply->isFinished()) {
         reply->abort();
         reply->deleteLater();
-        if (error) *error = trc("The embedding request timed out.");
+        if (error) *error = QCoreApplication::translate("Rag", "The embedding request timed out.");
         return {};
     }
     const QByteArray data = reply->readAll();
@@ -100,7 +95,7 @@ QVector<QVector<float>> Embedder::embed(const QStringList& texts, QString* error
         if (serverMessage.isEmpty())
             serverMessage = json.value(QStringLiteral("error")).toObject().value(QStringLiteral("message")).toString();
         if (error)
-            *error = trc("Embedding request failed: %1")
+            *error = QCoreApplication::translate("Rag", "Embedding request failed: %1")
                     .arg(serverMessage.isEmpty() ? netError : serverMessage);
         return {};
     }
@@ -121,7 +116,7 @@ QVector<QVector<float>> Embedder::embed(const QStringList& texts, QString* error
     }
     if (out.size() != texts.size() || std::any_of(out.cbegin(), out.cend(), [](const QVector<float>& v) { return v.isEmpty(); })) {
         if (error)
-            *error = trc("The server returned %1 embeddings for %2 texts. Is %3 an embedding model?")
+            *error = QCoreApplication::translate("Rag", "The server returned %1 embeddings for %2 texts. Is %3 an embedding model?")
                     .arg(out.size()).arg(texts.size()).arg(m_model);
         return {};
     }

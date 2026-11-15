@@ -13,7 +13,7 @@ public:
     explicit PathColorDelegate(QFileSystemModel* fsm, QObject* parent=nullptr)
         : QStyledItemDelegate(parent), m_fsModel(fsm) {}
 
-    // красные = путь существует; зелёные = родитель для отсутствующего пути
+    // red = path exists; green = parent of a missing path
     void setMarkSets(const QSet<QString>& red, const QSet<QString>& green,
                      int greenAlpha = 90, int redAlpha = 70) {
         m_markRed   = red;
@@ -26,24 +26,24 @@ public:
         QStyleOptionViewItem o(opt);
         initStyleOption(&o, idx);
 
-        // сначала рисуем как обычно
+        // default painting first
         QStyledItemDelegate::paint(p, o, idx);
 
-        // красим ровно ОДИН раз — из колонки 0, но на всю строку
+        // paint the overlay once, from column 0, across the whole row
         if (idx.column() != 0) return;
 
         const QString path = m_fsModel->filePath(idx);
 
         QColor overlay;
         if (m_markRed.contains(path)) {
-            overlay = QColor(255, 0, 0, m_redAlpha);      // существует → красный фон
+            overlay = QColor(255, 0, 0, m_redAlpha);      // exists: red
         } else if (m_markGreen.contains(path)) {
-            overlay = QColor(0, 255, 0, m_greenAlpha);    // отсутствует → зелёный фон
+            overlay = QColor(0, 255, 0, m_greenAlpha);    // missing: green
         } else {
             return;
         }
 
-        // прямоугольник на всю ширину строки
+        // full row width
         QRect fullRowRect = o.rect;
         if (o.widget) {
             fullRowRect.setLeft(0);
@@ -52,7 +52,7 @@ public:
 
         p->save();
         p->setPen(Qt::NoPen);
-        p->fillRect(fullRowRect, overlay); // поверх текста/иконок — полупрозрачный слой
+        p->fillRect(fullRowRect, overlay); // translucent layer over text and icons
         p->restore();
     }
 

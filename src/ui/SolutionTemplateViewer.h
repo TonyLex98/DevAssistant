@@ -51,8 +51,8 @@ private:
     StyledButton* m_addTemplateBtn;
     StyledButton* m_exportTemplateBtn;
     StyledButton* m_importSequenceBtn;
-    MemoryComboBox* m_defaultSequenceCombo; // Для выбора последовательности по умолчанию
-    StyledButton* m_runTemplateBtn;          // Для запуска шаблона с выбранной последовательностью
+    MemoryComboBox* m_defaultSequenceCombo; // default sequence selector
+    StyledButton* m_runTemplateBtn;          // runs the template with the selected sequence
     QString m_currentTemplateDir;
-    static const int MAX_CHARS_PER_LINE = 50; // Максимальное количество символов в строке описания
+    static const int MAX_CHARS_PER_LINE = 50; // max characters per description line
 };

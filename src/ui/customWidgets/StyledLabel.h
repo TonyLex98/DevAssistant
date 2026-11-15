@@ -12,9 +12,9 @@ public:
         // Consistent styling with other custom widgets
         setStyleSheet(
             "QLabel {"
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  color: #000000;"                      // черный текст
-            "  padding: 6px 12px;"                   // внутренние отступы
+            "  font: 18px \"Arial\", sans-serif;"
+            "  color: #000000;"
+            "  padding: 6px 12px;"
             "}"
         );
     }
@@ -25,9 +25,9 @@ public:
         // Consistent styling with other custom widgets
         setStyleSheet(
             "QLabel {"
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  color: #000000;"                      // черный текст
-            "  padding: 6px 12px;"                   // внутренние отступы
+            "  font: 18px \"Arial\", sans-serif;"
+            "  color: #000000;"
+            "  padding: 6px 12px;"
             "}"
         );
     }

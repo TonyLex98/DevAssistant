@@ -42,7 +42,7 @@ public:
     void setTemplate(const SolutionTemplate &templateValue);
     SolutionTemplate templateValue() const;
 
-    // Обновление списка доступных последовательностей
+    // Refresh the list of sequences that can be added
     void updateAvailableSequences();
 
 signals:
@@ -74,9 +74,8 @@ private:
     StyledButton *m_setMainSequenceBtn;
     StyledButton *m_selectImageBtn;
     
-    // Для отображения всех последовательностей из проекта
-    QMap<QString, QString> m_seqPathByName;  // name -> fullPath для доступных последовательностей
-    QString m_imagePath; // Путь к выбранному изображению
+    QMap<QString, QString> m_seqPathByName;  // name -> full path of available sequences
+    QString m_imagePath; // selected image (relative to the template directory)
     
     // Graph visualization
     TemplateSequenceGraphWidget *m_graphWidget;

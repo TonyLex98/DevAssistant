@@ -6,11 +6,10 @@
 #include <QStyle>
 
 /**
- * @brief CustomTextTabBar - кастомная вкладка, которая подстраивает ширину под текст
+ * @brief Tab bar whose tab widths follow the tab text.
  *
- * Этот класс переопределяет поведение QTabBar для корректного подгонки ширины вкладок под текст.
- * В отличие от стандартного поведения setExpanding, этот класс вычисляет размер каждой вкладки
- * на основе длины текста и внутренних отступов.
+ * Unlike the default setExpanding behaviour, each tab is sized from its
+ * text width plus the style's internal padding.
  */
 class CustomTextTabBar : public QTabBar
 {
@@ -20,18 +19,18 @@ public:
     explicit CustomTextTabBar(QWidget *parent = nullptr)
         : QTabBar(parent)
     {
-        setExpanding(true);  // Отключаем равномерное расширение
-        setElideMode(Qt::ElideNone);  // Не обрезаем текст
-        setDrawBase(false);  // Убираем базовую линию, если не нужна
+        setExpanding(true);
+        setElideMode(Qt::ElideNone);  // never elide tab text
+        setDrawBase(false);  // no base line under the tabs
         //setStyleSheet("QTabBar::tab { margin: 1; padding: 1; }");
 
     }
 
 protected:
     /**
-     * @brief Переопределенный метод для вычисления размера вкладки
-     * @param index - индекс вкладки
-     * @return QSize - оптимальный размер для вкладки с указанным текстом
+     * @brief Size of a tab, fitted to its text.
+     * @param index tab index
+     * @return preferred size for the tab
      */
     QSize tabSizeHint(int index) const override
     {
@@ -39,27 +38,24 @@ protected:
             QString text = tabText(index);
             QFontMetrics fm = fontMetrics();
 
-            // Вычисляем ширину текста
             int textWidth = fm.width(text);
 
-            // Определяем размеры с учетом стиля
             QStyleOptionTab opt;
             initStyleOption(&opt, index);
 
-            // Вычисляем размер, необходимый для отображения текста
-            // с учетом внутренних отступов и стилевых параметров
+            // Size needed for the text including the style's padding
             QSize textSize(textWidth, fm.height());
             QSize size = style()->sizeFromContents(QStyle::CT_TabBarTab, &opt, textSize, this);
 
-            // Увеличиваем ширину, чтобы обеспечить комфортное отображение текста
-            int padding = 40; // Добавляем дополнительный отступ
+            // Extra room so the text does not look cramped
+            int padding = 40;
             size.setWidth(size.width() + padding);
 
-            // Устанавливаем минимальную ширину для читаемости
+            // Minimum width for readability
             int minWidth = 80;
             size.setWidth(qMax(minWidth, size.width()));
 
-            // Устанавливаем максимальную ширину, чтобы табы не были слишком широкими
+            // Cap the width so tabs do not get too wide
             int maxWidth = 400;
             size.setWidth(qMin(maxWidth, size.width()));
 
@@ -71,7 +67,7 @@ protected:
     }
 
     /**
-     * @brief Переопределенный метод для вычисления минимального размера вкладки
+     * @brief Minimum size of a tab.
      */
     QSize minimumTabSizeHint(int index) const override
     {
@@ -79,27 +75,24 @@ protected:
             QString text = tabText(index);
             QFontMetrics fm = fontMetrics();
 
-            // Вычисляем ширину текста
             int textWidth = fm.width(text);
 
-            // Определяем размеры с учетом стиля
             QStyleOptionTab opt;
             initStyleOption(&opt, index);
 
-            // Вычисляем размер, необходимый для отображения текста
-            // с учетом внутренних отступов и стилевых параметров
+            // Size needed for the text including the style's padding
             QSize textSize(textWidth, fm.height());
             QSize size = style()->sizeFromContents(QStyle::CT_TabBarTab, &opt, textSize, this);
 
-            // Для минимального размера используем меньший padding
-            int padding = 20; // Меньше padding для минимального размера
+            // Smaller padding for the minimum size
+            int padding = 20;
             size.setWidth(size.width() + padding);
 
-            // Устанавливаем минимальную ширину для читаемости
+            // Minimum width for readability
             int minWidth = 60;
             size.setWidth(qMax(minWidth, size.width()));
 
-            // Устанавливаем максимальную ширину минимального размера, чтобы табы не были слишком узкими
+            // Upper bound for the minimum width
             int maxWidth = 150;
             size.setWidth(qMin(maxWidth, size.width()));
 

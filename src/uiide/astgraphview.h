@@ -21,17 +21,17 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
-    void mouseDoubleClickEvent(QMouseEvent *event) override;   // добавлено
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
     QGraphicsScene *scene_;
     struct Node { int id; QRectF rect; int start_row=0; int start_col=0; };
     QVector<Node> nodes;
 
-    QJsonObject rootAst_;                          // ← хранит весь JSON‑объект
-    QMap<int, QJsonObject> nodeMap_;    // id → JSON‑узел
+    QJsonObject rootAst_;                          // whole AST JSON object
+    QMap<int, QJsonObject> nodeMap_;    // node id -> JSON node
 
-    // Вспомогательные функции для формирования надписей
+    // Helpers for node labels
     QString nodeLabel(const QJsonObject &node) const;
     QString nodeIdentifier(const QJsonObject &node) const;
     QString enclosingClassName(const QJsonObject &node) const;

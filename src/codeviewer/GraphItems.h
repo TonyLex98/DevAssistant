@@ -31,12 +31,12 @@ public:
 
 signals:
     void positionChanged();
-    void heldChanged(bool held);              // <-- ДОБАВИЛИ
+    void heldChanged(bool held);
 
 protected:
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-    void mousePressEvent(QGraphicsSceneMouseEvent *e) override;    // <-- ДОБАВИЛИ
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent *e) override;  // <-- ДОБАВИЛИ
+    void mousePressEvent(QGraphicsSceneMouseEvent *e) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *e) override;
 
 private:
     NodeData m_data;
@@ -64,13 +64,13 @@ public:
 signals:
     void positionChanged();
     void openRequested(const QString &file, int line);
-    void heldChanged(bool held);              // <-- ДОБАВИЛИ
+    void heldChanged(bool held);
 
 protected:
     void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *e) override;
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-    void mousePressEvent(QGraphicsSceneMouseEvent *e) override;    // <-- ДОБАВИЛИ
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent *e) override;  // <-- ДОБАВИЛИ
+    void mousePressEvent(QGraphicsSceneMouseEvent *e) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent *e) override;
 
 private:
     NodeData m_data; QRectF m_rect{0,0,240,36};
@@ -83,7 +83,7 @@ public:
     void setLabel(const QString &text){ m_label=text; update(); }
     void setOrder(int order){ m_order = order; update(); }
     void setLost(bool lost){ m_lost = lost; update(); }
-    void setHighlight(bool on){ m_highlight = on; update(); }  // <-- ДОБАВИЛИ
+    void setHighlight(bool on){ m_highlight = on; update(); }
 
     enum { Type = UserType + 1 }; int type() const override { return Type; }
 

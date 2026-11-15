@@ -44,7 +44,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     form->setVerticalSpacing(8);
 
     m_nameEdit = new QLineEdit(this);
-    m_nameEdit->setPlaceholderText(tr("Название последовательности"));
+    m_nameEdit->setPlaceholderText(tr("Sequence name"));
     m_nameEdit->setStyleSheet(
         "QLineEdit {"
         "  border: 1px solid #0f766e;"
@@ -61,8 +61,8 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     m_descEdit->setMinimumHeight(80);
     m_descEdit->setMaximumHeight(140);
 
-    form->addRow(tr("Имя:"), m_nameEdit);
-    form->addRow(tr("Описание:"), m_descEdit);
+    form->addRow(tr("Name:"), m_nameEdit);
+    form->addRow(tr("Description:"), m_descEdit);
     mainLay->addLayout(form);
 
     auto *splitter = new QSplitter(Qt::Horizontal, this);
@@ -83,18 +83,18 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     leftLay->setContentsMargins(0, 0, 0, 0);
     leftLay->setSpacing(8);
 
-    leftLay->addWidget(new QLabel(tr("Шаги:"), left));
+    leftLay->addWidget(new QLabel(tr("Steps:"), left));
 
     m_list = new StyledListWidget(left);
     m_list->setSelectionMode(QAbstractItemView::SingleSelection);
     leftLay->addWidget(m_list, 1);
 
     auto *btnLay = new QHBoxLayout();
-    m_addBtn  = new StyledButton(tr("Добавить"), left);
-    m_editBtn = new StyledButton(tr("Редактировать"), left);
-    m_delBtn  = new StyledButton(tr("Удалить"), left);
-    m_upBtn   = new StyledButton(tr("Вверх"), left);
-    m_downBtn = new StyledButton(tr("Вниз"), left);
+    m_addBtn  = new StyledButton(tr("Add"), left);
+    m_editBtn = new StyledButton(tr("Edit"), left);
+    m_delBtn  = new StyledButton(tr("Delete"), left);
+    m_upBtn   = new StyledButton(tr("Up"), left);
+    m_downBtn = new StyledButton(tr("Down"), left);
 
     btnLay->addWidget(m_addBtn);
     btnLay->addWidget(m_editBtn);
@@ -113,7 +113,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     splitter->setStretchFactor(1, 4);
     splitter->setSizes({360, 900});
 
-    /* ────────────────────── Сигналы ──────────────────────── */
+    /* ────────────────────── Signals ──────────────────────── */
     connect(m_addBtn,   &StyledButton::clicked, this, &PromptSequenceEditor::onAddStep);
     connect(m_editBtn,  &StyledButton::clicked, this, &PromptSequenceEditor::onEditStep);
     connect(m_delBtn,   &StyledButton::clicked, this, &PromptSequenceEditor::onRemoveStep);
@@ -135,7 +135,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
     loadStepToEditor(-1);
 }
 
-/* ────────────────────────────────────── Методы ────────────────────────────────────── */
+/* ────────────────────────────────────── Methods ────────────────────────────────────── */
 
 void PromptSequenceEditor::setSequence(const PromptSequence &seq)
 {
@@ -164,8 +164,8 @@ void PromptSequenceEditor::refreshList()
     const auto &steps = m_seq.steps();
     for (int i = 0; i < steps.size(); ++i) {
         const PromptStep &s = steps[i];
-        QString title = s.tmpl().section('\n', 0, 0).trimmed(); // первая строка шаблона
-        if (title.isEmpty()) title = tr("Шаг %1").arg(i + 1);
+        QString title = s.tmpl().section('\n', 0, 0).trimmed(); // first line of the template
+        if (title.isEmpty()) title = tr("Step %1").arg(i + 1);
         QListWidgetItem *it = new QListWidgetItem(title, m_list);
         it->setData(Qt::UserRole, i);
     }
@@ -173,7 +173,7 @@ void PromptSequenceEditor::refreshList()
         m_list->setCurrentRow(preserveRow);
 }
 
-/* ────────────────────── Слоты ──────────────────────── */
+/* ────────────────────── Slots ──────────────────────── */
 
 void PromptSequenceEditor::onAddStep()
 {
@@ -234,7 +234,6 @@ void PromptSequenceEditor::onMoveDown()
     emit sequenceChanged(sequence());
 }
 
-/* Сигналы из полей имени/описания */
 void PromptSequenceEditor::onNameChanged()
 {
     emit sequenceChanged(sequence());
@@ -293,7 +292,7 @@ void PromptSequenceEditor::updateCurrentStepTitle()
     const PromptStep &s = m_seq.steps().at(m_currentStepIdx);
     QString title = s.tmpl().section('\n', 0, 0).trimmed();
     if (title.isEmpty())
-        title = tr("Шаг %1").arg(m_currentStepIdx + 1);
+        title = tr("Step %1").arg(m_currentStepIdx + 1);
     if (auto *it = m_list->item(m_currentStepIdx))
         it->setText(title);
 }

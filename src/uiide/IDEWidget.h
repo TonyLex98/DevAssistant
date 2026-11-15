@@ -6,7 +6,7 @@
 #include <QJsonObject>
 #include <QMap>
 #include <tree_sitter/api.h>
-#include <QPushButton>           // <‑‑ добавить
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QSyntaxHighlighter>
@@ -43,7 +43,7 @@ private slots:
     void onTreeItemDoubleClicked(QTreeWidgetItem *item, int column);
     void onGraphOpenAt(int line, int column);
 
-    // Внутренний слот, обрабатывающий Ctrl+S
+    // Handles Ctrl+S
     void handleSaveRequest();
 
     void onGraphNodeDoubleClicked(const QJsonObject &node);
@@ -54,8 +54,8 @@ private slots:
 
 signals:
     void fileModified(bool modified);
-    void signal_runSequenceDialog();                      // Кнопка Run / Enter в InputTextEdit
-    void signal_updatelastUserMessage(const QString& lastUserMessage); // Текст последнего сообщения
+    void signal_runSequenceDialog();                      // Run button / Enter in InputTextEdit
+    void signal_updatelastUserMessage(const QString& lastUserMessage); // text of the last user message
 
 private:
     QTreeView *dirView;
@@ -76,11 +76,9 @@ private:
     QJsonObject nodeToJson(const TSNode& node, const std::string& source);
     void updateFoldsFromAst();
 
-    // IDEWidget.cpp (или отдельный cpp, но в этом примере в IDEWidget.cpp)
-
     QSyntaxHighlighter* createHighlighter(const QString &ext);
 
-    QString getCurrentFilePath() const { return currentFilePath; }   // <-- геттер
+    QString getCurrentFilePath() const { return currentFilePath; }
 
     // IDEWidget.cpp
 
@@ -90,7 +88,7 @@ private:
     QMap<QString, const TSLanguage *(*)()> langMap;
 
 
-    QSyntaxHighlighter *currentHighlighter = nullptr;   // ← хранит активный подсветчик
+    QSyntaxHighlighter *currentHighlighter = nullptr;   // active syntax highlighter
 
     MethodEditDialog *methodEdit;
 

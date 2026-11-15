@@ -10,14 +10,14 @@
 SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     : QWidget(parent)
 {
-    setWindowTitle("Sequence Relationships Graph");
+    setWindowTitle(tr("Sequence Relationships Graph"));
     setMinimumSize(200, 200);
 
     // Create the main layout
     m_mainLayout = new QVBoxLayout(this);
 
     // Create label and combobox for template selection
-    m_templateLabel = new QLabel("Select Template:", this);
+    m_templateLabel = new QLabel(tr("Select Template:"), this);
     m_templateComboBox = new MemoryComboBox("sequenceGraphTemplate", this);
     
     // Create a horizontal layout for the label and combobox
@@ -26,7 +26,7 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     topLayout->addWidget(m_templateLabel, 0, Qt::AlignVCenter);
     m_templateComboBox->setMaximumWidth(160);
     topLayout->addWidget(m_templateComboBox, 0, Qt::AlignVCenter);
-    StyledButton *fitAllBtn = new StyledButton(tr("Поместить всё"), this);
+    StyledButton *fitAllBtn = new StyledButton(tr("Fit All"), this);
     topLayout->addWidget(fitAllBtn, 0, Qt::AlignVCenter);
     topLayout->addStretch(); // Add stretch to push the combo box to the left
     connect(fitAllBtn, &StyledButton::clicked, this, [this]() {

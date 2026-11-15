@@ -27,8 +27,8 @@ IDEWidget::IDEWidget(const QString &key,
     langMap[".cpp"] = tree_sitter_cpp;
     langMap[".hpp"] = tree_sitter_cpp;
 
-    langMap[".py"]   = tree_sitter_python;   // <‑‑ добавляем
-    langMap[".dart"] = tree_sitter_dart;    // <‑‑ добавляем
+    langMap[".py"]   = tree_sitter_python;
+    langMap[".dart"] = tree_sitter_dart;
 
 
 
@@ -61,22 +61,22 @@ IDEWidget::IDEWidget(const QString &key,
     astTree = new StyledTreeWidget(this);
     astTree->setHeaderLabel("AST");
     connect(astTree, &QTreeWidget::itemDoubleClicked, this, &IDEWidget::onTreeItemDoubleClicked);
-    rightTabs->addTab(astTree, "Outline");
+    rightTabs->addTab(astTree, tr("Outline"));
 
     astGraph = new ASTGraphView(this);
     connect(astGraph, &ASTGraphView::openAt, this, &IDEWidget::onGraphOpenAt);
-    rightTabs->addTab(astGraph, "Graph");
+    rightTabs->addTab(astGraph, tr("Graph"));
 
     this->addWidget(rightTabs);
     //addWidget(openProjectBtn);
     //setCentralWidget(this);
     resize(1400, 900);
 
-// Подключаем сигнал о запросе сохранения
+    // Save request from the editor (Ctrl+S)
     connect(codeEditor, &CodeEditor::requestSave,
             this, &IDEWidget::handleSaveRequest);
 
-    // Сигнал о изменении документа
+    // Document modification state
     connect(codeEditor->document(), &QTextDocument::modificationChanged,
             this, &IDEWidget::fileModified);
 
@@ -125,25 +125,24 @@ void IDEWidget::parseFile(const QString &filePath) {
 
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "Error", "Cannot open file");
+        QMessageBox::warning(this, tr("Error"), tr("Cannot open file"));
         return;
     }
     sourceCode = file.readAll().toStdString();
     file.close();
 
-    // 1️⃣ Удаляем старый подсветчик
+    // Replace the previous highlighter
     if (currentHighlighter) {
-        delete currentHighlighter;          // Qt удалит его при уничтожении
+        delete currentHighlighter;          // would otherwise live until the document is destroyed
         currentHighlighter = nullptr;
     }
 
-    // 2️⃣ Создаём новый
     QString ext = QFileInfo(filePath).suffix();
     ext = "." + ext;
     currentHighlighter = createHighlighter(ext);
 
     if (!langMap.contains(ext)) {
-        QMessageBox::warning(this, "Error", "Unsupported file type");
+        QMessageBox::warning(this, tr("Error"), tr("Unsupported file type"));
         return;
     }
 
@@ -152,7 +151,7 @@ void IDEWidget::parseFile(const QString &filePath) {
     ts_parser_set_language(parser, lang);
     TSTree *tree = ts_parser_parse_string(parser, nullptr, sourceCode.c_str(), (uint32_t)sourceCode.length());
     if (!tree) {
-        QMessageBox::warning(this, "Error", "Parsing failed");
+        QMessageBox::warning(this, tr("Error"), tr("Parsing failed"));
         ts_parser_delete(parser);
         return;
     }
@@ -165,7 +164,7 @@ void IDEWidget::parseFile(const QString &filePath) {
 
     // Update code editor text
     codeEditor->setPlainText(QString::fromStdString(sourceCode));
-    codeEditor->document()->setModified(false);   // <-- сброс
+    codeEditor->document()->setModified(false);
 
     // Build side outline
     astTree->clear();
@@ -284,26 +283,25 @@ void IDEWidget::onGraphOpenAt(int line, int column) {
 
 void IDEWidget::handleSaveRequest() {
     if (currentFilePath.isEmpty())
-        return; // Можно добавить диалог «Save As…»
+        return; // TODO: offer a "Save As..." dialog
 
     QFile file(currentFilePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "Error", "Cannot write file");
+        QMessageBox::warning(this, tr("Error"), tr("Cannot write file"));
         return;
     }
     file.write(codeEditor->toPlainText().toUtf8());
     file.close();
 
-    // Обнуляем флаг «модифицировано»
     codeEditor->document()->setModified(false);
     emit fileModified(false);
 
-    // После сохранения обновляем AST/Graph
+    // Refresh the AST and graph after saving
     parseFile(currentFilePath);
 }
 
 void IDEWidget::onGraphNodeDoubleClicked(const QJsonObject &node) {
-    // Повторяем логику двойного щелчка в Outline‑tree
+    // Same as a double click in the Outline tree
     const QString type = node["type"].toString();
     if (type.contains("function") || type.contains("method") ||
             type.contains("class") || type.contains("struct")) {
@@ -370,13 +368,13 @@ void IDEWidget::updateFoldsFromAst() {
 QSyntaxHighlighter *IDEWidget::createHighlighter(const QString &ext)
 {
     if (ext == ".cpp" || ext == ".h" || ext == ".hpp")
-        return new CppHighlighter(codeEditor->document());   // parent = this → авто‑delete
+        return new CppHighlighter(codeEditor->document());   // owned by the document
     else if (ext == ".py")
         return new PythonHighlighter(codeEditor->document());
     else if (ext == ".dart")
         return new DartHighlighter(codeEditor->document());
     else
-        return nullptr;   // для языков без подсветки
+        return nullptr;   // no highlighting for other languages
 }
 
 void IDEWidget::updateMissingFiles(const QSet<QString>& paths)
@@ -386,9 +384,9 @@ void IDEWidget::updateMissingFiles(const QSet<QString>& paths)
     for (const QString& p : paths) {
         const QString ap = QDir::cleanPath(QFileInfo(p).absoluteFilePath());
         if (QFileInfo::exists(ap)) {
-            red.insert(ap); // сам путь существует → красный
+            red.insert(ap); // path exists: red
         } else {
-            // найти ближайшего существующего родителя
+            // find the nearest existing parent
             QFileInfo fi(ap);
             QDir d = fi.isDir() ? QDir(ap) : fi.dir();
             QString parentPath = d.absolutePath();
@@ -397,7 +395,7 @@ void IDEWidget::updateMissingFiles(const QSet<QString>& paths)
                 if (!dd.cdUp()) break;
                 parentPath = dd.absolutePath();
             }
-            if (!parentPath.isEmpty()) green.insert(parentPath); // зелёный на родителя
+            if (!parentPath.isEmpty()) green.insert(parentPath); // existing parent: green
         }
     }
 

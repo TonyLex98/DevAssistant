@@ -5,10 +5,10 @@
 GraphWidget::GraphWidget(QWidget *parent)
     : QWidget(parent)
 {
-    setWindowTitle("Project Graph");
+    setWindowTitle(tr("Project Graph"));
     setMinimumSize(600, 400);
 
-    m_openBtn = new StyledButton("Open Project…", this);
+    m_openBtn = new StyledButton(tr("Open Project…"), this);
     m_view    = new ProjectRelationView(this);
     //m_view->hide();
 
@@ -19,10 +19,10 @@ GraphWidget::GraphWidget(QWidget *parent)
 
     connect(m_openBtn, &StyledButton::clicked, this, [this](){
         QString root = QFileDialog::getExistingDirectory(
-            this, "Select project folder", QDir::homePath());
+            this, tr("Select project folder"), QDir::homePath());
         if (root.isEmpty()) return;
 
-        m_view->setProjectRoot(root);   // запускает сборку графа
-        m_view->show();                 // показываем виджет
+        m_view->setProjectRoot(root);   // starts building the graph
+        m_view->show();
     });
 }

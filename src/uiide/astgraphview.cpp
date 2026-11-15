@@ -11,8 +11,7 @@ ASTGraphView::ASTGraphView(QWidget *parent) : QGraphicsView(parent) {
 }
 
 
-// Основная логика построения графа
-// ---------- построение графа ----------
+// ---------- graph construction ----------
 void ASTGraphView::setAST(const QJsonObject &ast) {
     rootAst_ = ast;
     scene_->clear();
@@ -43,7 +42,7 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
             n.start_col = c["start_column"].toInt();
             nodes.push_back(n);
 
-            nodeMap_[n.id] = c;    // <‑‑ храним объект
+            nodeMap_[n.id] = c;
 
             x += dx;
             if (x > 1000) { x = 20; y += dy; }
@@ -161,7 +160,7 @@ void ASTGraphView::mouseReleaseEvent(QMouseEvent *event) {
     QGraphicsView::mouseReleaseEvent(event);
 }
 
-// ---------- Вспомогательные функции ----------
+// ---------- helpers ----------
 QString ASTGraphView::nodeIdentifier(const QJsonObject &node) const {
     if (!node.contains("children")) return QString();
     QJsonArray children = node["children"].toArray();
@@ -189,7 +188,7 @@ QString ASTGraphView::enclosingClassName(const QJsonObject &node) const {
         int cStart = c["start_row"].toInt();
         int cEnd   = c["end_row"].toInt();
 
-        // если узел полностью находится внутри класса/структуры/namespace
+        // node lies entirely inside this class/struct/namespace
         if (nodeStart >= cStart && nodeEnd <= cEnd) {
             QString name = nodeIdentifier(c);
             if (!name.isEmpty())
@@ -200,7 +199,7 @@ QString ASTGraphView::enclosingClassName(const QJsonObject &node) const {
 }
 
 // ------------------------------------------------------------------
-// Рекурсивный поиск идентификатора
+// Recursive identifier lookup
 QString ASTGraphView::findIdentifier(const QJsonObject &node) const {
     if (!node.contains("children")) return QString();
 
@@ -209,7 +208,6 @@ QString ASTGraphView::findIdentifier(const QJsonObject &node) const {
         if (child["type"].toString() == "identifier" && child.contains("text"))
             return child["text"].toString();
 
-        // Ищем дальше рекурсивно
         QString res = findIdentifier(child);
         if (!res.isEmpty())
             return res;
@@ -218,7 +216,7 @@ QString ASTGraphView::findIdentifier(const QJsonObject &node) const {
 }
 
 // ------------------------------------------------------------------
-// Рекурсивный поиск имени самого верхнего (или ближайшего) класса/struct/namespace
+// Recursively find the name of the outermost class/struct/namespace enclosing the node
 QString ASTGraphView::findEnclosingClassName(const QJsonObject &node) const {
     if (!rootAst_.contains("children")) return QString();
 
@@ -227,7 +225,7 @@ QString ASTGraphView::findEnclosingClassName(const QJsonObject &node) const {
         int start = n["start_row"].toInt();
         int end   = n["end_row"].toInt();
 
-        if (start < minRow || end > maxRow) return QString(); // не в диапазоне
+        if (start < minRow || end > maxRow) return QString(); // out of range
 
         QString type = n["type"].toString();
         if (type.contains("class") || type.contains("struct") || type.contains("namespace")) {
@@ -236,7 +234,6 @@ QString ASTGraphView::findEnclosingClassName(const QJsonObject &node) const {
                 return name;
         }
 
-        // Переходим к потомкам
         if (n.contains("children")) {
             for (const auto &cVal : n["children"].toArray()) {
                 QString res = dfs(cVal.toObject(), minRow, maxRow);
@@ -251,11 +248,11 @@ QString ASTGraphView::findEnclosingClassName(const QJsonObject &node) const {
 }
 
 // ------------------------------------------------------------------
-// Формируем надпись для узла
+// Display label for a node
 QString ASTGraphView::nodeLabel(const QJsonObject &node) const {
     QString type = node["type"].toString();
 
-    // Функция
+    // Function
     if (type.contains("function")) {
         QString funcName = findIdentifier(node);
         if (!funcName.isEmpty()) {
@@ -266,26 +263,26 @@ QString ASTGraphView::nodeLabel(const QJsonObject &node) const {
         }
     }
 
-    // Класс/структура/namespace
+    // Class/struct/namespace
     if (type.contains("class") || type.contains("struct") || type.contains("namespace")) {
         QString name = findIdentifier(node);
         if (!name.isEmpty())
             return name;
     }
 
-    // Для остальных типов – просто имя типа
+    // Anything else: the node type
     return type;
 }
 
-// ---------- двойной щелчок ----------
+// ---------- double click ----------
 void ASTGraphView::mouseDoubleClickEvent(QMouseEvent *event) {
     QPointF p = mapToScene(event->pos());
     for (const auto &n : nodes) {
         if (n.rect.contains(p)) {
-            // 1️⃣  сигнал о двойном щелчке (для открытия редактора)
+            // notify about the double click (opens the editor)
             emit nodeDoubleClicked(nodeMap_[n.id]);
 
-            // 2️⃣  перейти к строке/столбцу – как при простом щелчке
+            // jump to the row/column, as with a single click
             emit openAt(n.start_row, n.start_col);
 
             break;

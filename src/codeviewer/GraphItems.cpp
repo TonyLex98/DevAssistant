@@ -125,7 +125,7 @@ void EdgeItem::paint(QPainter *p, const QStyleOptionGraphicsItem *o, QWidget *w)
     QPen pen;
     pen.setWidthF(1.8);
 
-    // базовый цвет по типу ребра
+    // base color by edge kind
     switch(m_kind){
         case EdgeKind::Calls:        pen.setColor(QColor(40,120,220)); break;
         case EdgeKind::Instantiates: pen.setColor(QColor(40,180,120)); pen.setStyle(Qt::DashLine); break;
@@ -149,10 +149,10 @@ void EdgeItem::paint(QPainter *p, const QStyleOptionGraphicsItem *o, QWidget *w)
     p->setPen(pen);
     p->setBrush(Qt::NoBrush);
 
-    // РИСУЕМ САМИ, а не через базовый paint:
+    // draw the path ourselves instead of calling the base paint()
     p->drawPath(this->path());
 
-    // стрелка и подписи — как было
+    // arrowhead
     const qreal arrowSize = 8.0;
     QPainterPath path = this->path();
     QPointF end = path.pointAtPercent(1.0);
@@ -167,19 +167,19 @@ void EdgeItem::paint(QPainter *p, const QStyleOptionGraphicsItem *o, QWidget *w)
     p->setBrush(pen.color());
     p->drawPolygon(arrow);
 
-    // ... подпись/порядок без изменений
+    // label/order are not drawn yet
 }
 
 
 void ClassItem::mousePressEvent(QGraphicsSceneMouseEvent *e){
     setCursor(QCursor(Qt::ClosedHandCursor));
-    emit heldChanged(true);                         // <-- В РУКЕ
+    emit heldChanged(true);                         // grabbed
     QGraphicsObject::mousePressEvent(e);
 }
 
 void ClassItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *e){
     setCursor(QCursor(Qt::OpenHandCursor));
-    emit heldChanged(false);                        // <-- ОТПУСТИЛИ
+    emit heldChanged(false);                        // released
     QGraphicsObject::mouseReleaseEvent(e);
 }
 
@@ -193,7 +193,7 @@ MethodChip::MethodChip(const NodeData &data, QGraphicsItem* parent)
     setCursor(QCursor(Qt::OpenHandCursor));
 }
 
-// ... paint / toJson / fromJson как было ...
+// paint / toJson / fromJson are defined above
 
 void MethodChip::mousePressEvent(QGraphicsSceneMouseEvent *e){
     setCursor(QCursor(Qt::ClosedHandCursor));

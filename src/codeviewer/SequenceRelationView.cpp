@@ -238,7 +238,7 @@ SequenceEdgeItem::SequenceEdgeItem(SequenceNodeItem *source, SequenceNodeItem *d
 {
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
-    setZValue(-1); // Устанавливаем z-значение, чтобы стрелки отображались под узлами
+    setZValue(-1); // draw edges below nodes
     updatePosition();
 }
 
@@ -1147,8 +1147,8 @@ void SequenceRelationView::mousePressEvent(QMouseEvent *event)
         }
         if (targetNode) {
             if (!addDirectedConnection(m_connectSource->name(), targetNode->name())) {
-                QMessageBox::warning(this, tr("Связь не создана"),
-                                     tr("Не удалось создать связь между %1 и %2.")
+                QMessageBox::warning(this, tr("Link Not Created"),
+                                     tr("Could not create a link between %1 and %2.")
                                          .arg(m_connectSource->name(), targetNode->name()));
             }
             cancelConnection();
@@ -1163,16 +1163,15 @@ void SequenceRelationView::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         QPointF scenePos = mapToScene(event->pos());
 
-        // Если нажата клавиша Shift, выбираем нижний элемент (в порядке z-значений)
+        // With Shift held, pick the bottom-most item (by z-order)
         Qt::SortOrder order = event->modifiers() & Qt::ShiftModifier ? Qt::AscendingOrder : Qt::DescendingOrder;
         QList<QGraphicsItem*> itemsAtPos = m_scene->items(scenePos, Qt::IntersectsItemShape, order, transform());
 
-        // Ищем SequenceNodeItem среди элементов
         SequenceNodeItem *targetNode = nullptr;
         for (QGraphicsItem *item : itemsAtPos) {
             if (item && item->type() == SequenceNodeItem::Type) {
                 targetNode = static_cast<SequenceNodeItem*>(item);
-                break; // Выбираем первый элемент в зависимости от порядка сортировки
+                break; // first match in the chosen sort order
             }
         }
 
@@ -1384,23 +1383,23 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
 
     QMenu menu(this);
     
-    QAction *fitAction = menu.addAction(tr("Поместить всё"));
-    QAction *focusAction = menu.addAction(tr("Показать выделенное"));
-    QAction *resetAction = menu.addAction(tr("Сбросить масштаб"));
-    QAction *refreshAction = menu.addAction(tr("Обновить граф"));
+    QAction *fitAction = menu.addAction(tr("Fit All"));
+    QAction *focusAction = menu.addAction(tr("Show Selection"));
+    QAction *resetAction = menu.addAction(tr("Reset Zoom"));
+    QAction *refreshAction = menu.addAction(tr("Refresh Graph"));
     QAction *createAction = nullptr;
     if (!m_currentTemplateDirPath.isEmpty()) {
-        createAction = menu.addAction(tr("Создать последовательность здесь"));
+        createAction = menu.addAction(tr("Create Sequence Here"));
     }
 
     if (nodeItem) {
         menu.addSeparator();
-        QAction *openAction = menu.addAction(tr("Открыть/редактировать"));
-        QAction *connectAction = menu.addAction(tr("Начать связь отсюда"));
+        QAction *openAction = menu.addAction(tr("Open/Edit"));
+        QAction *connectAction = menu.addAction(tr("Start Link Here"));
         connectAction->setEnabled(!m_currentTemplateDirPath.isEmpty());
         QAction *deleteAction = nullptr;
         if (!m_currentTemplateDirPath.isEmpty()) {
-            deleteAction = menu.addAction(tr("Удалить из шаблона"));
+            deleteAction = menu.addAction(tr("Remove from Template"));
         }
 
         QAction *nodeChoice = menu.exec(mapToGlobal(pos));
@@ -1417,8 +1416,8 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                 rebuildGraphForTemplate(m_currentTemplateDirPath);
             }
         } else if (nodeChoice == createAction && createAction) {
-            QString name = QInputDialog::getText(this, tr("Новая последовательность"),
-                                                 tr("Название последовательности:"));
+            QString name = QInputDialog::getText(this, tr("New Sequence"),
+                                                 tr("Sequence name:"));
             if (!name.isEmpty()) {
                 if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
                     rebuildGraphForTemplate(m_currentTemplateDirPath);
@@ -1427,7 +1426,7 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                         savePositions();
                     }
                 } else {
-                    QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+                    QMessageBox::warning(this, tr("Not Created"), tr("Could not create the sequence."));
                 }
             }
         } else if (nodeChoice == openAction) {
@@ -1435,8 +1434,8 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
         } else if (nodeChoice == connectAction) {
             startConnectionFrom(nodeItem);
         } else if (nodeChoice == deleteAction && deleteAction) {
-            if (QMessageBox::question(this, tr("Удалить последовательность"),
-                                      tr("Удалить \"%1\" из шаблона?").arg(nodeItem->name()))
+            if (QMessageBox::question(this, tr("Delete Sequence"),
+                                      tr("Remove \"%1\" from the template?").arg(nodeItem->name()))
                 == QMessageBox::Yes) {
                 QString base = m_sequenceToBaseName.value(nodeItem->name());
                 QString fileName = base.isEmpty() ? QString() : base + ".seq.json";
@@ -1502,7 +1501,7 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
 
     if (edgeItem) {
         menu.addSeparator();
-        QAction *removeEdgeAction = menu.addAction(tr("Удалить связь"));
+        QAction *removeEdgeAction = menu.addAction(tr("Delete Link"));
         removeEdgeAction->setEnabled(!m_currentTemplateDirPath.isEmpty());
         QAction *choice = menu.exec(mapToGlobal(pos));
         if (choice == removeEdgeAction) {
@@ -1520,8 +1519,8 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                 rebuildGraphForTemplate(m_currentTemplateDirPath);
             }
         } else if (choice == createAction && createAction) {
-            QString name = QInputDialog::getText(this, tr("Новая последовательность"),
-                                                 tr("Название последовательности:"));
+            QString name = QInputDialog::getText(this, tr("New Sequence"),
+                                                 tr("Sequence name:"));
             if (!name.isEmpty()) {
                 if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
                     rebuildGraphForTemplate(m_currentTemplateDirPath);
@@ -1530,7 +1529,7 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                         savePositions();
                     }
                 } else {
-                    QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+                    QMessageBox::warning(this, tr("Not Created"), tr("Could not create the sequence."));
                 }
             }
         }
@@ -1548,8 +1547,8 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
     } else if (selectedAction == refreshAction) {
         rebuildGraph();
     } else if (selectedAction == createAction && createAction) {
-        QString name = QInputDialog::getText(this, tr("Новая последовательность"),
-                                             tr("Название последовательности:"));
+        QString name = QInputDialog::getText(this, tr("New Sequence"),
+                                             tr("Sequence name:"));
         if (!name.isEmpty()) {
             if (m_templateMgr && m_templateMgr->createNewSequenceInTemplate(m_currentTemplateDirPath, name, QString())) {
                 rebuildGraphForTemplate(m_currentTemplateDirPath);
@@ -1558,7 +1557,7 @@ void SequenceRelationView::showContextMenu(const QPoint &pos)
                     savePositions();
                 }
             } else {
-                QMessageBox::warning(this, tr("Не создано"), tr("Не удалось создать последовательность."));
+                QMessageBox::warning(this, tr("Not Created"), tr("Could not create the sequence."));
             }
         }
     }

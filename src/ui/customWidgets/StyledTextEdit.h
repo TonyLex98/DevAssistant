@@ -12,12 +12,12 @@ public:
         // Consistent styling with other custom widgets
         setStyleSheet(
             "QTextEdit {"
-            "  border: 2px solid #5A9;"            // светло-синий контур
-            "  border-radius: 12px;"               // округлые углы
-            "  padding: 6px 12px;"                 // внутренние отступы
-            "  font: 18px \"Arial\", sans-serif;" // крупный шрифт
-            "  background-color: #ffffff;"         // белый фон
-            "  color: #000000;"                    // черный текст
+            "  border: 2px solid #5A9;"
+            "  border-radius: 12px;"
+            "  padding: 6px 12px;"
+            "  font: 18px \"Arial\", sans-serif;"
+            "  background-color: #ffffff;"
+            "  color: #000000;"
             "}"
         );
 
