@@ -212,7 +212,7 @@ static QList<QByteArray> findDslCommandsInText(const QByteArray& rawText)
 {
     QList<QByteArray> out;
     const QString text = QString::fromUtf8(rawText);
-    const QStringList lines = text.split('\n', QString::SkipEmptyParts);
+    const QStringList lines = text.split('\n', Qt::SkipEmptyParts);
     // Only an upper-case command name of a known command starts a DSL line
     // ("OPEN_FILE src/main.cpp"). Ordinary prose such as "2. Undo the previous change" or
     // "Open the file" must not turn into commands.

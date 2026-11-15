@@ -112,7 +112,7 @@ static bool applyHunks(QStringList& lines, const QList<PatchHunk>& hunks, QStrin
 
 static bool parseUnifiedDiff(const QString& text, int strip, QList<FilePatch>& out, QString* err)
 {
-    QStringList lines = text.split('\n', QString::KeepEmptyParts);
+    QStringList lines = text.split('\n', Qt::KeepEmptyParts);
     if (!lines.isEmpty() && lines.last().isEmpty())
         lines.removeLast();
 

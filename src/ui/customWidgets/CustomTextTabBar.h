@@ -38,7 +38,7 @@ protected:
             QString text = tabText(index);
             QFontMetrics fm = fontMetrics();
 
-            int textWidth = fm.width(text);
+            int textWidth = fm.horizontalAdvance(text);
 
             QStyleOptionTab opt;
             initStyleOption(&opt, index);
@@ -75,7 +75,7 @@ protected:
             QString text = tabText(index);
             QFontMetrics fm = fontMetrics();
 
-            int textWidth = fm.width(text);
+            int textWidth = fm.horizontalAdvance(text);
 
             QStyleOptionTab opt;
             initStyleOption(&opt, index);

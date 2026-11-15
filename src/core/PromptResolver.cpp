@@ -15,6 +15,11 @@
 #include <QJsonDocument>
 #include "utils/Logging.h"
 
+namespace {
+// QSet::fromList is deprecated in Qt 5.15.
+QSet<QString> toSet(const QStringList& list) { return QSet<QString>(list.begin(), list.end()); }
+} // namespace
+
 // Static members initialization
 QString PromptResolver::m_nextSequenceName;
 QString PromptResolver::m_nextSequenceDescription;
@@ -23,7 +28,7 @@ static QString absoluteFileList(const QString& list, const QString& root)
 {
     QStringList abs;
     QDir rootDir(root);
-    const QStringList lines = list.split('\n', QString::KeepEmptyParts);
+    const QStringList lines = list.split('\n', Qt::KeepEmptyParts);
     for (const QString& line : lines) {
         QString trimmed = line.trimmed();
         if (trimmed.isEmpty())
@@ -39,7 +44,7 @@ static QString absoluteFileList(const QString& list, const QString& root)
 
 static QString truncateLinesForPrompt(const QString& text, int maxLines, int maxChars)
 {
-    QStringList lines = text.split('\n', QString::KeepEmptyParts);
+    QStringList lines = text.split('\n', Qt::KeepEmptyParts);
     if (maxLines > 0 && lines.size() > maxLines) {
         const int head = qMax(1, maxLines - 50);
         const int tail = qMin(50, maxLines / 4);
@@ -125,7 +130,7 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     // 5) {{SUPPORTED_COMMANDS}}: only the commands allowed for this step
     QString allowedList;
     const auto all = CommandRegistry::all(); // prototypes of all commands
-    QSet<QString> allowedSet = QSet<QString>::fromList(step.allowedCommands());
+    QSet<QString> allowedSet = toSet(step.allowedCommands());
 
     for (Command *c : all) {
         if (!allowedSet.contains(c->name())) {

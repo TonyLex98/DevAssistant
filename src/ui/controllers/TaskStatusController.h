@@ -3,7 +3,7 @@
 #include <QObject>
 #include <QLabel>
 #include <QTimer>
-#include <QTime>
+#include <QElapsedTimer>
 
 class OllamaAdapter;
 class ContextManager;
@@ -48,7 +48,7 @@ private:
 
     QLabel*   m_statusWidget;
     QTimer*   m_timer;
-    QTime     m_elapsedTime;
+    QElapsedTimer m_elapsedTime;
     int       m_totalElapsedTimeMs;
     bool      m_taskRunning;
     bool      m_timerActive;

@@ -59,7 +59,7 @@ static QString randomUserAgent()
 
 static void applyCommonHeaders(QNetworkRequest& req, const QString& referer = QString())
 {
-    req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     req.setRawHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
     req.setRawHeader("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.7");
     // Avoid compressed bodies unless we're prepared to decompress them.

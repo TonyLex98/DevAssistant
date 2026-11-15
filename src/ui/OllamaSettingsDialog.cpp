@@ -358,7 +358,7 @@ QVariantMap OllamaSettingsDialog::params() const
     o["mirostat_eta"] = m_mirostatEta->value();
     o["seed"] = m_seed->value();
 
-    const QStringList stopWords = m_stopWords->toPlainText().split('\n', QString::SkipEmptyParts);
+    const QStringList stopWords = m_stopWords->toPlainText().split('\n', Qt::SkipEmptyParts);
     if (!stopWords.isEmpty()) {
         QJsonArray stopArray;
         for (const QString& word : stopWords) {

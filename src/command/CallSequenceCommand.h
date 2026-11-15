@@ -4,9 +4,9 @@
 class CallSequenceCommand : public Command
 {
 public:
-    CallSequenceCommand(const QString& sequenceName = QString(), bool needSummary = true, const QString& description = QString()) {
+    CallSequenceCommand(const QString& sequenceName = QString(), bool needSummary = false, const QString& description = QString()) {
         m_params["sequenceName"] = sequenceName;
-        m_params["summarize"] = false;//needSummary;
+        m_params["summarize"] = needSummary;
         m_description = description.isEmpty() 
             ? QString("Calls another sequence of commands. "
                       "Example: { \"command\": \"CALL_SEQUENCE\", \"params\": { \"sequenceName\": \"deploy_app\" } }")

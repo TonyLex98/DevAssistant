@@ -38,6 +38,11 @@
 #include <algorithm>
 #include "utils/Logging.h"
 
+namespace {
+// QSet::fromList is deprecated in Qt 5.15.
+QSet<QString> toSet(const QStringList& list) { return QSet<QString>(list.begin(), list.end()); }
+} // namespace
+
 SequenceRunner::SequenceRunner(MainWindow* mainWindow, ISequenceService* seq, IContextService* ctx, IModelService* model,
                                IProjectService* project, IUIUpdater* ui, ITemplateService* tmpl,
                                IStatusControllerService* status, ITTSService* tts)
@@ -1086,7 +1091,7 @@ void SequenceRunner::autoFinalizeSequenceWithResult(const QString& reason, const
             for (const QString& block : web->results()) {
                 if (sourceLines.size() >= 5)
                     break;
-                const QStringList parts = block.split('\n', QString::SkipEmptyParts);
+                const QStringList parts = block.split('\n', Qt::SkipEmptyParts);
                 if (parts.size() < 2)
                     continue;
                 const QString title = parts.at(0).trimmed();
@@ -1163,7 +1168,7 @@ bool SequenceRunner::ensureAgentModelConfigured()
 QStringList SequenceRunner::buildAllowedCommandsDocsCompact(const PromptStep& step) const
 {
     QStringList out;
-    const QSet<QString> allowed = QSet<QString>::fromList(step.allowedCommands());
+    const QSet<QString> allowed = toSet(step.allowedCommands());
     for (Command* c : CommandRegistry::all()) {
         const QString name = c->name();
         if (!allowed.contains(name)) {
@@ -1452,7 +1457,7 @@ void SequenceRunner::handleOpenCommand(Command* cmd)
     const QString text = QString::fromUtf8(file.readAll());
     file.close();
 
-    QStringList allLines = text.split('\n', QString::KeepEmptyParts);
+    QStringList allLines = text.split('\n', Qt::KeepEmptyParts);
     if (text.endsWith('\n') && !allLines.isEmpty())
         allLines.removeLast();
     if (cmd->name() == "OPEN_FILE") {
@@ -1508,7 +1513,7 @@ void SequenceRunner::handleOpenCommand(Command* cmd)
         const int startIndex = match.capturedStart();
         startLine = text.left(startIndex).count('\n') + 1;
         const QString captured = match.captured(0);
-        snippet = captured.split('\n', QString::KeepEmptyParts);
+        snippet = captured.split('\n', Qt::KeepEmptyParts);
         if (captured.endsWith('\n') && !snippet.isEmpty())
             snippet.removeLast();
     }

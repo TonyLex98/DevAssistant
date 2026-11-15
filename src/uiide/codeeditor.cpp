@@ -77,7 +77,6 @@ void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent *event) {
     int bottom = top + (int) blockBoundingRect(block).height();
 
     const int w = m_lineNumberArea->width();
-    const int fmw = fontMetrics().horizontalAdvance(QLatin1Char('9')) * 3;
 
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {

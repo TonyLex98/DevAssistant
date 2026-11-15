@@ -15,6 +15,11 @@
 #include "utils/Logging.h"
 
 namespace {
+// QSet::fromList is deprecated in Qt 5.15.
+QSet<QString> toSet(const QStringList& list) { return QSet<QString>(list.begin(), list.end()); }
+} // namespace
+
+namespace {
 constexpr int kMaxActiveContextChars = 18000;
 constexpr int kMaxPerCommandChars = 3000;
 constexpr int kMaxArchiveChunks = 60;
@@ -777,7 +782,7 @@ void ContextManager::attachCommandToContextGraph(const CommandContextInfo& info)
                          .arg(info.name,
                               shortText(info.description.isEmpty() ? info.name : info.description, 140));
     if (!info.result.trimmed().isEmpty()) {
-        const QStringList lines = info.result.split('\n', QString::SkipEmptyParts);
+        const QStringList lines = info.result.split('\n', Qt::SkipEmptyParts);
         if (!lines.isEmpty())
             action += QStringLiteral(" -> %1").arg(shortText(lines.first(), 140));
     }
@@ -1076,7 +1081,7 @@ void ContextManager::observeUserQuery(const QString& text)
             });
             while (list.size() > 60)
                 list.removeFirst();
-            merged = QSet<QString>::fromList(list);
+            merged = toSet(list);
         }
         m_currentTopicKeywords = merged;
     }

@@ -122,7 +122,7 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
             text = QString::fromLocal8Bit(content);
         }
 
-        QStringList lines = text.split('\n', QString::KeepEmptyParts);
+        QStringList lines = text.split('\n', Qt::KeepEmptyParts);
         for (int i = 0; i < lines.size() && m_matches.size() < maxMatches; ++i) {
             const QString& line = lines[i];
             int lineNo = i + 1; // Line numbers start from 1

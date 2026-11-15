@@ -110,7 +110,7 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     m_templateCombo = new MemoryComboBox("defaultTemplateSelector", this);
     m_templateCombo->addItem(tr("Choose a default template"), "");
     m_templateCombo->addItem(tr("Simple chat"), "simple_chat");
-    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
+    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundRole); // Light yellow background
     m_templateCombo->addItems(QStringList()); // ensure initial
 
     // Populate the combobox with all available templates
@@ -446,7 +446,7 @@ QStringList ChatDialog::ensureImageSummaries(QString* combinedOut)
         return summaries;
 
     QMap<int, QString> parsed;
-    const auto lines = resp.split('\n', QString::SkipEmptyParts);
+    const auto lines = resp.split('\n', Qt::SkipEmptyParts);
     QRegularExpression re("^\\s*(\\d+)\\s*[\\).:-]\\s*(.+)\\s*$");
     for (const QString& line : lines) {
         QRegularExpressionMatch m = re.match(line);
@@ -886,7 +886,7 @@ void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManag
     m_templateCombo->clear();
     m_templateCombo->addItem(tr("Choose a default template"), "");
     m_templateCombo->addItem(tr("Simple chat"), "simple_chat");
-    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
+    m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundRole); // Light yellow background
     populateTemplates();
 
     // Restore persisted selection first (cross-session stable behavior).

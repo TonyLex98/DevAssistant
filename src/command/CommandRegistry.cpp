@@ -584,7 +584,7 @@ static QHash<QString, FactoryFn>& registry()
             QString sequenceName = firstNonEmptyString(p, {"sequenceName", "sequence", "name", "sequence_name"});
             if (sequenceName.isEmpty()) sequenceName = obj["sequence_name"].toString();
             if (sequenceName.isEmpty()) sequenceName = p["sequence_name"].toString();
-            bool needSummary = true;
+            bool needSummary = false;   // the called sequence's result is passed back in full
             if (p.contains("summarize")) needSummary = p.value("summarize").toBool();
             else if (obj.contains("summarize")) needSummary = obj.value("summarize").toBool();
             QString description = obj["description"].toString();

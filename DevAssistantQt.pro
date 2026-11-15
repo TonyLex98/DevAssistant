@@ -6,6 +6,8 @@ QT += widgets network multimedia core gui sql
 QMAKE_CXXFLAGS += -std=gnu++1z
 QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
 QMAKE_CFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+# All C sources are third-party (tree-sitter, md4c): keep their warnings out of the build log.
+QMAKE_CFLAGS += -Wno-format -Wno-format-extra-args -Wno-unused-parameter -Wno-unused-value -Wno-unused-function
 
 CONFIG += c++17 object_parallel_to_source
 

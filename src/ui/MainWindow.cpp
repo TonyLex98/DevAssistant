@@ -688,10 +688,10 @@ void MainWindow::rescan(){
 
         if (needRed){
             needRed_set.insert(absPath);
-            item->setBackgroundColor(Qt::red);
+            item->setBackground(Qt::red);
         }
         else
-            item->setBackgroundColor(Qt::green);
+            item->setBackground(Qt::green);
 
         item->setData(Qt::UserRole, absPath);
     }
@@ -892,7 +892,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
     const QString text = QString::fromUtf8(file.readAll());
     file.close();
 
-    QStringList allLines = text.split('\n', QString::KeepEmptyParts);
+    QStringList allLines = text.split('\n', Qt::KeepEmptyParts);
     if (text.endsWith('\n') && !allLines.isEmpty())
         allLines.removeLast();
     if (cmd->name() == "OPEN_FILE") {
@@ -954,7 +954,7 @@ void MainWindow::handleOpenCommand(Command* cmd)
         const int startIndex = match.capturedStart();
         startLine = text.left(startIndex).count('\n') + 1;
         const QString captured = match.captured(0);
-        snippet = captured.split('\n', QString::KeepEmptyParts);
+        snippet = captured.split('\n', Qt::KeepEmptyParts);
         if (captured.endsWith('\n') && !snippet.isEmpty())
             snippet.removeLast();
     }
