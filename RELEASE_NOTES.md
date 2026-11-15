@@ -1,35 +1,38 @@
-## DevAssistant 1.0.0
+## DevAssistant 1.1.0
 
-The first public release: a desktop AI assistant for programmers that works on local models
-and changes the project only through commands you can see and undo.
+A rebuilt inside: the same features on a cleaner, layered architecture, with an agent that
+never freezes the window and fixes for problems the rework brought to light.
 
-**Download** `DevAssistant-v1.0.0-windows-x64.zip` below, unpack it and run
+**Download** `DevAssistant-v1.1.0-windows-x64.zip` below, unpack it and run
 `DevAssistantQt.exe`. You also need a model server: [Ollama](https://ollama.com)
 (for example `ollama pull qwen2.5-coder:7b`) or any OpenAI-compatible server.
 
-### What is in it
+### What changed
 
-- **Commands instead of free-form edits.** The model answers with JSON commands (open a file
-  region, edit a line range, apply a diff, search the project, run a program, ask the user);
-  36 commands, described in [docs/COMMANDS.md](https://github.com/TonyLex98/DevAssistant/blob/main/docs/COMMANDS.md).
-- **Safe by default.**
-  - Every path must stay inside the project folder.
-  - Each workflow step lists the commands it may use.
-  - Read-only commands run at once; changes, programs and deletions are shown first with
-    the exact command line, paths and line ranges.
-  - Changes are applied all-or-nothing and can be undone, up to 50 steps back.
-- **Questions about your documents (RAG).** A persistent SQLite index next to the project,
-  incremental updates, answers with the excerpts they rely on; the agent can search it with
-  `SEARCH_DOCS`.
-- **LightRAG client.** Upload documents, query in graph or vector modes, explore the graph.
-- **Code insight.** An editor with highlighting, the tree-sitter syntax tree, and a project
-  graph of classes, methods and calls (C/C++, Python, Dart).
-- **Workflows.** Multi-step prompt sequences grouped into solution templates. An optional
-  agent mode plans each step with a separate model call.
-- **Voice (optional, off by default).** Dictation with faster-whisper, Vosk, whisper.cpp or
-  a wav2vec2 model, and answers read aloud.
-- **English and Russian interface.** It follows the system language by default; you can
-  change it in Settings.
+- **The window stays responsive.** Model requests are asynchronous; commands that wait on a
+  program or the network (shell, Python, git, web and document search) run in a worker
+  thread. "Stop" works at any moment, and answers that arrive for a stopped run are dropped.
+- **The model sees the files it opened.** `{{OPEN_FILES}}` was always empty before; it now
+  holds the opened files and lines with their numbers, program output and search results.
+- **Context usage in the status bar** shows the size of the last prompt against the model's
+  context window (it showed 0 before).
+- **No modal pop-ups at the end of a run**: the outcome goes to the status bar and the log.
+- **Agent mode uses the model selected in the chat**, as the setting says.
+- **Model servers that need a key** (OpenAI-compatible): the key from the settings is sent.
+- **File descriptions** are generated in the background with a progress window that can be
+  cancelled.
+
+### Architecture
+
+- `src/core` is a static library without QtWidgets: the session state, an asynchronous model
+  client (`LlmClient`, `ModelReply`), the agent engine (`AgentEngine`, `CommandRunner`,
+  `LoopGuard`, `WorkflowLibrary`), the commands, the context, the project, RAG.
+- `src/ui` only builds the widgets and connects them; the main window went from 2300 lines
+  and ten "service" interfaces to a few hundred lines.
+- 12 test suites, among them the agent engine end to end with a scripted model on a
+  temporary project, and the model client against a fake HTTP server.
+
+See [docs/ARCHITECTURE.md](https://github.com/TonyLex98/DevAssistant/blob/main/docs/ARCHITECTURE.md).
 
 ### Requirements
 

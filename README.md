@@ -76,22 +76,21 @@ Requirements: Qt 5.15 with MinGW 8.1 64-bit, Git, PowerShell.
 git clone https://github.com/TonyLex98/DevAssistant.git
 cd DevAssistant
 powershell -ExecutionPolicy Bypass -File scripts/fetch_tree_sitter.ps1
-qmake DevAssistantQt.pro CONFIG+=release
-mingw32-make -j4
-```
-
-`fetch_tree_sitter.ps1` downloads tree-sitter and the C++, Python and Dart grammars at pinned
-commits. To build the Windows package: `scripts/deploy_windows.ps1 -Zip DevAssistant.zip`.
-
-Tests (QtTest, 9 suites: path sandbox, command parser and policy, file commands, change
-batches with undo, line-ending-preserving edits, prompt data, the code indexer):
-
-```powershell
-mkdir build-tests; cd build-tests
-qmake ../tests/tests.pro CONFIG+=release
+mkdir build; cd build
+qmake ../DevAssistant.pro CONFIG+=release
 mingw32-make -j4
 mingw32-make check
 ```
+
+This builds the core library, the program (`build/bin/DevAssistantQt.exe`) and the tests,
+then runs the tests. `fetch_tree_sitter.ps1` downloads tree-sitter and the C++, Python and
+Dart grammars at pinned commits. To build the Windows package:
+`scripts/deploy_windows.ps1 -ExePath build/bin/DevAssistantQt.exe -Zip DevAssistant.zip`.
+
+Tests (QtTest, 12 suites): the agent engine end to end with a scripted model on a temporary
+project, the model client against a fake HTTP server, the session, path sandbox, command
+parser and policy, file commands, change batches with undo, line-ending-preserving edits,
+prompt data, the code indexer.
 
 CI (GitHub Actions) builds, runs the tests, updates the Russian translation, packages the
 zip, starts the program headless to take the screenshots above, and publishes releases.
@@ -100,15 +99,15 @@ zip, starts the program headless to take the screenshots above, and publishes re
 
 | Folder | Contents |
 |---|---|
-| `src/command` | commands, parser, registry, policy and confirmation dialog |
-| `src/core` | project and change management, context, prompt resolution, sequences |
-| `src/adapters` | model server client (Ollama, OpenAI-compatible) |
-| `ragmodule` | document search: SQLite store, chunking, embeddings, Q&A window |
-| `src/codeviewer`, `src/uiide` | tree-sitter project graph, editor |
+| `src/core` | everything the assistant does, as a static library without QtWidgets: `session` (the session state), `model` (asynchronous model client), `workflow` (the agent engine, sequences, templates), `commands`, `context`, `project`, `code` (tree-sitter index), `rag`, `util` |
+| `src/ui` | the main window, chat, dialogs, editor, graphs, document windows |
+| `src/app` | `main()` and resources |
 | `src/audio` | speech recognition engines, text to speech |
-| `src/ui` | main window, chat, settings, LightRAG client |
-| `tests` | unit tests |
+| `third_party` | md4c; tree-sitter is downloaded here |
+| `tests` | QtTest suites, linked against the core library |
 | `translations` | Russian translation |
+
+The layers and the flow of one step are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## License
 

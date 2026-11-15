@@ -19,14 +19,14 @@
 #include <QLoggingCategory>
 
 // Core
-Q_DECLARE_LOGGING_CATEGORY(logCore)        // DevAssManager, ContextManager, ModelAdapter
+Q_DECLARE_LOGGING_CATEGORY(logCore)        // Project, DevAssManager, WorkingContext, ContextManager
 Q_DECLARE_LOGGING_CATEGORY(logCmd)         // CommandParser, CommandRegistry, all Commands
 Q_DECLARE_LOGGING_CATEGORY(logPrompt)      // PromptResolver
 
 // UI / Controllers
 Q_DECLARE_LOGGING_CATEGORY(logUI)          // MainWindow, dialogs
-Q_DECLARE_LOGGING_CATEGORY(logSeq)         // SequenceRunner, SequenceEditorController
-Q_DECLARE_LOGGING_CATEGORY(logProject)     // ProjectBrowserController
+Q_DECLARE_LOGGING_CATEGORY(logSeq)         // AgentEngine, WorkflowLibrary, SequenceEditorController
+Q_DECLARE_LOGGING_CATEGORY(logProject)     // project browsing in the UI
 
 // Code viewer / graph
 Q_DECLARE_LOGGING_CATEGORY(logViewer)      // SequenceRelationView, SequenceGraphWidget

@@ -50,7 +50,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force translations | Out-Null
-          lupdate DevAssistant.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none -tr-function-alias tr+=tr_fn
+          # The source folder, not the .pro files: lupdate does not descend into a subproject
+          # that lists its own TRANSLATIONS when -ts is given.
+          lupdate src -extensions h,cpp,ui -ts translations/devassistant_ru.ts -no-obsolete -locations none -tr-function-alias tr+=tr_fn
           & "$env:pythonLocation\python.exe" scripts/fill_translations.py translations/devassistant_ru.ts translations/ru
 
       # One shadow build of everything: the core library, the program and the tests.

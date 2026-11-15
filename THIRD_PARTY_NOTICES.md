@@ -8,7 +8,7 @@ with the components below, each under its own license.
 | Component | How it is used | License |
 |---|---|---|
 | [Qt 5.15](https://www.qt.io) (Core, Gui, Widgets, Network, Multimedia, Sql with the SQLite driver) | application framework; the Windows package ships the unmodified Qt DLLs, linked dynamically | LGPL v3 |
-| [md4c](https://github.com/mity/md4c) | Markdown parser for model answers, source in `src/md4c` | MIT, see `src/md4c/LICENSE.md` |
+| [md4c](https://github.com/mity/md4c) | Markdown parser for model answers, source in `third_party/md4c` | MIT, see `third_party/md4c/LICENSE.md` |
 | [tree-sitter](https://github.com/tree-sitter/tree-sitter) with the [C++](https://github.com/tree-sitter/tree-sitter-cpp), [Python](https://github.com/tree-sitter/tree-sitter-python) and [Dart](https://github.com/UserNobody14/tree-sitter-dart) grammars | parsing source code for the project graph and the editor; downloaded at pinned commits by `scripts/fetch_tree_sitter.ps1` and compiled into the program | MIT |
 | [OpenSSL 1.1.1](https://www.openssl.org) | HTTPS for web search and remote model servers; the Windows package ships `libssl-1_1-x64.dll` and `libcrypto-1_1-x64.dll` | OpenSSL and SSLeay licenses |
 | MinGW-w64 runtime (`libgcc`, `libstdc++`, `libwinpthread`) | C/C++ runtime of the Windows build | GPL v3 with the GCC Runtime Library Exception; MIT/ZPL for winpthreads |

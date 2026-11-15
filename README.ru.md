@@ -78,23 +78,30 @@ flowchart LR
 git clone https://github.com/TonyLex98/DevAssistant.git
 cd DevAssistant
 powershell -ExecutionPolicy Bypass -File scripts/fetch_tree_sitter.ps1
-qmake DevAssistantQt.pro CONFIG+=release
-mingw32-make -j4
-```
-
-`fetch_tree_sitter.ps1` скачивает tree-sitter и грамматики C++, Python и Dart на
-закреплённых коммитах. Архив для Windows: `scripts/deploy_windows.ps1 -Zip DevAssistant.zip`.
-
-Тесты (QtTest, 9 наборов: песочница путей, разбор и политика команд, файловые команды,
-пакеты изменений с отменой, правки с сохранением переводов строк, данные промптов,
-индексатор кода):
-
-```powershell
-mkdir build-tests; cd build-tests
-qmake ../tests/tests.pro CONFIG+=release
+mkdir build; cd build
+qmake ../DevAssistant.pro CONFIG+=release
 mingw32-make -j4
 mingw32-make check
 ```
+
+Собираются библиотека ядра, программа (`build/bin/DevAssistantQt.exe`) и тесты, затем
+тесты запускаются. `fetch_tree_sitter.ps1` скачивает tree-sitter и грамматики C++, Python и
+Dart на закреплённых коммитах. Архив для Windows:
+`scripts/deploy_windows.ps1 -ExePath build/bin/DevAssistantQt.exe -Zip DevAssistant.zip`.
+
+Тесты (QtTest, 12 наборов): движок агента целиком — со сценарной моделью на временном
+проекте, клиент модели — против поддельного HTTP-сервера, состояние сессии, песочница путей,
+разбор и политика команд, файловые команды, пакеты изменений с отменой, правки с сохранением
+переводов строк, данные промптов, индексатор кода.
+
+## Устройство
+
+- `src/core` — вся логика ассистента, статическая библиотека без QtWidgets: состояние
+  сессии, асинхронный клиент модели, движок агента, команды, контекст, проект, индекс кода,
+  поиск по документам. Подключить виджет сюда нельзя — сборка упадёт.
+- `src/ui` — главное окно, чат, диалоги, редактор, графы. Окно только собирает виджеты и
+  связывает их с сессией и движком.
+- `src/app` — `main()`; `src/audio` — распознавание и синтез речи; `third_party` — сторонний код.
 
 CI (GitHub Actions) собирает программу, гоняет тесты, обновляет русский перевод, упаковывает
 архив, запускает программу без экрана, чтобы снять скриншоты выше, и публикует релизы.
