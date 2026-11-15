@@ -109,7 +109,6 @@ SOURCES += \
     src/ui/ChangesDialog.cpp \
     src/ui/LightRagClient.cpp \
     src/ui/LightRagWidget.cpp \
-    src/ui/OllamaClient.cpp \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
     src/ui/RunSequenceDialog.cpp \
@@ -253,7 +252,6 @@ HEADERS += \
     src/ui/ChangesDialog.h \
     src/ui/LightRagClient.h \
     src/ui/LightRagWidget.h \
-    src/ui/OllamaClient.h \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
     src/ui/RunSequenceDialog.h \

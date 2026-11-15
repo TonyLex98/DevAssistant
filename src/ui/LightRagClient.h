@@ -1,49 +1,58 @@
 #pragma once
 
-#include <QObject>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QUrl>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
-#include <QTimer>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QObject>
+#include <QStringList>
+#include <QUrl>
 
+#include <functional>
+
+class QNetworkReply;
+class QUrlQuery;
+
+// Client for a LightRAG server (github.com/HKUDS/LightRAG, `lightrag-server`, port 9621 by
+// default). The server has its own LLM and embedding model; this client uploads documents,
+// asks questions in one of LightRAG's retrieval modes and reads the knowledge graph.
+//
+// All calls are asynchronous; each result or error arrives as a signal.
 class LightRagClient : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit LightRagClient(QObject *parent = nullptr);
-    ~LightRagClient();
+    explicit LightRagClient(QObject* parent = nullptr);
 
-    void setSettings(const QString &host, const QString &embeddingModel, 
-                     const QString &llmModel, const QString &indexPath);
+    // Server address, e.g. http://localhost:9621, and the optional API key
+    // (LIGHTRAG_API_KEY on the server, sent as X-API-Key).
+    void setServer(const QUrl& baseUrl, const QString& apiKey = QString());
+    QUrl server() const { return m_base; }
 
-    void indexFile(const QString &filePath);
-    void chatQuery(const QString &query, const QString &model = QString());
-    void getGraphData();
+    void checkHealth();                                   // GET  /health
+    void uploadFile(const QString& filePath);             // POST /documents/upload
+    void listDocuments();                                 // GET  /documents
+    void query(const QString& question, const QString& mode); // POST /query
+    void listGraphLabels();                               // GET  /graph/label/list
+    void loadGraph(const QString& label, int maxDepth = 2, int maxNodes = 300); // GET /graphs
 
 signals:
-    void chatResponse(const QString &response);
-    void chatStreamResponse(const QString &response);  // For streaming responses
-    void chatError(const QString &error);
-    void graphDataReceived(const QJsonObject &graphData);
-    void indexProgress(const QString &filePath, int progress);
-    void indexComplete(const QString &filePath, bool success, const QString &message);
-
-private slots:
-    void onNetworkReplyFinished(QNetworkReply *reply);
+    void healthChecked(bool ok, const QString& details);
+    void fileUploaded(const QString& filePath, bool ok, const QString& message);
+    void documentsListed(const QJsonArray& documents);   // one object per document: id, file_path, status, ...
+    void answered(const QString& answer);
+    void graphLabelsListed(const QStringList& labels);
+    void graphLoaded(const QJsonArray& nodes, const QJsonArray& edges);
+    void failed(const QString& what, const QString& error);
 
 private:
-    QNetworkAccessManager *m_networkManager;
-    QString m_host;
-    QString m_embeddingModel;
-    QString m_llmModel;
-    QString m_indexPath;
-    QHash<QNetworkReply*, QString> m_pendingRequests; // Track which file each request is for
-    QString m_currentQuery; // Keep track of current query for streaming responses
+    QNetworkRequest request(const QString& path, const QUrlQuery* query = nullptr) const;
+    // Calls `onSuccess` with the JSON body, or emits failed(what, reason).
+    void handle(QNetworkReply* reply, const QString& what, std::function<void(const QJsonDocument&)> onSuccess);
 
-    void sendRequest(const QString &endpoint, const QJsonObject &payload, const QString &filePath = QString());
+    QNetworkAccessManager m_nam;
+    QUrl m_base = QUrl(QStringLiteral("http://localhost:9621"));
+    QString m_apiKey;
 };

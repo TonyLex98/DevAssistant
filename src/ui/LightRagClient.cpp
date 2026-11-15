@@ -1,240 +1,167 @@
 #include "LightRagClient.h"
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QEventLoop>
-#include <QTimer>
+
+#include <QFile>
 #include <QFileInfo>
-#include <QDir>
-#include <QDebug>
+#include <QHttpMultiPart>
+#include <QJsonDocument>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrlQuery>
 
-LightRagClient::LightRagClient(QObject *parent)
+LightRagClient::LightRagClient(QObject* parent)
     : QObject(parent)
-    , m_networkManager(new QNetworkAccessManager(this))
 {
-    connect(m_networkManager, &QNetworkAccessManager::finished, 
-            this, &LightRagClient::onNetworkReplyFinished);
+    m_nam.setTransferTimeout(300000);
 }
 
-LightRagClient::~LightRagClient()
+void LightRagClient::setServer(const QUrl& baseUrl, const QString& apiKey)
 {
+    m_base = baseUrl;
+    m_apiKey = apiKey.trimmed();
 }
 
-void LightRagClient::setSettings(const QString &host, const QString &embeddingModel, 
-                                 const QString &llmModel, const QString &indexPath)
+QNetworkRequest LightRagClient::request(const QString& path, const QUrlQuery* query) const
 {
-    m_host = host;
-    m_embeddingModel = embeddingModel;
-    m_llmModel = llmModel;
-    m_indexPath = indexPath;
+    QUrl url = m_base;
+    QString base = url.path();
+    while (base.endsWith(QLatin1Char('/')))
+        base.chop(1);
+    url.setPath(base + path);
+    if (query)
+        url.setQuery(*query);
+    QNetworkRequest req(url);
+    if (!m_apiKey.isEmpty())
+        req.setRawHeader("X-API-Key", m_apiKey.toUtf8());
+    return req;
 }
 
-void LightRagClient::indexFile(const QString &filePath)
+void LightRagClient::handle(QNetworkReply* reply, const QString& what,
+                            std::function<void(const QJsonDocument&)> onSuccess)
 {
-    QJsonObject payload;
-    payload["file_path"] = filePath;
-    payload["embedding_model"] = m_embeddingModel;
-    payload["llm_model"] = m_llmModel;
-
-    if (!m_indexPath.isEmpty()) {
-        payload["index_path"] = m_indexPath;
-    }
-
-    // Use the correct LightRAG API endpoint for indexing
-    sendRequest("/v1/index", payload, filePath);
-}
-
-void LightRagClient::chatQuery(const QString &query, const QString &model)
-{
-    QJsonObject payload;
-    payload["query"] = query;
-    payload["model"] = model.isEmpty() ? m_llmModel : model;
-
-    if (!m_indexPath.isEmpty()) {
-        payload["index_path"] = m_indexPath;
-    }
-
-    // Try to enable streaming if supported by the API
-    payload["stream"] = true;
-
-    m_currentQuery = query;
-    // Use the correct LightRAG API endpoint for chat
-    sendRequest("/v1/chat/completions", payload);
-}
-
-void LightRagClient::sendRequest(const QString &endpoint, const QJsonObject &payload, const QString &filePath)
-{
-    // Use the correct LightRAG server address
-    QString baseUrl = "http://localhost:9621"; // Correct LightRAG server address
-    QUrl url(baseUrl + endpoint);
-    if (!url.isValid()) {
-        emit chatError("Invalid URL: " + url.toString());
-        return;
-    }
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QNetworkReply *reply = m_networkManager->post(request, QJsonDocument(payload).toJson());
-
-    // Store the file path for this request if provided
-    if (!filePath.isEmpty()) {
-        m_pendingRequests[reply] = filePath;
-    }
-
-    // Connect to handle errors specifically for this request
-    connect(reply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error),
-            [reply, this]() {
-                if (m_pendingRequests.contains(reply)) {
-                    QString filePath = m_pendingRequests.take(reply);
-                    emit indexComplete(filePath, false, "Network error: " + reply->errorString());
-                } else {
-                    emit chatError("Network error: " + reply->errorString());
-                }
-            });
-}
-
-void LightRagClient::getGraphData()
-{
-    QJsonObject payload;
-    if (!m_indexPath.isEmpty()) {
-        payload["index_path"] = m_indexPath;
-    }
-
-    // Use the correct LightRAG API endpoint for getting graph data
-    sendRequest("/v1/graph", payload);
-}
-
-void LightRagClient::onNetworkReplyFinished(QNetworkReply *reply)
-{
-    // Remove from pending requests
-    QString filePath = m_pendingRequests.take(reply);
-
-    // Check for network errors
-    if (reply->error() != QNetworkReply::NoError) {
-        QString error = QString("Network error: %1").arg(reply->errorString());
-        if (!filePath.isEmpty()) {
-            emit indexComplete(filePath, false, error);
-        } else {
-            emit chatError(error);
-        }
+    connect(reply, &QNetworkReply::finished, this, [this, reply, what, onSuccess]() {
         reply->deleteLater();
+        const QByteArray body = reply->readAll();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() != QNetworkReply::NoError || status >= 400) {
+            // FastAPI puts the reason into {"detail": ...}.
+            const QJsonValue detail = QJsonDocument::fromJson(body).object().value(QStringLiteral("detail"));
+            QString reason = detail.isString() ? detail.toString()
+                                               : QString::fromUtf8(QJsonDocument(detail.toArray()).toJson(QJsonDocument::Compact));
+            if (reason.isEmpty() || reason == QLatin1String("[]"))
+                reason = reply->errorString();
+            if (status == 401 || status == 403)
+                reason = tr("The server needs an API key (%1).").arg(reason);
+            emit failed(what, reason);
+            return;
+        }
+        onSuccess(QJsonDocument::fromJson(body));
+    });
+}
+
+void LightRagClient::checkHealth()
+{
+    QNetworkReply* reply = m_nam.get(request(QStringLiteral("/health")));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit healthChecked(false, reply->errorString());
+            return;
+        }
+        const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+        const QJsonObject cfg = o.value(QStringLiteral("configuration")).toObject();
+        QStringList details;
+        for (const QString& key : {QStringLiteral("llm_model"), QStringLiteral("embedding_model"),
+                                   QStringLiteral("working_directory")}) {
+            const QString v = cfg.value(key).toString();
+            if (!v.isEmpty())
+                details << QStringLiteral("%1: %2").arg(key, v);
+        }
+        emit healthChecked(true, details.join(QStringLiteral(", ")));
+    });
+}
+
+void LightRagClient::uploadFile(const QString& filePath)
+{
+    auto* file = new QFile(filePath);
+    if (!file->open(QIODevice::ReadOnly)) {
+        emit fileUploaded(filePath, false, tr("Cannot open the file."));
+        delete file;
         return;
     }
+    auto* multi = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+    QHttpPart part;
+    part.setHeader(QNetworkRequest::ContentDispositionHeader,
+                   QStringLiteral("form-data; name=\"file\"; filename=\"%1\"").arg(QFileInfo(filePath).fileName()));
+    part.setBodyDevice(file);
+    file->setParent(multi);
+    multi->append(part);
 
-    // Read the response
-    QByteArray responseData = reply->readAll();
-
-    // Check if this is an index request (has file path)
-    if (!filePath.isEmpty()) {
-        // This is an index response
-        QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
-
-        bool success = false;
-        QString message;
-
-        if (parseError.error == QJsonParseError::NoError) {
-            if (doc.isObject()) {
-                QJsonObject obj = doc.object();
-                success = obj.value("success").toBool(false);
-                message = obj.value("message").toString("Operation completed");
-            }
-        } else {
-            success = false;
-            message = QString("JSON parse error: %1").arg(parseError.errorString());
+    QNetworkReply* reply = m_nam.post(request(QStringLiteral("/documents/upload")), multi);
+    multi->setParent(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, filePath]() {
+        reply->deleteLater();
+        const QJsonObject o = QJsonDocument::fromJson(reply->readAll()).object();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() != QNetworkReply::NoError || status >= 400) {
+            const QString detail = o.value(QStringLiteral("detail")).toString();
+            emit fileUploaded(filePath, false, detail.isEmpty() ? reply->errorString() : detail);
+            return;
         }
+        // {"status": "success" | "duplicated" | ..., "message": "..."}
+        const QString state = o.value(QStringLiteral("status")).toString();
+        emit fileUploaded(filePath, state != QLatin1String("failure"), o.value(QStringLiteral("message")).toString());
+    });
+}
 
-        emit indexComplete(filePath, success, message);
-    } else if (reply->url().toString().contains("/v1/graph")) {
-        // This is a graph response
-        QJsonParseError parseError;
-        QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
-
-        if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-            emit graphDataReceived(doc.object());
-        } else {
-            emit chatError(QString("Graph data parse error: %1").arg(parseError.errorString()));
-        }
-    } else {
-        // This is a chat response
-        // Check if it's a streaming response (multiple JSON objects separated by newlines)
-        QString responseText = QString::fromUtf8(responseData);
-
-        // Check if response looks like streaming response (multiple JSON lines)
-        if (responseText.contains('\n')) {
-            QStringList lines = responseText.split('\n', QString::SkipEmptyParts);
-            QString fullResponse;
-
-            for (const QString &line : lines) {
-                QString trimmedLine = line.trimmed();
-                if (!trimmedLine.isEmpty()) {
-                    QJsonParseError parseError;
-                    QJsonDocument doc = QJsonDocument::fromJson(trimmedLine.toUtf8(), &parseError);
-
-                    if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-                        QJsonObject obj = doc.object();
-                        QString partialResponse = obj.value("response").toString();
-                        if (!partialResponse.isEmpty()) {
-                            fullResponse += partialResponse;
-                            emit chatStreamResponse(partialResponse);
-                        }
-                    }
-                }
-            }
-
-            if (!fullResponse.isEmpty()) {
-                emit chatResponse(fullResponse);
-            }
-        } else {
-            // Regular single JSON response
-            QJsonParseError parseError;
-            QJsonDocument doc = QJsonDocument::fromJson(responseData, &parseError);
-
-            if (parseError.error == QJsonParseError::NoError) {
-                if (doc.isObject()) {
-                    QJsonObject obj = doc.object();
-
-                    // For OpenAI-compatible API (like v1/chat/completions), the response format is different
-                    // Check if it's an OpenAI-style response
-                    if (obj.contains("choices")) {
-                        QJsonArray choices = obj.value("choices").toArray();
-                        if (choices.size() > 0) {
-                            QJsonObject choice = choices[0].toObject();
-                            QJsonObject message = choice.value("message").toObject();
-                            QString response = message.value("content").toString();
-                            emit chatResponse(response);
-                        }
-                    } else {
-                        // Fallback to previous format
-                        QString response = obj.value("response").toString();
-                        emit chatResponse(response);
-                    }
-                } else if (doc.isArray()) {
-                    // Handle array response if needed
-                    QJsonArray arr = doc.array();
-                    QString response;
-                    for (const QJsonValue &val : arr) {
-                        if (val.isObject()) {
-                            QJsonObject obj = val.toObject();
-                            if (obj.contains("choices")) {
-                                QJsonArray choices = obj.value("choices").toArray();
-                                if (choices.size() > 0) {
-                                    QJsonObject choice = choices[0].toObject();
-                                    QJsonObject message = choice.value("message").toObject();
-                                    response += message.value("content").toString() + " ";
-                                }
-                            } else {
-                                response += obj.value("response").toString() + " ";
-                            }
-                        }
-                    }
-                    emit chatResponse(response.trimmed());
-                }
-            } else {
-                emit chatError(QString("JSON parse error: %1").arg(parseError.errorString()));
+void LightRagClient::listDocuments()
+{
+    handle(m_nam.get(request(QStringLiteral("/documents"))), tr("List documents"), [this](const QJsonDocument& d) {
+        // {"statuses": {"processed": [...], "pending": [...], "failed": [...], ...}}
+        QJsonArray all;
+        const QJsonObject statuses = d.object().value(QStringLiteral("statuses")).toObject();
+        for (auto it = statuses.constBegin(); it != statuses.constEnd(); ++it) {
+            for (const QJsonValue& v : it.value().toArray()) {
+                QJsonObject doc = v.toObject();
+                if (!doc.contains(QStringLiteral("status")))
+                    doc.insert(QStringLiteral("status"), it.key());
+                all.append(doc);
             }
         }
-    }
+        emit documentsListed(all);
+    });
+}
 
-    reply->deleteLater();
+void LightRagClient::query(const QString& question, const QString& mode)
+{
+    QNetworkRequest req = request(QStringLiteral("/query"));
+    req.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    QJsonObject body;
+    body.insert(QStringLiteral("query"), question);
+    body.insert(QStringLiteral("mode"), mode);
+    handle(m_nam.post(req, QJsonDocument(body).toJson(QJsonDocument::Compact)), tr("Query"),
+           [this](const QJsonDocument& d) {
+        emit answered(d.object().value(QStringLiteral("response")).toString());
+    });
+}
+
+void LightRagClient::listGraphLabels()
+{
+    handle(m_nam.get(request(QStringLiteral("/graph/label/list"))), tr("Graph labels"), [this](const QJsonDocument& d) {
+        QStringList labels;
+        for (const QJsonValue& v : d.array())
+            labels << v.toString();
+        emit graphLabelsListed(labels);
+    });
+}
+
+void LightRagClient::loadGraph(const QString& label, int maxDepth, int maxNodes)
+{
+    QUrlQuery q;
+    q.addQueryItem(QStringLiteral("label"), label);
+    q.addQueryItem(QStringLiteral("max_depth"), QString::number(maxDepth));
+    q.addQueryItem(QStringLiteral("max_nodes"), QString::number(maxNodes));
+    handle(m_nam.get(request(QStringLiteral("/graphs"), &q)), tr("Graph"), [this](const QJsonDocument& d) {
+        const QJsonObject o = d.object();
+        emit graphLoaded(o.value(QStringLiteral("nodes")).toArray(), o.value(QStringLiteral("edges")).toArray());
+    });
 }
