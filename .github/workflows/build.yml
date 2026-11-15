@@ -66,11 +66,14 @@ jobs:
           mingw32-make -k -j4
           exit $LASTEXITCODE
 
+      # Without a console, Qt Test on Windows writes its results to OutputDebugString;
+      # QT_FORCE_STDERR_LOGGING puts them on stdout. A test that prints no totals fails.
       - name: Run tests
         if: ${{ !cancelled() }}
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
+          QT_FORCE_STDERR_LOGGING: '1'
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $failed = @()
@@ -83,8 +86,10 @@ jobs:
               continue
             }
             Write-Host "===== $name"
-            & $exe.FullName
-            if ($LASTEXITCODE -ne 0) { $failed += $name }
+            $out = & $exe.FullName
+            $code = $LASTEXITCODE
+            $out | ForEach-Object { Write-Host $_ }
+            if ($code -ne 0 -or -not ($out -match '^Totals:')) { $failed += $name }
           }
           if ($failed.Count -gt 0) {
             Write-Host "::error::Failed: $($failed -join ', ')"
