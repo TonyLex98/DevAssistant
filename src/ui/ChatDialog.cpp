@@ -190,13 +190,21 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
 
 void ChatDialog::ensureSpeechRecognizer()
 {
-    if (m_whisperRunner)
+    const SpeechRecognizer::Engine engine = SpeechRecognizer::configuredEngine();
+    if (m_recognizer && m_recognizerEngine == int(engine))
         return;
-    m_whisperRunner = new FasterWhisperRunner(this);
-    connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
-    connect(m_whisperRunner, &FasterWhisperRunner::errorOccurred, this, &ChatDialog::onAsrError);
-    connect(m_whisperRunner, &FasterWhisperRunner::silenceDetected, this, &ChatDialog::onSilenceDetected);
-    connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg) {
+    // The engine was changed in Settings: replace the recognizer (only when not recording).
+    if (m_recognizer) {
+        if (m_recognizer->isRecording())
+            return;
+        m_recognizer->deleteLater();
+    }
+    m_recognizer = SpeechRecognizer::create(engine, this);
+    m_recognizerEngine = int(engine);
+    connect(m_recognizer, &SpeechRecognizer::recognitionFinished, this, &ChatDialog::onAsrFinished);
+    connect(m_recognizer, &SpeechRecognizer::errorOccurred, this, &ChatDialog::onAsrError);
+    connect(m_recognizer, &SpeechRecognizer::silenceDetected, this, &ChatDialog::onSilenceDetected);
+    connect(m_recognizer, &SpeechRecognizer::statusMessage, this, [this](const QString& msg) {
         if (m_chat) {
             m_chat->setVisible(true);
             m_chat->append("<i>" + msg.toHtmlEscaped() + "</i>");
@@ -493,7 +501,7 @@ QString ChatDialog::buildAugmentedTextWithImages(const QString& text, const QVec
 void ChatDialog::onMicClicked() {
     ensureSpeechRecognizer();
     if (m_isRecording) {
-        m_whisperRunner->stopRecording();
+        m_recognizer->stopRecording();
         
         // Switch to "not recording" state - blue microphone
         m_micBtn->setText("🎤");
@@ -519,7 +527,7 @@ void ChatDialog::onMicClicked() {
         }
     } else {
         // Use Faster Whisper by default for streaming experience
-        m_whisperRunner->startRecording();
+        m_recognizer->startRecording();
         
         // Switch to "recording" state - red crossed microphone
         m_micBtn->setText("🎙️");

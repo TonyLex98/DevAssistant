@@ -119,7 +119,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_graphWindow = ui.m_graphWindow; m_seqGraphWindow = ui.m_seqGraphWindow;
     browseBtn = ui.browseBtn; m_files = ui.m_files;
     m_log = ui.m_log; m_chat = ui.m_chat; m_resultDisplayWidget = ui.m_resultDisplayWidget;
-    m_voskWidget = ui.m_voskWidget;
     m_contextStatusWidget = ui.m_contextStatusWidget; m_contextCommandsList = ui.m_contextCommandsList;
     m_contextGraphWidget = ui.m_contextGraphWidget; m_contextTabs = ui.m_contextTabs;
     m_settingsPanel = ui.m_settingsPanel;
@@ -162,7 +161,6 @@ MainWindow::MainWindow(QWidget *parent)
         bool v = !m_log->isVisible(); m_log->setVisible(v);
         logToggleBtn->setText(v ? tr("Hide log") : tr("Show log"));
     });
-    connect(m_voskWidget, &VoskWidget::voiceRecognized, this, &MainWindow::onVoskText);
     connect(runTemplateBtn, &StyledButton::clicked, this, [this]() {
         refreshAllSequences(); ensureDefaultSequence();
         RunTemplateOrSequenceDialog dlg(m_seqMgr.sequences(), &m_templateMgr, this);
@@ -1287,11 +1285,6 @@ void MainWindow::generateDescriptions()
 void MainWindow::log(const QString& m){ m_log->append(m); }
 
 // <‑‑ Добавлен новый слот для обработки текста от Vosk
-void MainWindow::onVoskText(const QString& text){
-    log("Vosk recognized: " + text);
-    sendUserMessage(text);
-}
-
 void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
 {
     if (lastUserMessage.trimmed().isEmpty())
@@ -2108,19 +2101,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 
 
-void MainWindow::onOmniAsrText(const QString& text)
-{
-    if (text.isEmpty()) return;
-    log("OmniASR Recognized: " + text);
-    if (m_chat) {
-        m_chat->setInputText(text);
-        // Ensure chat is visible if needed, or just notify user
-        if (!m_chat->isVisible()) {
-             // Maybe show a toast or status message
-             statusBar()->showMessage("ASR Text: " + text, 5000);
-        }
-    }
-}
 void MainWindow::updateChatToggleButton(bool visible)
 {
     if (chatToggleBtn) {

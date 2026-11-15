@@ -120,27 +120,14 @@ int main(int argc, char** argv)
 
     QApplication app(argc, argv);
 
-    // Load global stylesheet from .qss file
+    // The stylesheet is compiled into the program (src/resources/resources.qrc). A styles.qss
+    // next to the executable overrides it, for trying out a theme without rebuilding.
     {
-        QString stylePath = QCoreApplication::applicationDirPath() + "/../src/resources/styles.qss";
-        QFile styleFile(stylePath);
-        if (!styleFile.exists()) {
-            // Fallback: try relative to executable
-            stylePath = QDir(QCoreApplication::applicationDirPath()).filePath("styles.qss");
-            styleFile.setFileName(stylePath);
-        }
-        if (styleFile.exists() && styleFile.open(QFile::ReadOnly | QFile::Text)) {
+        QFile styleFile(QDir(QCoreApplication::applicationDirPath()).filePath("styles.qss"));
+        if (!styleFile.exists())
+            styleFile.setFileName(QStringLiteral(":/styles.qss"));
+        if (styleFile.open(QFile::ReadOnly | QFile::Text))
             app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
-            styleFile.close();
-        } else {
-            // Hardcoded fallback if file not found
-            app.setStyleSheet(
-                "QMainWindow, QDialog, QWidget { background: #f2fbf9; color: #0f172a; font: 10pt \"Segoe UI Variable\"; }"
-                "QLabel { color: #0f172a; }"
-                "QListWidget, QTreeWidget, QTreeView, QTableView, QPlainTextEdit, QTextEdit, QTextBrowser, QGraphicsView {"
-                "  background: #ffffff; border: 1px solid #bfeee6; border-radius: 6px; }"
-            );
-        }
     }
 
     qRegisterMetaType<QList<int>>();
@@ -150,14 +137,3 @@ int main(int argc, char** argv)
     return app.exec();
 }
 
-
-/*
-int main(int argc, char *argv[]) {
-    QApplication app(argc, argv);
-
-    VoskWidget w;
-    w.show();
-
-    return app.exec();
-}
-*/

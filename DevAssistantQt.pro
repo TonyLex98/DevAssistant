@@ -28,18 +28,15 @@ INCLUDEPATH += \
 
 
 SOURCES += \
-    src/audio/MicStreamWidget.cpp \
     src/audio/MicTranscriber.cpp \
-    src/audio/StreamRunner.cpp \
     src/audio/VoskDyn.cpp \
     src/audio/VoskRunner.cpp \
-    src/audio/VoskWidget.cpp \
     src/audio/WavWriter.cpp \
     src/audio/OmniAsrRunner.cpp \
-    src/audio/OmniAsrWidget.cpp \
     src/audio/FasterWhisperRunner.cpp \
     src/audio/TtsRunner.cpp \
     src/audio/PythonScripts.cpp \
+    src/audio/SpeechRecognizer.cpp \
     src/core/ContextManager.cpp \
     src/core/ContextChainResolver.cpp \
     src/codeviewer/CodePatcher.cpp \
@@ -160,18 +157,15 @@ SOURCES += \
     src/md4c/src/md4c-html.c
 
 HEADERS += \
-    src/audio/MicStreamWidget.h \
     src/audio/MicTranscriber.h \
-    src/audio/StreamRunner.h \
     src/audio/VoskDyn.h \
     src/audio/VoskRunner.h \
-    src/audio/VoskWidget.h \
     src/audio/WavWriter.h \
     src/audio/OmniAsrRunner.h \
-    src/audio/OmniAsrWidget.h \
     src/audio/FasterWhisperRunner.h \
     src/audio/TtsRunner.h \
     src/audio/PythonScripts.h \
+    src/audio/SpeechRecognizer.h \
     src/core/ContextManager.h \
     src/core/ContextChainResolver.h \
     src/codeviewer/CodePatcher.h \
@@ -343,3 +337,5 @@ FORMS += \
 
 HEADERS += $$PWD/src/utils/Logging.h
 SOURCES += $$PWD/src/utils/Logging.cpp
+
+RESOURCES += src/resources/resources.qrc

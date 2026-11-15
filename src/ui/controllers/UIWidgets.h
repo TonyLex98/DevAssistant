@@ -19,7 +19,6 @@ class ChatDialog;
 class GraphWidget;
 class SequenceGraphWidget;
 class ResultDisplayWidget;
-class VoskWidget;
 class ContextGraphWidget;
 class OllamaSettingsDialog;
 
@@ -46,7 +45,6 @@ struct UIWidgets {
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
 
     // Vosk
-    VoskWidget* m_voskWidget = nullptr;
 
     // Context status
     QWidget* m_contextStatusWidget = nullptr;

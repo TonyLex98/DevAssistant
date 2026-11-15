@@ -1,5 +1,7 @@
 #include "OmniAsrRunner.h"
+#include "PythonScripts.h"
 #include <QTemporaryFile>
+#include <QTimer>
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
@@ -20,8 +22,8 @@ OmniAsrRunner::OmniAsrRunner(QObject* parent) : QObject(parent), m_audioInput(nu
 
     m_process = new QProcess(this);
     connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &OmniAsrRunner::onProcessFinished);
-
-    checkAndInstallDependencies();
+    // After the owner has connected to our signals.
+    QTimer::singleShot(0, this, &OmniAsrRunner::checkAndInstallDependencies);
 }
 
 OmniAsrRunner::~OmniAsrRunner() {
@@ -60,24 +62,16 @@ void OmniAsrRunner::stopRecording() {
 
     // Run process
     // Try to find the script
-    QString scriptPath = QCoreApplication::applicationDirPath() + "/scripts/run_omni_asr.py";
-    
-    // Check if we are in debug/release subdir
-    if (!QFile::exists(scriptPath)) {
-         scriptPath = QCoreApplication::applicationDirPath() + "/../scripts/run_omni_asr.py";
-    }
-    // Check source dir (hardcoded fallback)
-    if (!QFile::exists(scriptPath)) {
-        scriptPath = "c:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/scripts/run_omni_asr.py";
+    const QString scriptPath = PythonScripts::findScript(QStringLiteral("run_omni_asr.py"));
+    if (scriptPath.isEmpty()) {
+        emit errorOccurred(tr("Omni ASR: scripts/run_omni_asr.py was not found next to the program."));
+        return;
     }
 
     QStringList args;
     args << scriptPath << m_tempFilePath;
-
-    // Assuming 'python' is in PATH. If not, user might need to configure it.
-    // We could use a setting for python path.
-    qCDebug(logAudio) << "Starting ASR process: python" << args;
-    m_process->start("python", args);
+    qCDebug(logAudio) << "Starting ASR process:" << PythonScripts::pythonProgram() << args;
+    m_process->start(PythonScripts::pythonProgram(), args);
 }
 
 void OmniAsrRunner::onAudioReady() {
@@ -105,36 +99,21 @@ void OmniAsrRunner::onProcessFinished(int exitCode, QProcess::ExitStatus exitSta
 }
 
 void OmniAsrRunner::checkAndInstallDependencies() {
-    // Check if torchaudio is installed
-    QProcess checkProcess;
-    checkProcess.start("python", QStringList() << "-c" << "import torchaudio; print('ok')");
-    checkProcess.waitForFinished();
-    
-    if (checkProcess.exitCode() != 0) {
-        qCDebug(logAudio) << "Dependencies missing. Installing...";
-        // Install dependencies
-        QProcess installProcess;
-        // Use pip to install requirements
-        // We assume requirements.txt is in scripts folder
-        QString scriptPath = QCoreApplication::applicationDirPath() + "/scripts/requirements.txt";
-        if (!QFile::exists(scriptPath)) {
-             scriptPath = QCoreApplication::applicationDirPath() + "/../scripts/requirements.txt";
+    // Only checks. Installing torch and transformers takes gigabytes and minutes, so it is
+    // left to the user instead of being started silently from the UI.
+    PythonScripts::checkPython(this, [this](bool ok, const QString& error) {
+        if (!ok) {
+            emit errorOccurred(tr("Omni ASR: %1").arg(error));
+            return;
         }
-        if (!QFile::exists(scriptPath)) {
-            scriptPath = "c:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/scripts/requirements.txt";
-        }
-
-        QStringList args;
-        args << "-m" << "pip" << "install" << "torch" << "torchaudio" << "transformers" << "soundfile" << "pyctcdecode" << "faster-whisper";
-        // args << "-r" << scriptPath; // Fallback to direct list if file not found logic is complex, but direct list is safer for now.
-        
-        installProcess.start("python", args);
-        installProcess.waitForFinished(-1); // Wait indefinitely
-        
-        if (installProcess.exitCode() == 0) {
-            qCDebug(logAudio) << "Dependencies installed successfully.";
-        } else {
-            qCDebug(logAudio) << "Failed to install dependencies: " << installProcess.readAllStandardError();
-        }
-    }
+        auto* check = new QProcess(this);
+        connect(check, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+                [this, check](int code, QProcess::ExitStatus status) {
+            check->deleteLater();
+            if (status != QProcess::NormalExit || code != 0)
+                emit errorOccurred(tr("Omni ASR needs Python packages: pip install torch torchaudio transformers soundfile"));
+        });
+        check->start(PythonScripts::pythonProgram(),
+                     {QStringLiteral("-c"), QStringLiteral("import torch, torchaudio, transformers, soundfile")});
+    });
 }

@@ -19,7 +19,12 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QCheckBox>
+#include <QComboBox>
+#include <QFormLayout>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QSettings>
+#include "../../audio/SpeechRecognizer.h"
 #include "MemoryLineEdit.h"
 #include "StyledButton.h"
 #include "MemoryComboBox.h"
@@ -31,7 +36,6 @@
 #include "SequenceGraphWidget.h"
 #include "ContextGraphWidget.h"
 #include "ResultDisplayWidget.h"
-#include "VoskWidget.h"
 #include "OllamaSettingsDialog.h"
 #include "PromptEditorDialog.h"
 #include "SolutionTemplateViewer.h"
@@ -88,9 +92,6 @@ void UiBuilder::build(UIWidgets& ui,
 
     // Result display widget
     ui.m_resultDisplayWidget = new ResultDisplayWidget(parent);
-
-    // Vosk widget
-    ui.m_voskWidget = new VoskWidget(parent);
 
     // Context status widget
     ui.m_contextStatusWidget = new QWidget(parent);
@@ -314,7 +315,57 @@ void UiBuilder::buildAudioPage(std::function<QString(const char*)> tr_fn,
 {
     auto* audioLay = pageLay(page);
 
-    addSection(tr_fn("Синтез речи (TTS)"), audioLay);
+    addSection(tr_fn("Voice input"), audioLay);
+    auto* form = new QFormLayout;
+
+    auto* engine = new QComboBox(page);
+    for (SpeechRecognizer::Engine e : {SpeechRecognizer::Engine::FasterWhisper, SpeechRecognizer::Engine::Vosk,
+                                       SpeechRecognizer::Engine::WhisperCpp, SpeechRecognizer::Engine::OmniAsr})
+        engine->addItem(SpeechRecognizer::engineTitle(e), SpeechRecognizer::engineKey(e));
+    engine->setCurrentIndex(qMax(0, engine->findData(SpeechRecognizer::engineKey(SpeechRecognizer::configuredEngine()))));
+    QObject::connect(engine, QOverload<int>::of(&QComboBox::currentIndexChanged), [engine](int) {
+        QSettings().setValue("speech/engine", engine->currentData().toString());
+    });
+    form->addRow(tr_fn("Engine"), engine);
+
+    // A path setting with a "..." button; `folder` picks a directory instead of a file.
+    const auto pathRow = [page, form](const QString& label, const QString& key, bool folder, const QString& hint) {
+        auto* row = new QHBoxLayout;
+        auto* edit = new QLineEdit(QSettings().value(key).toString(), page);
+        edit->setPlaceholderText(hint);
+        auto* browse = new QPushButton(QStringLiteral("..."), page);
+        browse->setFixedWidth(32);
+        row->addWidget(edit, 1);
+        row->addWidget(browse);
+        QObject::connect(edit, &QLineEdit::editingFinished, [edit, key]() {
+            QSettings().setValue(key, edit->text().trimmed());
+        });
+        QObject::connect(browse, &QPushButton::clicked, [page, edit, key, folder, label]() {
+            const QString picked = folder ? QFileDialog::getExistingDirectory(page, label, edit->text())
+                                          : QFileDialog::getOpenFileName(page, label, edit->text());
+            if (!picked.isEmpty()) {
+                edit->setText(QDir::toNativeSeparators(picked));
+                QSettings().setValue(key, edit->text());
+            }
+        });
+        form->addRow(label, row);
+    };
+    pathRow(tr_fn("Vosk library"), "speech/voskDll", false, tr_fn("libvosk.dll"));
+    pathRow(tr_fn("Vosk model"), "speech/voskModel", true, tr_fn("folder, e.g. vosk-model-small-ru-0.22"));
+    pathRow(tr_fn("whisper.cpp program"), "speech/whisperExe", false, tr_fn("whisper-cli.exe"));
+    pathRow(tr_fn("whisper.cpp model"), "speech/whisperModel", false, tr_fn("ggml-small.bin"));
+    pathRow(tr_fn("Python"), "speech/python", false, tr_fn("python from PATH"));
+
+    auto* language = new QLineEdit(QSettings().value("speech/language").toString(), page);
+    language->setPlaceholderText(tr_fn("detect automatically, or a code such as ru, en"));
+    QObject::connect(language, &QLineEdit::editingFinished, [language]() {
+        QSettings().setValue("speech/language", language->text().trimmed());
+    });
+    form->addRow(tr_fn("Language (whisper.cpp)"), language);
+    audioLay->addLayout(form);
+
+    addDiv(audioLay);
+    addSection(tr_fn("Text to speech"), audioLay);
     audioLay->addWidget(tts->toggleButton());
     audioLay->addStretch();
 }
@@ -337,6 +388,7 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
     ui.confirmModeCombo->setToolTip(tr_fn("Read-only commands open and search files. Commands that "
                                           "change files, run programs or delete anything are confirmed "
                                           "in a dialog that shows exactly what they will do."));
+    sysLay->addWidget(ui.confirmModeCombo);
 
     addDiv(sysLay);
     addSection(tr_fn("Agent mode"), sysLay);
@@ -346,7 +398,6 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
                                 "It uses the model selected in the chat."));
     QObject::connect(agentMode, &QCheckBox::toggled, [](bool on) { QSettings().setValue("agent/enabled", on); });
     sysLay->addWidget(agentMode);
-    sysLay->addWidget(ui.confirmModeCombo);
 
     addDiv(sysLay);
     addSection(tr_fn("Интерфейс"), sysLay);

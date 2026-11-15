@@ -17,7 +17,6 @@
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
 #include <QString>
-#include "../audio/VoskWidget.h"
 #include <PromptSequenceManager.h>
 #include <QMessageBox>
 #include  <PromptResolver.h>
@@ -313,8 +312,6 @@ private slots:
     void undoLast();
 
     void generateDescriptions();      // <‑‑ новый слот
-    void onVoskText(const QString&);  // <‑‑ новый слот
-    void onOmniAsrText(const QString&);
 
     void openGraph();
     // New slots for template selection combobox in ChatDialog
@@ -416,7 +413,6 @@ private:
     MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
     StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
-    VoskWidget* m_voskWidget = nullptr;  // <‑‑ виджет Vosk
 
     QString m_contextContent;
 

@@ -11,7 +11,7 @@
 #include <InputTextEdit.h>
 #include <MemoryComboBox.h>
 #include <StyleTextEdit.h>
-#include "../audio/FasterWhisperRunner.h"
+#include "../audio/SpeechRecognizer.h"
 #include <QScrollArea>
 #include <QHBoxLayout>
 #include <QVector>
@@ -90,7 +90,8 @@ private:
     class SolutionTemplateManager* m_templateManager = nullptr;
     class MainWindow* m_mainWnd = nullptr;
     StyledButton* m_micBtn = nullptr;
-    FasterWhisperRunner* m_whisperRunner = nullptr; // created on first use
+    SpeechRecognizer* m_recognizer = nullptr; // created on first use, for the engine chosen in Settings
+    int m_recognizerEngine = -1;
     void ensureSpeechRecognizer();
     bool m_isRecording = false;
 
