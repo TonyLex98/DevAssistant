@@ -27,6 +27,13 @@ bool OpenUrlCommand::apply(DevAssManager* devAss, QString* err)
         if (err) *err = QString("OPEN_URL: invalid url: %1").arg(rawUrl);
         return false;
     }
+    // Only web pages: a file:// or custom-scheme URL would let the model start any program
+    // through the shell's URL handlers.
+    const QString scheme = url.scheme().toLower();
+    if (scheme != QLatin1String("http") && scheme != QLatin1String("https")) {
+        if (err) *err = QString("OPEN_URL: only http and https links can be opened, got %1").arg(rawUrl);
+        return false;
+    }
 
     m_opened = QDesktopServices::openUrl(url);
     if (!m_opened) {

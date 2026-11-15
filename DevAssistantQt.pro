@@ -51,6 +51,7 @@ SOURCES += \
     src/codeviewer/TemplateSequenceGraphWidget.cpp \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
+    src/command/CommandPolicy.cpp \
     src/command/CommandFactory.cpp \
     src/command/CommandParser.cpp \
     src/command/CommandRegistry.cpp \
@@ -138,6 +139,7 @@ SOURCES += \
     src/utils/DescriptionGenerator.cpp \
     src/utils/PromptManager.cpp\
     src/utils/json_utils.cpp \
+    src/utils/PathGuard.cpp \
     src/uiide/tree-sitter/lib/src/lib.c \
     src/uiide/tree-sitter-cpp/src/parser.c \
     src/uiide/tree-sitter-cpp/src/scanner.c \
@@ -175,6 +177,8 @@ HEADERS += \
     src/codeviewer/SymbolModel.h \
     src/command/Command.h \
     src/command/CommandConfirmDialog.h \
+    src/command/CommandPolicy.h \
+    src/utils/PathGuard.h \
     src/command/CommandFactory.h \
     src/command/CommandParser.h \
     src/command/CommandRegistry.h \

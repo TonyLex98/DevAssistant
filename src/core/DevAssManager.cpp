@@ -1,5 +1,6 @@
 #include "DevAssManager.h"
 #include "utils/Logging.h"
+#include "utils/PathGuard.h"
 
 DevAssManager::DevAssManager(const QString &projectRoot,
                              QObject *parent)
@@ -15,12 +16,30 @@ bool DevAssManager::applyChanges(QList<Change> changes, QString* errorOut)
     if (changes.isEmpty())
         return true;
 
-    // Normalize paths to absolute project paths when possible.
+    // Every change must stay inside the open project. Commands are checked before they run
+    // (CommandPolicy); this is the last line of defence right before the disk is touched.
+    const QString root = m_projectRoot.path();
+    if (root.isEmpty() || root == QLatin1String(".")) {
+        if (errorOut)
+            *errorOut = tr("No project is open.");
+        return false;
+    }
+    const QString absRoot = m_projectRoot.absolutePath();
     for (Change& c : changes) {
         if (!QFileInfo(c.targetPath).isAbsolute())
             c.targetPath = m_projectRoot.filePath(c.targetPath);
         if (!c.aux.isEmpty() && !QFileInfo(c.aux).isAbsolute())
             c.aux = m_projectRoot.filePath(c.aux);
+        QString outside;
+        if (!PathGuard::isInside(absRoot, c.targetPath))
+            outside = c.targetPath;
+        else if (!c.aux.isEmpty() && !PathGuard::isInside(absRoot, c.aux))
+            outside = c.aux;
+        if (!outside.isEmpty()) {
+            if (errorOut)
+                *errorOut = tr("%1 is outside the project folder.").arg(QDir::toNativeSeparators(outside));
+            return false;
+        }
     }
 
     QList<Change> copy = changes;

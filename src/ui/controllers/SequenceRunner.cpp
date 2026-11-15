@@ -4,6 +4,8 @@
 #include "../../command/CommandParser.h"
 #include "../../command/CommandRegistry.h"
 #include "../../command/CommandDocs.h"
+#include "../../command/CommandConfirmDialog.h"
+#include "../../command/CommandPolicy.h"
 #include "../../command/EditInRangeCommand.h"
 #include "../../command/SearchWebCommand.h"
 #include "../../command/SearchProjectCommand.h"
@@ -20,6 +22,7 @@
 #include "../../ui/controllers/ContextCacheManager.h"
 #include "../../ui/controllers/TaskStatusController.h"
 #include "../../ui/controllers/TtsController.h"
+#include <QCoreApplication>
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QTimer>
@@ -460,20 +463,65 @@ void SequenceRunner::handleAssistantFinished()
         return;
     }
 
-    QList<Command*> toRun;
-    if (m_ui->confirmModeComboBox()->currentData().toString() == "auto") {
-        toRun = cmds.toList();
-        m_ui->log(QString("Команды запускаются без подтверждения (режим: %1).").arg(m_ui->confirmModeComboBox()->currentText()));
-    } else {
-        auto dlg = new CommandConfirmDialog(cmds.toList(), nullptr, true);
-        if (dlg->exec() != QDialog::Accepted) {
-            m_ui->log("Пользователь отклонил команды");
-            qDeleteAll(cmds);
-            delete dlg;
+    // Policy first: a command whose path leads outside the project folder, or that the
+    // current step does not allow, never reaches the user or the file system. The model is
+    // told why, so its next attempt can do better.
+    QStringList allowedInStep;
+    if (m_seq->isSequenceMode()) {
+        const int stepIndex = m_seq->currentStepIndex();
+        const auto& steps = m_seq->currentSeq().steps();
+        if (stepIndex >= 0 && stepIndex < steps.size())
+            allowedInStep = steps[stepIndex].allowedCommands();
+    }
+    const QString projectRoot = m_project->projectRoot();
+    QList<Command*> candidates;
+    QStringList rejections;
+    for (Command* c : cmds) {
+        QString reason;
+        if (CommandPolicy::check(c, projectRoot, allowedInStep, &reason)) {
+            candidates << c;
+        } else {
+            rejections << reason;
+            delete c;
+        }
+    }
+    if (!rejections.isEmpty()) {
+        const QString feedback = QCoreApplication::translate("SequenceRunner", "Rejected commands:")
+                + QStringLiteral("\n- ") + rejections.join(QStringLiteral("\n- "));
+        m_ui->log(feedback);
+        m_model->history().push_back(qMakePair(QString("system"), feedback));
+        m_ctx->appendConsoleContext(QStringLiteral("REJECTED COMMANDS"), feedback, QString(), -1);
+    }
+    if (candidates.isEmpty()) {
+        if (m_seq->isSequenceMode() && ++m_batchesWithoutResult >= 7 && !m_resultShownInCurrentRun) {
+            autoFinalizeSequenceWithResult(QCoreApplication::translate("SequenceRunner",
+                    "the model keeps proposing commands that are not allowed"), QList<Command*>());
             return;
         }
-        toRun = dlg->confirmed();
-        delete dlg;
+        retryCurrentSequenceStep();
+        return;
+    }
+
+    // Then the user: "readonly" (the default) runs read-only batches without asking,
+    // "auto" runs everything, "ask" always asks.
+    const QString confirmMode = m_ui->confirmModeComboBox()->currentData().toString();
+    const bool runWithoutAsking = confirmMode == QLatin1String("auto")
+            || (confirmMode == QLatin1String("readonly") && CommandPolicy::isReadOnlyBatch(candidates));
+    QList<Command*> toRun;
+    if (runWithoutAsking) {
+        toRun = candidates;
+    } else {
+        CommandConfirmDialog dialog(candidates, projectRoot);
+        if (dialog.exec() != QDialog::Accepted) {
+            m_ui->log(QCoreApplication::translate("SequenceRunner", "The commands were declined."));
+            qDeleteAll(candidates);
+            return;
+        }
+        toRun = dialog.confirmed();
+        for (Command* c : candidates) {
+            if (!toRun.contains(c))
+                delete c;
+        }
     }
 
     const bool hasShowResultCommand = std::any_of(toRun.begin(), toRun.end(), [](Command* c) {

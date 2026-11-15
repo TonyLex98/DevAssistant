@@ -321,10 +321,16 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
 
     addSection(tr_fn("Безопасность"), sysLay);
 
-    ui.confirmModeCombo = new MemoryComboBox("confirmMode", parent);
-    ui.confirmModeCombo->addItem("Автоподтверждение команд", "auto");
-    ui.confirmModeCombo->addItem("Спрашивать подтверждение", "ask");
+    // New key on purpose: the old "confirmMode" default was "run everything", and a stored
+    // value from those days must not carry over.
+    ui.confirmModeCombo = new MemoryComboBox("commandConfirmMode", parent);
+    ui.confirmModeCombo->addItem(tr_fn("Run read-only commands, ask for the rest"), "readonly");
+    ui.confirmModeCombo->addItem(tr_fn("Ask before every command"), "ask");
+    ui.confirmModeCombo->addItem(tr_fn("Run everything without asking (unsafe)"), "auto");
     ui.confirmModeCombo->setCurrentIndex(0);
+    ui.confirmModeCombo->setToolTip(tr_fn("Read-only commands open and search files. Commands that "
+                                          "change files, run programs or delete anything are confirmed "
+                                          "in a dialog that shows exactly what they will do."));
     sysLay->addWidget(ui.confirmModeCombo);
 
     addDiv(sysLay);
