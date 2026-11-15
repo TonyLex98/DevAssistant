@@ -1,4 +1,5 @@
 #include "CodePatcher.h"
+#include "../utils/TextFileLines.h"
 #include <QFile>
 #include <QTextStream>
 #include <QDateTime>
@@ -36,14 +37,17 @@ bool CodePatcher::restoreFromStash(const QString &filePath){
 }
 
 bool CodePatcher::replaceInFile(const QString &filePath, const QRegExp &re, const QString &replacement){
+    // Binary I/O through TextFileLines: line endings, BOM and the final newline stay as they were.
     QFile f(filePath);
-    if(!f.open(QIODevice::ReadOnly|QIODevice::Text)) return false;
-    QString s=QString::fromUtf8(f.readAll()); f.close();
+    if(!f.open(QIODevice::ReadOnly)) return false;
+    TextFileLines doc = TextFileLines::fromBytes(f.readAll()); f.close();
+    const QString s = doc.lines.join(QLatin1Char('\n'));
     QString out = s; out.replace(re, replacement);
     if(out==s) return false;
     QString bak = stashFile(filePath); Q_UNUSED(bak);
-    if(!f.open(QIODevice::WriteOnly|QIODevice::Text|QIODevice::Truncate)) return false;
-    QTextStream ts(&f); ts.setCodec("UTF-8"); ts<<out; f.close();
+    doc.lines = out.split(QLatin1Char('\n'));
+    if(!f.open(QIODevice::WriteOnly|QIODevice::Truncate)) return false;
+    f.write(doc.toBytes()); f.close();
     return true;
 }
 
@@ -58,10 +62,13 @@ bool CodePatcher::renameMethod(const NodeData &method, const QString &newName){
 
 bool CodePatcher::addMethodStub(const NodeData &clazz, const QString &retType, const QString &name, const QVector<ParamInfo>& params){
     if(clazz.loc.file.isEmpty()) return false;
-    QFile f(clazz.loc.file); if(!f.open(QIODevice::ReadOnly|QIODevice::Text)) return false; QString txt=QString::fromUtf8(f.readAll()); f.close();
+    QFile f(clazz.loc.file); if(!f.open(QIODevice::ReadOnly)) return false;
+    const QByteArray eol = TextFileLines::fromBytes(f.readAll()).eol; f.close();
     QString paramStr; for(int i=0;i<params.size();++i){ if(i) paramStr+=", "; paramStr+=params[i].type+" "+params[i].name; }
     QString retDefault = (retType=="void") ? "" : ("    return "+retType+"{};\n");
     QString stub = QString("\n\n%1 %2::%3(%4)\n{\n    // TODO: implement\n%5}\n").arg(retType, clazz.displayName, name, paramStr, retDefault);
     QString bak = stashFile(clazz.loc.file); Q_UNUSED(bak);
-    if(!f.open(QIODevice::WriteOnly|QIODevice::Text|QIODevice::Append)) return false; QTextStream ts(&f); ts.setCodec("UTF-8"); ts<<stub; f.close(); return true;
+    // Appended in the file's own line endings.
+    if(!f.open(QIODevice::WriteOnly|QIODevice::Append)) return false;
+    f.write(stub.toUtf8().replace("\n", eol)); f.close(); return true;
 }

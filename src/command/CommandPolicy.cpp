@@ -49,7 +49,9 @@ QString relative(const QString& path, const QString& projectRoot)
             ? QDir::cleanPath(path)
             : QDir::cleanPath(QDir(projectRoot).absoluteFilePath(path));
     const QString rel = QDir(projectRoot).relativeFilePath(abs);
-    return QDir::toNativeSeparators(rel.startsWith(QLatin1String("..")) ? abs : rel);
+    const bool outside = rel == QLatin1String("..") || rel.startsWith(QLatin1String("../"))
+            || QDir::isAbsolutePath(rel);   // another drive
+    return QDir::toNativeSeparators(outside ? abs : rel);
 }
 
 QString lineCount(const QString& text)

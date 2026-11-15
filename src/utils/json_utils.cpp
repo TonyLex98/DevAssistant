@@ -48,7 +48,9 @@ QString displayContextPath(const QString& normalizedPath, const QString& project
 {
     QDir root(projectRoot);
     QString rel = root.relativeFilePath(normalizedPath);
-    if (!rel.startsWith(".."))
+    const bool outside = rel == QLatin1String("..") || rel.startsWith(QLatin1String("../"))
+            || QDir::isAbsolutePath(rel);   // another drive
+    if (!outside)
         return QDir::toNativeSeparators(rel);
     return QDir::toNativeSeparators(normalizedPath);
 }

@@ -22,7 +22,7 @@ static QByteArray attemptJsonFix(const QByteArray& rawJson);
 static QList<QByteArray> findDslCommandsInText(const QByteArray& rawText);
 
 /* Remove code fences and any leading labels like "Assistant:" */
-static QByteArray sanitizeRaw(const QByteArray& in)
+static QByteArray sanitizeRaw(const QByteArray& in, bool keepLeadingText = false)
 {
     QByteArray s = in.trimmed();
 
@@ -35,7 +35,7 @@ static QByteArray sanitizeRaw(const QByteArray& in)
         char c = s[i];
         if (c=='[' || c=='{'){ firstBrace = i; break; }
     }
-    if (firstBrace>0) s = s.mid(firstBrace);
+    if (firstBrace>0 && !keepLeadingText) s = s.mid(firstBrace);
 
     // Strip markdown code fences ```json ... ``` or ``` ...
     static QRegularExpression fence(R"(^```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```$)");
@@ -380,6 +380,12 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
             }
         }
         addFromDoc(d);
+    }
+
+    // "OPEN_FILE {\"path\": ...}" lines: the passes above see only the braces, without the name.
+    if (res.isEmpty()) {
+        for (const QByteArray& p : findDslCommandsInText(sanitizeRaw(jsonRaw, true)))
+            addFromDoc(QJsonDocument::fromJson(p));
     }
 
     return res;
