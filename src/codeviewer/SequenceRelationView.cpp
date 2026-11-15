@@ -944,18 +944,15 @@ void SequenceRelationView::addEdge(const QString &from, const QString &to)
 
 void SequenceRelationView::positionNodes()
 {
-    // Simple layout: arrange nodes in a circle
-    int count = m_nodeItems.size();
-    if (count == 0) return;
-    
-    int radius = qMax(200, count * 30); // Increase radius based on number of nodes
-    QPointF center(sceneRect().width() / 2, sceneRect().height() / 2);
-    
-    int i = 0;
-    for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it, ++i) {
-        double angle = 2.0 * M_PI * i / count;
-        QPointF pos = center + QPointF(radius * qCos(angle), radius * qSin(angle));
-        it.value()->setPos(pos);
+    // One column: it fits the tall side panel, and nodes of any width never overlap
+    // (on a circle, wide nodes ran into each other).
+    if (m_nodeItems.isEmpty()) return;
+
+    qreal y = 0;
+    for (auto it = m_nodeItems.constBegin(); it != m_nodeItems.constEnd(); ++it) {
+        const qreal h = it.value()->boundingRect().height();
+        it.value()->setPos(QPointF(0, y + h / 2));
+        y += h + 48;
     }
     
     // Force an update for all edges to recalculate their positions after nodes are positioned
