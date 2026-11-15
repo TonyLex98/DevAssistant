@@ -435,7 +435,7 @@ CommandDoc CommandDocs::doc(const QString& commandName)
             req("query", "string", QStringLiteral("What to look for, in natural language.")),
             opt("k", "int", QStringLiteral("How many excerpts to return (default 5, at most 20)."))
         };
-        d.notes = { QStringLiteral("Works after the project was indexed in Settings > Documents; otherwise it fails with that hint.") };
+        d.notes = QStringList() << QStringLiteral("Works after the project was indexed in Settings > Documents; otherwise it fails with that hint.");
         d.example = baseExample(QJsonObject{{"query", "how are settings saved"}, {"k", 5}});
         return d;
     }
