@@ -12,50 +12,50 @@ class SolutionTemplateManager : public QObject
 public:
     explicit SolutionTemplateManager(QObject *parent = nullptr);
 
-    /* Папка, где находятся шаблоны решений */
+    /* Folder that holds the solution templates */
     void setRoot(const QString& rootPath);          // <project>/DevelopersAssistant/SolutionTemplates
     QString root() const { return m_root; }
 
-    /* Сканирование всех папок с шаблонами */
+    /* Rescan all template folders */
     void refresh();
 
-    /* Доступ к уже загруженным объектам */
+    /* Already loaded templates */
     const QMap<QString, SolutionTemplate>& templates(); // key = full path to template directory
 
-    /* Сохранить/удалить отдельный шаблон */
+    /* Save/delete a single template */
     bool save(const SolutionTemplate& tmpl, const QString& templateDirPath);
     bool remove(const QString& templateDirPath);
 
-    /* Получить список папок (полные пути) – удобно для UI-выбора */
+    /* Template folders (full paths), handy for UI selection */
     QStringList templateDirs() const { return m_templateDirs; }
 
-    /* Получить список доступных последовательностей для конкретного шаблона */
+    /* Sequences available in the given template */
     QStringList getAvailableSequences(const QString& templateDirPath) const;
 
-    /* Получить информацию о последовательности внутри шаблона */
+    /* Path of the template's main sequence */
     QString getMainSequencePath(const QString& templateDirPath) const;
 
-    /* Экспорт шаблона в ZIP-архив */
+    /* Export a template to a ZIP archive */
     bool exportTemplate(const QString& templateDirPath, const QString& exportPath) const;
     
-    /* Импорт шаблона из ZIP-архив */
+    /* Import a template from a ZIP archive */
     bool importTemplate(const QString& importPath, const QString& targetDir) const;
     
-    /* Экспорт последовательности как шаблона */
+    /* Export a sequence as a template */
     bool exportSequenceAsTemplate(const QString& sequencePath, const QString& templateDirPath, 
                                   const QString& templateName, const QString& description = QString()) const;
     
-    /* Создать новую последовательность в папке шаблона */
+    /* Create a new sequence in the template folder */
     bool createNewSequenceInTemplate(const QString& templateDirPath, const QString& sequenceName, 
                                      const QString& description = QString()) const;
     
-    /* Синхронизировать файл шаблона с содержимым папки шаблона (добавить отсутствующие файлы последовательностей) */
+    /* Sync the template file with the template folder (add missing sequence files) */
     bool syncTemplateFileWithFolder(const QString& templateDirPath) const;
     
-    /* Проверить целостность шаблона - наличие всех файлов последовательностей */
+    /* Template integrity check: all sequence files must exist */
     QStringList checkTemplateIntegrity(const QString& templateDirPath) const;
     
-    /* Работа с позициями последовательностей на холсте */
+    /* Sequence positions on the canvas */
     void savePositionsToTemplate(const QString& templateDirPath, const QMap<QString, QPointF>& positions);
     QMap<QString, QPointF> loadPositionsFromTemplate(const QString& templateDirPath) const;
 
@@ -64,8 +64,8 @@ public:
     PromptSequenceManager* sequenceManager() { return m_seqMgr; }
 
 private:
-    QString m_root;                                  // директория SolutionTemplates
-    QMap<QString, SolutionTemplate> m_templates;     // key = абсолютный путь к папке шаблона
-    QStringList m_templateDirs;                      // список папок шаблонов
+    QString m_root;                                  // SolutionTemplates directory
+    QMap<QString, SolutionTemplate> m_templates;     // key = absolute path to the template folder
+    QStringList m_templateDirs;                      // template folders
     PromptSequenceManager* m_seqMgr = nullptr;       // pointer to sequence manager
 };

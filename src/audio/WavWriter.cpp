@@ -37,10 +37,10 @@ void WavWriter::close() {
 }
 
 void WavWriter::writeHeader() {
-    // 44-байтный WAV PCM
+    // 44-byte WAV PCM header
     char hdr[44] = {};
     memcpy(hdr+0, "RIFF", 4);
-    put32(hdr+4, 0); // заполнится в finalize
+    put32(hdr+4, 0); // filled in by finalize
     memcpy(hdr+8, "WAVE", 4);
     memcpy(hdr+12, "fmt ", 4);
     put32(hdr+16, 16);                 // PCM chunk size
@@ -53,7 +53,7 @@ void WavWriter::writeHeader() {
     put16(hdr+32, blockAlign);
     put16(hdr+34, quint16(m_bits));
     memcpy(hdr+36, "data", 4);
-    put32(hdr+40, 0);                  // data size (позже)
+    put32(hdr+40, 0);                  // data size (filled in later)
     m_file.write(hdr, 44);
 }
 

@@ -28,13 +28,13 @@ void PromptSequenceManager::refresh()
     if (!dir.exists())
         return;
 
-    // ищем *.seq.json во всех подпапках
+    // look for *.seq.json in all subfolders
     QStringList filters = {"*.seq.json"};
     QFileInfoList files = dir.entryInfoList(filters,
                                             QDir::Files | QDir::NoSymLinks,
                                             QDir::Name);
 
-    // рекурсивный поиск
+    // recursive search
     QDirIterator it(m_root,
                     filters,
                     QDir::Files,
@@ -68,7 +68,7 @@ const QMap<QString, PromptSequence> &PromptSequenceManager::sequences()
     return m_sequences;
 }
 
-/* Сохранить/перезаписать */
+/* Save or overwrite */
 bool PromptSequenceManager::save(const PromptSequence &seq, const QString &filePath)
 {
     QJsonObject obj = seq.toJson();
@@ -79,14 +79,14 @@ bool PromptSequenceManager::save(const PromptSequence &seq, const QString &fileP
     f.write(doc.toJson(QJsonDocument::Indented));
     f.close();
 
-    // обновляем кеш
+    // update the cache
     m_sequences.insert(filePath, seq);
     if (!m_fileList.contains(filePath))
         m_fileList << filePath;
     return true;
 }
 
-/* Удалить файл */
+/* Delete the file */
 bool PromptSequenceManager::remove(const QString &filePath)
 {
     if (!QFile::remove(filePath))
@@ -96,7 +96,7 @@ bool PromptSequenceManager::remove(const QString &filePath)
     return true;
 }
 
-/* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
+/* Add/update a single sequence in the cache (used with templates) */
 void PromptSequenceManager::addSequenceToCache(const QString& filePath, const PromptSequence& sequence)
 {
     m_cachedExtra.insert(filePath, sequence);
@@ -105,7 +105,7 @@ void PromptSequenceManager::addSequenceToCache(const QString& filePath, const Pr
         m_fileList << filePath;
 }
 
-/* Найти последовательность по имени (возвращается путь к файлу и сама последовательность) */
+/* Find a sequence by name (returns the file path and the sequence) */
 QPair<QString, PromptSequence> PromptSequenceManager::findSequenceByName(const QString& name) const
 {
     for (auto it = m_sequences.constBegin(); it != m_sequences.constEnd(); ++it) {

@@ -5,6 +5,7 @@
 #include "../core/ContextChainResolver.h"
 #include "../core/ProjectStructureResolver.h"
 #include "../command/CommandDocs.h"
+#include <QCoreApplication>
 #include <QMap>
 #include <QRegularExpression>
 #include <QFileInfo>
@@ -99,7 +100,7 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
                                                  ctx->projectRootPath());
     result.replace("{{FILE_LIST}}", truncateLinesForPrompt(fileListAbs, 600, 18000));
 
-    // 3) {{HISTORY}} – берём последние N сообщений из MainWindow
+    // 3) {{HISTORY}}: the last N messages from MainWindow
     QString hist;
     const int maxHist = 12;
     const auto &history = ctx->history();
@@ -112,18 +113,18 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
     }
     result.replace("{{HISTORY}}", hist.trimmed());
 
-    // 3.1) {{LAST_USER_MESSAGES}} – берём последние N пользовательских сообщений из отдельного хранилища
+    // 3.1) {{LAST_USER_MESSAGES}}: the last N user messages from a separate store
     QString userMessages = ctx->getLastUserMessages();
     qCDebug(logPrompt) << "[PromptResolver] LAST_USER_MESSAGES content:" << userMessages;
     qCDebug(logPrompt) << "[PromptResolver] LAST_USER_MESSAGES count:" << userMessages.split('\n').size();
     result.replace("{{LAST_USER_MESSAGES}}", userMessages);
 
-    // 4) {{OPEN_FILES}} – содержимое файлов, открытых через OPEN_FILE
+    // 4) {{OPEN_FILES}}: contents of files opened via OPEN_FILE
     result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
 
-    // 5) {{SUPPORTED_COMMANDS}} – список только разрешённых для шага
+    // 5) {{SUPPORTED_COMMANDS}}: only the commands allowed for this step
     QString allowedList;
-    const auto all = CommandRegistry::all(); // шаблоны всех команд
+    const auto all = CommandRegistry::all(); // prototypes of all commands
     QSet<QString> allowedSet = QSet<QString>::fromList(step.allowedCommands());
 
     for (Command *c : all) {
@@ -136,73 +137,58 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
         // Small-model friendly: keep command docs compact to reduce token pressure.
         allowedList += CommandDocs::renderForLLM(doc, true) + "\n\n";
         delete c;
-        // Формат как в PromptManager::supportedCommandsText()
+        // Format as in PromptManager::supportedCommandsText()
 
         continue;
         QJsonObject example = c->toJson();
         QString json = QString::fromStdString(QJsonDocument(example).toJson(QJsonDocument::Compact).toStdString());
-        allowedList += "- " + c->name() + ": " + c->description() + "\n  Формат: " + json + "\n\n";
+        allowedList += "- " + c->name() + ": " + c->description() + "\n  Format: " + json + "\n\n";
         delete c;
     }
     result.replace("{{SUPPORTED_COMMANDS}}", allowedList.trimmed());
 
-    // 6) {{USER_QUERY}} – текущий запрос пользователя
+    // 6) {{USER_QUERY}}: the current user request
     result.replace("{{USER_QUERY}}", userQuery);
     result.replace("{{CURRENT_DATE}}", currentDate);
     result.replace("{{TODAY}}", currentDate);
     result.replace("{{CURRENT_DATETIME}}", currentDateTime);
 
-    // Последний ответ ассистента
     result.replace("{{LAST_ASSISTANTS_RESPONSE}}", ctx->lastAssistantMessage());
 
-    // 7.1) {{SEARCH_RESULTS}} – результаты поисковых команд
+    // 7.1) {{SEARCH_RESULTS}}: results of the search commands
     result.replace("{{SEARCH_RESULTS}}", ctx->searchResultsText());
 
-    // 7.2) {{CONTEXT_CHAIN}} – context chain from executed commands
+    // 7.2) {{CONTEXT_CHAIN}}: context chain from executed commands
     result.replace("{{CONTEXT_CHAIN}}", ContextChainResolver::resolveContextChain(ctx));
 
     
-    // 6.1) {{FILE_DESCRIPTIONS}} — описания из папки DevelopersAssistant
+    // 6.1) {{FILE_DESCRIPTIONS}}: descriptions from the DevelopersAssistant folder
     result.replace("{{FILE_DESCRIPTIONS}}", ctx->fileDescriptionsText());
 
-    // 6.2) {{PREVIOUS_STEPS}} — краткая выжимка по уже выполненным шагам
+    // 6.2) {{PREVIOUS_STEPS}}: short digest of the steps already done
     result.replace("{{PREVIOUS_STEPS}}", ctx->previousStepsText());
 
-    // 6.3) {{TOKEN_COUNT}} — приблизительная оценка токенов для этого шаблона
+    // 6.3) {{TOKEN_COUNT}}: rough token estimate for this template
     {
-        // Простейшая эвристика: ~4 символа на токен
+        // Simple heuristic: ~4 characters per token
         int approxTokens = (result.size() / 4) + 1;
         result.replace("{{TOKEN_COUNT}}", QString::number(approxTokens));
     }
     
-    // 7) {{OPEN_SEQUENCE_INFO}} – список доступных последовательностей в шаблоне
+    // 7) {{OPEN_SEQUENCE_INFO}}: sequences available in the template
     if (result.contains("{{OPEN_SEQUENCE_INFO}}")) {
         QString sequenceInfoList = generateSequenceInfoList(ctx);
         result.replace("{{OPEN_SEQUENCE_INFO}}", sequenceInfoList);
     }
     
-    // 8) {{PROJECT_STRUCTURE}} – древовидное представление структуры проекта
+    // 8) {{PROJECT_STRUCTURE}}: tree view of the project structure
     result.replace("{{PROJECT_STRUCTURE}}", ProjectStructureResolver::resolveProjectStructure(ctx));
-    
 
-    
-    // Удаляем дублирующий вызов из строки 92
-    // result.replace("{{OPEN_FILES}}", ctx->openedFilesContent());
-
-    // 8) Любой неизвестный {{…}} – просто удаляем, чтобы LLM не падал
-    // Но делаем это только ПОСЛЕ замены всех известных шаблонов
+    // 9) Remove any unknown {{...}} so it does not confuse the LLM,
+    // but only AFTER all known placeholders have been replaced.
     result.remove(QRegularExpression(R"(\{\{[^\}]+\}\})"));
     result.prepend(runtimeDateContext);
 
-    // Добавляем четкие инструкции о формате JSON-ответа
-    // Это поможет нейросети лучше понять, что нужно возвращать JSON команды
-    /*result += "\n\nВАЖНО: ";
-    result += "ВАЖНО: Отвечай только JSON-массивом команд в правильном формате. ";
-    result += "Не добавляй пояснительный текст вне JSON. ";
-    result += "Используй только команды из списка 'Доступные команды'. ";
-    result += "Каждая команда должна быть валидным JSON-объектом с полями 'command' и 'params'.\n";
-    result += "Формат: [{\"command\": \"НАЗВАНИЕ_КОМАНДЫ\", \"params\": {...}}, ...]";
-*/
     ResolvedPrompt out;
     out.systemPrompt = result;
     out.userPrompt = userQuery;
@@ -213,25 +199,25 @@ QVector<PromptResolver::ResolverInfo> PromptResolver::availableResolvers()
 {
     QVector<ResolverInfo> vec;
 
-    vec.append(ResolverInfo{"PROJECT_ROOT",    "Корневая папка проекта"});
-    vec.append(ResolverInfo{"FILE_LIST",       "Список файлов проекта"});
-    vec.append(ResolverInfo{"HISTORY",         "Последние 20 сообщений из чата"});
-    vec.append(ResolverInfo{"LAST_USER_MESSAGES", "Последние 100 пользовательских сообщений из чата"});
-    vec.append(ResolverInfo{"OPEN_FILES",      "Содержимое файлов, открытых командой OPEN_FILE"});
-    vec.append(ResolverInfo{"SUPPORTED_COMMANDS", "Список доступных команд в данном шаге"});
-    vec.append(ResolverInfo{"USER_QUERY",      "Текущий запрос пользователя"});
-    vec.append(ResolverInfo{"CURRENT_DATE",    "Текущая дата (YYYY-MM-DD)"});
-    vec.append(ResolverInfo{"TODAY",           "Синоним текущей даты (YYYY-MM-DD)"});
-    vec.append(ResolverInfo{"CURRENT_DATETIME","Текущие дата/время с UTC-смещением"});
-    vec.append(ResolverInfo{"LAST_ASSISTANTS_RESPONSE",      "Последний ответ ассистент"});
-    vec.append(ResolverInfo{"OPEN_FILES",      "Открытые файлы"});
-    vec.append(ResolverInfo{"FILE_DESCRIPTIONS", "Добавить описание файлов проекта"});
-    vec.append(ResolverInfo{"PREVIOUS_STEPS", "Что было уже сделано на предыдущих этапах"});
-    vec.append(ResolverInfo{"TOKEN_COUNT", "Число токенов текущего контекста"});
-    vec.append(ResolverInfo{"SEARCH_RESULTS", "Краткие выдержки из SEARCH_WEB / SEARCH_PROJECT"});
-    vec.append(ResolverInfo{"OPEN_SEQUENCE_INFO", "Список доступных последовательностей в шаблоне в формате: номер. описание; sequenceName = \"имя_файла_без_.seq.json\"; summarize = true;"});
-    vec.append(ResolverInfo{"CONTEXT_CHAIN", "Цепочка контекста из выполненных команд с визуальным статусом"});
-    vec.append(ResolverInfo{"PROJECT_STRUCTURE", "Древовидное представление структуры папок проекта"});
+    vec.append(ResolverInfo{"PROJECT_ROOT",    QCoreApplication::translate("PromptResolver", "Project root folder")});
+    vec.append(ResolverInfo{"FILE_LIST",       QCoreApplication::translate("PromptResolver", "Project file list")});
+    vec.append(ResolverInfo{"HISTORY",         QCoreApplication::translate("PromptResolver", "Last 12 chat messages")});
+    vec.append(ResolverInfo{"LAST_USER_MESSAGES", QCoreApplication::translate("PromptResolver", "Last 100 user messages from the chat")});
+    vec.append(ResolverInfo{"OPEN_FILES",      QCoreApplication::translate("PromptResolver", "Contents of files opened with OPEN_FILE")});
+    vec.append(ResolverInfo{"SUPPORTED_COMMANDS", QCoreApplication::translate("PromptResolver", "Commands available in this step")});
+    vec.append(ResolverInfo{"USER_QUERY",      QCoreApplication::translate("PromptResolver", "Current user request")});
+    vec.append(ResolverInfo{"CURRENT_DATE",    QCoreApplication::translate("PromptResolver", "Current date (YYYY-MM-DD)")});
+    vec.append(ResolverInfo{"TODAY",           QCoreApplication::translate("PromptResolver", "Same as the current date (YYYY-MM-DD)")});
+    vec.append(ResolverInfo{"CURRENT_DATETIME",QCoreApplication::translate("PromptResolver", "Current date/time with UTC offset")});
+    vec.append(ResolverInfo{"LAST_ASSISTANTS_RESPONSE",      QCoreApplication::translate("PromptResolver", "Last assistant response")});
+    vec.append(ResolverInfo{"OPEN_FILES",      QCoreApplication::translate("PromptResolver", "Open files")});
+    vec.append(ResolverInfo{"FILE_DESCRIPTIONS", QCoreApplication::translate("PromptResolver", "Add project file descriptions")});
+    vec.append(ResolverInfo{"PREVIOUS_STEPS", QCoreApplication::translate("PromptResolver", "What was already done in the previous steps")});
+    vec.append(ResolverInfo{"TOKEN_COUNT", QCoreApplication::translate("PromptResolver", "Token count of the current context")});
+    vec.append(ResolverInfo{"SEARCH_RESULTS", QCoreApplication::translate("PromptResolver", "Short excerpts from SEARCH_WEB / SEARCH_PROJECT")});
+    vec.append(ResolverInfo{"OPEN_SEQUENCE_INFO", QCoreApplication::translate("PromptResolver", "Sequences available in the template, as: number. description; sequenceName = \"file_name_without_.seq.json\"; summarize = true;")});
+    vec.append(ResolverInfo{"CONTEXT_CHAIN", QCoreApplication::translate("PromptResolver", "Context chain of the executed commands with a visual status")});
+    vec.append(ResolverInfo{"PROJECT_STRUCTURE", QCoreApplication::translate("PromptResolver", "Tree view of the project folder structure")});
 
     return vec;
 }
@@ -259,7 +245,7 @@ void PromptResolver::clearNextSequence()
 QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
 {
     if (!ctx) {
-        return QString("Нет доступных последовательностей: контекст отсутствует");
+        return QString("No sequences available: no context");
     }
     
     // Get the current template directory based on the current sequence path
@@ -409,7 +395,7 @@ QString PromptResolver::generateSequenceInfoList(MainWindow* ctx)
     }
     
     if (sequenceInfoList.isEmpty()) {
-        return QString("Нет доступных последовательностей");
+        return QString("No sequences available");
     }
     
     return sequenceInfoList.join("\n");

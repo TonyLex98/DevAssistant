@@ -21,16 +21,16 @@ public:
                            const PromptStep& step,
                            MainWindow* ctx);
 
-    /* Структура описания доступного резолвера.
-     *  token – текст, который будет вставлен в шаблон, например "PROJECT_ROOT".
-     *  description – русское описание, которое будет выводиться в подсказке к кнопке. */
+    /* A placeholder resolver available in templates.
+     *  token: text inserted into the template, e.g. "PROJECT_ROOT".
+     *  description: translated label shown in the insert list/combo. */
     struct ResolverInfo
     {
         QString token;
         QString description;
     };
 
-    /* Список всех доступных резолверов. */
+    /* All available resolvers. */
     static QVector<ResolverInfo> availableResolvers();
     
     /* Set context for next sequence */

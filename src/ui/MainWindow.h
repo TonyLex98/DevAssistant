@@ -301,7 +301,7 @@ private slots:
     void applyChanges();
     void undoLast();
 
-    void generateDescriptions();      // <‑‑ новый слот
+    void generateDescriptions();
 
     void openGraph();
     // New slots for template selection combobox in ChatDialog
@@ -402,19 +402,18 @@ private:
     StyledButton *exportSequenceAsTemplateBtn;
     MemoryComboBox* confirmModeCombo;
     DevAssManager m_dev_manager;
-    StyledButton* descBtn = nullptr;   // <‑‑ новая кнопка
+    StyledButton* descBtn = nullptr;
 
     QString m_contextContent;
 
     QStringList m_prevSteps;
 
-    // ... уже есть
-    PromptSequenceManager m_seqMgr;          // менеджер наборов
-    SolutionTemplateManager m_templateMgr;   // менеджер шаблонов
-    PromptSequence        m_currentSeq;     // текущая выбранная последовательность
+    PromptSequenceManager m_seqMgr;
+    SolutionTemplateManager m_templateMgr;
+    PromptSequence        m_currentSeq;     // sequence being run
     bool                  m_sequenceMode = false;
     bool                  m_stopRequested = false; // Flag to indicate that the sequence execution should be stopped
-    int                   m_currentStepIdx = -1; // -1 = не запущено  // Run the next sequence specified by OPEN_SEQUENCE
+    int                   m_currentStepIdx = -1; // -1 = not running
     void addSequenceTransitionToHistory(const QString& sequenceName);  // Add sequence transition to history
     
     /* ────── NEW ────── */    void ensureUniversalAgentTemplateInternal(); // Write UniversalAgent template v3 if missing/outdated
@@ -438,14 +437,14 @@ private:
     MemorySplitter *m_centerSplitter{nullptr};
 
 
-    StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
-    StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
+    StyledButton *graphBtn{nullptr};
+    StyledButton *seqGraphBtn{nullptr};
     StyledButton *chatToggleBtn{nullptr};
     StyledButton *logToggleBtn{nullptr};
-    StyledButton *lightRagBtn{nullptr}; // кнопка «LightRAG»
+    StyledButton *lightRagBtn{nullptr};
     QWidget *m_settingsPanel{nullptr};
-    GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
-    SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
+    GraphWidget  *m_graphWindow{nullptr};
+    SequenceGraphWidget  *m_seqGraphWindow{nullptr};
     QPointer<LightRagWidget> m_lightRagWidget; // deletes itself on close
     QPointer<Rag::RagWidget> m_documentsWidget; // deletes itself on close
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)

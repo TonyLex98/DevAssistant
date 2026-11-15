@@ -22,7 +22,6 @@ public:
     const QStringList& rawResults() const { return m_rawResults; }
     QString query() const { return m_params.value("query").toString(); }
 
-    // Переопределение метода для работы с LLM
     bool applyWithLLM(DevAssManager* devAss,
                       ModelAdapter* adapter,
                       QString* errorOut = nullptr) override;
@@ -33,9 +32,8 @@ private:
     QStringList m_results;
     QStringList m_rawResults;  // Store raw results for potential LLM summarization
 
-    // Внутренняя функция для суммаризации контента
+    // Extractive summary without the LLM.
     QString summarizeContentInternal(const QString& content, const QString& query);
 
-    // Новый метод для LLM-суммаризации
     QString generateLLMSummary(ModelAdapter* adapter, const QString& content, const QString& query);
 };

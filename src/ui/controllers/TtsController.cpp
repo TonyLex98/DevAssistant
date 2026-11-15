@@ -15,7 +15,7 @@ TtsController::TtsController(QObject* parent)
     QSettings settings;
     m_enabled = settings.value("speech/ttsEnabled", false).toBool();
 
-    m_toggleBtn = new StyledButton(m_enabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), nullptr);
+    m_toggleBtn = new StyledButton(m_enabled ? tr("Text to speech: On") : tr("Text to speech: Off"), nullptr);
     connect(m_toggleBtn, &StyledButton::clicked, this, &TtsController::onToggleClicked);
 
     if (m_enabled)
@@ -45,7 +45,7 @@ void TtsController::onToggleClicked()
     QSettings settings;
     settings.setValue("speech/ttsEnabled", m_enabled);
 
-    m_toggleBtn->setText(m_enabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"));
+    m_toggleBtn->setText(m_enabled ? tr("Text to speech: On") : tr("Text to speech: Off"));
 
     if (m_enabled)
         initRunner();

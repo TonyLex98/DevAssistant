@@ -18,11 +18,13 @@
 #include "../utils/AppConfig.h"
 #include "MainWindow.h"
 
+// Spoken words that send the message, in Russian and English. Matched against the end of
+// the recognized text, so they stay in both languages whatever the interface language is.
 static QStringList asrSendTriggers()
 {
     return QStringList{
         "отправить", "отправь", "готово", "выполни", "выполнить", "поехали", "давай",
-        "send", "submit", "done", "go", "execute"
+        "send", "send it", "submit", "done", "go", "execute"
     };
 }
 
@@ -44,11 +46,11 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     v->addWidget(m_chat,1);
     auto mainLayout = new QHBoxLayout();
     m_input = new InputTextEdit(this);
-    m_send = new StyledButton("Отправить", this);
-    m_stop = new StyledButton("Остановить", this);
+    m_send = new StyledButton(tr("Send"), this);
+    m_stop = new StyledButton(tr("Stop"), this);
     m_micBtn = new StyledButton("🎤", this);
     m_micBtn->setFixedSize(36, 36);
-    m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
+    m_micBtn->setToolTip(tr("Voice input (click to record)"));
     m_micBtn->setStyleSheet(R"(
         QPushButton {
             background-color: #0f766e;
@@ -65,9 +67,9 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
         }
     )");
 
-    m_attachBtn = new StyledButton("Image", this);
+    m_attachBtn = new StyledButton(tr("Image"), this);
     m_attachBtn->setFixedSize(44, 36);
-    m_attachBtn->setToolTip("Attach image (png/jpg/webp)");
+    m_attachBtn->setToolTip(tr("Attach image (png/jpg/webp)"));
     
     // Left column: input + image attachments bar
     auto leftColumnLayout = new QVBoxLayout();
@@ -106,8 +108,8 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
     
     // Add the template selection combobox below the buttons
     m_templateCombo = new MemoryComboBox("defaultTemplateSelector", this);
-    m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
-    m_templateCombo->addItem("Простой чат", "simple_chat");
+    m_templateCombo->addItem(tr("Choose a default template"), "");
+    m_templateCombo->addItem(tr("Simple chat"), "simple_chat");
     m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
     m_templateCombo->addItems(QStringList()); // ensure initial
 
@@ -505,7 +507,7 @@ void ChatDialog::onMicClicked() {
         
         // Switch to "not recording" state - blue microphone
         m_micBtn->setText("🎤");
-        m_micBtn->setToolTip("Голосовой ввод (нажмите для записи)");
+        m_micBtn->setToolTip(tr("Voice input (click to record)"));
         m_micBtn->setStyleSheet(R"(
             QPushButton {
                 background-color: #0f766e;
@@ -531,7 +533,7 @@ void ChatDialog::onMicClicked() {
         
         // Switch to "recording" state - red crossed microphone
         m_micBtn->setText("🎙️");
-        m_micBtn->setToolTip("Идёт запись... (нажмите для остановки)");
+        m_micBtn->setToolTip(tr("Recording... (click to stop)"));
         m_micBtn->setStyleSheet(R"(
             QPushButton {
                 background-color: #b91c1c;
@@ -604,7 +606,7 @@ void ChatDialog::onAsrError(const QString& msg) {
     m_micBtn->setStyleSheet(""); // Reset style
     m_isRecording = false;
     // Show error in chat or log
-    m_chat->append("ASR Error: " + msg);
+    m_chat->append(tr("Speech recognition error: %1").arg(msg));
 }
 
 void ChatDialog::resumeRecordingAfterResponse() {
@@ -709,7 +711,7 @@ void ChatDialog::refreshModelList()
 
 void ChatDialog::appendAssistantChunk(const QString& s){
     static bool first = true;
-    if (first) { m_chat->append("Assistant: \n"); first=false; }
+    if (first) { m_chat->append(tr("Assistant:") + QStringLiteral(" \n")); first=false; }
     m_chat->moveCursor(QTextCursor::End);
     m_chat->insertPlainText(s);
 }
@@ -729,7 +731,7 @@ bool ChatDialog::isChatLogVisible() const
 }
 
 void ChatDialog::finishAssistantMessage(){
-    m_chat->append("\n<< stream finished >>");
+    m_chat->append(QStringLiteral("\n") + tr("<< stream finished >>"));
     appendAssistantChunk("");
 }
 
@@ -869,7 +871,7 @@ void ChatDialog::onSend(){
 
 void ChatDialog::appendUserMessage(const QString &s)
 {
-    m_chat->append(QString("You: %1\n\n").arg(s));
+    m_chat->append(tr("You: %1").arg(s) + QStringLiteral("\n\n"));
 }
 
 void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManager)
@@ -882,8 +884,8 @@ void ChatDialog::setTemplateManager(class SolutionTemplateManager* templateManag
     
     // Repopulate the templates with the new manager
     m_templateCombo->clear();
-    m_templateCombo->addItem("Выберите шаблон по умолчанию", "");
-    m_templateCombo->addItem("Простой чат", "simple_chat");
+    m_templateCombo->addItem(tr("Choose a default template"), "");
+    m_templateCombo->addItem(tr("Simple chat"), "simple_chat");
     m_templateCombo->setItemData(1, QColor(255, 255, 200), Qt::BackgroundColorRole); // Light yellow background
     populateTemplates();
 

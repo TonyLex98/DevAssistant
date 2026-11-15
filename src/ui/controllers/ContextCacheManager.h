@@ -6,13 +6,13 @@
 #include <QVector>
 
 /*
- * ContextCacheManager — управляет кэшем контекстных срезов файлов
- * 
- * Инкапсулирует:
+ * ContextCacheManager — cache of the file slices that are in the model's context.
+ *
+ * Holds:
  *  - m_contextSlices (QMap<QString, FileContextSlice>)
- *  - m_contextContent (сгенерированный текст контекста)
- *  - m_consoleLogs (логи консоли)
- *  - m_externalSources (внешние источники)
+ *  - m_contextContent (the generated context text)
+ *  - m_consoleLogs (console output)
+ *  - m_externalSources (external sources)
  *  - rebuildContextCache()
  *  - formatNumberedLines()
  *  - setFullFileContext()

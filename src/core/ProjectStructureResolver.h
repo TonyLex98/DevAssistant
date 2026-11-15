@@ -8,10 +8,9 @@ class MainWindow;  // forward declaration
 class ProjectStructureResolver
 {
 public:
-    /* Генерирует древовидное представление структуры проекта */
+    /* Builds a tree view of the project structure */
     static QString resolveProjectStructure(MainWindow* ctx);
     
 private:
-    /* Вспомогательная функция для формирования дерева */
     static QString generateProjectTree(const QString& projectRoot, const QStringList& files);
 };

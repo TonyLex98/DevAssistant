@@ -31,14 +31,14 @@ RunShellCommand::RunShellCommand(const QString& command,
 bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
 {
     if (!m_params.contains("command")) {
-        if (err) *err = "Команда не задана";
+        if (err) *err = "No command given";
         return false;
     }
 
     QProcess proc;
     QString cmd = m_params["command"].toString();
 
-    // Установить рабочую директорию из devAssManager, если возможно
+    // Resolve the working directory against the project root when possible
     QString cwd = m_params.value("cwd").toString().trimmed();
     if (devAss) {
         QDir projectRoot = devAss->projectRoot();
@@ -54,7 +54,7 @@ bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
     if (!cwd.isEmpty())
         proc.setWorkingDirectory(cwd);
 
-    // Для *nix будем использовать /bin/sh -c
+    // cmd /C on Windows, /bin/sh -c elsewhere
 #ifdef Q_OS_WIN
     proc.start("cmd", {"/C", cmd});
 #else
@@ -62,13 +62,13 @@ bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
 #endif
 
     if (!proc.waitForStarted()) {
-        if (err) *err = "Не удалось запустить команду";
+        if (err) *err = "Failed to start the command";
         return false;
     }
     const int timeoutMs = m_params.value("timeoutMs").toInt(120000);
     if (!proc.waitForFinished(timeoutMs)) {
         proc.kill();
-        if (err) *err = QString("Команда превысила лимит времени (%1 ms)").arg(timeoutMs);
+        if (err) *err = QString("The command exceeded the time limit (%1 ms)").arg(timeoutMs);
         m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
         m_stderr = decodeProcessOutput(proc.readAllStandardError());
         m_exitCode = -1;
@@ -79,7 +79,7 @@ bool RunShellCommand::apply(DevAssManager* devAss, QString* err)
     m_exitCode = proc.exitCode();
 
     if (m_exitCode != 0) {
-        if (err) *err = QString("Команда завершилась с кодом %1").arg(m_exitCode);
+        if (err) *err = QString("The command exited with code %1").arg(m_exitCode);
         return false;
     }
     return true;

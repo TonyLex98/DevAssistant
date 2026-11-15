@@ -1,4 +1,5 @@
 ﻿#include "SequenceEditorController.h"
+#include <QCoreApplication>
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QFileDialog>
@@ -81,25 +82,22 @@ void SequenceEditorController::updateSequenceGraphTemplateSelection()
 /* ────────────────────────────────────────────────────── */
 void SequenceEditorController::openSequenceEditorForName(const QString &sequenceName)
 {
-    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
+    // Refresh the cache so it includes the sequences from template folders.
     refreshAllSequences();
 
-    // Find the sequence by name using the new method
-    m_ui->log(QStringLiteral("DEBUG: Searching for sequence name: ") + sequenceName + QStringLiteral(" in openSequenceEditorForName"));
+    qCDebug(logSeq) << "[openSequenceEditorForName] Searching for sequence name:" << sequenceName;
     QPair<QString, PromptSequence> result = m_seq->seqMgrPtr()->findSequenceByName(sequenceName);
     QString filePath = result.first;
     PromptSequence seq = result.second;
 
     if (filePath.isEmpty()) {
-        // If not found in main manager, try to find in template directories
-        m_ui->log(QStringLiteral("DEBUG: Sequence NOT FOUND in main manager, searching in template directories..."));
+        // Not in the main manager: look in the template directories.
+        qCDebug(logSeq) << "[openSequenceEditorForName] Not found in the main manager, searching template directories";
 
-        // Search in template directories
         const QStringList& templateDirs = m_tmpl->templateMgrPtr()->templateDirs();
         for (const QString& templateDir : templateDirs) {
             QDir dir(templateDir);
             if (dir.exists()) {
-                // ищем *.seq.json в папке шаблона
                 QStringList filters = {"*.seq.json"};
                 QFileInfoList files = dir.entryInfoList(filters,
                                                         QDir::Files | QDir::NoSymLinks,
@@ -119,7 +117,7 @@ void SequenceEditorController::openSequenceEditorForName(const QString &sequence
                                 // Found the sequence in template directory
                                 seq = tempSeq;
                                 filePath = path;
-                                m_ui->log(QStringLiteral("DEBUG: Found sequence '") + sequenceName + QStringLiteral("' in template directory: ") + path);
+                                qCDebug(logSeq) << "[openSequenceEditorForName] Found" << sequenceName << "in template directory:" << path;
                                 seqFile.close();
                                 break;
                             }
@@ -137,48 +135,19 @@ void SequenceEditorController::openSequenceEditorForName(const QString &sequence
     }
 
     if (filePath.isEmpty()) {
-        m_ui->log(QStringLiteral("DEBUG: Sequence NOT FOUND in openSequenceEditorForName. Available sequences:"));
+        qCDebug(logSeq) << "[openSequenceEditorForName] Sequence not found:" << sequenceName;
         const QMap<QString, PromptSequence>& allSequences_debug = m_seq->seqMgrPtr()->sequences();
-        for (auto it = allSequences_debug.constBegin(); it != allSequences_debug.constEnd(); ++it) {
-            QString seqName = it.value().name();
-            QString filePath = it.key();
-            QFileInfo fileInfo(filePath);
-            QString fileName = fileInfo.fileName();
-            m_ui->log(QStringLiteral("  - Available sequence name: '") + seqName + QStringLiteral("' from file: '") + fileName + QLatin1String("'"));
-        }
-        // Also list template directory contents
-        const QStringList& templateDirs = m_tmpl->templateMgrPtr()->templateDirs();
-        m_ui->log(QStringLiteral("  Template directories and their sequences:"));
-        for (const QString& templateDir : templateDirs) {
-            QDir dir(templateDir);
-            if (dir.exists()) {
-                QStringList filters = {"*.seq.json"};
-                QFileInfoList files = dir.entryInfoList(filters,
-                                                        QDir::Files | QDir::NoSymLinks,
-                                                        QDir::Name);
-                m_ui->log(QStringLiteral("    - Template directory: ") + templateDir);
-                for (const QFileInfo& fileInfo : files) {
-                    // Load and get the sequence name
-                    QFile seqFile(fileInfo.absoluteFilePath());
-                    if (seqFile.open(QIODevice::ReadOnly)) {
-                        QByteArray data = seqFile.readAll();
-                        QJsonDocument doc = QJsonDocument::fromJson(data);
-                        if (doc.isObject()) {
-                            PromptSequence tempSeq = PromptSequence::fromJson(doc.object());
-                            m_ui->log(QStringLiteral("      - Sequence file: '") + fileInfo.fileName() + QStringLiteral("' with internal name: '") + tempSeq.name() + QLatin1String("'"));
-                        }
-                        seqFile.close();
-                    }
-                }
-            }
-        }
-        QMessageBox::warning(nullptr, QStringLiteral("Error"), QStringLiteral("Sequence not found: ") + sequenceName);
+        for (auto it = allSequences_debug.constBegin(); it != allSequences_debug.constEnd(); ++it)
+            qCDebug(logSeq) << "  available:" << it.value().name() << "file:" << QFileInfo(it.key()).fileName();
+        QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceEditorController", "Error"),
+                             QCoreApplication::translate("SequenceEditorController", "Sequence not found: %1").arg(sequenceName));
         return;
     } else {
-        m_ui->log(QStringLiteral("DEBUG: Successfully found sequence '") + sequenceName + QStringLiteral("' at path: ") + filePath);
+        qCDebug(logSeq) << "[openSequenceEditorForName] Found" << sequenceName << "at" << filePath;
     }
 
-    openSequenceEditorWindow(QStringLiteral("Редактор последовательности") + ": " + sequenceName, filePath, seq);
+    openSequenceEditorWindow(QCoreApplication::translate("SequenceEditorController", "Sequence editor: %1").arg(sequenceName),
+                             filePath, seq);
 }
 
 /* ────────────────────────────────────────────────────── */
@@ -202,8 +171,8 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
     lay->addWidget(editor, 1);
 
     auto *btnRow = new QHBoxLayout();
-    auto *saveBtn = new StyledButton(QStringLiteral("Сохранить"), win);
-    auto *closeBtn = new StyledButton(QStringLiteral("Закрыть"), win);
+    auto *saveBtn = new StyledButton(QCoreApplication::translate("SequenceEditorController", "Save"), win);
+    auto *closeBtn = new StyledButton(QCoreApplication::translate("SequenceEditorController", "Close"), win);
     saveBtn->setEnabled(false);
     btnRow->addStretch(1);
     btnRow->addWidget(saveBtn);
@@ -226,17 +195,19 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
 
     QObject::connect(editor, &PromptSequenceEditor::sequenceChanged, win, [win, saveBtn](const PromptSequence& edited) {
         saveBtn->setEnabled(true);
-        win->setWindowTitle(QStringLiteral("Редактор последовательности") + ": " + edited.name());
+        win->setWindowTitle(QCoreApplication::translate("SequenceEditorController", "Sequence editor: %1").arg(edited.name()));
     });
 
     QObject::connect(saveBtn, &QPushButton::clicked, win, [this, editor, filePath, saveBtn, refreshAfterSave, win]() {
         const PromptSequence edited = editor->sequence();
         if (m_seq->seqMgrPtr()->save(edited, filePath)) {
-            QMessageBox::information(win, QStringLiteral("Сохранено"), QStringLiteral("Последовательность сохранена."));
+            QMessageBox::information(win, QCoreApplication::translate("SequenceEditorController", "Saved"),
+                                     QCoreApplication::translate("SequenceEditorController", "The sequence has been saved."));
             saveBtn->setEnabled(false);
             refreshAfterSave();
         } else {
-            QMessageBox::warning(win, QStringLiteral("Ошибка"), QStringLiteral("Не удалось сохранить."));
+            QMessageBox::warning(win, QCoreApplication::translate("SequenceEditorController", "Error"),
+                                 QCoreApplication::translate("SequenceEditorController", "Could not save the sequence."));
         }
     });
 
@@ -248,40 +219,37 @@ void SequenceEditorController::openSequenceEditorWindow(const QString& title, co
 /* ────────────────────────────────────────────────────── */
 void SequenceEditorController::editSequences()
 {
-    // Обновим кэш, чтобы включить все последовательности из папок шаблонов
+    // Refresh the cache so it includes the sequences from template folders.
     refreshAllSequences();
 
-    // 1. Проверяем, что есть наборы
     if (m_seq->seqMgrPtr()->sequences().isEmpty()) {
-        QMessageBox::information(nullptr, QStringLiteral("Нет наборов"),
-                                 QStringLiteral("В папке нет ни одного *.seq.json"));
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceEditorController", "No sequences"),
+                                 QCoreApplication::translate("SequenceEditorController", "The folder has no *.seq.json files."));
         return;
     }
 
-    // 2. Формируем список названий файлов (без пути)
+    // File names without the path, mapped to the full path.
     QStringList names;
-    QMap<QString, QString> pathByName;      // имя → путь
+    QMap<QString, QString> pathByName;
     for (const QString &filePath : m_seq->seqMgrPtr()->fileList()) {
         QString name = QFileInfo(filePath).fileName();
         names << name;
         pathByName.insert(name, filePath);
     }
 
-    // 3. Попросим пользователя выбрать файл
     bool ok = false;
     QString selectedName = QInputDialog::getItem(
-                nullptr, QStringLiteral("Выберите последовательность"),
-                QStringLiteral("Файл:"), names, 0, false, &ok);
+                nullptr, QCoreApplication::translate("SequenceEditorController", "Choose a sequence"),
+                QCoreApplication::translate("SequenceEditorController", "File:"), names, 0, false, &ok);
 
     if (!ok || selectedName.isEmpty())
-        return;          // пользователь отменил
+        return;
 
     QString filePath = pathByName.value(selectedName);
-
-    // 4. Загружаем выбранную последовательность
     PromptSequence seq = m_seq->seqMgrPtr()->sequences().value(filePath);
 
-    openSequenceEditorWindow(QStringLiteral("Редактор последовательности") + ": " + selectedName, filePath, seq);
+    openSequenceEditorWindow(QCoreApplication::translate("SequenceEditorController", "Sequence editor: %1").arg(selectedName),
+                             filePath, seq);
 }
 
 /* ────────────────────────────────────────────────────── */
@@ -289,15 +257,19 @@ void SequenceEditorController::createNewSequence()
 {
     // Ask user for name
     bool ok=false;
-    QString name = QInputDialog::getText(nullptr, QStringLiteral("New sequence"), QStringLiteral("Name:"), QLineEdit::Normal, QString(), &ok);
+    QString name = QInputDialog::getText(nullptr, QCoreApplication::translate("SequenceEditorController", "New sequence"),
+                                         QCoreApplication::translate("SequenceEditorController", "Name:"),
+                                         QLineEdit::Normal, QString(), &ok);
     if (!ok || name.trimmed().isEmpty()) return;
 
     // Ask user whether to create in PromptSequences folder or in a template folder
     QMessageBox msgBar;
-    msgBar.setWindowTitle(QStringLiteral("Create Sequence"));
-    msgBar.setText(QStringLiteral("Where would you like to create the sequence?"));
-    QAbstractButton* promptSeqButton = msgBar.addButton(QStringLiteral("In PromptSequences folder"), QMessageBox::ActionRole);
-    QAbstractButton* templateButton = msgBar.addButton(QStringLiteral("In Template folder"), QMessageBox::ActionRole);
+    msgBar.setWindowTitle(QCoreApplication::translate("SequenceEditorController", "Create Sequence"));
+    msgBar.setText(QCoreApplication::translate("SequenceEditorController", "Where would you like to create the sequence?"));
+    QAbstractButton* promptSeqButton = msgBar.addButton(
+        QCoreApplication::translate("SequenceEditorController", "In PromptSequences folder"), QMessageBox::ActionRole);
+    QAbstractButton* templateButton = msgBar.addButton(
+        QCoreApplication::translate("SequenceEditorController", "In Template folder"), QMessageBox::ActionRole);
     QAbstractButton* cancelButton = msgBar.addButton(QMessageBox::Cancel);
     msgBar.exec();
 
@@ -320,37 +292,45 @@ void SequenceEditorController::createNewSequence()
         PromptSequence seq = defaultSequenceTemplate();
         seq.setName(name.trimmed());
         if (!m_seq->seqMgrPtr()->save(seq, filePath)) {
-            QMessageBox::warning(nullptr, QStringLiteral("Error"), QStringLiteral("Cannot save sequence to: ") + filePath);
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceEditorController", "Error"),
+                                 QCoreApplication::translate("SequenceEditorController", "Cannot save sequence to: %1").arg(filePath));
             return;
         }
         refreshAllSequences();
         ensureDefaultSequence();
-        QMessageBox::information(nullptr, QStringLiteral("OK"), QStringLiteral("Sequence created:\n") + filePath);
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceEditorController", "OK"),
+                                 QCoreApplication::translate("SequenceEditorController", "Sequence created:\n%1").arg(filePath));
     } else if (msgBar.clickedButton() == templateButton) {
         // Create in template folder - user needs to select a template directory
-        QString templateDir = QFileDialog::getExistingDirectory(nullptr, QStringLiteral("Select Template Folder"),
-                                                              QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+        QString templateDir = QFileDialog::getExistingDirectory(nullptr,
+                                                                QCoreApplication::translate("SequenceEditorController", "Select Template Folder"),
+                                                                QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
         if (templateDir.isEmpty()) return;
 
         // Verify that the selected directory is a valid template directory by checking for template.templ.json
         QString templateJsonPath = QDir(templateDir).filePath("template.templ.json");
         if (!QFile::exists(templateJsonPath)) {
-            QMessageBox::warning(nullptr, QStringLiteral("Invalid Template Directory"),
-                               QStringLiteral("The selected directory is not a valid template directory (missing template.templ.json)."));
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceEditorController", "Invalid Template Directory"),
+                                 QCoreApplication::translate("SequenceEditorController",
+                                     "The selected directory is not a valid template directory (missing template.templ.json)."));
             return;
         }
 
         // Use the SolutionTemplateManager to create the new sequence in the template folder
         // This will create a default sequence structure in the template directory
         if (!m_tmpl->templateMgrPtr()->createNewSequenceInTemplate(templateDir, name.trimmed())) {
-            QMessageBox::warning(nullptr, QStringLiteral("Error"), QStringLiteral("Cannot create sequence in template directory: ") + templateDir);
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceEditorController", "Error"),
+                                 QCoreApplication::translate("SequenceEditorController",
+                                     "Cannot create sequence in template directory: %1").arg(templateDir));
             return;
         }
 
         // Now we need to refresh both sequence and template managers to recognize the new sequence
         m_tmpl->templateMgrPtr()->refresh();
         refreshAllSequences(); // This will refresh both the main sequences and those in templates
-        QMessageBox::information(nullptr, QStringLiteral("OK"), QStringLiteral("Sequence created in template:\n") + templateDir + "/" + name.trimmed() + ".seq.json");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceEditorController", "OK"),
+                                 QCoreApplication::translate("SequenceEditorController", "Sequence created in template:\n%1")
+                                     .arg(templateDir + "/" + name.trimmed() + ".seq.json"));
     }
 }
 
@@ -371,7 +351,6 @@ void SequenceEditorController::refreshAllSequences()
     for (const QString& templateDir : templateDirs) {
         QDir dir(templateDir);
         if (dir.exists()) {
-            // ищем *.seq.json в папке шаблона
             QStringList filters = {"*.seq.json"};
             QFileInfoList files = dir.entryInfoList(filters,
                                                     QDir::Files | QDir::NoSymLinks,
@@ -407,36 +386,24 @@ void SequenceEditorController::refreshAllSequences()
     allSequencePaths = m_seq->seqMgrPtr()->fileList();
     qCDebug(logSeq) << "[refreshAllSequences] Completed discovery and loading, total sequence files in manager:" << allSequencePaths.size();
 
-    // Add comprehensive logging about all available sequences for debugging
     const QMap<QString, PromptSequence>& allSequences = m_seq->seqMgrPtr()->sequences();
-    qCDebug(logSeq) << "[refreshAllSequences] Detailed sequence list for debugging:";
-    m_ui->log(QStringLiteral("=== SEQUENCE REFRESH DEBUG INFO ==="));
-    m_ui->log(QStringLiteral("Total sequences discovered: ") + QString::number(allSequences.size()));
-    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
-        QString seqName = it.value().name();
-        QString filePath = it.key();
-        QFileInfo fileInfo(filePath);
-        QString fileName = fileInfo.fileName();
-        m_ui->log(QStringLiteral("  - Sequence: '") + seqName + QStringLiteral("' -> File: '") + fileName + QStringLiteral("' at ") + filePath);
-    }
-    m_ui->log(QStringLiteral("=== END SEQUENCE DEBUG INFO ==="));
+    qCDebug(logSeq) << "[refreshAllSequences] Sequences discovered:" << allSequences.size();
+    for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it)
+        qCDebug(logSeq) << "  sequence:" << it.value().name() << "file:" << it.key();
 }
 
 /* ────────────────────────────────────────────────────── */
 void SequenceEditorController::ensureDefaultSequence()
 {
-    // Путь к файлу default.seq.json
     QString defaultFile = QDir(m_seq->seqMgrPtr()->root()).filePath("default.seq.json");
 
     if (QFile::exists(defaultFile))
-        return;        // уже есть – ничего не делаем
+        return;
 
-    // Создаём объект-шаблон
     PromptSequence seq = defaultSequenceTemplate();
 
-    // Сохраняем
     if (!m_seq->seqMgrPtr()->save(seq, defaultFile))
-        qCWarning(logSeq) << "Не удалось создать файл default.seq.json";
+        qCWarning(logSeq) << "Could not create default.seq.json";
 }
 
 /* ────────────────────────────────────────────────────── */
@@ -445,59 +412,59 @@ PromptSequence SequenceEditorController::defaultSequenceTemplate()
     // Step 1: Clarify the task if needed
     PromptStep s1;
     s1.setTemplate(
-        "Ты — ИИ-помощник по рефакторингу и правкам кода.\n"
-        "Контекст проекта:\n{{PROJECT_ROOT}}"
-        "Вот список файлов:\n{{FILE_LIST}}\n"
+        "You are an AI assistant for refactoring and editing code.\n"
+        "Project context:\n{{PROJECT_ROOT}}\n"
+        "Files:\n{{FILE_LIST}}\n"
         "\n{{HISTORY}}\n"
-        "Если задача пользователя не до конца ясна — задай до 3 уточняющих вопросов, используя команду ASK_USER (один JSON на вопрос)."
-        "При необходимости можешь сразу вызывать SEARCH_PROJECT (поиск по проекту) или SEARCH_WEB (внешние источники), прежде чем формировать план."
-        "Доступные команды: {{SUPPORTED_COMMANDS}}"
-        "Затем опиши краткий план действий."
+        "If the user's task is not entirely clear, ask up to 3 clarifying questions with the ASK_USER command (one JSON object per question).\n"
+        "If needed, call SEARCH_PROJECT (search the project) or SEARCH_WEB (external sources) before writing the plan.\n"
+        "Available commands: {{SUPPORTED_COMMANDS}}\n"
+        "Then describe a short plan of action."
     );
     s1.setAllowedCommands(QStringList{ "ASK_USER", "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
     // Step 2: Gather minimal relevant context (snippets only)
     PromptStep s2;
     s2.setTemplate(
-        "На основе запроса и плана выбери минимальные необходимые участки кода."
-        "Используй OPEN_FILE_REGION (желательно c startLine/endLine или регуляркой) для точечных фрагментов."
-        "Если нужен целый файл (редко) — используй OPEN_FILE."
-        "Для полнотекстового поиска по проекту используй SEARCH_PROJECT (укажи maxMatches и, при необходимости, include)."
-        "Если требуются внешние сведения — вызови SEARCH_WEB и кратко перескажи найденные материалы."
-        "Выведи только команды."
+        "Based on the request and the plan, pick the smallest pieces of code you need.\n"
+        "Use OPEN_FILE_REGION (preferably with startLine/endLine or a regular expression) for specific fragments.\n"
+        "If you need a whole file (rarely), use OPEN_FILE.\n"
+        "For full-text search in the project, use SEARCH_PROJECT (set maxMatches and, if needed, include).\n"
+        "If you need outside information, call SEARCH_WEB and briefly summarize what you found.\n"
+        "Output only commands."
     );
     s2.setAllowedCommands(QStringList{ "OPEN_FILE_REGION", "OPEN_FILE", "SEARCH_PROJECT", "SEARCH_WEB" });
 
     // Step 3: Propose concrete edits as commands (dry‑run)
     PromptStep s3;
     s3.setTemplate(
-        "Сформируй набор правок."
-        "• Для замены — REPLACE_IN_FILE"
-        "• Для правки диапазона — EDIT_IN_RANGE"
-        "• Для создания — CREATE_FILE"
-        "• Для переименования/удаления — RENAME_FILE/DELETE_FILE"
-        "Покажи только список JSON-команд без пояснений.\n"
-        "Контекст:\n{{OPEN_FILES}}\n"
+        "Prepare the set of edits.\n"
+        "• To replace text: REPLACE_IN_FILE\n"
+        "• To edit a range of lines: EDIT_IN_RANGE\n"
+        "• To create a file: CREATE_FILE\n"
+        "• To rename or delete: RENAME_FILE/DELETE_FILE\n"
+        "Output only the list of JSON commands, without explanations.\n"
+        "Context:\n{{OPEN_FILES}}\n"
     );
     s3.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE" });
 
     // Step 4: If compilation hints are needed, ask short questions (optional)
     PromptStep s4;
     s4.setTemplate(
-        "Если для точности правок не хватает 1-2 деталей — задай вопросы через ASK_USER, иначе верни пустой список."
+        "If 1-2 details are missing to make the edits precise, ask about them with ASK_USER; otherwise return an empty list."
     );
     s4.setAllowedCommands(QStringList{ "ASK_USER" });
 
     // Step 5: Finalize edits
     PromptStep s5;
     s5.setTemplate(
-        "Выведи окончательные команды для применения изменений (повтори весь набор без пояснений)."
-        "Если нужно показать пользователю результат или инструкцию — добавь команду SHOW_RESULT с title/content."
+        "Output the final commands that apply the changes (repeat the whole set, without explanations).\n"
+        "If the user should see a result or instructions, add a SHOW_RESULT command with title/content."
     );
     s5.setAllowedCommands(QStringList{ "REPLACE_IN_FILE", "EDIT_IN_RANGE", "CREATE_FILE", "RENAME_FILE", "DELETE_FILE", "SHOW_RESULT" });
 
     PromptSequence seq("Default");
-    seq.setDescription("Поэтапная последовательность правок: уточнение → сбор минимального контекста → черновик правок → уточнения → финальные команды.");
+    seq.setDescription("Step-by-step editing: clarify → collect minimal context → draft edits → follow-up questions → final commands.");
     seq.addStep(s1);
     seq.addStep(s2);
     seq.addStep(s3);

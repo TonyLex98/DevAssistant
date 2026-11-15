@@ -13,23 +13,23 @@ public:
                         const QStringList& allowed = {})
         : m_template(tmpl), m_allowedCommands(allowed) {}
 
-    /*--- сериализация ---------------------------------------------------*/
+    /*--- serialization ---------------------------------------------------*/
     QJsonObject toJson() const;
     static PromptStep fromJson(const QJsonObject& obj);
 
-    /*--- геттеры/сеттеры ------------------------------------------------*/
+    /*--- getters/setters -------------------------------------------------*/
     const QString&   tmpl() const { return m_template; }
     void setTemplate(const QString& t) { m_template = t; }
 
     const QStringList& allowedCommands() const { return m_allowedCommands; }
     void setAllowedCommands(const QStringList& lst) { m_allowedCommands = lst; }
 
-    /*--- зацикливаем ли шаг ----------------------------------------------*/
+    /*--- whether the step loops -----------------------------------------*/
     bool loop() const { return m_loop; }
     void setLoop(bool v) { m_loop = v; }
 
 private:
-    QString      m_template;          // шаблон промпта
-    QStringList  m_allowedCommands;   // имена команд из CommandRegistry
-    bool         m_loop = false;      // ← новое поле
+    QString      m_template;          // prompt template
+    QStringList  m_allowedCommands;   // command names from CommandRegistry
+    bool         m_loop = false;
 };

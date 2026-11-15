@@ -60,18 +60,18 @@ void SolutionTemplateManager::refresh()
         return;
     }
 
-    // Получаем все поддиректории (это будут папки шаблонов)
+    // Every subdirectory is a template folder
     QFileInfoList entryList = dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
     
     for (const QFileInfo& info : entryList) {
         QString templateDirPath = info.absoluteFilePath();
         
-        // Синхронизируем содержимое папки шаблона с файлом шаблона
+        // Sync the template file with the template folder contents
         bool syncSuccess = syncTemplateFileWithFolder(templateDirPath);
         
         QString templateJsonPath = templateDirPath + "/template.templ.json";
         
-        // Загружаем JSON-файл шаблона
+        // Load the template JSON file
         QFile tmplFile(templateJsonPath);
         if (!tmplFile.open(QIODevice::ReadOnly)) {
             continue;
@@ -86,7 +86,7 @@ void SolutionTemplateManager::refresh()
 
         SolutionTemplate tmpl = SolutionTemplate::fromJson(doc.object());
         
-        // Проверяем целостность шаблона и выводим предупреждение о несуществующих последовательностях
+        // Integrity check: warn about missing sequence files
         auto sequences = tmpl.sequences(); // QVector<QString> 
         for (const QString& seqPath : sequences) {
             QString fullPath = QDir(templateDirPath).filePath(seqPath);
@@ -106,7 +106,7 @@ const QMap<QString, SolutionTemplate> &SolutionTemplateManager::templates()
     return m_templates;
 }
 
-/* Сохранить/перезаписать шаблон */
+/* Save or overwrite a template */
 bool SolutionTemplateManager::save(const SolutionTemplate &tmpl, const QString &templateDirPath)
 {
     QDir dir;
@@ -114,7 +114,7 @@ bool SolutionTemplateManager::save(const SolutionTemplate &tmpl, const QString &
         return false;
     }
 
-    // Сохраняем JSON-файл шаблона
+    // Write the template JSON file
     QJsonObject obj = tmpl.toJson();
     QJsonDocument doc(obj);
     QString templateJsonPath = templateDirPath + "/template.templ.json";
@@ -124,7 +124,7 @@ bool SolutionTemplateManager::save(const SolutionTemplate &tmpl, const QString &
     tmplFile.write(doc.toJson(QJsonDocument::Indented));
     tmplFile.close();
 
-    // Обновляем кеш
+    // Update the cache
     m_templates.insert(templateDirPath, tmpl);
     if (!m_templateDirs.contains(templateDirPath))
         m_templateDirs << templateDirPath;
@@ -132,14 +132,14 @@ bool SolutionTemplateManager::save(const SolutionTemplate &tmpl, const QString &
     return true;
 }
 
-/* Удалить шаблон */
+/* Delete a template */
 bool SolutionTemplateManager::remove(const QString &templateDirPath)
 {
     QDir dir(templateDirPath);
     if (!dir.exists())
         return false;
 
-    // Удаляем всю директорию шаблона
+    // Remove the whole template directory
     if (!dir.removeRecursively())
         return false;
         
@@ -148,7 +148,7 @@ bool SolutionTemplateManager::remove(const QString &templateDirPath)
     return true;
 }
 
-/* Получить список доступных последовательностей для конкретного шаблона */
+/* Sequences available in the given template */
 QStringList SolutionTemplateManager::getAvailableSequences(const QString &templateDirPath) const
 {
     QStringList sequences;
@@ -156,7 +156,7 @@ QStringList SolutionTemplateManager::getAvailableSequences(const QString &templa
     if (!dir.exists())
         return sequences;
 
-    // Ищем все файлы *.seq.json в директории шаблона
+    // All *.seq.json files in the template directory
     QStringList filters = {"*.seq.json"};
     QFileInfoList fileInfoList = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     
@@ -167,14 +167,14 @@ QStringList SolutionTemplateManager::getAvailableSequences(const QString &templa
     return sequences;
 }
 
-/* Получить информацию о главной последовательности внутри шаблона */
+/* Path of the template's main sequence */
 QString SolutionTemplateManager::getMainSequencePath(const QString &templateDirPath) const
 {
     if (m_templates.contains(templateDirPath)) {
         SolutionTemplate tmpl = m_templates.value(templateDirPath);
         QString mainSeqPath = tmpl.mainSequencePath();
         
-        // Если указан относительный путь к главной последовательности, делаем его абсолютным
+        // Make a relative main sequence path absolute
         if (!mainSeqPath.isEmpty()) {
             // Check if the main sequence path exists as an absolute path
             if (QFileInfo::exists(mainSeqPath)) {
@@ -196,7 +196,7 @@ QString SolutionTemplateManager::getMainSequencePath(const QString &templateDirP
     return QString();
 }
 
-/* Экспорт шаблона в ZIP-архив */
+/* Export a template to a ZIP archive */
 bool SolutionTemplateManager::exportTemplate(const QString& templateDirPath, const QString& exportPath) const
 {
     QDir templateDir(templateDirPath);
@@ -214,7 +214,7 @@ bool SolutionTemplateManager::exportTemplate(const QString& templateDirPath, con
     return copyRecursively(templateDirPath, targetDir);
 }
 
-/* Импорт шаблона из ZIP-архива */
+/* Import a template from a ZIP archive */
 bool SolutionTemplateManager::importTemplate(const QString& importPath, const QString& targetDir) const
 {
     QFileInfo importInfo(importPath);
@@ -234,7 +234,7 @@ bool SolutionTemplateManager::importTemplate(const QString& importPath, const QS
     return copyRecursively(sourceDir, targetDir);
 }
 
-/* Экспорт последовательности как шаблона */
+/* Export a sequence as a template */
 bool SolutionTemplateManager::exportSequenceAsTemplate(const QString& sequencePath, const QString& templateDirPath, 
                                                       const QString& templateName, const QString& description) const
 {
@@ -282,7 +282,7 @@ bool SolutionTemplateManager::exportSequenceAsTemplate(const QString& sequencePa
     return true;
 }
 
-/* Создать новую последовательность в папке шаблона */
+/* Create a new sequence in the template folder */
 bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templateDirPath, 
                                                           const QString& sequenceName, 
                                                           const QString& description) const
@@ -344,7 +344,7 @@ bool SolutionTemplateManager::createNewSequenceInTemplate(const QString& templat
     return true;
 }
 
-/* Синхронизировать файл шаблона с содержимым папки шаблона (добавить отсутствующие файлы последовательностей) */
+/* Sync the template file with the template folder (add missing sequence files) */
 bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& templateDirPath) const
 {
     QDir dir(templateDirPath);
@@ -407,20 +407,20 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
     
     SolutionTemplate tmpl = SolutionTemplate::fromJson(tmplDoc.object());
     
-    // Получаем список всех файлов последовательностей в папке шаблона
+    // All sequence files in the template folder
     QStringList seqFilters = {"*.seq.json"};
     QFileInfoList fileInfoList = dir.entryInfoList(seqFilters, QDir::Files | QDir::NoSymLinks);
     
-    // Создаем список имен файлов последовательностей в папке
+    // Names of the sequence files in the folder
     QStringList folderSeqFiles;
     for (const QFileInfo& fileInfo : fileInfoList) {
         folderSeqFiles << fileInfo.fileName();
     }
     
-    // Проверяем, какие файлы уже есть в шаблоне
+    // Files already listed in the template
     auto existingSequences = tmpl.sequences();  // QVector<QString>
     
-    // Добавляем новые файлы, которых нет в шаблоне
+    // Add files missing from the template
     for (const QString& fileName : folderSeqFiles) {
         bool found = false;
         for (const QString& existingSeq : existingSequences) {
@@ -430,12 +430,11 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
             }
         }
         if (!found) {
-            // Добавляем файл к шаблону
             tmpl.addSequence(fileName);
         }
     }
     
-    // Удаляем из шаблона файлы, которые больше не существуют в папке
+    // Remove template entries whose files no longer exist in the folder
     QVector<QString> seqsToRemove;
     for (const QString& seqPath : existingSequences) {
         if (!folderSeqFiles.contains(seqPath)) {
@@ -446,7 +445,7 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
         tmpl.removeSequenceByPath(seqToRemove);
     }
     
-    // Сохраняем обновленный шаблон
+    // Save the updated template
     QJsonObject updatedTmplObj = tmpl.toJson();
     QJsonDocument updatedTmplDoc(updatedTmplObj);
     
@@ -461,7 +460,7 @@ bool SolutionTemplateManager::syncTemplateFileWithFolder(const QString& template
     return true;
 }
 
-/* Проверить целостность шаблона - наличие всех файлов последовательностей */
+/* Template integrity check: all sequence files must exist */
 QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templateDirPath) const
 {
     QStringList missingFiles;
@@ -471,7 +470,7 @@ QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templ
         return missingFiles;
     }
 
-    // Загружаем шаблон
+    // Load the template
     QString templateJsonPath = QDir(templateDirPath).filePath("template.templ.json");
 
     QFile tmplFile(templateJsonPath);
@@ -487,7 +486,7 @@ QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templ
 
     SolutionTemplate tmpl = SolutionTemplate::fromJson(tmplDoc.object());
 
-    // Проверяем, существуют ли все файлы последовательностей
+    // Check that every sequence file exists
     auto sequences = tmpl.sequences(); // QVector<QString>
     for (const QString& seqPath : sequences) {
         QString fullPath = QDir(templateDirPath).filePath(seqPath);
@@ -499,7 +498,7 @@ QStringList SolutionTemplateManager::checkTemplateIntegrity(const QString& templ
     return missingFiles;
 }
 
-/* Сохранить позиции последовательностей в шаблон */
+/* Save sequence positions to the template */
 void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDirPath, const QMap<QString, QPointF>& positions)
 {
     
@@ -545,7 +544,7 @@ void SolutionTemplateManager::savePositionsToTemplate(const QString& templateDir
     
 }
 
-/* Загрузить позиции последовательностей из шаблона */
+/* Load sequence positions from the template */
 QMap<QString, QPointF> SolutionTemplateManager::loadPositionsFromTemplate(const QString& templateDirPath) const
 {
     

@@ -6,19 +6,19 @@
 QString ProjectStructureResolver::resolveProjectStructure(MainWindow* ctx)
 {
     if (!ctx) {
-        return QString("Не удается получить структуру проекта: контекст отсутствует");
+        return QString("Cannot get the project structure: no context");
     }
     
     QString projectRoot = ctx->projectRootPath();
     if (projectRoot.isEmpty()) {
-        return QString("Не удается получить структуру проекта: корневая папка проекта не задана");
+        return QString("Cannot get the project structure: the project root folder is not set");
     }
     
-    // Получаем список файлов из ProjectIndex
+    // File list from ProjectIndex
     QStringList files = ctx->projectIndex().files();
     
     if (files.isEmpty()) {
-        return QString("Проект пуст или не содержит файлов");
+        return QString("The project is empty or contains no files");
     }
     
     return generateProjectTree(projectRoot, files);
@@ -26,14 +26,14 @@ QString ProjectStructureResolver::resolveProjectStructure(MainWindow* ctx)
 
 QString ProjectStructureResolver::generateProjectTree(const QString& projectRoot, const QStringList& files)
 {
-    // Создаем структуру дерева папок
+    // Collect the folder tree
     QSet<QString> directorySet;
     
     for (const QString& file : files) {
         QFileInfo fileInfo(file);
         QString dirPath = fileInfo.path();
         
-        // Добавляем все промежуточные папки
+        // Add every intermediate folder
         QStringList pathParts = dirPath.split('/');
         QString currentPath = "";
         for (int i = 0; i < pathParts.size(); ++i) {
@@ -45,41 +45,39 @@ QString ProjectStructureResolver::generateProjectTree(const QString& projectRoot
         }
     }
     
-    // Преобразуем в QMap для сортировки по уровням вложенности
+    // Group by nesting level
     QMap<int, QStringList> directoriesByLevel;
     for (const QString& dir : directorySet) {
         int level = dir.count('/') + 1;
-        if (dir.isEmpty()) level = 0; // Корневая директория
+        if (dir.isEmpty()) level = 0; // root directory
         directoriesByLevel[level].append(dir);
     }
     
-    // Сортируем имена папок на каждом уровне
+    // Sort folder names within each level
     for (auto& dirs : directoriesByLevel) {
         dirs.sort();
     }
     
-    // Строим дерево
     QStringList result;
-    result << "Структура проекта (только папки):";
+    result << "Project structure (folders only):";
     result << "";
     
-    // Выводим директории по уровням
+    // Output folders level by level
     for (auto it = directoriesByLevel.begin(); it != directoriesByLevel.end(); ++it) {
         int level = it.key();
         const QStringList& dirs = it.value();
         
         for (const QString& dirPath : dirs) {
-            // Создаем отступы для визуального представления вложенности
+            // Indent 2 spaces per nesting level
             QString indent = "";
             for (int i = 0; i < level; ++i) {
-                indent += "  "; // 2 пробела на каждый уровень
+                indent += "  ";
             }
-            
-            // Получаем имя папки
+
             QStringList pathParts = dirPath.split('/');
             QString folderName = pathParts.isEmpty() ? "" : pathParts.last();
             if (folderName.isEmpty() && level == 0) {
-                folderName = QFileInfo(projectRoot).fileName(); // Имя корневой папки проекта
+                folderName = QFileInfo(projectRoot).fileName(); // project root folder name
             }
             
             result << QString("%1%2/").arg(indent).arg(folderName);

@@ -79,7 +79,7 @@ void DevAssManager::setProjectRoot(const QString &projectRoot)
 }
 
 /* --------------------------------------------------------------- */
-/* 1. Создание каталога DevAss                                    */
+/* 1. Create the DevAss folder                                    */
 /* --------------------------------------------------------------- */
 bool DevAssManager::createFolder()
 {
@@ -87,7 +87,7 @@ bool DevAssManager::createFolder()
     {
         if (!m_devAssDir.mkpath("."))
         {
-            qCWarning(logCore) << "Не удалось создать папку DevelopersAssistant:" << m_devAssDir.absolutePath();
+            qCWarning(logCore) << "Failed to create the DevelopersAssistant folder:" << m_devAssDir.absolutePath();
             return false;
         }
     }
@@ -95,7 +95,7 @@ bool DevAssManager::createFolder()
 }
 
 /* --------------------------------------------------------------- */
-/* 2. Создание/обновление .dapro                                   */
+/* 2. Create/update .dapro                                         */
 /* --------------------------------------------------------------- */
 bool DevAssManager::createDaproFile()
 {
@@ -109,7 +109,7 @@ bool DevAssManager::createDaproFile()
     {
         if (!m_daproFile.open(QIODevice::WriteOnly))
         {
-            qCWarning(logCore) << "Не удалось создать .dapro файл:" << m_daproFile.fileName();
+            qCWarning(logCore) << "Failed to create the .dapro file:" << m_daproFile.fileName();
             return false;
         }
         m_daproFile.close();
@@ -118,7 +118,7 @@ bool DevAssManager::createDaproFile()
 }
 
 /* --------------------------------------------------------------- */
-/* 3. Генерация файлов‑дескрипторов *.dadescr                     */
+/* 3. Generate the *.dadescr descriptor files                     */
 /* --------------------------------------------------------------- */
 bool DevAssManager::generateDescrFiles()
 {
@@ -129,7 +129,7 @@ bool DevAssManager::generateDescrFiles()
     }
 
     QDirIterator it(m_projectRoot.absolutePath(),
-                    QDir::Files,   // только файлы
+                    QDir::Files,
                     QDirIterator::Subdirectories);
 
     bool ok = true;
@@ -140,31 +140,28 @@ bool DevAssManager::generateDescrFiles()
 
         QString srcFilePath = it.filePath();
 
-        /* Не обрабатывать собственную папку DevelopersAssistant (иначе зациклимся) */
+        /* Skip our own DevelopersAssistant folder (otherwise we would loop) */
         if (srcFilePath.startsWith(m_devAssDir.absolutePath()))
             continue;
 
-        /* Полный относительный путь от корня проекта */
         QString relPath = m_projectRoot.relativeFilePath(srcFilePath);
 
-        /* Путь к файлу‑дескриптору в DevelopersAssistant */
+        /* Descriptor file path inside DevelopersAssistant */
         QString descrPath = m_devAssDir.absoluteFilePath(relPath + ".dadescr");
         QFileInfo descrInfo(descrPath);
 
-        /* Создаём необходимые подкаталоги */
         QDir descrDir = descrInfo.dir();
         if (!descrDir.exists())
             descrDir.mkpath(".");
 
-        /* Если дескриптор уже существует – пропускаем */
         if (descrInfo.exists())
             continue;
 
-        /* Создаём пустой файл (можно позже заполнить текстом) */
+        /* Create an empty file (filled with text later) */
         QFile descrFile(descrPath);
         if (!descrFile.open(QIODevice::WriteOnly))
         {
-            qCWarning(logCore) << "Не удалось создать дескриптор:" << descrPath;
+            qCWarning(logCore) << "Failed to create the descriptor:" << descrPath;
             ok = false;
             continue;
         }
@@ -175,7 +172,7 @@ bool DevAssManager::generateDescrFiles()
 }
 
 /* --------------------------------------------------------------- */
-/* 4. Методы настройки конфигурации (.dapro)                       */
+/* 4. Configuration setters (.dapro)                               */
 /* --------------------------------------------------------------- */
 void DevAssManager::setBasePrompt(const QString &path, const QString &label)
 {
@@ -234,7 +231,7 @@ void DevAssManager::setHistoryFile(const QString &historyPath)
 }
 
 /* --------------------------------------------------------------- */
-/* 5. Сохранение/загрузка .dapro                                   */
+/* 5. Save/load .dapro                                             */
 /* --------------------------------------------------------------- */
 bool DevAssManager::save()
 {
@@ -265,7 +262,7 @@ bool DevAssManager::save()
 
     if (!m_daproFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
     {
-        qCWarning(logCore) << "Не удалось открыть .dapro файл для записи:" << m_daproFile.fileName();
+        qCWarning(logCore) << "Failed to open the .dapro file for writing:" << m_daproFile.fileName();
         return false;
     }
 
@@ -281,7 +278,7 @@ bool DevAssManager::load()
 
     if (!m_daproFile.open(QIODevice::ReadOnly))
     {
-        qCWarning(logCore) << "Не удалось открыть .dapro файл для чтения:" << m_daproFile.fileName();
+        qCWarning(logCore) << "Failed to open the .dapro file for reading:" << m_daproFile.fileName();
         return false;
     }
 
@@ -292,7 +289,7 @@ bool DevAssManager::load()
     QJsonDocument doc = QJsonDocument::fromJson(jsonBytes, &parseError);
     if (parseError.error != QJsonParseError::NoError)
     {
-        qCWarning(logCore) << "Ошибка разбора JSON в .dapro:" << parseError.errorString();
+        qCWarning(logCore) << "Failed to parse the .dapro JSON:" << parseError.errorString();
         return false;
     }
 

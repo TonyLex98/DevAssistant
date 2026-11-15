@@ -3,21 +3,15 @@
 #include <DevAssManager.h>
 
 /**
- * @brief Генерация и сохранение описания файла.
+ * @brief Generates and saves file descriptions.
  *
- * Внутри использует:
- *   - `OllamaAdapter::generate()` для получения текста
- *   - `DevAssManager` для вычисления относительного пути, создания
- *     каталога `DevAss/<rel>.dadescr` и обновления .dapro
+ * Uses:
+ *   - `OllamaAdapter::generate()` to produce the text
+ *   - `DevAssManager` to compute the relative path, create
+ *     `DevAss/<rel>.dadescr` and update .dapro
  *
- * API:
- *   - `generateAndSave()` – принимает абсолютный путь к исходному файлу,
- *     генерирует описание, сохраняет его в *.dadescr и обновляет .dapro.
- *
- * Возвращает: QString – сгенерированное описание (пустая строка – ошибка).
- *
- * @note Вызов `generateAndSave()` идёт только через один экземпляр
- *       класса (создаётся в `MainWindow` и переиспользуется в `DescriptionDialog`).
+ * @note A single instance is used (created in `MainWindow` and reused
+ *       in `DescriptionDialog`).
  */
 class DescriptionGenerator : public QObject
 {
@@ -26,11 +20,11 @@ public:
     explicit DescriptionGenerator(OllamaAdapter* model, DevAssManager* devAss, QObject* parent = nullptr);
 
     /**
-     * @brief Генерирует описание файла и сохраняет его в .dadescr.
-     * @param filePath Абсолютный путь к исходному файлу.
-     * @return Сгенерированный текст. В случае ошибки – пустая строка.
-     * @note Если описание уже актуально, метод ничего не делает
-     *       и возвращает пустую строку (в клиенте можно отобразить «уже актуально»).
+     * @brief Generates a file description and saves it to .dadescr.
+     * @param filePath Absolute path to the source file.
+     * @return The generated text, or an empty string on error.
+     * @note If the description is already up to date, does nothing
+     *       and returns an empty string.
      */
     QString generateAndSave(const QString& filePath);
 

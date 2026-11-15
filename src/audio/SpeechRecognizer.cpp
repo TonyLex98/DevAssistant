@@ -45,11 +45,11 @@ public:
         });
         connect(m_runner, &VoskRunner::partialText, this, [this](const QString& text) {
             if (!text.trimmed().isEmpty())
-                emit statusMessage(tr("Hearing: %1").arg(text.trimmed()));
+                emit statusMessage(SpeechRecognizer::tr("Hearing: %1").arg(text.trimmed()));
         });
         connect(m_runner, &VoskRunner::error, this, [this](const QString& e) {
             m_recording = false;
-            emit errorOccurred(tr("Vosk: %1").arg(e));
+            emit errorOccurred(SpeechRecognizer::tr("Vosk: %1").arg(e));
         });
     }
     void startRecording() override
@@ -58,7 +58,7 @@ public:
         const QString dll = s.value(QStringLiteral("speech/voskDll")).toString();
         const QString model = s.value(QStringLiteral("speech/voskModel")).toString();
         if (!QFileInfo::exists(dll) || !QFileInfo(model).isDir()) {
-            emit errorOccurred(tr("Vosk: set libvosk.dll and the model folder in Settings > Audio "
+            emit errorOccurred(SpeechRecognizer::tr("Vosk: set libvosk.dll and the model folder in Settings > Audio "
                                   "(models: alphacephei.com/vosk/models)."));
             return;
         }
@@ -85,7 +85,7 @@ public:
         });
         connect(m_runner, &MicTranscriber::error, this, [this](const QString& e) {
             m_recording = false;
-            emit errorOccurred(tr("whisper.cpp: %1").arg(e));
+            emit errorOccurred(SpeechRecognizer::tr("whisper.cpp: %1").arg(e));
         });
     }
     void startRecording() override
@@ -94,7 +94,7 @@ public:
         const QString exe = s.value(QStringLiteral("speech/whisperExe")).toString();
         const QString model = s.value(QStringLiteral("speech/whisperModel")).toString();
         if (!QFileInfo::exists(exe) || !QFileInfo::exists(model)) {
-            emit errorOccurred(tr("whisper.cpp: set the whisper-cli program and a ggml model in Settings > Audio."));
+            emit errorOccurred(SpeechRecognizer::tr("whisper.cpp: set the whisper-cli program and a ggml model in Settings > Audio."));
             return;
         }
         m_runner->setWhisperExe(exe);
@@ -128,7 +128,7 @@ public:
     {
         m_runner->stopRecording();
         m_recording = false;
-        emit statusMessage(tr("Recognizing the recording..."));
+        emit statusMessage(SpeechRecognizer::tr("Recognizing the recording..."));
     }
 
 private:
@@ -161,10 +161,10 @@ QString SpeechRecognizer::engineKey(Engine engine)
 QString SpeechRecognizer::engineTitle(Engine engine)
 {
     switch (engine) {
-    case Engine::FasterWhisper: return tr("faster-whisper (Python, streaming)");
-    case Engine::Vosk:          return tr("Vosk (offline, libvosk.dll)");
-    case Engine::WhisperCpp:    return tr("whisper.cpp (command-line program)");
-    case Engine::OmniAsr:       return tr("Omni ASR (Python, wav2vec2)");
+    case Engine::FasterWhisper: return SpeechRecognizer::tr("faster-whisper (Python, streaming)");
+    case Engine::Vosk:          return SpeechRecognizer::tr("Vosk (offline, libvosk.dll)");
+    case Engine::WhisperCpp:    return SpeechRecognizer::tr("whisper.cpp (command-line program)");
+    case Engine::OmniAsr:       return SpeechRecognizer::tr("Omni ASR (Python, wav2vec2)");
     }
     return QString();
 }

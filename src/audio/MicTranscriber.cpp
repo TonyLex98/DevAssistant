@@ -6,7 +6,7 @@
 #include <QDebug>
 
 MicTranscriber::MicTranscriber(QObject* parent) : QObject(parent) {
-    // Аудио формат 16k/mono/PCM16
+    // Audio format: 16 kHz, mono, PCM16
     m_fmt.setSampleRate(16000);
     m_fmt.setChannelCount(1);
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
@@ -22,14 +22,14 @@ MicTranscriber::MicTranscriber(QObject* parent) : QObject(parent) {
 
 bool MicTranscriber::start() {
     if (m_whisperExe.isEmpty() || m_modelPath.isEmpty()) {
-        emit error("Set whisper exe and model path first");
+        emit error(tr("Set the whisper program and the model path first"));
         return false;
     }
 
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
     QAudioDeviceInfo info = QAudioDeviceInfo::defaultInputDevice();
     if (!info.isFormatSupported(m_fmt)) {
-        emit error("Requested audio format not supported");
+        emit error(tr("The requested audio format is not supported"));
         return false;
     }
     m_in.reset(new QAudioInput(info, m_fmt, this));
@@ -39,19 +39,19 @@ bool MicTranscriber::start() {
     // m_in.reset(new QAudioSource(device, m_fmt, this));
 #endif
 
-    // куда писать временные файлы
+    // where the temporary files go
     QString baseDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     if (baseDir.isEmpty()) baseDir = QDir::currentPath();
     QDir(baseDir).mkpath("qt_mic_whisper");
     QString dir = baseDir + "/qt_mic_whisper";
 
-    // старт первой записи
+    // start the first recording
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
     m_dev = m_in->start();
 #else
     // m_dev = m_in->start(); // Qt6
 #endif
-    if (!m_dev) { emit error("Failed to start audio input"); return false; }
+    if (!m_dev) { emit error(tr("Failed to start audio input")); return false; }
 
     connect(m_dev, &QIODevice::readyRead, this, &MicTranscriber::onReadyRead);
     startNewChunk();
@@ -87,7 +87,7 @@ void MicTranscriber::startNewChunk() {
     m_curTxt = dir + "/chunk_" + ts + ".txt";
 
     if (!m_writer.open(m_curWav, 16000, 1, 16)) {
-        emit error("Cannot open WAV for write: " + m_curWav);
+        emit error(tr("Cannot open the WAV file for writing: %1").arg(m_curWav));
     }
 }
 
@@ -101,7 +101,7 @@ void MicTranscriber::closeChunkAndRunWhisper() {
     m_writer.close();
 
     if (m_proc) {
-        // если прошлый ещё бежит — не плодим, можно очередь сделать; тут просто скипаем
+        // the previous run is still going: skip this chunk (no queue)
         if (m_proc->state() != QProcess::NotRunning) return;
         m_proc->deleteLater();
         m_proc = nullptr;
@@ -115,7 +115,7 @@ void MicTranscriber::closeChunkAndRunWhisper() {
     args << "-m" << m_modelPath
          << "-f" << m_curWav
          << "-otxt"
-         << "-of" << m_curWav;   // создаст chunk_xxx.wav.txt
+         << "-of" << m_curWav;   // writes chunk_xxx.wav.txt
     if (!m_language.isEmpty())
         args << "-l" << m_language;
 
@@ -125,7 +125,7 @@ void MicTranscriber::closeChunkAndRunWhisper() {
 }
 
 void MicTranscriber::onProcFinished(int, QProcess::ExitStatus) {
-    const QString outTxt = m_curWav + ".txt"; // т.к. -of = путь WAV
+    const QString outTxt = m_curWav + ".txt"; // since -of is the WAV path
     QFile f(outTxt);
     if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QString text = QString::fromUtf8(f.readAll()).trimmed();

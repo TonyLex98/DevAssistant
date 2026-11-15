@@ -6,44 +6,37 @@
 #include <SolutionTemplateManager.h>
 #include "../../services/IService.h"
 
-// Контроллер редактора последовательностей
-// Отвечает за:
-//  - создание/редактирование/сохранение последовательностей
-//  - управление графом последовательностей
-//  - обновление кэша последовательностей из папок и шаблонов
+// Sequence editor controller:
+//  - creates, edits and saves sequences
+//  - drives the sequence graph
+//  - refreshes the sequence cache from the sequences folder and the template folders
 class SequenceEditorController
 {
 public:
     SequenceEditorController(ISequenceService* seq, ITemplateService* tmpl, IGraphService* graph, IUIUpdater* ui);
 
-    // Открытие графа последовательностей
     void openSequenceGraph();
 
-    // Обновление подсветки текущей последовательности в графе
+    // Highlights the running sequence in the graph.
     void updateSequenceGraphHighlight();
 
-    // Обновление выбора шаблона в графе
     void updateSequenceGraphTemplateSelection();
 
-    // Открытие редактора для последовательности по имени
     void openSequenceEditorForName(const QString& sequenceName);
 
-    // Диалог выбора и редактирования последовательности
+    // Lets the user pick a sequence file and opens it in the editor.
     void editSequences();
 
-    // Создание новой последовательности
     void createNewSequence();
 
-    // Обновление кэша всех последовательностей (основные + из шаблонов)
+    // Reloads all sequences: the main folder plus the template folders.
     void refreshAllSequences();
 
-    // Гарантия наличия default.seq.json
+    // Writes default.seq.json if it does not exist.
     void ensureDefaultSequence();
 
-    // Обработка изменения выбора шаблона в чате
     void onChatTemplateSelectionChanged(const QString& templatePath);
 
-    // Статический шаблон последовательности по умолчанию
     static PromptSequence defaultSequenceTemplate();
 
 private:
@@ -52,7 +45,6 @@ private:
     IGraphService* m_graph;
     IUIUpdater* m_ui;
 
-    // Открытие окна редактора последовательности
     void openSequenceEditorWindow(const QString& title,
                                   const QString& filePath,
                                   const PromptSequence& seq);

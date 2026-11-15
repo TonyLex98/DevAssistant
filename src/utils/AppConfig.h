@@ -10,7 +10,7 @@ public:
     QString selectedModel;
     QUrl    endpoint;
     QVariantMap params;
-    // Параметры генерации для Ollama
+    // Ollama generation parameters
     double temperature = 0.1;
     double topP = 0.9;
     int topK = 40;

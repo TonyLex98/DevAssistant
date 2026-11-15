@@ -23,7 +23,7 @@ SearchProjectCaseInsensitiveCommand::SearchProjectCaseInsensitiveCommand(const Q
         m_params["include"] = arr;
     }
     m_description = descr.isEmpty()
-        ? QString("Поиск по проекту (регистронезависимый): \"%1\"").arg(query)
+        ? QString("Case-insensitive project search: \"%1\"").arg(query)
         : descr;
 }
 
@@ -31,12 +31,12 @@ bool SearchProjectCaseInsensitiveCommand::apply(DevAssManager* devAss, QString* 
 {
     m_matches.clear();
     if (!devAss) {
-        if (err) *err = "SEARCH_PROJECT_CASE_INSENSITIVE: DevAssManager недоступен";
+        if (err) *err = "SEARCH_PROJECT_CASE_INSENSITIVE: DevAssManager is not available";
         return false;
     }
     const QString query = m_params.value("query").toString();
     if (query.trimmed().isEmpty()) {
-        if (err) *err = "SEARCH_PROJECT_CASE_INSENSITIVE: пустой запрос";
+        if (err) *err = "SEARCH_PROJECT_CASE_INSENSITIVE: empty query";
         return false;
     }
 
@@ -79,14 +79,14 @@ bool SearchProjectCaseInsensitiveCommand::apply(DevAssManager* devAss, QString* 
     }
 
     if (m_matches.isEmpty() && err) {
-        *err = "SEARCH_PROJECT_CASE_INSENSITIVE: совпадения не найдены";
+        *err = "SEARCH_PROJECT_CASE_INSENSITIVE: no matches found";
     }
     return true;
 }
 
 bool SearchProjectCaseInsensitiveCommand::shouldSkipFile(const QString& path) const
 {
-    // Пропускаем файлы в подкаталоге DevelopersAssistant проекта
+    // Skip files in the project's DevelopersAssistant subfolder
     QString normalizedPath = QDir::cleanPath(path);
     QStringList pathParts = normalizedPath.split('/');
     for (const QString& part : pathParts) {

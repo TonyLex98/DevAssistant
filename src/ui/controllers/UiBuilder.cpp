@@ -60,7 +60,7 @@ void UiBuilder::build(UIWidgets& ui,
     ui.m_rootEdit = new MemoryLineEdit("projectRoot", parent);
     ui.m_graphWindow = new GraphWidget();
     ui.m_seqGraphWindow = nullptr;
-    ui.browseBtn = new StyledButton("Browse...", parent);
+    ui.browseBtn = new StyledButton(tr_fn("Browse..."), parent);
 
     // Top row (path + Browse)
     ui.top_widget = new QWidget(parent);
@@ -114,7 +114,7 @@ void UiBuilder::build(UIWidgets& ui,
     ui.m_contextTabs->addTab(ui.m_contextGraphWidget, tr_fn("Context Graph"));
     contextLayout->addWidget(ui.m_contextTabs);
 
-    ui.m_contextCommandsList->setHeaderLabels(QStringList() << "Time" << "Description");
+    ui.m_contextCommandsList->setHeaderLabels(QStringList() << tr_fn("Time") << tr_fn("Description"));
     ui.m_contextCommandsList->setColumnCount(2);
     ui.m_contextCommandsList->setHeaderHidden(false);
     ui.m_contextCommandsList->setRootIsDecorated(true);
@@ -153,12 +153,12 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
         "QListWidget::item:selected { background: #dff8f3; color: #0f766e; font-weight: 600; }"
         "QListWidget::item:hover { background: #e6f5f1; }"
     );
-    ui.m_settingsSidebar->addItem("📁  Проект");
-    ui.m_settingsSidebar->addItem("🤖  Модель");
-    ui.m_settingsSidebar->addItem("📋  Последовательности");
-    ui.m_settingsSidebar->addItem("📊  Графики");
-    ui.m_settingsSidebar->addItem("🔊  Аудио");
-    ui.m_settingsSidebar->addItem("⚙️  Система");
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("📁  ") + tr_fn("Project"));
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("🤖  ") + tr_fn("Model"));
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("📋  ") + tr_fn("Sequences"));
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("📊  ") + tr_fn("Graphs"));
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("🔊  ") + tr_fn("Audio"));
+    ui.m_settingsSidebar->addItem(QString::fromUtf8("⚙️  ") + tr_fn("System"));
     settingsRoot->addWidget(ui.m_settingsSidebar, 0);
 
     // Pages stack
@@ -186,11 +186,11 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
     }
 
     // Hidden buttons
-    ui.applyBtn = new StyledButton("Apply", parent);
-    ui.undoBtn = new StyledButton("Undo", parent);
+    ui.applyBtn = new StyledButton(tr_fn("Apply"), parent);
+    ui.undoBtn = new StyledButton(tr_fn("Undo"), parent);
     ui.applyBtn->hide();
     ui.undoBtn->hide();
-    ui.runSeqBtn = new StyledButton(tr_fn("Запустить"), parent);
+    ui.runSeqBtn = new StyledButton(tr_fn("Run"), parent);
     ui.runSeqBtn->hide();
 }
 
@@ -232,13 +232,13 @@ void UiBuilder::buildProjectPage(UIWidgets& ui,
 {
     auto* projLay = pageLay(page);
 
-    addSection(tr_fn("Путь к проекту"), projLay);
+    addSection(tr_fn("Project path"), projLay);
     projLay->addWidget(ui.top_widget);
     addDiv(projLay);
-    addSection(tr_fn("Действия"), projLay);
+    addSection(tr_fn("Actions"), projLay);
 
-    ui.rescanBtn = new StyledButton(tr_fn("Обновить проект"), parent);
-    ui.descBtn = new StyledButton(tr_fn("Сгенерировать описания"), parent);
+    ui.rescanBtn = new StyledButton(tr_fn("Rescan project"), parent);
+    ui.descBtn = new StyledButton(tr_fn("Generate descriptions"), parent);
     ui.rescanBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui.descBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     projLay->addWidget(ui.rescanBtn);
@@ -252,10 +252,10 @@ void UiBuilder::buildModelPage(UIWidgets& ui,
 {
     auto* llmLay = pageLay(page);
 
-    addSection(tr_fn("Настройки модели"), llmLay);
+    addSection(tr_fn("Model settings"), llmLay);
 
-    ui.settingsBtn = new StyledButton(tr_fn("Открыть настройки LLM"), parent);
-    ui.promptBtn = new StyledButton(tr_fn("Редактировать базовый промпт"), parent);
+    ui.settingsBtn = new StyledButton(tr_fn("Open LLM settings"), parent);
+    ui.promptBtn = new StyledButton(tr_fn("Edit base prompt"), parent);
     llmLay->addWidget(ui.settingsBtn);
     llmLay->addWidget(ui.promptBtn);
     addDiv(llmLay);
@@ -272,13 +272,13 @@ void UiBuilder::buildSequencesPage(UIWidgets& ui,
 {
     auto* seqLay = pageLay(page);
 
-    addSection(tr_fn("Последовательности"), seqLay);
+    addSection(tr_fn("Sequences"), seqLay);
 
-    ui.editSeqBtn = new StyledButton(tr_fn("Редактировать"), parent);
-    ui.newSeqBtn = new StyledButton(tr_fn("Создать"), parent);
-    ui.runTemplateBtn = new StyledButton(tr_fn("Запустить шаблон"), parent);
-    ui.editTemplatesBtn = new StyledButton(tr_fn("Редактировать шаблоны"), parent);
-    ui.exportSequenceAsTemplateBtn = new StyledButton(tr_fn("Экспорт как шаблон"), parent);
+    ui.editSeqBtn = new StyledButton(tr_fn("Edit"), parent);
+    ui.newSeqBtn = new StyledButton(tr_fn("Create"), parent);
+    ui.runTemplateBtn = new StyledButton(tr_fn("Run template"), parent);
+    ui.editTemplatesBtn = new StyledButton(tr_fn("Edit templates"), parent);
+    ui.exportSequenceAsTemplateBtn = new StyledButton(tr_fn("Export as template"), parent);
 
     seqLay->addWidget(ui.editSeqBtn);
     seqLay->addWidget(ui.newSeqBtn);
@@ -294,10 +294,10 @@ void UiBuilder::buildGraphsPage(UIWidgets& ui,
 {
     auto* graphLay = pageLay(page);
 
-    addSection(tr_fn("Визуализация"), graphLay);
+    addSection(tr_fn("Visualization"), graphLay);
 
-    ui.graphBtn = new StyledButton(tr_fn("Граф контекста"), parent);
-    ui.seqGraphBtn = new StyledButton(tr_fn("Граф последовательностей"), parent);
+    ui.graphBtn = new StyledButton(tr_fn("Context graph"), parent);
+    ui.seqGraphBtn = new StyledButton(tr_fn("Sequence graph"), parent);
     ui.lightRagBtn = new StyledButton(tr_fn("LightRAG"), parent);
     ui.documentsBtn = new StyledButton(tr_fn("Documents: search and questions"), parent);
     ui.documentsBtn->setToolTip(tr_fn("Index the project's documents and ask questions about them. "
@@ -376,7 +376,7 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
 {
     auto* sysLay = pageLay(page);
 
-    addSection(tr_fn("Безопасность"), sysLay);
+    addSection(tr_fn("Security"), sysLay);
 
     // New key on purpose: the old "confirmMode" default was "run everything", and a stored
     // value from those days must not carry over.
@@ -400,10 +400,10 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
     sysLay->addWidget(agentMode);
 
     addDiv(sysLay);
-    addSection(tr_fn("Интерфейс"), sysLay);
+    addSection(tr_fn("Interface"), sysLay);
 
-    ui.chatToggleBtn = new StyledButton(tr_fn("Показать чат"), parent);
-    ui.logToggleBtn = new StyledButton(tr_fn("Показать лог"), parent);
+    ui.chatToggleBtn = new StyledButton(tr_fn("Show chat"), parent);
+    ui.logToggleBtn = new StyledButton(tr_fn("Show log"), parent);
     ui.chatToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     ui.logToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     sysLay->addWidget(ui.chatToggleBtn);

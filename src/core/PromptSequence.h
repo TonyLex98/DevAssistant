@@ -10,11 +10,11 @@ public:
     PromptSequence() = default;
     explicit PromptSequence(const QString& name) : m_name(name) {}
 
-    /*--- сериализация ---------------------------------------------------*/
+    /*--- serialization ---------------------------------------------------*/
     QJsonObject toJson() const;
     static PromptSequence fromJson(const QJsonObject& obj);
 
-    /*--- базовые операции -----------------------------------------------*/
+    /*--- basic operations ------------------------------------------------*/
     void addStep(const PromptStep& step) { m_steps.append(step); }
     void insertStep(int idx, const PromptStep& step) { m_steps.insert(idx, step); }
     void removeStep(int idx) { m_steps.removeAt(idx); }
@@ -25,7 +25,7 @@ public:
         m_steps[idx] = step;
     }
 
-    /*--- геттеры --------------------------------------------------------*/
+    /*--- getters ---------------------------------------------------------*/
     const QString&               name() const { return m_name; }
     const QString&               description() const { return m_description; }
     const QVector<PromptStep>&   steps() const { return m_steps; }

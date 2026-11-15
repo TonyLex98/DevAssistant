@@ -41,45 +41,45 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     };
 
     if (commandName == "ASK_USER") {
-        d.summary = QStringLiteral("Задаёт пользователю уточняющий вопрос (используй, если не хватает данных).");
-        d.params = { req("question", "string", QStringLiteral("Текст вопроса (что именно нужно уточнить).")) };
-        d.notes = QStringList() << QStringLiteral("Не добавляй лишних команд: сначала спроси, потом действуй по ответу.");
-        d.example = baseExample(QJsonObject{{"question", "Какой файл менять: src/main.cpp или src/app.cpp?"}});
+        d.summary = QStringLiteral("Asks the user a clarifying question (use it when information is missing).");
+        d.params = { req("question", "string", QStringLiteral("Question text (what exactly needs clarifying).")) };
+        d.notes = QStringList() << QStringLiteral("Do not add other commands: ask first, then act on the answer.");
+        d.example = baseExample(QJsonObject{{"question", "Which file should be changed: src/main.cpp or src/app.cpp?"}});
         return d;
     }
 
     if (commandName == "OPEN_FILE") {
-        d.summary = QStringLiteral("Открывает файл и возвращает содержимое с номерами строк.");
-        d.params = { req("path", "string", QStringLiteral("Путь к файлу (абсолютный или относительно корня проекта).")) };
+        d.summary = QStringLiteral("Opens a file and returns its contents with line numbers.");
+        d.params = { req("path", "string", QStringLiteral("File path (absolute or relative to the project root).")) };
         d.notes = QStringList()
-                  << QStringLiteral("Номера строк из результата используй для EDIT_IN_RANGE.")
-                  << QStringLiteral("Если файл большой — используй OPEN_FILE_REGION.");
+                  << QStringLiteral("Use the line numbers from the result for EDIT_IN_RANGE.")
+                  << QStringLiteral("For a large file, use OPEN_FILE_REGION.");
         d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}});
         return d;
     }
 
     if (commandName == "OPEN_FILE_REGION") {
-        d.summary = QStringLiteral("Открывает часть файла по диапазону строк или по regex и возвращает строки с номерами.");
+        d.summary = QStringLiteral("Opens part of a file by line range or by regex and returns the lines with numbers.");
         d.params = {
-            req("path", "string", QStringLiteral("Путь к файлу (абсолютный или относительно корня проекта).")),
-            opt("startLine", "int", QStringLiteral("Начальная строка (1-based, включительно). Требуется вместе с endLine.")),
-            opt("endLine", "int", QStringLiteral("Конечная строка (1-based, включительно). Требуется вместе с startLine.")),
-            opt("region", "string", QStringLiteral("Regex: если указан, вернёт строки, которые совпали (вместо диапазона)."))
+            req("path", "string", QStringLiteral("File path (absolute or relative to the project root).")),
+            opt("startLine", "int", QStringLiteral("First line (1-based, inclusive). Requires endLine.")),
+            opt("endLine", "int", QStringLiteral("Last line (1-based, inclusive). Requires startLine.")),
+            opt("region", "string", QStringLiteral("Regex: if set, returns the matching lines (instead of a range)."))
         };
-        d.notes = QStringList() << QStringLiteral("Нужно указать либо startLine+endLine, либо region.");
+        d.notes = QStringList() << QStringLiteral("Specify either startLine+endLine or region.");
         d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}, {"startLine", 1}, {"endLine", 120}});
         return d;
     }
 
     if (commandName == "CREATE_FILE") {
-        d.summary = QStringLiteral("Создаёт новый текстовый файл. Ошибка, если файл уже существует.");
+        d.summary = QStringLiteral("Creates a new text file. Fails if the file already exists.");
         d.params = {
-            req("path", "string", QStringLiteral("Путь к новому файлу (абсолютный или относительно корня проекта).")),
-            req("content", "string", QStringLiteral("Полное содержимое файла (используй \\n для переносов)."))
+            req("path", "string", QStringLiteral("Path of the new file (absolute or relative to the project root).")),
+            req("content", "string", QStringLiteral("Full file contents (use \\n for line breaks)."))
         };
         d.notes = QStringList()
-                  << QStringLiteral("Не используй для перезаписи существующего файла — для этого REPLACE_IN_FILE или EDIT_IN_RANGE.")
-                  << QStringLiteral("Если нужно создать папки — они будут созданы автоматически.");
+                  << QStringLiteral("Do not use it to overwrite an existing file; use REPLACE_IN_FILE or EDIT_IN_RANGE for that.")
+                  << QStringLiteral("Missing folders are created automatically.");
         d.example = baseExample(QJsonObject{
             {"path", "src/utils/NewHelper.h"},
             {"content", "#pragma once\n\nint add(int a, int b);\n"}
@@ -88,12 +88,12 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "REPLACE_IN_FILE") {
-        d.summary = QStringLiteral("Полностью заменяет содержимое существующего файла на новое.");
+        d.summary = QStringLiteral("Replaces the entire contents of an existing file.");
         d.params = {
-            req("path", "string", QStringLiteral("Путь к файлу (абсолютный или относительно корня проекта).")),
-            req("content", "string", QStringLiteral("Новое полное содержимое файла (используй \\n)."))
+            req("path", "string", QStringLiteral("File path (absolute or relative to the project root).")),
+            req("content", "string", QStringLiteral("New full file contents (use \\n)."))
         };
-        d.notes = QStringList() << QStringLiteral("Если нужно точечно поменять строки — используй EDIT_IN_RANGE.");
+        d.notes = QStringList() << QStringLiteral("To change only specific lines, use EDIT_IN_RANGE.");
         d.example = baseExample(QJsonObject{
             {"path", "src/main.cpp"},
             {"content", "#include <iostream>\n\nint main(){\n  std::cout << \"Hello\";\n}\n"}
@@ -102,17 +102,17 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "EDIT_IN_RANGE") {
-        d.summary = QStringLiteral("Заменяет диапазон строк в файле (по номерам строк из OPEN_FILE/OPEN_FILE_REGION).");
+        d.summary = QStringLiteral("Replaces a range of lines in a file (line numbers from OPEN_FILE/OPEN_FILE_REGION).");
         d.params = {
-            req("path", "string", QStringLiteral("Путь к файлу (абсолютный или относительно корня проекта).")),
-            req("startLine", "int", QStringLiteral("Начальная строка (1-based, включительно).")),
-            req("endLine", "int", QStringLiteral("Конечная строка (1-based, включительно).")),
-            opt("content", "string", QStringLiteral("Новые строки одним текстом (\\n). Альтернатива replacementLines.")),
-            opt("replacementLines", "array", QStringLiteral("Массив объектов {line:int, text:string}. Альтернатива content."))
+            req("path", "string", QStringLiteral("File path (absolute or relative to the project root).")),
+            req("startLine", "int", QStringLiteral("First line (1-based, inclusive).")),
+            req("endLine", "int", QStringLiteral("Last line (1-based, inclusive).")),
+            opt("content", "string", QStringLiteral("New lines as a single text (\\n). Alternative to replacementLines.")),
+            opt("replacementLines", "array", QStringLiteral("Array of objects {line:int, text:string}. Alternative to content."))
         };
         d.notes = QStringList()
-                  << QStringLiteral("Проще всего: укажи startLine/endLine и content с нужными строками.")
-                  << QStringLiteral("Диапазон обязан существовать в файле; иначе будет ошибка.");
+                  << QStringLiteral("Simplest: set startLine/endLine and content with the new lines.")
+                  << QStringLiteral("The range must exist in the file; otherwise it is an error.");
         d.example = baseExample(QJsonObject{
             {"path", "src/main.cpp"},
             {"startLine", 10},
@@ -123,49 +123,49 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "DELETE_FILE") {
-        d.summary = QStringLiteral("Удаляет файл.");
-        d.params = { req("path", "string", QStringLiteral("Путь к файлу (абсолютный или относительно корня проекта).")) };
-        d.notes = QStringList() << QStringLiteral("Используй осторожно. Если не уверен — сначала OPEN_FILE.");
+        d.summary = QStringLiteral("Deletes a file.");
+        d.params = { req("path", "string", QStringLiteral("File path (absolute or relative to the project root).")) };
+        d.notes = QStringList() << QStringLiteral("Use with care. If unsure, run OPEN_FILE first.");
         d.example = baseExample(QJsonObject{{"path", "src/old/unused.cpp"}});
         return d;
     }
 
     if (commandName == "RENAME_FILE") {
-        d.summary = QStringLiteral("Переименовывает/перемещает файл.");
+        d.summary = QStringLiteral("Renames or moves a file.");
         d.params = {
-            req("oldPath", "string", QStringLiteral("Старый путь к файлу.")),
-            req("newPath", "string", QStringLiteral("Новый путь к файлу."))
+            req("oldPath", "string", QStringLiteral("Current file path.")),
+            req("newPath", "string", QStringLiteral("New file path."))
         };
-        d.notes = QStringList() << QStringLiteral("Пути могут быть абсолютными или относительно корня проекта.");
+        d.notes = QStringList() << QStringLiteral("Paths may be absolute or relative to the project root.");
         d.example = baseExample(QJsonObject{{"oldPath", "src/old_name.cpp"}, {"newPath", "src/new_name.cpp"}});
         return d;
     }
 
     if (commandName == "WRITE_DESCRIPTION") {
-        d.summary = QStringLiteral("Записывает текстовое описание для файла (метаданные проекта).");
+        d.summary = QStringLiteral("Writes a text description for a file (project metadata).");
         d.params = {
-            req("sourceFilePath", "string", QStringLiteral("Файл, к которому относится описание (абсолютный или относительный путь).")),
-            req("description", "string", QStringLiteral("Описание файла (что делает и где используется)."))
+            req("sourceFilePath", "string", QStringLiteral("File the description belongs to (absolute or relative path).")),
+            req("description", "string", QStringLiteral("File description (what it does and where it is used)."))
         };
-        d.notes = QStringList() << QStringLiteral("Полезно после больших изменений: чтобы ассистент лучше ориентировался в проекте.");
+        d.notes = QStringList() << QStringLiteral("Useful after large changes, so the assistant finds its way around the project better.");
         d.example = baseExample(QJsonObject{
             {"sourceFilePath", "src/main.cpp"},
-            {"description", "Точка входа приложения, инициализация UI и менеджеров."}
+            {"description", "Application entry point; initializes the UI and managers."}
         });
         return d;
     }
 
     if (commandName == "RUN_PYTHON") {
-        d.summary = QStringLiteral("Запускает Python-скрипт (scriptPath) или inline-код (code) и возвращает stdout/stderr/exitCode.");
+        d.summary = QStringLiteral("Runs a Python script (scriptPath) or inline code (code) and returns stdout/stderr/exitCode.");
         d.params = {
-            opt("scriptPath", "string", QStringLiteral("Путь к .py файлу (абсолютный или относительно корня проекта).")),
-            opt("code", "string", QStringLiteral("Inline Python-код (будет выполнен через `python -c`).")),
-            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта).")),
-            opt("timeoutMs", "int", QStringLiteral("Лимит выполнения в миллисекундах (по умолчанию 120000)."))
+            opt("scriptPath", "string", QStringLiteral("Path to a .py file (absolute or relative to the project root).")),
+            opt("code", "string", QStringLiteral("Inline Python code (run via `python -c`).")),
+            opt("cwd", "string", QStringLiteral("Working directory (absolute or relative to the project root).")),
+            opt("timeoutMs", "int", QStringLiteral("Time limit in milliseconds (default 120000)."))
         };
         d.notes = QStringList()
-                  << QStringLiteral("Нужно указать либо scriptPath, либо code.")
-                  << QStringLiteral("Печатай результат через print().");
+                  << QStringLiteral("Specify either scriptPath or code.")
+                  << QStringLiteral("Print the result with print().");
         d.example = baseExample(QJsonObject{
             {"code", "print(1+1)\n"},
             {"cwd", "."}
@@ -174,40 +174,40 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "RUN_SHELL") {
-        d.summary = QStringLiteral("Запускает команду в shell и возвращает stdout/stderr/exitCode (рабочая папка: корень проекта).");
+        d.summary = QStringLiteral("Runs a shell command and returns stdout/stderr/exitCode (working folder: the project root).");
         d.params = {
-            req("command", "string", QStringLiteral("Команда для выполнения (одной строкой).")),
-            opt("cwd", "string", QStringLiteral("Рабочая директория (абсолютная или относительно корня проекта).")),
-            opt("timeoutMs", "int", QStringLiteral("Лимит выполнения в миллисекундах (по умолчанию 120000)."))
+            req("command", "string", QStringLiteral("Command to run (a single line).")),
+            opt("cwd", "string", QStringLiteral("Working directory (absolute or relative to the project root).")),
+            opt("timeoutMs", "int", QStringLiteral("Time limit in milliseconds (default 120000)."))
         };
         d.notes = QStringList()
-                  << QStringLiteral("Для поиска по проекту предпочитай SEARCH_PROJECT.")
-                  << QStringLiteral("Если нужен запуск в другой папке — укажи cwd.");
+                  << QStringLiteral("To search the project, prefer SEARCH_PROJECT.")
+                  << QStringLiteral("To run in another folder, set cwd.");
         d.example = baseExample(QJsonObject{{"command", "dir"}, {"cwd", "."}});
         return d;
     }
 
     if (commandName == "SEARCH_WEB") {
-        d.summary = QStringLiteral("Ищет информацию в интернете и возвращает краткие результаты (title/url/snippet).");
+        d.summary = QStringLiteral("Searches the web and returns short results (title/url/snippet).");
         d.params = {
-            req("query", "string", QStringLiteral("Поисковый запрос.")),
-            opt("maxResults", "int", QStringLiteral("Сколько результатов вернуть (1..10)."))
+            req("query", "string", QStringLiteral("Search query.")),
+            opt("maxResults", "int", QStringLiteral("How many results to return (1..10)."))
         };
         d.example = baseExample(QJsonObject{{"query", "Qt 5.12 QNetworkAccessManager timeout example"}, {"maxResults", 5}});
         return d;
     }
 
     if (commandName == "SEARCH_PROJECT") {
-        d.summary = QStringLiteral("Ищет текст/regex по файлам проекта и возвращает совпадения вида path:line + snippet.");
+        d.summary = QStringLiteral("Searches project files for text/regex and returns matches as path:line + snippet.");
         d.params = {
-            req("query", "string", QStringLiteral("Строка поиска или regex (если useRegex=true).")),
-            opt("maxMatches", "int", QStringLiteral("Максимум совпадений (по умолчанию 10).")),
-            opt("caseSensitive", "bool", QStringLiteral("Учитывать регистр (по умолчанию false).")),
-            opt("useRegex", "bool", QStringLiteral("Интерпретировать query как regex.")),
-            opt("contextLines", "int", QStringLiteral("Сколько строк контекста вокруг совпадения добавить.")),
-            opt("include", "array<string>", QStringLiteral("Глоб-маски файлов, например [\"*.cpp\",\"*.h\"].")),
-            opt("includePaths", "array<string>", QStringLiteral("Ограничить поиск указанными путями/папками.")),
-            opt("excludePaths", "array<string>", QStringLiteral("Исключить пути/папки."))
+            req("query", "string", QStringLiteral("Search string or regex (if useRegex=true).")),
+            opt("maxMatches", "int", QStringLiteral("Maximum number of matches (default 10).")),
+            opt("caseSensitive", "bool", QStringLiteral("Match case (default false).")),
+            opt("useRegex", "bool", QStringLiteral("Treat query as a regex.")),
+            opt("contextLines", "int", QStringLiteral("How many context lines to add around each match.")),
+            opt("include", "array<string>", QStringLiteral("File glob masks, e.g. [\"*.cpp\",\"*.h\"].")),
+            opt("includePaths", "array<string>", QStringLiteral("Limit the search to these paths/folders.")),
+            opt("excludePaths", "array<string>", QStringLiteral("Paths/folders to exclude."))
         };
         d.example = baseExample(QJsonObject{
             {"query", "observeUserQuery"},
@@ -218,11 +218,11 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "SEARCH_PROJECT_CASE_INSENSITIVE") {
-        d.summary = QStringLiteral("Упрощённый поиск по проекту без учёта регистра.");
+        d.summary = QStringLiteral("Simplified case-insensitive project search.");
         d.params = {
-            req("query", "string", QStringLiteral("Строка поиска.")),
-            opt("maxMatches", "int", QStringLiteral("Максимум совпадений (по умолчанию 10).")),
-            opt("include", "array<string>", QStringLiteral("Глоб-маски файлов, например [\"*.cpp\",\"*.h\"]."))
+            req("query", "string", QStringLiteral("Search string.")),
+            opt("maxMatches", "int", QStringLiteral("Maximum number of matches (default 10).")),
+            opt("include", "array<string>", QStringLiteral("File glob masks, e.g. [\"*.cpp\",\"*.h\"]."))
         };
         d.example = baseExample(QJsonObject{
             {"query", "SearchWebCommand"},
@@ -233,53 +233,53 @@ CommandDoc CommandDocs::doc(const QString& commandName)
     }
 
     if (commandName == "LIST_FILES_IN_FOLDER") {
-        d.summary = QStringLiteral("Список файлов в директории (не рекурсивно) + количество строк в каждом файле.");
+        d.summary = QStringLiteral("Lists the files in a folder (non-recursive) with the line count of each file.");
         d.params = {
-            req("folderPath", "string", QStringLiteral("Путь к папке (абсолютный или относительно корня проекта).")),
-            opt("pattern", "string", QStringLiteral("Фильтр по имени, например \"*.cpp\" (необязательно)."))
+            req("folderPath", "string", QStringLiteral("Folder path (absolute or relative to the project root).")),
+            opt("pattern", "string", QStringLiteral("Name filter, e.g. \"*.cpp\" (optional)."))
         };
         d.notes = QStringList()
-                  << QStringLiteral("Команда перечисляет файлы в папке (не рекурсивно) и считает строки в текстовых файлах.");
+                  << QStringLiteral("The command lists the files in the folder (non-recursive) and counts lines in text files.");
         d.example = baseExample(QJsonObject{{"folderPath", "DevAss/src/command"}, {"pattern", "*.cpp"}});
         return d;
     }
 
     if (commandName == "SHOW_RESULT") {
-        d.summary = QStringLiteral("Показывает пользователю итоговый текст/ответ (без выполнения действий).");
+        d.summary = QStringLiteral("Shows the final text/answer to the user (performs no actions).");
         d.params = {
-            req("content", "string", QStringLiteral("Текст, который нужно показать пользователю.")),
-            opt("title", "string", QStringLiteral("Заголовок (необязательно)."))
+            req("content", "string", QStringLiteral("Text to show to the user.")),
+            opt("title", "string", QStringLiteral("Title (optional)."))
         };
-        d.example = baseExample(QJsonObject{{"title", "Итог"}, {"content", "Сделано: ...\nДальше: ..."}});
+        d.example = baseExample(QJsonObject{{"title", "Summary"}, {"content", "Done: ...\nNext: ..."}});
         return d;
     }
 
     if (commandName == "CALL_SEQUENCE") {
-        d.summary = QStringLiteral("Передаёт управление другой последовательности/эксперту (оркестрация).");
+        d.summary = QStringLiteral("Hands control over to another sequence/expert (orchestration).");
         d.params = {
-            req("sequenceName", "string", QStringLiteral("Имя последовательности, как в списке {{OPEN_SEQUENCE_INFO}}.")),
-            opt("summarize", "bool", QStringLiteral("Сделать резюме перед переходом (если поддерживается)."))
+            req("sequenceName", "string", QStringLiteral("Sequence name as listed in {{OPEN_SEQUENCE_INFO}}.")),
+            opt("summarize", "bool", QStringLiteral("Summarize before switching (if supported)."))
         };
         d.example = baseExample(QJsonObject{{"sequenceName", "InternetFinder"}, {"summarize", true}});
         return d;
     }
 
     if (commandName == "OPEN_SEQUENCE") {
-        d.summary = QStringLiteral("Открывает (загружает) последовательность по имени.");
-        d.params = { req("sequenceName", "string", QStringLiteral("Имя последовательности (как в списке).")) };
+        d.summary = QStringLiteral("Opens (loads) a sequence by name.");
+        d.params = { req("sequenceName", "string", QStringLiteral("Sequence name (as listed).")) };
         d.example = baseExample(QJsonObject{{"sequenceName", "InternetFinder"}});
         return d;
     }
 
     if (commandName == "REASONING") {
-        d.summary = QStringLiteral("Логирует рассуждение/план (без действий).");
+        d.summary = QStringLiteral("Logs reasoning/a plan (performs no actions).");
         d.params = {
-            req("reasoning", "string", QStringLiteral("Короткий план: что делать дальше и почему.")),
-            opt("nextCommand", "string", QStringLiteral("Подсказка: какая команда будет следующей.")),
-            opt("nextCommandParams", "object", QStringLiteral("Подсказка: params для nextCommand."))
+            req("reasoning", "string", QStringLiteral("Short plan: what to do next and why.")),
+            opt("nextCommand", "string", QStringLiteral("Hint: which command comes next.")),
+            opt("nextCommandParams", "object", QStringLiteral("Hint: params for nextCommand."))
         };
         d.example = baseExample(QJsonObject{
-            {"reasoning", "Сначала открываю файл, затем меняю диапазон строк и проверяю сборку."},
+            {"reasoning", "First open the file, then replace the line range and check the build."},
             {"nextCommand", "OPEN_FILE"},
             {"nextCommandParams", QJsonObject{{"path", "src/main.cpp"}}}
         });
@@ -447,7 +447,7 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         return d;
     }
 
-    d.summary = QStringLiteral("Команда проекта.");
+    d.summary = QStringLiteral("Project command.");
     d.example = baseExample(QJsonObject());
     return d;
 }

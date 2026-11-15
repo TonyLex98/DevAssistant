@@ -87,7 +87,8 @@ void SequenceRunner::runSequenceDialog()
         const auto& currentSequences = m_seq->seqMgrPtr()->sequences();
         QString path = dlg.selectedSequencePath();
         if (!currentSequences.contains(path)) {
-            QMessageBox::warning(nullptr, "Ошибка", "Файл последовательности не найден.");
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceRunner", "Error"),
+                                 QCoreApplication::translate("SequenceRunner", "Sequence file not found."));
             return;
         }
 
@@ -108,7 +109,8 @@ void SequenceRunner::runSequenceDialog()
         QString sequencePath = dlg.selectedDefaultSequencePath();
 
         if (sequencePath.isEmpty() || !QFile::exists(sequencePath)) {
-            QMessageBox::warning(nullptr, "Ошибка", "Выбранная последовательность для шаблона не найдена.");
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceRunner", "Error"),
+                                 QCoreApplication::translate("SequenceRunner", "The sequence selected for the template was not found."));
             return;
         }
 
@@ -123,7 +125,8 @@ void SequenceRunner::runSequenceDialog()
         }
 
         if (seq.name().isEmpty()) {
-            QMessageBox::warning(nullptr, "Ошибка", "Не удалось загрузить выбранную последовательность.");
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceRunner", "Error"),
+                                 QCoreApplication::translate("SequenceRunner", "Could not load the selected sequence."));
             return;
         }
 
@@ -155,19 +158,19 @@ void SequenceRunner::runNextStep()
         m_seq->setCurrentSeqId("");
         m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(nullptr, "Остановлено",
-                                 "Выполнение шаблона остановлено пользователем.");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Stopped"),
+                                 QCoreApplication::translate("SequenceRunner", "Template execution was stopped by the user."));
         return;
     }
 
     if (m_seq->currentStepIndex() < 0 ||
             m_seq->currentStepIndex() >= m_seq->currentSeq().steps().size()) {
         if (!m_resultShownInCurrentRun) {
-            autoFinalizeSequenceWithResult(QStringLiteral("последовательность завершилась без SHOW_RESULT"), QList<Command*>());
+            autoFinalizeSequenceWithResult(QStringLiteral("the sequence ended without SHOW_RESULT"), QList<Command*>());
             return;
         }
-        QMessageBox::information(nullptr, "Готово",
-                                 "Последовательность выполнена полностью.");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Done"),
+                                 QCoreApplication::translate("SequenceRunner", "The sequence has finished."));
         if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
             m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
         }
@@ -185,11 +188,10 @@ void SequenceRunner::runNextStep()
 
     {
         int tokens = m_model->modelPtr()->estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
-        m_ui->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_seq->currentStepIndex()+1).arg(tokens));
+        m_ui->log(QString("[Step %1] Context ≈ %2 tokens").arg(m_seq->currentStepIndex()+1).arg(tokens));
     }
-    m_ui->log(QString("\n--- Шаг %1 ------------------------------------------------")
+    m_ui->log(QString("\n--- Step %1 ------------------------------------------------")
         .arg(m_seq->currentStepIndex()+1));
-    m_ui->log(resolved.systemPrompt);
     if (!resolved.userPrompt.isEmpty())
         m_ui->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
@@ -270,8 +272,8 @@ void SequenceRunner::handleAssistantFinished()
         m_seq->setCurrentSeqId("");
         m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(nullptr, "Остановлено",
-                                 "Выполнение шаблона остановлено пользователем.");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Stopped"),
+                                 QCoreApplication::translate("SequenceRunner", "Template execution was stopped by the user."));
         m_status->statusControllerPtr()->stopTask();
         qDeleteAll(CommandParser::parse(m_model->streamBuf().toUtf8()));
         return;
@@ -293,7 +295,7 @@ void SequenceRunner::handleAssistantFinished()
     const QByteArray payload = usedRaw ? fullResp : jsonResp;
     if (usedRaw) {
         m_ctx->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(fullResp), QString(), -1);
-        m_ui->log("LLM ответ сохранён как контекст: не удалось извлечь JSON. Пытаемся распарсить сырой ответ.");
+        m_ui->log("No JSON found in the model's answer; it was saved as context. Trying to parse the raw answer.");
     }
 
     m_model->history().push_back(qMakePair(QString("assistant"), QString::fromUtf8(payload)));
@@ -302,7 +304,7 @@ void SequenceRunner::handleAssistantFinished()
     // Check if the LLM specified to open a new sequence
     QString nextSeqName = PromptResolver::getNextSequence();
     if (!nextSeqName.isEmpty()) {
-        m_ui->log("DEBUG: NEXT_SEQUENCE requested, searching for: " + nextSeqName);
+        qCDebug(logSeq) << "[handleAssistantFinished] NEXT_SEQUENCE requested, searching for:" << nextSeqName;
         m_seq->refreshAllSequences();
 
         const QMap<QString, PromptSequence>& allSequences = m_seq->seqMgrPtr()->sequences();
@@ -416,20 +418,11 @@ void SequenceRunner::handleAssistantFinished()
             return;
         }
 
-        m_ui->log("Указанная последовательность не найдена: " + nextSeqName);
-        m_ui->log("DEBUG: NEXT_SEQUENCE - Available sequences debugging:");
-        m_ui->log("  Total sequences in manager: " + QString::number(allSequences.size()));
-        m_ui->log("  Searched sequence name: '" + nextSeqName + "'");
-        m_ui->log("  Available sequence names and paths:");
-        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it) {
-            QString seqName = it.value().name();
-            QString filePath = it.key();
-            QFileInfo fileInfo(filePath);
-            m_ui->log("    - Sequence name: '" + seqName + "'");
-            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_ui->log("    - File path: " + filePath);
-        }
+        m_ui->log("Sequence not found: " + nextSeqName);
+        qCDebug(logSeq) << "[NEXT_SEQUENCE] Not found:" << nextSeqName
+                        << "- sequences in manager:" << allSequences.size();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it)
+            qCDebug(logSeq) << "  name:" << it.value().name() << "file:" << it.key();
         PromptResolver::clearNextSequence();
     }
 
@@ -437,12 +430,12 @@ void SequenceRunner::handleAssistantFinished()
     if (cmds.isEmpty()) {
         if (!usedRaw)
             m_ctx->appendConsoleContext("LLM RAW OUTPUT", QString::fromUtf8(payload), QString(), -1);
-        m_ui->log("LLM не вернул команд. Сырой ответ добавлен в контекст.");
+        m_ui->log("The model returned no commands. The raw answer was added to the context.");
 
         if (m_seq->isSequenceMode()) {
             ++m_batchesWithoutResult;
             if (m_batchesWithoutResult >= 7 && !m_resultShownInCurrentRun) {
-                autoFinalizeSequenceWithResult(QStringLiteral("LLM несколько шагов подряд не возвращает команды"), QList<Command*>());
+                autoFinalizeSequenceWithResult(QStringLiteral("the model returned no commands for several steps in a row"), QList<Command*>());
                 return;
             }
             if (m_seq->isStopRequested()) {
@@ -451,8 +444,8 @@ void SequenceRunner::handleAssistantFinished()
                 m_seq->setCurrentSeqId("");
                 m_seq->updateSequenceGraphHighlight();
 
-                QMessageBox::information(nullptr, "Остановлено",
-                                         "Выполнение шаблона остановлено пользователем.");
+                QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Stopped"),
+                                         QCoreApplication::translate("SequenceRunner", "Template execution was stopped by the user."));
                 return;
             }
             m_seq->setCurrentStepIndex(m_seq->currentStepIndex() + 1);
@@ -486,9 +479,10 @@ void SequenceRunner::handleAssistantFinished()
         }
     }
     if (!rejections.isEmpty()) {
-        const QString feedback = QCoreApplication::translate("SequenceRunner", "Rejected commands:")
-                + QStringLiteral("\n- ") + rejections.join(QStringLiteral("\n- "));
-        m_ui->log(feedback);
+        // The log shows the translated heading; the model always gets the English one.
+        const QString details = QStringLiteral("\n- ") + rejections.join(QStringLiteral("\n- "));
+        m_ui->log(QCoreApplication::translate("SequenceRunner", "Rejected commands:") + details);
+        const QString feedback = QStringLiteral("Rejected commands:") + details;
         m_model->history().push_back(qMakePair(QString("system"), feedback));
         m_ctx->appendConsoleContext(QStringLiteral("REJECTED COMMANDS"), feedback, QString(), -1);
     }
@@ -548,10 +542,10 @@ void SequenceRunner::handleAssistantFinished()
 
             if (readOnlyBatch && m_batchesWithoutResult >= 8) {
                 shouldAutoFinalizeBeforeTransition = true;
-                autoFinalizeReason = QStringLiteral("слишком много шагов без финального ответа");
+                autoFinalizeReason = QStringLiteral("too many steps without a final answer");
             } else if (readOnlyBatch && m_sameBatchRepeatCount >= 3) {
                 shouldAutoFinalizeBeforeTransition = true;
-                autoFinalizeReason = QStringLiteral("повторяющиеся команды без прогресса");
+                autoFinalizeReason = QStringLiteral("the same commands repeat without progress");
             }
         }
     }
@@ -566,7 +560,7 @@ void SequenceRunner::handleAssistantFinished()
             const QString question = c->params().value("question").toString();
             bool ok = false;
             const QString ans = QInputDialog::getText(nullptr,
-                                                      QStringLiteral("Ответьте на вопрос нейросети"),
+                                                      QCoreApplication::translate("SequenceRunner", "Answer the model's question"),
                                                       question,
                                                       QLineEdit::Normal,
                                                       QString(),
@@ -583,10 +577,12 @@ void SequenceRunner::handleAssistantFinished()
         } else if (c->name() == "SHOW_RESULT") {
             QString title = c->params().value("title").toString();
             if (title.isEmpty())
-                title = QStringLiteral("Ответ от %1:\n\n").arg(m_model->modelPtr()->selectedModel());
+                title = QCoreApplication::translate("SequenceRunner", "Answer from %1:")
+                            .arg(m_model->modelPtr()->selectedModel()) + QStringLiteral("\n\n");
             QString content = c->params().value("content").toString() + "\n\n\n";
             if (content.isEmpty())
-                content = QStringLiteral("SHOW_RESULT вызван без текста.\n\n\n");
+                content = QCoreApplication::translate("SequenceRunner", "SHOW_RESULT was called without text.")
+                          + QStringLiteral("\n\n\n");
             appendResultToUi(title, content);
             m_resultShownInCurrentRun = true;
             m_batchesWithoutResult = 0;
@@ -642,7 +638,7 @@ void SequenceRunner::handleAssistantFinished()
 
             if (m_ui->resultDisplayWidget()) {
                 auto metadata = m_seq->collectContextMetadataSince(m_ui->lastQuestionTimestamp());
-                m_ui->resultDisplayWidget()->appendResult(QStringLiteral("Context"), result,
+                m_ui->resultDisplayWidget()->appendResult(QCoreApplication::translate("SequenceRunner", "Context"), result,
                                                     ResultDisplayWidget::EntryType::Default,
                                                     metadata);
             } else {
@@ -761,7 +757,7 @@ void SequenceRunner::handleAssistantFinished()
                     if (i < m_seq->currentSeq().steps().size()) {
                         QString stepDesc = m_seq->currentSeq().steps()[i].tmpl().section('\n', 0, 0).trimmed();
                         if (stepDesc.length() > 80) stepDesc = stepDesc.left(80) + "...";
-                        completedStepsSummary << QString("Шаг %1: %2").arg(i+1).arg(stepDesc);
+                        completedStepsSummary << QString("Step %1: %2").arg(i+1).arg(stepDesc);
                     }
                 }
 
@@ -776,7 +772,7 @@ void SequenceRunner::handleAssistantFinished()
                 m_seq->setCurrentSeqPath(foundPath);
 
                 if (!completedStepsSummary.isEmpty()) {
-                    QString summaryText = QString("Предыдущая последовательность выполнила: %1").arg(completedStepsSummary.join("; "));
+                    QString summaryText = QString("The previous sequence completed: %1").arg(completedStepsSummary.join("; "));
                     m_model->history().push_back(qMakePair(QString("system"), summaryText));
                 }
 
@@ -804,33 +800,12 @@ void SequenceRunner::handleAssistantFinished()
             }
         }
 
-        m_ui->log("Указанная последовательность не найдена: " + sequenceToCall);
-        const QMap<QString, PromptSequence>& allSequences_debug = m_seq->seqMgrPtr()->sequences();
-        m_ui->log("DEBUG: CALL_SEQUENCE - Available sequences debugging:");
-        m_ui->log("  Total sequences in main manager: " + QString::number(allSequences_debug.size()));
-        m_ui->log("  Current sequence path: '" + m_seq->currentSeqPath() + "'");
-        if (!m_seq->currentSeqPath().isEmpty()) {
-            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
-            QDir templateDir = currentSeqInfo.absoluteDir();
-            m_ui->log("  Current sequence directory: " + templateDir.absolutePath());
-            QStringList filters = {"*.seq.json", "*.seq", "*.json"};
-            QFileInfoList files = templateDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
-            m_ui->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
-            for (const QFileInfo& fileInfo : files) {
-                m_ui->log("    - File: " + fileInfo.fileName());
-            }
-        }
-        m_ui->log("  Searched sequence name: '" + sequenceToCall + "'");
-        m_ui->log("  Available sequence names and paths in main manager:");
-        for (auto it = allSequences_debug.constBegin(); it != allSequences_debug.constEnd(); ++it) {
-            QString seqName = it.value().name();
-            QString filePath = it.key();
-            QFileInfo fileInfo(filePath);
-            m_ui->log("    - Sequence name: '" + seqName + "'");
-            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_ui->log("    - File path: " + filePath);
-        }
+        m_ui->log("Sequence not found: " + sequenceToCall);
+        qCDebug(logSeq) << "[CALL_SEQUENCE] Not found:" << sequenceToCall
+                        << "- current sequence path:" << m_seq->currentSeqPath()
+                        << "- sequences in manager:" << allSequences.size();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it)
+            qCDebug(logSeq) << "  name:" << it.value().name() << "file:" << it.key();
     }
 
     // OPEN_SEQUENCE handling
@@ -896,33 +871,12 @@ void SequenceRunner::handleAssistantFinished()
             return;
         }
 
-        m_ui->log("Указанная последовательность не найдена: " + openSequenceName);
-        const QMap<QString, PromptSequence>& allSequences_debug2 = m_seq->seqMgrPtr()->sequences();
-        m_ui->log("DEBUG: OPEN_SEQUENCE - Available sequences debugging:");
-        m_ui->log("  Total sequences in main manager: " + QString::number(allSequences_debug2.size()));
-        m_ui->log("  Current sequence path: '" + m_seq->currentSeqPath() + "'");
-        if (!m_seq->currentSeqPath().isEmpty()) {
-            QFileInfo currentSeqInfo(m_seq->currentSeqPath());
-            QDir templateDir = currentSeqInfo.absoluteDir();
-            m_ui->log("  Current sequence directory: " + templateDir.absolutePath());
-            QStringList filters = {"*.seq.json", "*.seq", "*.json"};
-            QFileInfoList files = templateDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks, QDir::Name);
-            m_ui->log("  Sequence files in current directory (" + QString::number(files.size()) + "):");
-            for (const QFileInfo& fileInfo : files) {
-                m_ui->log("    - File: " + fileInfo.fileName());
-            }
-        }
-        m_ui->log("  Searched sequence name: '" + openSequenceName + "'");
-        m_ui->log("  Available sequence names and paths in main manager:");
-        for (auto it = allSequences_debug2.constBegin(); it != allSequences_debug2.constEnd(); ++it) {
-            QString seqName = it.value().name();
-            QString filePath = it.key();
-            QFileInfo fileInfo(filePath);
-            m_ui->log("    - Sequence name: '" + seqName + "'");
-            m_ui->log("    - File name: '" + fileInfo.fileName() + "'");
-            m_ui->log("    - Base name: '" + fileInfo.baseName() + "'");
-            m_ui->log("    - File path: " + filePath);
-        }
+        m_ui->log("Sequence not found: " + openSequenceName);
+        qCDebug(logSeq) << "[OPEN_SEQUENCE] Not found:" << openSequenceName
+                        << "- current sequence path:" << m_seq->currentSeqPath()
+                        << "- sequences in manager:" << allSequences.size();
+        for (auto it = allSequences.constBegin(); it != allSequences.constEnd(); ++it)
+            qCDebug(logSeq) << "  name:" << it.value().name() << "file:" << it.key();
     }
 
     // Apply commands
@@ -937,7 +891,7 @@ void SequenceRunner::handleAssistantFinished()
         appliedSummary << one;
     }
     if (!appliedSummary.isEmpty()) {
-        m_seq->prevSteps() << QString("Шаг %1: %2").arg(m_seq->currentStepIndex() + 1).arg(appliedSummary.join("; "));
+        m_seq->prevSteps() << QString("Step %1: %2").arg(m_seq->currentStepIndex() + 1).arg(appliedSummary.join("; "));
     }
 
     QString err;
@@ -978,7 +932,7 @@ void SequenceRunner::handleAssistantFinished()
         if (!c->applyWithLLM(m_project->devManagerPtr(), execModel, &err)) {
             c->setExecutionResult(false, err);
             logConsoleResult(c, err);
-            QMessageBox::warning(nullptr, QStringLiteral("Ошибка выполнения"), err);
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceRunner", "Execution error"), err);
             applyFailed = true;
             break;
         }
@@ -990,7 +944,7 @@ void SequenceRunner::handleAssistantFinished()
 
     if (!applyFailed && !pendingEdits.isEmpty()) {
         if (!m_project->applyGroupedEditInRange(pendingEdits, &err)) {
-            QMessageBox::warning(nullptr, QStringLiteral("Ошибка выполнения"), err);
+            QMessageBox::warning(nullptr, QCoreApplication::translate("SequenceRunner", "Execution error"), err);
         } else {
             for (Command* c : pendingEdits) {
                 m_ctx->handlePostApplyContextCleanup(c);
@@ -1010,8 +964,8 @@ void SequenceRunner::handleAssistantFinished()
             m_seq->setCurrentSeqId("");
             m_seq->updateSequenceGraphHighlight();
 
-            QMessageBox::information(nullptr, "Остановлено",
-                                     "Выполнение шаблона остановлено пользователем.");
+            QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Stopped"),
+                                     QCoreApplication::translate("SequenceRunner", "Template execution was stopped by the user."));
             qDeleteAll(toRun);
             return;
         }
@@ -1023,7 +977,7 @@ void SequenceRunner::handleAssistantFinished()
         }
         const bool finishingCurrentStep = !step.loop() && (m_seq->currentStepIndex() + 1 >= m_seq->currentSeq().steps().size());
         if (finishingCurrentStep && !hasShowResultCommand && !m_resultShownInCurrentRun) {
-            autoFinalizeSequenceWithResult(QStringLiteral("финальный шаг не вернул SHOW_RESULT"), toRun);
+            autoFinalizeSequenceWithResult(QStringLiteral("the final step returned no SHOW_RESULT"), toRun);
             qDeleteAll(toRun);
             return;
         }
@@ -1117,9 +1071,9 @@ void SequenceRunner::autoFinalizeSequenceWithResult(const QString& reason, const
 {
     QStringList lines;
     Q_UNUSED(reason);
-    lines << QStringLiteral("Я завершил выполнение автоматически, чтобы не допустить зацикливания.");
+    lines << QCoreApplication::translate("SequenceRunner", "I stopped automatically so as not to run in a loop.");
     if (!m_model->lastUserMessage().trimmed().isEmpty())
-        lines << QStringLiteral("Запрос: %1").arg(m_model->lastUserMessage().trimmed());
+        lines << QCoreApplication::translate("SequenceRunner", "Request: %1").arg(m_model->lastUserMessage().trimmed());
 
     QStringList sourceLines;
     QStringList commandNames;
@@ -1144,16 +1098,17 @@ void SequenceRunner::autoFinalizeSequenceWithResult(const QString& reason, const
         }
     }
     if (!sourceLines.isEmpty()) {
-        lines << QStringLiteral("Найденные источники:");
+        lines << QCoreApplication::translate("SequenceRunner", "Sources found:");
         for (const QString& s : sourceLines)
             lines << QString("- %1").arg(s);
     } else if (!commandNames.isEmpty()) {
-        lines << QStringLiteral("Последние выполненные команды: %1").arg(commandNames.join(", "));
+        lines << QCoreApplication::translate("SequenceRunner", "Last commands run: %1").arg(commandNames.join(", "));
     }
 
-    lines << QStringLiteral("Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.");
+    lines << QCoreApplication::translate("SequenceRunner",
+                                         "If needed, make the request a little more specific: period, region, sources.");
     const QString content = lines.join(QStringLiteral("\n\n")) + QStringLiteral("\n\n\n");
-    appendResultToUi(QStringLiteral("Ответ нейросети"), content);
+    appendResultToUi(QCoreApplication::translate("SequenceRunner", "Model's answer"), content);
     m_resultShownInCurrentRun = true;
 
     if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr())
@@ -1175,8 +1130,8 @@ void SequenceRunner::retryCurrentSequenceStep()
         m_seq->setCurrentSeqId("");
         m_seq->updateSequenceGraphHighlight();
 
-        QMessageBox::information(nullptr, "Остановлено",
-                                 "Выполнение шаблона остановлено пользователем.");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Stopped"),
+                                 QCoreApplication::translate("SequenceRunner", "Template execution was stopped by the user."));
         return;
     }
 
@@ -1260,6 +1215,7 @@ QByteArray SequenceRunner::repairToJsonArrayIfNeeded(const QByteArray& rawText, 
 bool SequenceRunner::isImplementationIntentText(const QString& text)
 {
     const QString t = text.toLower();
+    // Word stems matched against the user's request: Russian and English.
     static const QStringList needles = {
         "реализ", "сделай", "создай", "добав", "исправ", "почин", "внедр", "напис",
         "сгенер", "передел", "улучш", "доработ", "перепиш",
@@ -1393,8 +1349,8 @@ void SequenceRunner::runNextSequence()
     if (!m_seq->isSequenceMode()) return;
     if (m_seq->currentStepIndex() < 0 ||
             m_seq->currentStepIndex() >= m_seq->currentSeq().steps().size()) {
-        QMessageBox::information(nullptr, "Готово",
-                                 "Последовательность выполнена полностью.");
+        QMessageBox::information(nullptr, QCoreApplication::translate("SequenceRunner", "Done"),
+                                 QCoreApplication::translate("SequenceRunner", "The sequence has finished."));
         if (!m_seq->currentSeqId().isEmpty() && m_ctx->contextManagerPtr()) {
             m_ctx->contextManagerPtr()->endCommandSequence(m_seq->currentSeqId());
         }
@@ -1412,11 +1368,10 @@ void SequenceRunner::runNextSequence()
 
     {
         int tokens = m_model->modelPtr()->estimateTokens(resolved.systemPrompt + "\n" + resolved.userPrompt);
-        m_ui->log(QString("[Шаг %1] Контекст ≈ %2 токенов").arg(m_seq->currentStepIndex()+1).arg(tokens));
+        m_ui->log(QString("[Step %1] Context ≈ %2 tokens").arg(m_seq->currentStepIndex()+1).arg(tokens));
     }
-    m_ui->log(QString("\n--- Шаг %1 ------------------------------------------------")
+    m_ui->log(QString("\n--- Step %1 ------------------------------------------------")
         .arg(m_seq->currentStepIndex()+1));
-    m_ui->log(resolved.systemPrompt);
     if (!resolved.userPrompt.isEmpty())
         m_ui->log(QString("USER_QUERY:\n%1").arg(resolved.userPrompt));
 
@@ -1452,7 +1407,7 @@ void SequenceRunner::runNextSequence()
 
 void SequenceRunner::addSequenceTransitionToHistory(const QString& sequenceName)
 {
-    QString transitionMsg = QString("Переход к последовательности: %1").arg(sequenceName);
+    QString transitionMsg = QString("Switched to sequence: %1").arg(sequenceName);
     m_model->history().push_back(qMakePair(QString("system"), transitionMsg));
 }
 
@@ -1468,7 +1423,7 @@ void SequenceRunner::appendUserQuestionToResultDisplay(const QString& question)
     m_ui->lastQuestionTimestamp() = QDateTime::currentDateTime();
 
     const QString formattedQuestion = QString("\n\n%1\n").arg(trimmedQuestion);
-    m_ui->resultDisplayWidget()->appendResult(QStringLiteral("Вопрос пользователя"),
+    m_ui->resultDisplayWidget()->appendResult(QCoreApplication::translate("SequenceRunner", "User question"),
                                         formattedQuestion,
                                         ResultDisplayWidget::EntryType::UserQuestion);
 }
@@ -1478,7 +1433,7 @@ void SequenceRunner::stopExecution()
     m_seq->setStopRequested(true);
 
     if (m_seq->isSequenceMode()) {
-        m_ui->log("Шаблонное выполнение остановлено пользователем.");
+        m_ui->log("Template execution stopped by the user.");
         m_status->statusControllerPtr()->stopTask();
     }
 }
@@ -1681,7 +1636,9 @@ void SequenceRunner::handleSearchResults(Command* cmd)
             qCDebug(logSeq) << "[MainWindow] SEARCH_WEB result body is empty";
         }
 
-        bool needsSummarization = body.contains("Контент для суммаризации", Qt::CaseInsensitive);
+        // Matches the phrase SearchWebCommand writes when it found results but no page content
+        // ("... there is no content to summarize."). Keep the two in sync.
+        bool needsSummarization = body.contains("content to summarize", Qt::CaseInsensitive);
 
         QString resultBody = body;
         if (needsSummarization) {

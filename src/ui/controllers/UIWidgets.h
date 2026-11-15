@@ -44,8 +44,6 @@ struct UIWidgets {
     // Result display
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
 
-    // Vosk
-
     // Context status
     QWidget* m_contextStatusWidget = nullptr;
     QTreeWidget* m_contextCommandsList = nullptr;

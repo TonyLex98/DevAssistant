@@ -7,9 +7,9 @@
 class CommandParser
 {
 public:
-    // Парсит массив JSON‑объектов и возвращает список команд
+    // Parses a JSON array of objects and returns the commands
     static QVector<Command*> parse(const QByteArray& json);
 
-    // Вспомогательный: сериализует список команд обратно в JSON
+    // Serializes commands back to JSON
     static QByteArray toJson(const QVector<Command*>& cmds);
 };

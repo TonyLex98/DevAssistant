@@ -22,5 +22,5 @@ public:
 private:
     QJsonObject m_params;
     QString m_description;
-    QString m_result;  // Для хранения результата выполнения
+    QString m_result;  // execution result
 };

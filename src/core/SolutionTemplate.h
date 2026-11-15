@@ -13,11 +13,11 @@ public:
     SolutionTemplate() = default;
     explicit SolutionTemplate(const QString& name) : m_name(name) {}
 
-    /*--- сериализация ---------------------------------------------------*/
+    /*--- serialization ---------------------------------------------------*/
     QJsonObject toJson() const;
     static SolutionTemplate fromJson(const QJsonObject& obj);
 
-    /*--- базовые операции -----------------------------------------------*/
+    /*--- basic operations ------------------------------------------------*/
     void addSequence(const QString& sequencePath) { m_sequences.append(sequencePath); }
     void removeSequence(int idx) { m_sequences.removeAt(idx); }
     void removeSequenceByPath(const QString& sequencePath);
@@ -35,7 +35,7 @@ public:
     void clearPositions() { m_positions.clear(); }
     const QMap<QString, QPointF>& positions() const { return m_positions; }
 
-    /*--- геттеры --------------------------------------------------------*/
+    /*--- getters ---------------------------------------------------------*/
     const QString&               name() const { return m_name; }
     const QString&               description() const { return m_description; }
     const QString&               imagePath() const { return m_imagePath; }
@@ -52,7 +52,7 @@ private:
     QString          m_description;
     QString          m_imagePath;
     QString          m_mainSequencePath;
-    QVector<QString> m_sequences; // Пути к файлам последовательностей
+    QVector<QString> m_sequences; // sequence file paths
     QJsonObject      m_sequenceTargets; // Directed links: sequence -> [target sequences] for OPEN_SEQUENCE_INFO
-    QMap<QString, QPointF> m_positions; // Позиции последовательностей на холсте
+    QMap<QString, QPointF> m_positions; // sequence positions on the canvas
 };

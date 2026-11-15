@@ -49,7 +49,8 @@ jobs:
       - name: Update the Russian translation
         shell: pwsh
         run: |
-          lupdate DevAssistantQt.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none
+          New-Item -ItemType Directory -Force translations | Out-Null
+          lupdate DevAssistantQt.pro -ts translations/devassistant_ru.ts -no-obsolete -locations none -tr-function-alias tr+=tr_fn
           & "$env:pythonLocation\python.exe" scripts/fill_translations.py translations/devassistant_ru.ts translations/ru
 
       - name: Configure

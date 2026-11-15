@@ -73,20 +73,20 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
         if (err) *err = "EDIT_IN_RANGE: path is empty";
         return false;
     }
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Resolve a relative path against the project root
     if (devAss && !QFileInfo(path).isAbsolute()) {
         path = QDir(devAss->projectRoot().absolutePath()).filePath(path);
-        // Обновляем путь в параметрах команды для отображения в результатах
+        // Store the resolved path so the result shows it
         const_cast<EditInRangeCommand*>(commands.first())->m_path = path;
         const_cast<EditInRangeCommand*>(commands.first())->m_params["path"] = path;
     }
 
     for (const EditInRangeCommand* cmd : commands) {
         QString cmdPath = cmd->path();
-        // Нормализуем путь команды для сравнения
+        // Normalize the command's path for comparison
         if (devAss && !QFileInfo(cmdPath).isAbsolute()) {
             cmdPath = QDir(devAss->projectRoot().absolutePath()).filePath(cmdPath);
-            // Обновляем путь в параметрах для отображения в результатах
+            // Store the resolved path so the result shows it
             const_cast<EditInRangeCommand*>(cmd)->m_path = cmdPath;
             const_cast<EditInRangeCommand*>(cmd)->m_params["path"] = cmdPath;
         }
@@ -141,13 +141,13 @@ bool EditInRangeCommand::saveFile(const QString& path,
                                   DevAssManager* devAss,
                                   QString* err)
 {
-    // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
+    // Resolve a relative path against the project root
     QString normalizedPath = path;
     if (devAss && !QFileInfo(path).isAbsolute()) {
         normalizedPath = QDir(devAss->projectRoot().absolutePath()).filePath(path);
     }
 
-    // Создаем родительские директории, если они не существуют
+    // Create missing parent directories
     QDir dir = QFileInfo(normalizedPath).absoluteDir();
     if (!dir.exists() && !dir.mkpath(".")) {
         if (err) *err = QString("Cannot create directory for file: %1").arg(dir.path());

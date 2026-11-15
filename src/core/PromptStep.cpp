@@ -23,7 +23,7 @@ PromptStep PromptStep::fromJson(const QJsonObject &obj)
     for (const QJsonValue &v : arr)
         step.m_allowedCommands << v.toString();
 
-    // читаем флаг зацикливания (если его нет – false)
+    // loop flag (false when absent)
     step.m_loop = obj.value("loop").toBool(false);
 
     return step;

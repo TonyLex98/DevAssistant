@@ -6,7 +6,7 @@
 class RunShellCommand : public Command
 {
 public:
-    /* command – произвольная консольная команда. */
+    /* command: an arbitrary shell command. */
     RunShellCommand(const QString& command = QString(),
                     const QString& cwd = QString(),
                     int timeoutMs = 120000,

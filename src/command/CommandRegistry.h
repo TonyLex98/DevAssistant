@@ -6,9 +6,9 @@
 class CommandRegistry
 {
 public:
-    /* Возвращает шаблоны всех команд (для генерации списка). */
+    /* Prototypes of all commands (for building the list). */
     static QVector<Command*> all();
 
-    /* Создаёт команду из JSON‑объекта. */
+    /* Creates a command from a JSON object. */
     static Command* create(const QJsonObject& obj);
 };

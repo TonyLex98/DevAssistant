@@ -16,18 +16,18 @@ class Command
 public:
     virtual ~Command() = default;
 
-    /* имя команды, например "CREATE_FILE" */
+    /* command name, e.g. "CREATE_FILE" */
     virtual QString name() const = 0;
 
-    /* параметры команды – можно использовать как есть */
+    /* command parameters, usable as is */
     virtual QJsonObject params() const = 0;
 
-    /* описание (коротко) того, что делает команда */
+    /* short description of what the command does */
     virtual QString description() const = 0;
 
-    /* применить команду к файловой системе.
-       `devAss` – менеджер описаний, нужен для обновления .dapro.
-       `errorOut` – сообщение об ошибке (если false). */
+    /* apply the command to the file system.
+       `devAss` - description manager, needed to update .dapro.
+       `errorOut` - error message (if false). */
     virtual bool apply(DevAssManager* devAss,
                        QString* errorOut = nullptr) = 0;
 
@@ -43,13 +43,13 @@ public:
         return apply(devAss, errorOut);
     }
 
-    /* сериализовать в JSON (можно использовать для *.dadescr) */
+    /* serialize to JSON (also usable for *.dadescr) */
     virtual QJsonObject toJson() const = 0;
 
-    /* получить результат выполнения команды (для отображения пользователю и LLM) */
+    /* command result (shown to the user and passed to the LLM) */
     virtual QString getResult() const { return QString(); }
 
-    /* методы для установки и получения результата выполнения */
+    /* execution status */
     void setExecutionResult(bool success, const QString& error = QString()) {
         m_executionSuccess = success;
         m_errorMessage = error;

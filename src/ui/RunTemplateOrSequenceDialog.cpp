@@ -12,7 +12,7 @@ RunTemplateOrSequenceDialog::RunTemplateOrSequenceDialog(const QMap<QString, Pro
                                                          QWidget *parent)
     : QDialog(parent), m_seqs(seqs), m_templateManager(templateManager)
 {
-    setWindowTitle("Select Sequence or Template");
+    setWindowTitle(tr("Select Sequence or Template"));
     resize(700, 500);
     
     setupUI();
@@ -26,10 +26,10 @@ void RunTemplateOrSequenceDialog::setupUI()
     
     // Mode selection
     auto *modeLayout = new QHBoxLayout();
-    QLabel *modeLabel = new QLabel("Mode:", this);
+    QLabel *modeLabel = new QLabel(tr("Mode:"), this);
     MemoryComboBox *modeCombo = new MemoryComboBox("runTemplateOrSequenceMode", this);
-    modeCombo->addItem("Run Individual Sequence", RunSequence);
-    modeCombo->addItem("Run Template", RunTemplate);
+    modeCombo->addItem(tr("Run Individual Sequence"), RunSequence);
+    modeCombo->addItem(tr("Run Template"), RunTemplate);
     modeCombo->setCurrentIndex(1); // Default to template mode (changed from 0 to 1)
     modeLayout->addWidget(modeLabel);
     modeLayout->addWidget(modeCombo, 1);
@@ -52,21 +52,21 @@ void RunTemplateOrSequenceDialog::setupUI()
     auto *seqLayout = new QVBoxLayout(sequenceTab);
     
     m_sequenceList = new QListWidget(this);
-    seqLayout->addWidget(new QLabel("Available Sequences:", this));
+    seqLayout->addWidget(new QLabel(tr("Available Sequences:"), this));
     seqLayout->addWidget(m_sequenceList, 1);
     
-    m_tabWidget->addTab(sequenceTab, "Sequences");
+    m_tabWidget->addTab(sequenceTab, tr("Sequences"));
     
     // Templates tab
     QWidget *templateTab = new QWidget(this);
     auto *tmplLayout = new QVBoxLayout(templateTab);
     
     m_templateList = new QListWidget(this);
-    tmplLayout->addWidget(new QLabel("Solution Templates:", this));
+    tmplLayout->addWidget(new QLabel(tr("Solution Templates:"), this));
     tmplLayout->addWidget(m_templateList, 1);
     
     // Template details
-    auto *detailsGroupBox = new QGroupBox("Template Details", this);
+    auto *detailsGroupBox = new QGroupBox(tr("Template Details"), this);
     auto *detailsLayout = new QVBoxLayout(detailsGroupBox);
     
     m_templateDescriptionLabel = new QLabel(this);
@@ -85,7 +85,7 @@ void RunTemplateOrSequenceDialog::setupUI()
     
     // Default sequence selection
     auto *seqLayout2 = new QHBoxLayout();
-    QLabel *seqLabel = new QLabel("Default Sequence:", this);
+    QLabel *seqLabel = new QLabel(tr("Default Sequence:"), this);
     m_defaultSequenceCombo = new MemoryComboBox("defaultTemplateSequence", this);
     seqLayout2->addWidget(seqLabel);
     seqLayout2->addWidget(m_defaultSequenceCombo, 1);
@@ -95,7 +95,7 @@ void RunTemplateOrSequenceDialog::setupUI()
     
     tmplLayout->addWidget(detailsGroupBox);
     
-    m_tabWidget->addTab(templateTab, "Templates");
+    m_tabWidget->addTab(templateTab, tr("Templates"));
     
     layout->addWidget(m_tabWidget, 1);
     
@@ -182,10 +182,10 @@ void RunTemplateOrSequenceDialog::onTemplateSelected(const QString &templateName
             if (!pixmap.isNull()) {
                 m_templateImageLabel->setPixmap(pixmap.scaled(100, 100, Qt::KeepAspectRatio, Qt::SmoothTransformation));
             } else {
-                m_templateImageLabel->setText("Image not found");
+                m_templateImageLabel->setText(tr("Image not found"));
             }
         } else {
-            m_templateImageLabel->setText("Image not found");
+            m_templateImageLabel->setText(tr("Image not found"));
         }
     } else {
         m_templateImageLabel->clear();
@@ -222,7 +222,7 @@ void RunTemplateOrSequenceDialog::onOk()
         // Get selected sequence
         QListWidgetItem *cur = m_sequenceList->currentItem();
         if (!cur) {
-            QMessageBox::warning(this, "Selection Error", "Please select a sequence.");
+            QMessageBox::warning(this, tr("Selection Error"), tr("Please select a sequence."));
             return;
         }
         m_selectedSequencePath = cur->data(Qt::UserRole).toString();
@@ -230,7 +230,7 @@ void RunTemplateOrSequenceDialog::onOk()
         // Get selected template
         QListWidgetItem *cur = m_templateList->currentItem();
         if (!cur) {
-            QMessageBox::warning(this, "Selection Error", "Please select a template.");
+            QMessageBox::warning(this, tr("Selection Error"), tr("Please select a template."));
             return;
         }
         m_selectedTemplatePath = cur->data(Qt::UserRole).toString();
@@ -238,7 +238,7 @@ void RunTemplateOrSequenceDialog::onOk()
         // Get selected default sequence for the template
         m_selectedDefaultSequencePath = m_defaultSequenceCombo->currentData().toString();
         if (m_selectedDefaultSequencePath.isEmpty()) {
-            QMessageBox::warning(this, "Selection Error", "Please select a default sequence for the template.");
+            QMessageBox::warning(this, tr("Selection Error"), tr("Please select a default sequence for the template."));
             return;
         }
     }

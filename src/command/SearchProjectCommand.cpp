@@ -60,12 +60,12 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
 {
     m_matches.clear();
     if (!devAss) {
-        if (err) *err = "SEARCH_PROJECT: DevAssManager недоступен";
+        if (err) *err = "SEARCH_PROJECT: DevAssManager is not available";
         return false;
     }
     const QString query = m_params.value("query").toString();
     if (query.trimmed().isEmpty()) {
-        if (err) *err = "SEARCH_PROJECT: пустой запрос";
+        if (err) *err = "SEARCH_PROJECT: empty query";
         return false;
     }
 
@@ -86,17 +86,17 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
         }
     }
 
-    // Сначала соберем список файлов для поиска (предварительная фильтрация)
+    // Collect the files to search first (pre-filtering)
     QStringList filePaths;
     QDirIterator it(rootPath, QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext() && filePaths.size() < 10000) { // Ограничиваем список файлов для предотвращения переполнения памяти
+    while (it.hasNext() && filePaths.size() < 10000) { // cap the file list to bound memory use
         const QString path = it.next();
         if (!shouldSkipFile(path)) {
             filePaths << path;
         }
     }
 
-    // Создаем регулярное выражение при необходимости
+    // Build the regex if needed
     QRegularExpression regex;
     if (useRegex) {
         QRegularExpression::PatternOptions options = caseSensitive ?
@@ -139,10 +139,9 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
                 QString absPath = QFileInfo(path).absoluteFilePath();  // Use absolute path
                 QString matchLine = line.trimmed();
 
-                // Добавляем контекст, если требуется
                 QString result;
                 if (contextLines > 0) {
-                    // Собираем строки контекста до и после
+                    // Context lines before and after the match
                     int start = qMax(0, i - contextLines);
                     int end = qMin(lines.size(), i + contextLines + 1);
 
@@ -156,7 +155,7 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
                     }
                     result = QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(contextLinesList.join("\n"));
                 } else {
-                    // Только найденная строка
+                    // The matching line only
                     if (matchLine.size() > 200)
                         matchLine = matchLine.left(197) + "...";
                     result = QString("%1:%2\n%3").arg(absPath).arg(lineNo).arg(matchLine);
@@ -168,7 +167,7 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
     }
 
     if (m_matches.isEmpty() && err) {
-        *err = "SEARCH_PROJECT: совпадения не найдены";
+        *err = "SEARCH_PROJECT: no matches found";
     }
     return true;
 }
@@ -180,7 +179,7 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
     QString fileName = fileInfo.fileName();
     QString filePath = fileInfo.absolutePath();
 
-    // Проверяем исключения по директориям
+    // Excluded directories
     if (!m_excludePaths.isEmpty()) {
         for (const QString& excludePath : m_excludePaths) {
             QFileInfo excludeInfo(excludePath);
@@ -195,7 +194,7 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
         }
     }
 
-    // Если заданы директории для включения, проверяем, что файл находится в одной из них
+    // If include directories are set, the file must be inside one of them
     if (!m_includePaths.isEmpty()) {
         bool inIncludePath = false;
         for (const QString& includePath : m_includePaths) {
@@ -215,7 +214,7 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
         }
     }
 
-    // Пропускаем файлы в подкаталоге DevelopersAssistant проекта
+    // Skip files in the project's DevelopersAssistant subfolder
     QStringList pathParts = normalizedPath.split('/');
     for (const QString& part : pathParts) {
         if (part == "DevelopersAssistant") {
@@ -223,7 +222,7 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
         }
     }
 
-    // Проверяем маски файлов
+    // File masks
     if (!m_includeGlobs.isEmpty()) {
         bool match = false;
         for (const QString& glob : m_includeGlobs) {
@@ -237,7 +236,7 @@ bool SearchProjectCommand::shouldSkipFile(const QString& path) const
             return true;
     }
 
-    // Проверяем бинарные расширения
+    // Binary extensions
     static const QStringList binaryExt = {
         "png","jpg","jpeg","gif","bmp","ico","exe","dll","so","bin","pdf","zip","tar","gz"
     };

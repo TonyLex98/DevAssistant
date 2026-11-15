@@ -49,18 +49,18 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
         QFileInfo info(path);
         if (!info.isAbsolute() && devAss) {
             path = devAss->projectRoot().filePath(path);
-            // Обновляем путь в параметрах для отображения в результатах
+            // Store the resolved path so the result shows it
             m_params["scriptPath"] = path;
         }
         if (!QFile::exists(path)) {
-            if (err) *err = QString("Файл скрипта %1 не найден").arg(path);
+            if (err) *err = QString("Script file %1 not found").arg(path);
             return false;
         }
         args << path;
     } else if (hasCode) {
         args << "-c" << code;
     } else {
-        if (err) *err = "Ни скрипта, ни кода не указано";
+        if (err) *err = "Neither a script nor code was given";
         return false;
     }
 
@@ -82,13 +82,13 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
     proc.start(program, args);
 
     if (!proc.waitForStarted()) {
-        if (err) *err = "Не удалось запустить Python";
+        if (err) *err = "Failed to start Python";
         return false;
     }
     const int timeoutMs = m_params.value("timeoutMs").toInt(120000);
     if (!proc.waitForFinished(timeoutMs)) {
         proc.kill();
-        if (err) *err = QString("Python превысил лимит времени (%1 ms)").arg(timeoutMs);
+        if (err) *err = QString("Python exceeded the time limit (%1 ms)").arg(timeoutMs);
         m_stdout = decodeProcessOutput(proc.readAllStandardOutput());
         m_stderr = decodeProcessOutput(proc.readAllStandardError());
         m_exitCode = -1;
@@ -99,7 +99,7 @@ bool RunPythonCommand::apply(DevAssManager* devAss, QString* err)
     m_exitCode = proc.exitCode();
 
     if (m_exitCode != 0) {
-        if (err) *err = QString("Python завершился с кодом %1").arg(m_exitCode);
+        if (err) *err = QString("Python exited with code %1").arg(m_exitCode);
         return false;
     }
     return true;

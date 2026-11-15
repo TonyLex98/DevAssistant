@@ -73,13 +73,13 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     root->setContentsMargins(16, 14, 16, 14);
     root->setSpacing(10);
 
-    auto* title = new QLabel(QStringLiteral("Generation and Connection"), this);
+    auto* title = new QLabel(tr("Generation and Connection"), this);
     title->setObjectName("title");
     root->addWidget(title);
 
     auto* subtitle = new QLabel(
-        QStringLiteral("Select provider (ollama/llama.cpp), endpoint and generation parameters. "
-                       "Changes are applied after pressing Save."),
+        tr("Select provider (ollama/llama.cpp), endpoint and generation parameters. "
+           "Changes are applied after pressing Save."),
         this);
     subtitle->setObjectName("subtitle");
     subtitle->setWordWrap(true);
@@ -124,7 +124,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
 
     m_numPredict = new QSpinBox(this);
     m_numPredict->setRange(-1, 10000);
-    m_numPredict->setSpecialValueText(QStringLiteral("No limit (-1)"));
+    m_numPredict->setSpecialValueText(tr("No limit (-1)"));
 
     m_numCtx = new QSpinBox(this);
     m_numCtx->setRange(256, 128000);
@@ -146,7 +146,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
     m_seed->setRange(0, 1000000000);
 
     m_stopWords = new QTextEdit(this);
-    m_stopWords->setPlaceholderText(QStringLiteral("One stop word per line"));
+    m_stopWords->setPlaceholderText(tr("One stop word per line"));
     m_stopWords->setMinimumHeight(110);
 
     m_reasoningEffort = new QComboBox(this);
@@ -167,14 +167,14 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* conn = new QGroupBox(QStringLiteral("Connection"), page);
+        auto* conn = new QGroupBox(tr("Connection"), page);
         auto* f = new QFormLayout(conn);
         f->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        f->addRow(QStringLiteral("Provider"), m_provider);
-        f->addRow(QStringLiteral("Endpoint"), m_endpoint);
+        f->addRow(tr("Provider"), m_provider);
+        f->addRow(tr("Endpoint"), m_endpoint);
 
         auto* hint = new QLabel(
-            QStringLiteral("Defaults: ollama -> http://127.0.0.1:11434, llama.cpp -> http://127.0.0.1:8080"),
+            tr("Defaults: ollama -> http://127.0.0.1:11434, llama.cpp -> http://127.0.0.1:8080"),
             page);
         hint->setWordWrap(true);
         hint->setObjectName("subtitle");
@@ -182,7 +182,7 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->addWidget(conn);
         lay->addWidget(hint);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Connection"));
+        tabs->addTab(page, tr("Connection"));
     }
 
     {
@@ -191,31 +191,31 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* sampling = new QGroupBox(QStringLiteral("Sampling"), page);
+        auto* sampling = new QGroupBox(tr("Sampling"), page);
         auto* fs = new QFormLayout(sampling);
-        fs->addRow(QStringLiteral("Temperature"), m_temperature);
-        fs->addRow(QStringLiteral("Top P"), m_topP);
-        fs->addRow(QStringLiteral("Top K"), m_topK);
+        fs->addRow(tr("Temperature"), m_temperature);
+        fs->addRow(tr("Top P"), m_topP);
+        fs->addRow(tr("Top K"), m_topK);
 
-        auto* penalties = new QGroupBox(QStringLiteral("Penalties and repetition"), page);
+        auto* penalties = new QGroupBox(tr("Penalties and repetition"), page);
         auto* fp = new QFormLayout(penalties);
-        fp->addRow(QStringLiteral("Repeat penalty"), m_repeatPenalty);
-        fp->addRow(QStringLiteral("Presence penalty"), m_presencePenalty);
-        fp->addRow(QStringLiteral("Frequency penalty"), m_frequencyPenalty);
-        fp->addRow(QStringLiteral("Repeat last N"), m_repeatLastN);
-        fp->addRow(QStringLiteral("Temperature decay"), m_temperatureDecay);
+        fp->addRow(tr("Repeat penalty"), m_repeatPenalty);
+        fp->addRow(tr("Presence penalty"), m_presencePenalty);
+        fp->addRow(tr("Frequency penalty"), m_frequencyPenalty);
+        fp->addRow(tr("Repeat last N"), m_repeatLastN);
+        fp->addRow(tr("Temperature decay"), m_temperatureDecay);
 
-        auto* miro = new QGroupBox(QStringLiteral("Mirostat"), page);
+        auto* miro = new QGroupBox(tr("Mirostat"), page);
         auto* fm = new QFormLayout(miro);
-        fm->addRow(QStringLiteral("Mode (0/1/2)"), m_mirostat);
-        fm->addRow(QStringLiteral("Tau"), m_mirostatTau);
-        fm->addRow(QStringLiteral("Eta"), m_mirostatEta);
+        fm->addRow(tr("Mode (0/1/2)"), m_mirostat);
+        fm->addRow(tr("Tau"), m_mirostatTau);
+        fm->addRow(tr("Eta"), m_mirostatEta);
 
         lay->addWidget(sampling);
         lay->addWidget(penalties);
         lay->addWidget(miro);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Generation"));
+        tabs->addTab(page, tr("Generation"));
     }
 
     {
@@ -224,26 +224,26 @@ OllamaSettingsDialog::OllamaSettingsDialog(QWidget* parent)
         lay->setContentsMargins(12, 12, 12, 12);
         lay->setSpacing(10);
 
-        auto* limits = new QGroupBox(QStringLiteral("Limits"), page);
+        auto* limits = new QGroupBox(tr("Limits"), page);
         auto* fl = new QFormLayout(limits);
-        fl->addRow(QStringLiteral("Num context (num_ctx)"), m_numCtx);
-        fl->addRow(QStringLiteral("Num predict (num_predict)"), m_numPredict);
-        fl->addRow(QStringLiteral("Seed"), m_seed);
-        fl->addRow(QStringLiteral("Reasoning effort"), m_reasoningEffort);
+        fl->addRow(tr("Num context (num_ctx)"), m_numCtx);
+        fl->addRow(tr("Num predict (num_predict)"), m_numPredict);
+        fl->addRow(tr("Seed"), m_seed);
+        fl->addRow(tr("Reasoning effort"), m_reasoningEffort);
 
-        auto* stop = new QGroupBox(QStringLiteral("Stop words"), page);
+        auto* stop = new QGroupBox(tr("Stop words"), page);
         auto* stopLay = new QVBoxLayout(stop);
         stopLay->addWidget(m_stopWords);
 
         lay->addWidget(limits);
         lay->addWidget(stop);
         lay->addStretch(1);
-        tabs->addTab(page, QStringLiteral("Context and output"));
+        tabs->addTab(page, tr("Context and output"));
     }
 
     auto* buttonRow = new QHBoxLayout();
-    auto* resetBtn = new QPushButton(QStringLiteral("Reset"), this);
-    auto* saveBtn = new QPushButton(QStringLiteral("Save"), this);
+    auto* resetBtn = new QPushButton(tr("Reset"), this);
+    auto* saveBtn = new QPushButton(tr("Save"), this);
     buttonRow->addStretch(1);
     buttonRow->addWidget(resetBtn);
     buttonRow->addWidget(saveBtn);

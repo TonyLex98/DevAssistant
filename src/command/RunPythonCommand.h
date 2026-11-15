@@ -6,8 +6,8 @@
 class RunPythonCommand : public Command
 {
 public:
-    /* scriptPath – путь к файлу‑скрипту.
-       inlineCode – код для запуска через `-c`.  Если оба аргумента пустые – команда будет невалидной.
+    /* scriptPath: path to a script file.
+       inlineCode: code to run via `-c`. If both are empty, the command is invalid.
     */
     RunPythonCommand(const QString& scriptPath = QString(),
                      const QByteArray& inlineCode = QByteArray(),
@@ -19,7 +19,7 @@ public:
     QJsonObject params() const override { return m_params; }
     QString description() const override { return m_description; }
 
-    /* Запускает `python` либо скрипт из файла, либо код через `-c`. */
+    /* Runs `python` with either the script file or the code via `-c`. */
     bool apply(DevAssManager* devAss, QString* err) override;
 
     QJsonObject toJson() const override;

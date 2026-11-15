@@ -12,24 +12,24 @@ class PromptManager
 public:
     PromptManager();
 
-    /* -------------  Настройка пути проекта ------------- */
-    void setProjectRoot(const QString& path);      // <-- новое
+    /* -------------  Project path ------------- */
+    void setProjectRoot(const QString& path);
 
-    /* -------------  Поддерживаемые команды ------------- */
-    QString supportedCommandsText() const;         // ← существующая
-    QString capabilitiesText() const;             // ← существующая
+    /* -------------  Supported commands ------------- */
+    QString supportedCommandsText() const;
+    QString capabilitiesText() const;
 
-    /* -------------  Основной промпт ------------- */
+    /* -------------  Main prompt ------------- */
     QString buildPrompt(const QString& userText,
                         const QString& capabilities, const QString&  buildProjectContext,
-                        const QList<QPair<QString,QString>>& history);   // <-- изменено
+                        const QList<QPair<QString,QString>>& history);
 
-    /* -------------  Хранение путей ------------- */
+    /* -------------  Paths ------------- */
     QDir projectRoot() const;
     QDir devAssDir()   const { return m_devAssDir; }
 
-    /* -------------  Вспомогательный список файлов ------------- */
-    QString fileListText() const;  // <-- новое
+    /* -------------  File list helper ------------- */
+    QString fileListText() const;
 
     int historySize(){
         return m_historySize;
@@ -38,11 +38,11 @@ public:
     void setBasePromptOverride(const QString& text);
     QString basePromptOverride() const { return m_basePromptOverride; }
 
-    /** @brief Оценка количества токенов строки.
+    /** @brief Estimates the token count of a string.
      *
-     *  Формула: ceil(text.length() / 4)
-     *  @param text Текст, который нужно посчитать
-     *  @return Приблизительное число токенов
+     *  Formula: ceil(text.length() / 4)
+     *  @param text Text to count
+     *  @return Approximate number of tokens
      */
     int tokenCount(const QString& text) const;
 
@@ -51,9 +51,9 @@ public:
 private:
 
 
-    /* -------------  Храним пути ------------- */
-    QDir m_projectRoot;   // корень проекта
-    QDir m_devAssDir;     // путь к <project>/DevAss
+    /* -------------  Paths ------------- */
+    QDir m_projectRoot;   // project root
+    QDir m_devAssDir;     // <project>/DevAss
     int m_historySize = 20;
     QString m_basePromptOverride;
 };

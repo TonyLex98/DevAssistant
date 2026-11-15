@@ -6,16 +6,16 @@
 #include <QSet>
 #include "utils/Logging.h"
 
-/* Преобразование объекта с path/content в команду */
+/* Turns an object with path/content into a command */
 static QByteArray convertToObjectCommand(const QByteArray& rawObj);
 
-/* Извлечение команд из текста по ключевым словам */
+/* Extracts commands from free text by keywords */
 static QList<QByteArray> findCommandsInText(const QByteArray& rawText);
 
-/* Исправление кавычек вокруг ключей JSON */
+/* Quotes bare JSON keys */
 static QString fixJsonKeys(const QString& input);
 
-/* Попытка исправить частично неправильный JSON */
+/* Tries to repair partially broken JSON */
 static QByteArray attemptJsonFix(const QByteArray& rawJson);
 
 /* Fallback parser for DSL-like lines: COMMAND key=value, key2="value" */
@@ -94,9 +94,8 @@ static QList<QByteArray> splitConcatenatedJson(const QByteArray& rawIn)
         }
     }
 
-    // Если не нашли JSON в стандартном формате, пробуем найти команды по ключевым словам
+    // No well-formed JSON found: look for commands by keywords.
     if (parts.isEmpty()) {
-        // Ищем возможные команды в тексте по ключевым словам
         parts = findCommandsInText(raw);
     }
 
@@ -109,24 +108,23 @@ static QList<QByteArray> splitConcatenatedJson(const QByteArray& rawIn)
     return parts;
 }
 
-/* Извлечение команд из текста по ключевым словам */
+/* Extracts commands from free text by keywords */
 static QList<QByteArray> findCommandsInText(const QByteArray& rawText)
 {
     QList<QByteArray> results;
     QString text = QString::fromUtf8(rawText);
-    
-    // Паттерн для поиска JSON-объектов команд в тексте
+
+    // Matches command-like JSON objects inside the text
     QRegularExpression cmdRegex(R"(\{[^{}]*(?:"command"[^{},]*"[^"]*"[^{}]*|(?:"\w+"\s*:)|(?:\[[^\[\]]*\])|(?:\{[^{}]*\}))*\})", QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator it = cmdRegex.globalMatch(text);
     
     while (it.hasNext()) {
         QRegularExpressionMatch match = it.next();
         QByteArray cmdJson = match.captured().toUtf8().trimmed();
-        // Проверяем, содержит ли найденный JSON команду
         if (cmdJson.contains("command") || cmdJson.contains("action")) {
             results << cmdJson;
         } else {
-            // Если это объект без "command" или "action", проверим, может ли он быть командой
+            // No "command"/"action": check whether it can still be a command.
             QByteArray convertedCmd = convertToObjectCommand(cmdJson);
             if (!convertedCmd.isEmpty()) {
                 results << convertedCmd;
@@ -134,15 +132,13 @@ static QList<QByteArray> findCommandsInText(const QByteArray& rawText)
         }
     }
 
-    // Если не найдено команд по паттерну, пробуем другие подходы
+    // Nothing matched: try a simpler form (objects inside a [...] array).
     if (results.isEmpty()) {
-        // Попробуем найти команды в более простом виде
         QRegularExpression simpleCmdRegex(R"(\[([^\[\]]*)\])", QRegularExpression::DotMatchesEverythingOption);
         QRegularExpressionMatchIterator simpleIt = simpleCmdRegex.globalMatch(text);
         while (simpleIt.hasNext()) {
             QRegularExpressionMatch match = simpleIt.next();
             QString arrContent = match.captured(1);
-            // Ищем в массиве объекты команд
             QRegularExpression objRegex(R"(\{[^}]*\})", QRegularExpression::DotMatchesEverythingOption);
             QRegularExpressionMatchIterator objIt = objRegex.globalMatch(arrContent);
             while (objIt.hasNext()) {
@@ -151,7 +147,7 @@ static QList<QByteArray> findCommandsInText(const QByteArray& rawText)
                 if (objJson.contains("command") || objJson.contains("action")) {
                     results << objJson;
                 } else {
-                    // Если это объект без "command" или "action", проверим, может ли он быть командой
+                    // No "command"/"action": check whether it can still be a command.
                     QByteArray convertedCmd = convertToObjectCommand(objJson);
                     if (!convertedCmd.isEmpty()) {
                         results << convertedCmd;
@@ -273,18 +269,16 @@ static QList<QByteArray> findDslCommandsInText(const QByteArray& rawText)
     return out;
 }
 
-/* Преобразование объекта с path/content в команду CREATE_FILE */
+/* Turns an object with path/content into a CREATE_FILE command */
 static QByteArray convertToObjectCommand(const QByteArray& rawObj)
 {
     QString objStr = QString::fromUtf8(rawObj);
-    
-    // Проверим, содержит ли объект поля path и content (или file_path и content)
+
+    // An object with path (or file_path) and content can be a CREATE_FILE command.
     if ((objStr.contains("path", Qt::CaseInsensitive) || objStr.contains("file_path", Qt::CaseInsensitive)) && objStr.contains("content", Qt::CaseInsensitive)) {
-        // Это может быть команда CREATE_FILE
         QJsonObject cmdObj;
         cmdObj["command"] = "CREATE_FILE";
-        
-        // Пытаемся извлечь путь и содержимое
+
         QRegularExpression pathRegex(R"((?:\"path\"|path|\"file_path\"|file_path)\s*:\s*\"([^\"]*)\"))");
         QRegularExpressionMatch pathMatch = pathRegex.match(objStr);
         if (pathMatch.hasMatch()) {
@@ -343,7 +337,7 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
 
     QList<QByteArray> docs = splitConcatenatedJson(jsonRaw);
     
-    // Если не нашли ничего через splitConcatenatedJson, пробуем другие методы
+    // Nothing found by splitConcatenatedJson: try other methods.
     if (docs.isEmpty()){
         // Try simple parse in case it's a clean array
         QJsonParseError err;
@@ -353,9 +347,8 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
         }
     }
 
-    // Попытаемся использовать ещё более устойчивый подход - извлечь команды по ключевым словам
+    // More tolerant: extract commands by keywords even from partially broken JSON.
     if (docs.isEmpty()) {
-        // Ищем возможные команды в тексте, даже если JSON частично неправильный
         docs = findCommandsInText(sanitizeRaw(jsonRaw));
     }
 
@@ -374,10 +367,9 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
 
     for (const QByteArray& p : docs){
         QJsonParseError err;
-        // Пробуем разобрать каждый найденный фрагмент как JSON
         QJsonDocument d = QJsonDocument::fromJson(p, &err);
         if (err.error != QJsonParseError::NoError){
-            // Если не получилось разобрать как JSON, пробуем исправить возможные проблемы
+            // Not valid JSON: try to repair it.
             QByteArray fixedJson = attemptJsonFix(p);
             QJsonDocument fixedDoc = QJsonDocument::fromJson(fixedJson, &err);
             if (err.error == QJsonParseError::NoError) {
@@ -393,7 +385,7 @@ QVector<Command*> CommandParser::parse(const QByteArray& jsonRaw)
     return res;
 }
 
-/* Попытка исправить частично неправильный JSON */
+/* Tries to repair partially broken JSON */
 static QByteArray attemptJsonFix(const QByteArray& rawJson)
 {
     QString jsonStr = QString::fromUtf8(rawJson);
@@ -406,43 +398,39 @@ static QByteArray attemptJsonFix(const QByteArray& rawJson)
     jsonStr.replace(QChar(0x2018), '\'');
     jsonStr.replace(QChar(0x2019), '\'');
     
-    // Удаляем лишние запятые перед закрывающими скобками или скобками массива
+    // Remove trailing commas before closing braces/brackets.
     jsonStr.replace(QRegularExpression(R"(\,\s*\})"), "}");
     jsonStr.replace(QRegularExpression(R"(\,\s*\])"), "]");
     
-    // Исправляем кавычки вокруг ключей JSON: исправляем {key: } на {"key": }
+    // Quote bare keys: {key: } -> {"key": }
     jsonStr = fixJsonKeys(jsonStr);
 
     // Support JSON-like output that uses single quotes.
     jsonStr.replace(QRegularExpression(R"('([A-Za-z_][A-Za-z0-9_]*)'\s*:)"), "\"\\1\":");
     jsonStr.replace(QRegularExpression(R"(:\s*'([^']*)')"), ":\"\\1\"");
     
-    // Проверяем, есть ли незавершённые объекты/массивы и пытаемся их завершить
-    // Подсчитываем количество открывающих и закрывающих скобок
-    // Используем более простой подход для версии Qt 5.12.12
+    // Close unterminated objects/arrays by counting opening and closing brackets.
     int openBraces = jsonStr.count('{');
     int closeBraces = jsonStr.count('}');
     int openBrackets = jsonStr.count('[');
     int closeBrackets = jsonStr.count(']');
 
-    // Если есть незакрытые фигурные скобки, добавляем соответствующее количество закрывающих
     if (openBraces > closeBraces) {
         for (int i = 0; i < openBraces - closeBraces; ++i) {
             jsonStr.append("}");
         }
     }
 
-    // Если есть незакрытые квадратные скобки, добавляем соответствующее количество закрывающих
     if (openBrackets > closeBrackets) {
         for (int i = 0; i < openBrackets - closeBrackets; ++i) {
             jsonStr.append("]");
         }
     }
 
-    // Удаляем лишние запятые перед закрывающими скобками (еще раз после добавления закрывающих)
+    // Remove trailing commas again after the closing brackets were added.
     jsonStr.replace(QRegularExpression(R"(\,\s*(\}|\]))"), "\\1");
 
-    // Проверяем, не начинается ли строка с лишней запятой или другого недопустимого символа
+    // Drop a stray leading comma.
     jsonStr = jsonStr.trimmed();
     if (jsonStr.startsWith(',')) {
         jsonStr = jsonStr.mid(1).trimmed();
@@ -451,7 +439,7 @@ static QByteArray attemptJsonFix(const QByteArray& rawJson)
     return jsonStr.toUtf8();
 }
 
-/* Исправление кавычек вокруг ключей JSON */
+/* Quotes bare JSON keys */
 static QString fixJsonKeys(const QString& input)
 {
     // Quotes bare keys ({key: ...} -> {"key": ...}). It walks the text and only looks at

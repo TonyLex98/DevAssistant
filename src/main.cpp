@@ -198,9 +198,7 @@ static void scheduleScreenshots(MainWindow& window, const QString& dir)
                         {"params", QJsonObject{{"path", "src/core/ContextManager.cpp"}, {"startLine", 80}, {"endLine", 140}}}},
             QJsonObject{{"command", "EDIT_IN_RANGE"},
                         {"params", QJsonObject{{"path", "src/core/ContextManager.cpp"}, {"startLine", 112}, {"endLine", 114},
-                                               {"content", "if (path.trimmed().isEmpty())
-    return QString();
-"}}}},
+                                               {"content", "if (path.trimmed().isEmpty())\n    return QString();\n"}}}},
             QJsonObject{{"command", "RUN_SHELL"},
                         {"params", QJsonObject{{"command", "cmake --build build --target tests && ctest --test-dir build"}}}},
             QJsonObject{{"command", "DELETE_FILE"}, {"params", QJsonObject{{"path", "build/old_report.txt"}}}},

@@ -1,3 +1,3 @@
 // OpenFileContextCommand.cpp
 #include "OpenFileContextCommand.h"
-// (определения находятся в заголовке – пустой файл)
+// (everything is defined in the header)

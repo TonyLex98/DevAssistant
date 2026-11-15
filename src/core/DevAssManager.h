@@ -13,11 +13,11 @@
 #include <QDateTime>
 #include "../core/ChangeApplier.h"
 
-/* Описание отдельного файла проекта (для сохранения в .dapro) */
+/* A single project file description (stored in .dapro) */
 struct FileDescription
 {
-    QString filePath;          // Абсолютный путь
-    QDateTime lastModTime;     // Время последнего изменения
+    QString filePath;          // absolute path
+    QDateTime lastModTime;     // last modification time
     bool isDescriptionUpToDate = true;
 
     QJsonObject toJson() const
@@ -47,30 +47,29 @@ public:
                            QObject *parent = nullptr);
 
 
-    // Конструктор‑по‑умолчанию
     DevAssManager() {}
 
-    /* Операции с DevelopersAssistant */
+    /* DevelopersAssistant folder operations */
     bool createFolder();
     bool createDaproFile();
     bool generateDescrFiles();
 
-    /* Конфигурация */
+    /* Configuration */
     void setBasePrompt(const QString &path, const QString &label);
     void addFileDescription(const QString &filePath);
     void markFileChanged(const QString &filePath);
     void setHistoryFile(const QString &historyPath);
 
-    /* Сохраняем/загружаем .dapro */
+    /* Save/load .dapro */
     bool save();
     bool load();
 
-    /* Вспомогательные геттеры */
+    /* Getters */
     QDir devAssDir() const { return m_devAssDir; }
     QDir projectRoot() const { return m_projectRoot; }
     QList<FileDescription> fileDescriptions() const { return m_fileDescriptions; }
 
-    /* Новые методы для работы с описанием файлов */
+    /* File descriptions */
     FileDescription* findFileDescription(const QString& path);
     void updateFileDescription(const QString& path,
                                const QDateTime& modTime,
@@ -84,8 +83,8 @@ public:
 
 
 private:
-    QDir m_projectRoot;   // Корень выбранного проекта
-    QDir m_devAssDir;     // Папка DevelopersAssistant
+    QDir m_projectRoot;   // root of the selected project
+    QDir m_devAssDir;     // DevelopersAssistant folder
     QFile m_daproFile;    // *.dapro
 
     QString m_basePromptPath;

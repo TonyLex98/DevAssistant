@@ -10,6 +10,7 @@
 #include <QSizePolicy>
 
 #include <QStatusBar>
+#include <QCoreApplication>
 #include <QMessageBox>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -105,9 +106,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_model.configure(startupModel, startupParams);
     m_agentModel.configure(startupModel, startupParams);
 
-    // --------  1. Build UI via UiBuilder (clean architecture) ----------
+    // Build the UI. The strings in UiBuilder belong to the "UiBuilder" translation context,
+    // which is where lupdate files them (with -tr-function-alias tr+=tr_fn).
     UIWidgets ui;
-    UiBuilder::build(ui, [this](const char* s) { return tr(s); },
+    UiBuilder::build(ui, [](const char* s) { return QCoreApplication::translate("UiBuilder", s); },
                      &m_model, &m_seqMgr, &m_templateMgr, m_ttsController, this);
     ide_widget = ui.ide_widget; m_rootEdit = ui.m_rootEdit;
     m_graphWindow = ui.m_graphWindow; m_seqGraphWindow = ui.m_seqGraphWindow;
@@ -161,13 +163,13 @@ MainWindow::MainWindow(QWidget *parent)
         dlg.setTemplateModeOnly();
         if (dlg.exec() != QDialog::Accepted) return;
         if (dlg.selectedMode() != RunTemplateOrSequenceDialog::RunTemplate) {
-            QMessageBox::warning(this, "Ошибка", "Необходимо выбрать шаблон."); return;
+            QMessageBox::warning(this, tr("Error"), tr("Please choose a template.")); return;
         }
         QString sp = dlg.selectedDefaultSequencePath();
-        if (sp.isEmpty() || !QFile::exists(sp)) { QMessageBox::warning(this, "Ошибка", "Последовательность не найдена."); return; }
+        if (sp.isEmpty() || !QFile::exists(sp)) { QMessageBox::warning(this, tr("Error"), tr("Sequence not found.")); return; }
         PromptSequence seq; QFile sf(sp);
         if (sf.open(QIODevice::ReadOnly)) seq = PromptSequence::fromJson(QJsonDocument::fromJson(sf.readAll()).object());
-        if (seq.name().isEmpty()) { QMessageBox::warning(this, "Ошибка", "Не удалось загрузить."); return; }
+        if (seq.name().isEmpty()) { QMessageBox::warning(this, tr("Error"), tr("Could not load the sequence.")); return; }
         m_currentSeq = seq; m_currentStepIdx = 0; m_sequenceMode = true;
         m_sequenceEditor->updateSequenceGraphHighlight(); m_sequenceRunner->runNextStep();
     });
@@ -182,22 +184,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(exportSequenceAsTemplateBtn, &StyledButton::clicked, this, [this]() {
         refreshAllSequences();
         const QMap<QString, PromptSequence>& seqs = m_seqMgr.sequences();
-        if (seqs.isEmpty()) { QMessageBox::information(this, "No Sequences", "No sequences found."); return; }
+        if (seqs.isEmpty()) { QMessageBox::information(this, tr("No sequences"), tr("No sequences found.")); return; }
         QStringList names; QMap<QString, QString> pb;
         for (auto &fp : m_seqMgr.fileList()) { names << QFileInfo(fp).fileName(); pb.insert(QFileInfo(fp).fileName(), fp); }
         bool ok = false;
         QString sel = QInputDialog::getItem(this, tr("Export"), tr("Choose:"), names, 0, false, &ok);
         if (!ok || sel.isEmpty()) return;
         PromptSequence seq = seqs.value(pb[sel]);
-        QString tn = QInputDialog::getText(this, "Name", "Template name:", QLineEdit::Normal, seq.name(), &ok);
+        QString tn = QInputDialog::getText(this, tr("Name"), tr("Template name:"), QLineEdit::Normal, seq.name(), &ok);
         if (!ok || tn.trimmed().isEmpty()) return;
-        QString desc = QInputDialog::getMultiLineText(this, "Desc", "Description:", seq.description(), &ok);
+        QString desc = QInputDialog::getMultiLineText(this, tr("Description"), tr("Description:"), seq.description(), &ok);
         if (!ok) desc = seq.description();
         QString td = QDir(m_templateMgr.root()).absoluteFilePath(tn.trimmed());
-        if (QDir().exists(td)) { QMessageBox::warning(this, "Failed", "Already exists."); return; }
+        if (QDir().exists(td)) { QMessageBox::warning(this, tr("Failed"), tr("A template with this name already exists.")); return; }
         if (m_templateMgr.exportSequenceAsTemplate(pb[sel], td, tn.trimmed(), desc)) {
-            m_templateMgr.refresh(); QMessageBox::information(this, "OK", "Exported.");
-        } else { QMessageBox::warning(this, "Failed", "Export failed."); }
+            m_templateMgr.refresh(); QMessageBox::information(this, tr("OK"), tr("Exported."));
+        } else { QMessageBox::warning(this, tr("Failed"), tr("Export failed.")); }
     });
 
 
@@ -272,7 +274,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (m_chat)
             m_chat->refreshModelList();
 
-        statusBar()->showMessage(QString("Provider: %1 | Model: %2")
+        statusBar()->showMessage(tr("Provider: %1 | Model: %2")
                                      .arg(m_model.providerName(),
                                           m_model.selectedModel().trimmed().isEmpty()
                                               ? tr("<not selected>")
@@ -281,7 +283,7 @@ MainWindow::MainWindow(QWidget *parent)
                 .arg(m_model.providerName(), endpoint.toString()));
     });
 
-    // Chat + модель
+    // Chat and model
     connect(m_chat, &ChatDialog::sendMessage, this, &MainWindow::sendUserMessage);
     connect(m_chat, &ChatDialog::sendMessageWithImages, this, &MainWindow::sendUserMessageWithImages);
     connect(m_chat, &ChatDialog::runTemplateRequested, this, &MainWindow::runTemplateRequested);
@@ -299,8 +301,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(descBtn, &StyledButton::clicked, this, &MainWindow::generateDescriptions);
 
-    // Состояния
-    statusBar()->showMessage(QString("Provider: %1 | Model: %2")
+    statusBar()->showMessage(tr("Provider: %1 | Model: %2")
                                  .arg(m_model.providerName(),
                                       m_model.selectedModel().trimmed().isEmpty()
                                           ? tr("<not selected>")
@@ -310,11 +311,10 @@ MainWindow::MainWindow(QWidget *parent)
 
 
 
-    // Папка, где будем хранить наборы
+    // Prompt sequences live in Documents/DevelopersAssistant/PromptSequences.
     QString seqRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
                         .append("/DevelopersAssistant/PromptSequences");
 
-    // Создаём каталог, если его нет
     QDir seqDir(seqRoot);
     if (!seqDir.exists())
         seqDir.mkpath(".");
@@ -323,11 +323,10 @@ MainWindow::MainWindow(QWidget *parent)
     refreshAllSequences();
     ensureDefaultSequence();
 
-    // Папка, где будем хранить шаблоны решений
+    // Solution templates live in Documents/DevelopersAssistant/SolutionTemplates.
     QString tmplRoot = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)
                         .append("/DevelopersAssistant/SolutionTemplates");
 
-    // Создаём каталог, если его нет
     QDir tmplDir(tmplRoot);
     if (!tmplDir.exists())
         tmplDir.mkpath(".");
@@ -388,9 +387,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_statusController->setModel(&m_model);
 
     //rescan();
-
-    // ------------ Управление последовательностями ----------------
-    // … (тот же код, что был ранее)
 }
 
 
@@ -645,7 +641,7 @@ void MainWindow::ensureUniversalAgentTemplateInternal()
 
 
 void MainWindow::browse(){
-    QString d = QFileDialog::getExistingDirectory(this,"Select project folder", m_projectRoot);
+    QString d = QFileDialog::getExistingDirectory(this, tr("Select project folder"), m_projectRoot);
     if (d.isEmpty()) return;
 
     m_projectRoot = d;
@@ -653,37 +649,30 @@ void MainWindow::browse(){
 }
 
 void MainWindow::rescan(){
-    /* 0. Подгружаем .dapro перед сканированием */
+    // Load .dapro before scanning.
     m_dev_manager.load();
 
-    /* Путь к каталогу DevelopersAssistant – будет использоваться для фильтрации */
+    // Files inside the DevelopersAssistant folder are skipped.
     const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
 
-    /* Корневой каталог проекта – просто строка, уже абсолютная */
-    const QString projectRootPath = m_projectRoot;   // m_projectRoot – QString
+    const QString projectRootPath = m_projectRoot;
 
-    /* Пересканируем индекс проекта */
     m_index.setRoot(m_projectRoot);
     m_files->clear();
 
     QSet<QString> needRed_set;
-    /* Идем по списку файлов проекта */
     for (const QString& rel : m_index.files()) {
-        /* Полный абсолютный путь к файлу */
         const QString absPath = QDir(projectRootPath).filePath(rel);
 
-        /* ---  Фильтр: игнорируем файлы из DevelopersAssistant  --- */
         if (absPath.startsWith(devAssPath))
-            continue;            // пропускаем файл, как будто его нет
+            continue;
 
-        /* Создаём элемент списка */
         QListWidgetItem* item = new QListWidgetItem(QDir::fromNativeSeparators(rel), m_files);
 
-        /* Получаем данные из .dapro */
         FileDescription* fd = m_dev_manager.findFileDescription(absPath);
         QDateTime fileMod = QFileInfo(absPath).lastModified();
 
-        /* Отметка цвета: красный – файл не описан / устарел, зелёный – актуален */
+        // Red: the file has no description or it is out of date. Green: up to date.
         bool needRed = false;
         if (!fd) {
             needRed = true;
@@ -696,9 +685,8 @@ void MainWindow::rescan(){
             item->setBackgroundColor(Qt::red);
         }
         else
-            item->setBackgroundColor(Qt::green);   // можно оставить default
+            item->setBackgroundColor(Qt::green);
 
-        /* Храним абсолютный путь в UserRole */
         item->setData(Qt::UserRole, absPath);
     }
 
@@ -715,13 +703,13 @@ void MainWindow::openSettings(){
 
     if (m_llmSettingsWindow->isVisible()) {
         m_llmSettingsWindow->hide();
-        settingsBtn->setText("LLM Settings");
+        settingsBtn->setText(tr("Open LLM settings"));
         return;
     }
 
     m_llmSettingsWindow->reloadFromConfig();
     m_llmSettingsWindow->show();
-    settingsBtn->setText("Hide LLM Settings");
+    settingsBtn->setText(tr("Hide LLM settings"));
 }
 
 void MainWindow::editBasePrompt(){
@@ -729,21 +717,18 @@ void MainWindow::editBasePrompt(){
     d.exec();
 }
 
-// MainWindow.cpp
-// ------------------------------------------
-
 QString MainWindow::buildProjectContext() const
 {
-    const QString projectRootPath = m_projectRoot;   // QString
+    const QString projectRootPath = m_projectRoot;
     const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
 
-    QString s = "Корневая папка: " + projectRootPath + "\nФайлы:\n";
+    QString s = "Project root: " + projectRootPath + "\nFiles:\n";
 
     int file_counter = 0;
     for (const QString& f : m_index.files()) {
         const QString abs = QDir(projectRootPath).filePath(f);
 
-        // --- пропускаем файлы из DevelopersAssistant и .dadescr
+        // Skip the DevelopersAssistant folder and .dadescr files.
         if (abs.startsWith(devAssPath) ||
             f.startsWith(QStringLiteral("DevelopersAssistant") + QDir::separator()) ||
             f.endsWith(QStringLiteral(".dadescr")))
@@ -752,10 +737,7 @@ QString MainWindow::buildProjectContext() const
         s += " - " + QDir::toNativeSeparators(abs) + '\n';
         ++file_counter;
 
-        // ---------- 1. Считаем описание (если надо) ----------
-        // В этом примере описания оставляем как есть – но можно удалить
-        // или закомментировать блок ниже, если они вам не нужны.
-
+        // The file's description, if one has been generated.
         const QString rel = QDir(projectRootPath).relativeFilePath(abs);
         const QString descrPath =
             m_dev_manager.devAssDir().filePath(rel + ".dadescr");
@@ -765,37 +747,37 @@ QString MainWindow::buildProjectContext() const
             descrFile.close();
 
             if (!descr.isEmpty()) {
-                s += "   Описание:\n";
+                s += "   Description:\n";
                 s += "   " + descr.replace("\n", "\n   ") + "\n";
             }
         }
 
-        // ---------- 2. ЗАГРУЖАЕМ СОДЕРЖИМОЕ файла ----------
+        // File contents are not included here.
         /*QFile fContent(abs);
         if (fContent.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString content = QString::fromUtf8(fContent.readAll());
             fContent.close();
 
             if (!content.isEmpty()) {
-                s += "   Содержимое:\n";
+                s += "   Contents:\n";
                 s += "   " + content.replace("\n", "\n   ") + "\n";
             }
         }*/
     }
 
     if(file_counter == 0){
-        s += QStringLiteral("Файлов в проекте пока нет.\n");
+        s += QStringLiteral("The project has no files yet.\n");
     }
 
-    // ---------- Контент файлов, открытых командой OPEN_FILE ----------
+    // Files opened with OPEN_FILE / OPEN_FILE_REGION.
     if (!m_contextCache.contextContent().isEmpty())
-        s += "\nСодержимое файлов, добавленных в контекст:\n" + m_contextCache.contextContent() + "\n";
+        s += "\nContents of files added to the context:\n" + m_contextCache.contextContent() + "\n";
 
-    // ---------- Context chain from command execution ----------
+    // Context chain from executed commands.
     if (m_contextManager) {
         QString contextChain = m_contextManager->generateContextText();
         if (!contextChain.isEmpty()) {
-            s += "\nЦепочка контекста из выполненных команд:\n" + contextChain + "\n";
+            s += "\nContext chain from executed commands:\n" + contextChain + "\n";
         }
     }
 
@@ -803,13 +785,13 @@ QString MainWindow::buildProjectContext() const
 }
 
 void MainWindow::applyChanges(){
-    if (m_pending.isEmpty()) { QMessageBox::information(this,"Nothing to apply","No pending changes."); return; }
+    if (m_pending.isEmpty()) { QMessageBox::information(this, tr("Nothing to apply"), tr("No pending changes.")); return; }
     ChangesDialog dlg(this);
     dlg.setChanges(m_pending);
     if (dlg.exec()==QDialog::Accepted) {
         QString err;
         QList<Change> copy = m_pending;
-        if (!m_applier.apply(copy, &err)) { QMessageBox::critical(this,"Apply failed", err); return; }
+        if (!m_applier.apply(copy, &err)) { QMessageBox::critical(this, tr("Apply failed"), err); return; }
         log(QString("Applied %1 change(s). ").arg(m_pending.size()));
         m_pending.clear();
         rescan();
@@ -819,7 +801,7 @@ void MainWindow::applyChanges(){
 }
 
 void MainWindow::undoLast(){
-    QString err; if (!m_applier.undo(&err)) { QMessageBox::warning(this,"Undo", err.isEmpty()?"Nothing to undo":err); }
+    QString err; if (!m_applier.undo(&err)) { QMessageBox::warning(this, tr("Undo"), err.isEmpty() ? tr("Nothing to undo") : err); }
     else { log("Undo done."); rescan(); }
 }
 
@@ -1095,12 +1077,12 @@ void MainWindow::handleSearchResults(Command* cmd)
             qCDebug(logUI) << "[MainWindow] SEARCH_WEB result body is empty";
         }
 
-        // Проверяем, содержит ли результат пометку о необходимости суммаризации
-        bool needsSummarization = body.contains("Контент для суммаризации", Qt::CaseInsensitive);
+        // Matches the phrase SearchWebCommand writes when it found results but no page content
+        // ("... there is no content to summarize."). Keep the two in sync.
+        bool needsSummarization = body.contains("content to summarize", Qt::CaseInsensitive);
 
         QString resultBody = body;
         if (needsSummarization) {
-            // Помечаем, что результат требует суммаризации (в реальной реализации вызовем LLM асинхронно)
             resultBody = summarizeSearchResults(body, query);
         }
 
@@ -1213,7 +1195,7 @@ void MainWindow::generateDescriptions()
 {
     DescriptionGenerator generator(&m_model, &m_dev_manager, this);
 
-    // 1. Перебираем файлы проекта
+    // Collect the project files whose description is missing or out of date.
     QStringList fileList;
     QDirIterator it(m_projectRoot, QDir::Files, QDirIterator::Subdirectories);
     const QString devAssPath = m_dev_manager.devAssDir().absolutePath();
@@ -1221,25 +1203,24 @@ void MainWindow::generateDescriptions()
     while (it.hasNext()) {
         const QString srcFilePath = it.next();
         if (srcFilePath.startsWith(devAssPath))
-            continue; // игнорируем DevAss
+            continue;
 
         FileDescription* fd = m_dev_manager.findFileDescription(srcFilePath);
         QDateTime fileMod = QFileInfo(srcFilePath).lastModified();
 
         if (fd && fd->isDescriptionUpToDate && fileMod <= fd->lastModTime)
-            continue; // уже актуально
+            continue;
 
         fileList << srcFilePath;
     }
 
     if (fileList.isEmpty()) {
-        QMessageBox::information(this, "Готово",
-                                 "В проекте нет файлов, требующих описания.");
+        QMessageBox::information(this, tr("Done"),
+                                 tr("No files in the project need a description."));
         return;
     }
 
-    // 2. Генерация с прогресс‑диалогом
-    QProgressDialog prog("Генерация описаний…", "Отмена",
+    QProgressDialog prog(tr("Generating descriptions…"), tr("Cancel"),
                          0, fileList.size(), this);
     prog.setWindowModality(Qt::WindowModal);
     prog.setMinimumDuration(0);
@@ -1253,24 +1234,17 @@ void MainWindow::generateDescriptions()
             ++failed;
         }
         else{
-            // 1. Относительный путь к исходному файлу
             QString relPath = QDir(m_projectRoot).relativeFilePath(srcFilePath);
-
-            // 2. Путь к файлу‑дескриптору *.dadescr
             QString descrPath = m_dev_manager.devAssDir().filePath(relPath + ".dadescr");
-
-            // 3. Имя файла дескриптора
             QString descrFileName = QFileInfo(descrPath).fileName();
-
-            // 4. Логируем
-            log(QString("✓ Описан %1 → %2").arg(relPath).arg(descrFileName));
+            log(QString("✓ Described %1 → %2").arg(relPath).arg(descrFileName));
         }
         ++processed;
         prog.setValue(processed);
     }
 
     prog.setValue(fileList.size());
-    log(QString("Генерация завершена: %1 успешно, %2 ошибок.")
+    log(QString("Description generation finished: %1 succeeded, %2 failed.")
         .arg(processed - failed).arg(failed));
 
     rescan();
@@ -1278,7 +1252,7 @@ void MainWindow::generateDescriptions()
 
 void MainWindow::log(const QString& m){ m_log->append(m); }
 
-// <‑‑ Добавлен новый слот для обработки текста от Vosk
+// Text typed in the chat or recognized from speech.
 void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
 {
     if (lastUserMessage.trimmed().isEmpty())
@@ -1307,13 +1281,13 @@ void MainWindow::reOpenRootDir(){
 
     if (!m_dev_manager.createFolder() || !m_dev_manager.createDaproFile())
     {
-        qCritical(logUI) << "Не удалось подготовить DevelopersAssistant / .dapro";
+        qCritical(logUI) << "Could not prepare the DevelopersAssistant folder / .dapro file";
         //return -1;
     }
 
     if (!m_dev_manager.generateDescrFiles())
     {
-        qCritical(logUI) << "Ошибка при создании .dadescr файлов";
+        qCritical(logUI) << "Could not create the .dadescr files";
     }
 
     rescan();
@@ -1321,11 +1295,9 @@ void MainWindow::reOpenRootDir(){
 
 void MainWindow::setupModelWithGenerationParams()
 {
-    // Загружаем параметры генерации
     AppConfig cfg;
     cfg.load();
 
-    // Подготовим карту параметров для Ollama
     QVariantMap genParams;
     genParams["temperature"] = cfg.temperature;
     genParams["top_p"] = cfg.topP;
@@ -1340,7 +1312,6 @@ void MainWindow::setupModelWithGenerationParams()
     genParams["mirostat_eta"] = cfg.mirostatEta;
     genParams["seed"] = cfg.seed;
 
-    // Если есть stop-слова, добавим их
     if (!cfg.stopWords.isEmpty()) {
         QJsonArray stopArray;
         for (const QString& word : cfg.stopWords) {
@@ -1353,7 +1324,6 @@ void MainWindow::setupModelWithGenerationParams()
     genParams["temperature_decay"] = cfg.temperatureDecay;
     genParams["repeat_last_n"] = cfg.repeatLastN;
 
-    // Применяем настройки модели
     if (!m_model.selectedModel().isEmpty()) {
         m_model.configure(m_model.selectedModel(), genParams);
     }
@@ -1363,7 +1333,7 @@ void MainWindow::setupModelWithGenerationParams()
 
 QString MainWindow::previousStepsText() const
 {
-    if (m_prevSteps.isEmpty()) return QString("Пока ничего не выполнено.");
+    if (m_prevSteps.isEmpty()) return QString("Nothing has been done yet.");
     QString out;
     for (const QString& s : m_prevSteps) out += " - " + s + "\n";
     return out.trimmed();
@@ -1438,39 +1408,40 @@ QString MainWindow::getAllCommandsText() const
     return QString();
 }
 
-// Вспомогательная функция для суммаризации результатов поиска
+// Summarizes web search results with the selected model.
 QString MainWindow::summarizeSearchResults(const QString& content, const QString& query)
 {
     const QString trimmedContent = content.trimmed();
     if (trimmedContent.isEmpty()) {
-        return QStringLiteral("Результаты поиска не содержат текста для суммаризации.");
+        return QStringLiteral("The search results contain no text to summarize.");
     }
 
     if (m_model.selectedModel().isEmpty()) {
         qCWarning(logUI) << "[MainWindow] Summarization skipped: LLM model not configured";
-        return QStringLiteral("LLM не настроен, суммаризация недоступна.");
+        return QStringLiteral("No model is configured, so the results could not be summarized.");
     }
 
     QString effectiveQuery = query.trimmed();
     if (effectiveQuery.isEmpty())
-        effectiveQuery = QStringLiteral("поисковый запрос без текста");
+        effectiveQuery = QStringLiteral("(empty search query)");
 
     QString contentForPrompt = trimmedContent;
     QString truncationNote;
     constexpr int kMaxContextChars = 12000;
     if (contentForPrompt.size() > kMaxContextChars) {
         contentForPrompt = contentForPrompt.left(kMaxContextChars);
-        truncationNote = QStringLiteral("\n[Контент обрезан до %1 символов]").arg(kMaxContextChars);
+        truncationNote = QStringLiteral("\n[Content truncated to %1 characters]").arg(kMaxContextChars);
     }
 
     const QString systemPrompt = QStringLiteral(
-        "Ты ассистент-разработчика. Сформируй на основе найденного обзора краткую, структурированную суммаризацию. "
-        "Укажи ключевые выводы, ссылки на источники и рекомендуемые действия. Отвечай на русском языке, не выдумывай фактов."
+        "You are a developer's assistant. Write a short, structured summary of the search results below. "
+        "Give the key findings, links to the sources and recommended actions. "
+        "Answer in the language of the user's request and do not make up facts."
     );
     const QString userPrompt = QStringLiteral(
-        "Запрос: %1\n"
-        "Содержимое результатов:\n%2%3\n\n"
-        "Выведи итоговое резюме (3–4 тезиса или коротких абзаца) с указанием ключевых фактов, ссылок и возможных действий."
+        "Query: %1\n"
+        "Search results:\n%2%3\n\n"
+        "Write the final summary (3-4 points or short paragraphs) with the key facts, links and possible actions."
     ).arg(effectiveQuery, contentForPrompt, truncationNote);
 
     qCDebug(logUI) << "[MainWindow] Summarizing SEARCH_WEB results for query:" << effectiveQuery
@@ -1480,10 +1451,10 @@ QString MainWindow::summarizeSearchResults(const QString& content, const QString
     const QString errorPrefix = QStringLiteral("[Ollama error]");
     if (summary.startsWith(errorPrefix)) {
         qCWarning(logUI) << "[MainWindow] LLM error during search summary:" << summary;
-        summary = QStringLiteral("LLM вернул ошибку: %1").arg(summary.mid(errorPrefix.length()).trimmed());
+        summary = QStringLiteral("The model returned an error: %1").arg(summary.mid(errorPrefix.length()).trimmed());
     } else if (summary.isEmpty()) {
         qCWarning(logUI) << "[MainWindow] LLM returned an empty summary for SEARCH_WEB";
-        summary = QStringLiteral("LLM не вернула ответ на суммаризацию.");
+        summary = QStringLiteral("The model returned no summary.");
     }
 
     return summary;
@@ -1559,8 +1530,8 @@ void MainWindow::updateContextStatusDisplay()
                     commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
                     commandItem->setForeground(0, Qt::darkGreen);
                     commandItem->setForeground(1, Qt::darkGreen);
-                    commandItem->setToolTip(0, "Active in context");
-                    commandItem->setToolTip(1, "Active in context");
+                    commandItem->setToolTip(0, tr("Active in context"));
+                    commandItem->setToolTip(1, tr("Active in context"));
                     break;
                 }
                 case CommandState::Invalidated: {
@@ -1569,7 +1540,7 @@ void MainWindow::updateContextStatusDisplay()
                     commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
                     commandItem->setForeground(0, Qt::red);
                     commandItem->setForeground(1, Qt::red);
-                    QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
+                    QString tooltip = tr("Invalidated: %1").arg(cmdInfo.reason);
                     commandItem->setToolTip(0, tooltip);
                     commandItem->setToolTip(1, tooltip);
                     break;
@@ -1580,8 +1551,8 @@ void MainWindow::updateContextStatusDisplay()
                     commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
                     commandItem->setForeground(0, Qt::gray);
                     commandItem->setForeground(1, Qt::gray);
-                    commandItem->setToolTip(0, "Command was removed from context");
-                    commandItem->setToolTip(1, "Command was removed from context");
+                    commandItem->setToolTip(0, tr("Command was removed from context"));
+                    commandItem->setToolTip(1, tr("Command was removed from context"));
                     break;
                 }
             }
@@ -1592,7 +1563,7 @@ void MainWindow::updateContextStatusDisplay()
             // Add result as child item if it exists
             if (!cmdInfo.result.isEmpty()) {
                 QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
-                resultItem->setText(0, "Result:");
+                resultItem->setText(0, tr("Result:"));
                 resultItem->setText(1, cmdInfo.result);
                 resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
                 resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
@@ -1604,7 +1575,7 @@ void MainWindow::updateContextStatusDisplay()
                 if (resultLines.size() > 10) {
                     // Show first 10 lines and indicate more
                     QStringList shortResult = resultLines.mid(0, 10);
-                    shortResult << "... (click to expand)";
+                    shortResult << tr("... (click to expand)");
                     resultItem->setText(1, shortResult.join('\n'));
                 } else {
                     resultItem->setText(1, cmdInfo.result);
@@ -1621,7 +1592,7 @@ void MainWindow::updateContextStatusDisplay()
             seqItem->setText(0, seqInfo.timestamp.toString("hh:mm:ss"));
 
             // Second column: sequence name with description
-            seqItem->setText(1, QString("SEQUENCE: %1").arg(seqInfo.name));
+            seqItem->setText(1, tr("SEQUENCE: %1").arg(seqInfo.name));
             if (!seqInfo.description.isEmpty()) {
                 seqItem->setToolTip(1, seqInfo.description);
             }
@@ -1653,8 +1624,8 @@ void MainWindow::updateContextStatusDisplay()
                         commandItem->setBackground(1, QColor(200, 255, 200)); // Light green
                         commandItem->setForeground(0, Qt::darkGreen);
                         commandItem->setForeground(1, Qt::darkGreen);
-                        commandItem->setToolTip(0, "Active in context");
-                        commandItem->setToolTip(1, "Active in context");
+                        commandItem->setToolTip(0, tr("Active in context"));
+                        commandItem->setToolTip(1, tr("Active in context"));
                         break;
                     }
                     case CommandState::Invalidated: {
@@ -1663,7 +1634,7 @@ void MainWindow::updateContextStatusDisplay()
                         commandItem->setBackground(1, QColor(255, 200, 200)); // Light red
                         commandItem->setForeground(0, Qt::red);
                         commandItem->setForeground(1, Qt::red);
-                        QString tooltip = QString("Invalidated: %1").arg(cmdInfo.reason);
+                        QString tooltip = tr("Invalidated: %1").arg(cmdInfo.reason);
                         commandItem->setToolTip(0, tooltip);
                         commandItem->setToolTip(1, tooltip);
                         break;
@@ -1674,8 +1645,8 @@ void MainWindow::updateContextStatusDisplay()
                         commandItem->setBackground(1, QColor(200, 200, 200)); // Light gray
                         commandItem->setForeground(0, Qt::gray);
                         commandItem->setForeground(1, Qt::gray);
-                        commandItem->setToolTip(0, "Command was removed from context");
-                        commandItem->setToolTip(1, "Command was removed from context");
+                        commandItem->setToolTip(0, tr("Command was removed from context"));
+                        commandItem->setToolTip(1, tr("Command was removed from context"));
                         break;
                     }
                 }
@@ -1686,7 +1657,7 @@ void MainWindow::updateContextStatusDisplay()
                 // Add result as child item if it exists
                 if (!cmdInfo.result.isEmpty()) {
                     QTreeWidgetItem* resultItem = new QTreeWidgetItem(commandItem);
-                    resultItem->setText(0, "Result:");
+                    resultItem->setText(0, tr("Result:"));
                     resultItem->setText(1, cmdInfo.result);
                     resultItem->setBackground(0, QColor(240, 240, 240)); // Light gray background for result header
                     resultItem->setBackground(1, QColor(245, 245, 245)); // Light gray background
@@ -1698,7 +1669,7 @@ void MainWindow::updateContextStatusDisplay()
                     if (resultLines.size() > 10) {
                         // Show first 10 lines and indicate more
                         QStringList shortResult = resultLines.mid(0, 10);
-                        shortResult << "... (click to expand)";
+                        shortResult << tr("... (click to expand)");
                         resultItem->setText(1, shortResult.join('\n'));
                     } else {
                         resultItem->setText(1, cmdInfo.result);
@@ -1799,7 +1770,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     }
 
     if (foundTemplatePath.isEmpty()) {
-        QMessageBox::warning(this, "Error", "Selected template not found: " + templatePath);
+        QMessageBox::warning(this, tr("Error"), tr("Selected template not found: %1").arg(templatePath));
         return;
     }
 
@@ -1832,7 +1803,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     }
 
     if (mainSequencePath.isEmpty() || !QFile::exists(mainSequencePath)) {
-        QMessageBox::warning(this, "Error", "No valid sequence found for template: " + selectedTemplate.name());
+        QMessageBox::warning(this, tr("Error"), tr("No valid sequence found for template: %1").arg(selectedTemplate.name()));
         return;
     }
 
@@ -1849,7 +1820,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
     }
 
     if (seq.name().isEmpty()) {
-        QMessageBox::warning(this, "Error", "Could not load the sequence for template: " + selectedTemplate.name());
+        QMessageBox::warning(this, tr("Error"), tr("Could not load the sequence for template: %1").arg(selectedTemplate.name()));
         return;
     }
 
@@ -1873,7 +1844,7 @@ void MainWindow::runTemplateRequested(const QString &templatePath, const QString
 
 void MainWindow::runSimpleChat(const QString &text)
 {
-    // This method is called when "Простой чат" is selected - direct chat mode
+    // This method is called when "Simple chat" is selected - direct chat mode
     // Send the message directly to the model in streaming mode without templates/sequences
 
     qCDebug(logUI) << "[runSimpleChat] Text:" << text;
@@ -2017,7 +1988,7 @@ void MainWindow::runSimpleChatWithImages(const QString &text,
     if (m_contextManager)
         m_contextManager->observeUserQuery(historyText);
 
-    m_chat->appendUserMessage(note.isEmpty() ? text : (text + QString("\n[Images attached: %1]").arg(imagePaths.size())));
+    m_chat->appendUserMessage(note.isEmpty() ? text : (text + QStringLiteral("\n") + tr("[Images attached: %n]", nullptr, imagePaths.size())));
     appendUserQuestionToResultDisplay(historyText);
 
     m_streamBuf.clear();
@@ -2216,8 +2187,8 @@ DevAssManager* MainWindow::devManagerPtr() { return &m_dev_manager; }
 // log() already implemented at line 1700
 void MainWindow::statusBarMessage(const QString& msg) { statusBar()->showMessage(msg); }
 // appendUserQuestionToResultDisplay() already implemented at line 2477
-void MainWindow::appendConsoleToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi("Console", block); }
-void MainWindow::appendExternalToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi("External", block); }
+void MainWindow::appendConsoleToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi(tr("Console"), block); }
+void MainWindow::appendExternalToResultDisplay(const QString& block) { m_sequenceRunner->appendResultToUi(tr("External"), block); }
 QTreeWidget* MainWindow::contextCommandsList() { return m_contextCommandsList; }
 
 // ─── ISequenceService ─────────────────────────────────────────────────

@@ -20,7 +20,7 @@ class UiBuilder {
 public:
     // Main entry point — builds all widgets and layouts
     // ui: struct to populate with widget pointers
-    // tr_fn: translation function (MainWindow::tr)
+    // tr_fn: translation function (the "UiBuilder" translation context)
     // model: OllamaAdapter for ChatDialog
     // seqMgr: PromptSequenceManager for SequenceGraphWidget
     // tmplMgr: SolutionTemplateManager for SequenceGraphWidget

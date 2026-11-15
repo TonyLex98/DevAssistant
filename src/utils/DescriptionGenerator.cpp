@@ -22,32 +22,32 @@ QString DescriptionGenerator::relativePath(const QString& absPath)
 QString DescriptionGenerator::createPrompt(const QString& content)
 {
     return QString(
-        "Составь формализованное, но очень краткое описание содержимого файла. Пиши по-русски и строго следуй формату ниже.\n"
+        "Write a formal but very short description of the file contents. Write in English and follow the format below strictly.\n"
         "\n"
-        "Если файл содержит код, выполни статический разбор и выведи в Markdown:\n"
-        "## Назначение файла\n"
-        "- 1–2 предложения о том, что делает файл.\n"
+        "If the file contains code, analyze it statically and output Markdown:\n"
+        "## Purpose\n"
+        "- 1-2 sentences on what the file does.\n"
         "\n"
-        "## Сущности\n"
-        "Таблица (Имя | Тип {class/struct/enum/namespace} | Назначение в 1 предложении).\n"
+        "## Entities\n"
+        "A table (Name | Kind {class/struct/enum/namespace} | Purpose in 1 sentence).\n"
         "\n"
-        "## Методы по классам\n"
-        "Для каждого класса перечисли методы строками вида:\n"
-        "- Class::method(params) — краткое назначение; вызывает: A::x, B::y; изменяет: поля; бросает: исключения; сигналы/слоты: …\n"
+        "## Methods by class\n"
+        "For each class, list its methods as lines like:\n"
+        "- Class::method(params) - short purpose; calls: A::x, B::y; modifies: fields; throws: exceptions; signals/slots: ...\n"
         "\n"
-        "## Взаимодействия\n"
-        "Список связей «источник → цель» с пояснением (когда/зачем), например:\n"
-        "- A::foo → B::bar — при обработке события …\n"
-        "Если явных вызовов нет — так и укажи.\n"
+        "## Interactions\n"
+        "A list of \"source -> target\" links with an explanation (when/why), for example:\n"
+        "- A::foo -> B::bar - while handling the event ...\n"
+        "If there are no explicit calls, say so.\n"
         "\n"
-        "## Зависимости\n"
-        "Внешние библиотеки/Qt-классы и для чего они используются.\n"
+        "## Dependencies\n"
+        "External libraries/Qt classes and what they are used for.\n"
         "\n"
-        "## Публичный API\n"
-        "Ключевые точки входа (короткий перечень).\n"
+        "## Public API\n"
+        "Key entry points (a short list).\n"
         "\n"
-        "Если это НЕ код, дай сжатое резюме в 2–3 предложениях.\n"
-        "Не выдумывай фактов; опирайся только на текст ниже.\n"
+        "If this is NOT code, give a concise 2-3 sentence summary.\n"
+        "Do not invent facts; rely only on the text below.\n"
         "\n"
         "-----\n"
         "%1"
@@ -58,15 +58,14 @@ QString DescriptionGenerator::createPrompt(const QString& content)
 QString DescriptionGenerator::writeDescription(const QString& relPath,
                                               const QString& description)
 {
-    // Путь к *.dadescr в каталоге DevAss
+    // *.dadescr path inside the DevAss folder
     QString descrPath = m_devAss->devAssDir().filePath(relPath + ".dadescr");
 
-    // Создаём вложенные каталоги, если нужно
     QDir().mkpath(QFileInfo(descrPath).absolutePath());
 
     QFile f(descrPath);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        qCWarning(logUtils) << "Не удалось записать дескриптор:" << descrPath;
+        qCWarning(logUtils) << "Failed to write the descriptor:" << descrPath;
         return QString();
     }
     f.write(description.toUtf8());
@@ -81,36 +80,36 @@ QString DescriptionGenerator::generateAndSave(const QString& filePath)
     if (!fi.exists() || !fi.isFile())
         return QString();
 
-    // --- 1. Проверяем актуальность ---
+    // --- 1. Is the description up to date? ---
     FileDescription* fd = m_devAss->findFileDescription(filePath);
     QDateTime fileMod = fi.lastModified();
     if (fd && fd->isDescriptionUpToDate && fileMod <= fd->lastModTime)
-        return QString(); // уже актуально – ничего не делаем
+        return QString(); // already up to date, nothing to do
 
-    // --- 2. Читаем файл ---
+    // --- 2. Read the file ---
     QFile f(filePath);
     if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qCWarning(logUtils) << "Не удалось открыть файл:" << filePath;
+        qCWarning(logUtils) << "Failed to open the file:" << filePath;
         return QString();
     }
     QString content = QString::fromUtf8(f.readAll());
     f.close();
 
-    // --- 3. Генерируем через модель ---
+    // --- 3. Generate with the model ---
     QString prompt = createPrompt(content);
     QString description = m_model->generate(prompt);
     if (description.isEmpty()) {
-        qCWarning(logUtils) << "LLM вернул пустое описание для:" << filePath;
+        qCWarning(logUtils) << "The LLM returned an empty description for:" << filePath;
         return QString();
     }
 
-    // --- 4. Записываем в *.dadescr ---
+    // --- 4. Write the *.dadescr file ---
     QString relPath = relativePath(filePath);
     QString descrPath = writeDescription(relPath, description);
     if (descrPath.isEmpty())
-        return QString(); // ошибка записи
+        return QString(); // write error
 
-    // --- 5. Обновляем .dapro ---
+    // --- 5. Update .dapro ---
     m_devAss->updateFileDescription(filePath,
                                     QDateTime::currentDateTime(),
                                     true);

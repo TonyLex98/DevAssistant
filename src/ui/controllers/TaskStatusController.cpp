@@ -127,7 +127,7 @@ QString TaskStatusController::buildStatusText() const
 
     double pers = 100.0 - (double)usedTokens / totalTokens * 100.0;
 
-    return QString("Time: %1 | Context left: %2/%3 (%4%)")
+    return tr("Time: %1 | Context left: %2/%3 (%4%)")
         .arg(timeStr)
         .arg(formatNumber(usedTokens))
         .arg(formatNumber(totalTokens))
@@ -139,13 +139,13 @@ QString TaskStatusController::formatNumber(quint64 num) const
     if (num >= 1000000) {
         double value = static_cast<double>(num) / 1000000.0;
         if (value == static_cast<int>(value))
-            return QString::number(static_cast<int>(value)) + "млн";
-        return QString::number(value, 'f', 2) + "млн";
+            return tr("%1M").arg(QString::number(static_cast<int>(value)));
+        return tr("%1M").arg(QString::number(value, 'f', 2));
     } else if (num >= 1000) {
         double value = static_cast<double>(num) / 1000.0;
         if (value == static_cast<int>(value))
-            return QString::number(static_cast<int>(value)) + "к";
-        return QString::number(value, 'f', 2) + "к";
+            return tr("%1k").arg(QString::number(static_cast<int>(value)));
+        return tr("%1k").arg(QString::number(value, 'f', 2));
     }
     return QString::number(num);
 }

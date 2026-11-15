@@ -25,7 +25,7 @@ void AppConfig::load(){
     endpoint        = QUrl(s.value("model/endpoint", endpointDefault).toString());
     params          = s.value("model/params").toMap();
     
-    // Загрузка параметров генерации
+    // Generation parameters
     temperature = s.value("generation/temperature", 0.1).toDouble();
     topP = s.value("generation/top_p", 0.9).toDouble();
     topK = s.value("generation/top_k", 40).toInt();
@@ -39,7 +39,7 @@ void AppConfig::load(){
     mirostatEta = s.value("generation/mirostat_eta", 0.1).toDouble();
     seed = s.value("generation/seed", 0).toULongLong();
     
-    // Загрузка stop words
+    // Stop words
     QStringList stopList = s.value("generation/stop_words").toStringList();
     if (!stopList.isEmpty()) {
         stopWords = stopList;
@@ -58,7 +58,7 @@ void AppConfig::save() const{
     s.setValue("model/endpoint", endpoint.toString());
     s.setValue("model/params", params);
     
-    // Сохранение параметров генерации
+    // Generation parameters
     s.setValue("generation/temperature", temperature);
     s.setValue("generation/top_p", topP);
     s.setValue("generation/top_k", topK);

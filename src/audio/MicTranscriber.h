@@ -3,7 +3,7 @@
 #include <QProcess>
 #include <QTimer>
 #include <QAudioFormat>
-#include <QAudioInput>   // Qt5; для Qt6: #include <QAudioSource>
+#include <QAudioInput>   // Qt5; for Qt6: #include <QAudioSource>
 #include "WavWriter.h"
 
 class MicTranscriber : public QObject {
@@ -13,7 +13,7 @@ public:
 
     void setWhisperExe(const QString& path) { m_whisperExe = path; }
     void setModelPath(const QString& path)  { m_modelPath  = path; }
-    void setLanguage(const QString& lang)   { m_language   = lang; } // "ru" или "" для авто
+    void setLanguage(const QString& lang)   { m_language   = lang; } // e.g. "ru", or "" for auto
     void setChunkMs(int ms)                 { m_chunkMs    = ms; }
 
 public slots:
@@ -38,17 +38,17 @@ private:
     QString m_language = "ru";
     int m_chunkMs = 5000;
 
-    // Аудио
+    // Audio
     QAudioFormat m_fmt;
-    QScopedPointer<QAudioInput> m_in;   // Qt5; для Qt6: QScopedPointer<QAudioSource>
+    QScopedPointer<QAudioInput> m_in;   // Qt5; for Qt6: QScopedPointer<QAudioSource>
     QIODevice* m_dev = nullptr;
 
-    // Чанк
+    // Current chunk
     WavWriter m_writer;
     QString m_curWav;
     QString m_curTxt;
 
-    // Процесс whisper
+    // whisper process
     QProcess* m_proc = nullptr;
 
     QTimer m_timer;

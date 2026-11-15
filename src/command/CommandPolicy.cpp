@@ -12,11 +12,6 @@
 
 namespace {
 
-QString trc(const char* text)
-{
-    return QCoreApplication::translate("CommandPolicy", text);
-}
-
 const QSet<QString>& readOnlyCommands()
 {
     static const QSet<QString> names = {
@@ -87,9 +82,9 @@ Risk riskOf(const QString& commandName)
 QString riskLabel(Risk risk)
 {
     switch (risk) {
-    case Risk::ReadOnly:  return trc("read-only");
-    case Risk::Modifying: return trc("changes files");
-    case Risk::Dangerous: return trc("dangerous");
+    case Risk::ReadOnly:  return QCoreApplication::translate("CommandPolicy", "read-only");
+    case Risk::Modifying: return QCoreApplication::translate("CommandPolicy", "changes files");
+    case Risk::Dangerous: return QCoreApplication::translate("CommandPolicy", "dangerous");
     }
     return QString();
 }
@@ -131,7 +126,7 @@ bool check(const QString& name, const QJsonObject& params, const QString& projec
         }
         if (!found) {
             if (errorOut)
-                *errorOut = trc("%1 is not allowed in this step. Allowed: %2.")
+                *errorOut = QCoreApplication::translate("CommandPolicy", "%1 is not allowed in this step. Allowed: %2.")
                         .arg(upper, allowed.join(QStringLiteral(", ")));
             return false;
         }
@@ -156,7 +151,7 @@ bool check(const Command* command, const QString& projectRoot,
 {
     if (!command) {
         if (errorOut)
-            *errorOut = trc("Empty command.");
+            *errorOut = QCoreApplication::translate("CommandPolicy", "Empty command.");
         return false;
     }
     return check(command->name(), command->params(), projectRoot, allowed, errorOut);
@@ -171,13 +166,13 @@ QString details(const QString& name, const QJsonObject& params, const QString& p
     if (upper == QLatin1String("RUN_SHELL")) {
         QString out = QStringLiteral("> ") + clipped(str("command"), 600);
         if (!str("cwd").isEmpty())
-            out += QStringLiteral("\n") + trc("in %1").arg(path("cwd"));
+            out += QStringLiteral("\n") + QCoreApplication::translate("CommandPolicy", "in %1").arg(path("cwd"));
         return out;
     }
     if (upper == QLatin1String("RUN_PYTHON")) {
         if (!str("scriptPath").isEmpty())
-            return trc("python %1").arg(path("scriptPath"));
-        return trc("Python code, %1:\n%2").arg(lineCount(str("code")), clipped(str("code"), 600));
+            return QCoreApplication::translate("CommandPolicy", "python %1").arg(path("scriptPath"));
+        return QCoreApplication::translate("CommandPolicy", "Python code, %1:\n%2").arg(lineCount(str("code")), clipped(str("code"), 600));
     }
     if (upper == QLatin1String("OPEN_APP")) {
         QStringList args;
@@ -191,8 +186,8 @@ QString details(const QString& name, const QJsonObject& params, const QString& p
         return str("url");
     if (upper == QLatin1String("DELETE_DIR")) {
         return params.value(QStringLiteral("recursive")).toBool()
-                ? trc("%1 and everything in it").arg(path("path"))
-                : trc("%1 (only if empty)").arg(path("path"));
+                ? QCoreApplication::translate("CommandPolicy", "%1 and everything in it").arg(path("path"))
+                : QCoreApplication::translate("CommandPolicy", "%1 (only if empty)").arg(path("path"));
     }
     if (upper == QLatin1String("RENAME_FILE") || upper == QLatin1String("COPY_FILE")) {
         const QString from = !str("oldPath").isEmpty() ? path("oldPath") : path("from");
@@ -202,17 +197,17 @@ QString details(const QString& name, const QJsonObject& params, const QString& p
     if (upper == QLatin1String("EDIT_IN_RANGE") || upper == QLatin1String("OPEN_FILE_REGION")) {
         const QString start = params.value(QStringLiteral("startLine")).toVariant().toString();
         const QString end = params.value(QStringLiteral("endLine")).toVariant().toString();
-        QString out = trc("%1, lines %2–%3").arg(path("path"), start, end);
+        QString out = QCoreApplication::translate("CommandPolicy", "%1, lines %2–%3").arg(path("path"), start, end);
         if (params.contains(QStringLiteral("content")))
-            out += QStringLiteral("\n") + trc("new text: %1").arg(lineCount(str("content")));
+            out += QStringLiteral("\n") + QCoreApplication::translate("CommandPolicy", "new text: %1").arg(lineCount(str("content")));
         return out;
     }
     if (upper == QLatin1String("CREATE_FILE") || upper == QLatin1String("APPEND_TO_FILE")
             || upper == QLatin1String("INSERT_AT_LINE")) {
-        return trc("%1, %2").arg(path("path"), lineCount(str("content")));
+        return QCoreApplication::translate("CommandPolicy", "%1, %2").arg(path("path"), lineCount(str("content")));
     }
     if (upper == QLatin1String("APPLY_PATCH"))
-        return trc("patch, %1").arg(lineCount(str("patch")));
+        return QCoreApplication::translate("CommandPolicy", "patch, %1").arg(lineCount(str("patch")));
     if (upper.startsWith(QLatin1String("SEARCH_")))
         return QStringLiteral("\"%1\"").arg(clipped(str("query").isEmpty() ? str("pattern") : str("query"), 200));
     if (!str("path").isEmpty())

@@ -12,32 +12,32 @@ class PromptSequenceManager : public QObject
 public:
     explicit PromptSequenceManager(QObject *parent = nullptr);
 
-    /* Папка, где находятся последовательности */
+    /* Folder that holds the sequences */
     void setRoot(const QString& rootPath);          // <project>/DevelopersAssistant/PromptSequences
     QString root() const { return m_root; }
 
-    /* Сканирование всех *.seq.json в папке и подпапках */
+    /* Scan all *.seq.json in the folder and its subfolders */
     void refresh();
 
-    /* Доступ к уже загруженным объектам */
+    /* Already loaded sequences */
     const QMap<QString, PromptSequence>& sequences(); // key = full path
 
-    /* Сохранить/удалить отдельную последовательность */
+    /* Save/delete a single sequence */
     bool save(const PromptSequence& seq, const QString& filePath);
     bool remove(const QString& filePath);
 
-    /* Получить список файлов (полные пути) – удобно для UI‑выбора */
+    /* File list (full paths), handy for UI selection */
     QStringList fileList() const { return m_fileList; }
 
-    /* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
+    /* Add/update a single sequence in the cache (used with templates) */
     void addSequenceToCache(const QString& filePath, const PromptSequence& sequence);
     
-    /* Найти последовательность по имени (возвращается путь к файлу и сама последовательность) */
+    /* Find a sequence by name (returns the file path and the sequence) */
     QPair<QString, PromptSequence> findSequenceByName(const QString& name) const;
 
 private:
-    QString m_root;                     // директория PromptSequences
-    QMap<QString, PromptSequence> m_sequences; // key = абсолютный путь к файлу
+    QString m_root;                     // PromptSequences directory
+    QMap<QString, PromptSequence> m_sequences; // key = absolute file path
     QStringList m_fileList;
     QMap<QString, PromptSequence> m_cachedExtra; // added via addSequenceToCache, kept on refresh()
 };
