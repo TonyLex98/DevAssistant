@@ -46,6 +46,10 @@ void TestPathGuard::relativePathInside()
     QVERIFY(PathGuard::resolveInside(m_root, QStringLiteral("./src/../src/main.cpp"), &abs, &err));
     QCOMPARE(abs, QDir::cleanPath(m_root + QStringLiteral("/src/main.cpp")));
     QVERIFY(PathGuard::isInside(m_root, m_root + QStringLiteral("/src/main.cpp")));
+
+    // A name that only starts with two dots stays inside.
+    QVERIFY2(PathGuard::resolveInside(m_root, QStringLiteral("..env"), &abs, &err), qPrintable(err));
+    QCOMPARE(abs, m_root + QStringLiteral("/..env"));
 }
 
 void TestPathGuard::backslashRelativePathInside()

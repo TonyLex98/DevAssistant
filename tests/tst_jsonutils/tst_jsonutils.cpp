@@ -87,6 +87,12 @@ void TestJsonUtils::displayContextPath()
     // Round trip: a relative path normalized and displayed again.
     QCOMPARE(::displayContextPath(::normalizeContextPath(QStringLiteral("src/main.cpp"), root), root),
              QDir::toNativeSeparators(QStringLiteral("src/main.cpp")));
+
+    // A name that only starts with two dots is inside the project.
+    QEXPECT_FAIL("", "displayContextPath() takes any relative path starting with \"..\" for one outside the "
+                     "project, so a file such as \"..env\" in the root is shown with its absolute path "
+                     "(json_utils.cpp:51)", Continue);
+    QCOMPARE(::displayContextPath(root + QStringLiteral("/..env"), root), QStringLiteral("..env"));
 }
 
 QTEST_MAIN(TestJsonUtils)

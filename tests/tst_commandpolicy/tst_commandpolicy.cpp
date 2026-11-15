@@ -307,6 +307,15 @@ void TestCommandPolicy::detailsOtherCommands()
     const QString search = CommandPolicy::details(QStringLiteral("SEARCH_PROJECT"),
                                                   QJsonObject{{"query", "TODO"}}, m_root);
     QCOMPARE(search, QStringLiteral("\"TODO\""));
+
+    // "..env" is a file in the project root (check() accepts it), not a path leading out of it.
+    QString err;
+    QVERIFY2(CommandPolicy::check(QStringLiteral("OPEN_FILE"), QJsonObject{{"path", "..env"}},
+                                  m_root, QStringList(), &err), qPrintable(err));
+    QEXPECT_FAIL("", "details() takes any relative path starting with \"..\" for one outside the project and "
+                     "shows \"..env\" in the root as an absolute path (CommandPolicy.cpp:56)", Continue);
+    QCOMPARE(CommandPolicy::details(QStringLiteral("OPEN_FILE"), QJsonObject{{"path", "..env"}}, m_root),
+             QStringLiteral("..env"));
 }
 
 QTEST_MAIN(TestCommandPolicy)
