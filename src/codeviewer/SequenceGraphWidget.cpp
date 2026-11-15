@@ -17,18 +17,18 @@ SequenceGraphWidget::SequenceGraphWidget(QWidget *parent)
     m_mainLayout = new QVBoxLayout(this);
 
     // Create label and combobox for template selection
-    m_templateLabel = new QLabel(tr("Select Template:"), this);
+    m_templateLabel = new QLabel(tr("Template:"), this);
     m_templateComboBox = new MemoryComboBox("sequenceGraphTemplate", this);
     
     // Create a horizontal layout for the label and combobox
     auto *topLayout = new QHBoxLayout();
     topLayout->setSpacing(6);
     topLayout->addWidget(m_templateLabel, 0, Qt::AlignVCenter);
-    m_templateComboBox->setMaximumWidth(160);
-    topLayout->addWidget(m_templateComboBox, 0, Qt::AlignVCenter);
+    m_templateComboBox->setMinimumContentsLength(10);
+    topLayout->addWidget(m_templateComboBox, 1, Qt::AlignVCenter);
     StyledButton *fitAllBtn = new StyledButton(tr("Fit All"), this);
+    fitAllBtn->setToolTip(tr("Fit the whole graph into the view"));
     topLayout->addWidget(fitAllBtn, 0, Qt::AlignVCenter);
-    topLayout->addStretch(); // Add stretch to push the combo box to the left
     connect(fitAllBtn, &StyledButton::clicked, this, [this]() {
         if (m_view)
             m_view->fitToContents();
