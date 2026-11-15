@@ -1,5 +1,6 @@
 # The core library: everything the assistant does, without a user interface.
 #
+#   session/   the state of a session: project, conversation, context, run
 #   model/     clients for the model servers
 #   project/   the project folder: files, changes with undo, path checks, descriptions
 #   code/      the code index (tree-sitter) and code patching

@@ -12,5 +12,6 @@
   "No answer within %1 s.": "Нет ответа за %1 с.",
   "Template not found: %1": "Шаблон не найден: %1",
   "The template \"%1\" has no sequence that can be loaded.": "В шаблоне «%1» нет последовательности, которую можно загрузить.",
-  "Describing the attached images...": "Описываю прикреплённые изображения..."
+  "Describing the attached images...": "Описываю прикреплённые изображения...",
+  "Indexing the project with tree-sitter...": "Индексирую проект с помощью tree-sitter..."
 }
