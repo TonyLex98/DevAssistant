@@ -331,7 +331,7 @@ QPointF SequenceEdgeItem::getSideCenterPoint(SequenceNodeItem *node, const QPoin
 
     QPointF intersection;
     for (const QLineF &edge : edges) {
-        if (pointer.intersect(edge, &intersection) == QLineF::BoundedIntersection) {
+        if (pointer.intersects(edge, &intersection) == QLineF::BoundedIntersection) {
             return intersection;
         }
     }
@@ -1616,11 +1616,8 @@ bool SequenceRelationView::addDirectedConnection(const QString &sourceName, cons
 
     QJsonObject targets = tmpl.getSequenceTargets();
     QJsonArray arr = targets.value(sourceBase).toArray();
-    bool added = false;
-    if (!arr.contains(targetBase)) {
+    if (!arr.contains(targetBase))
         arr.append(targetBase);
-        added = true;
-    }
     targets[sourceBase] = arr;
     tmpl.setSequenceTargets(targets);
     if (saveTemplate(tmpl)) {

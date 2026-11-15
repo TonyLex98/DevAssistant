@@ -67,7 +67,7 @@ void SolutionTemplateManager::refresh()
         QString templateDirPath = info.absoluteFilePath();
         
         // Sync the template file with the template folder contents
-        bool syncSuccess = syncTemplateFileWithFolder(templateDirPath);
+        syncTemplateFileWithFolder(templateDirPath);
         
         QString templateJsonPath = templateDirPath + "/template.templ.json";
         

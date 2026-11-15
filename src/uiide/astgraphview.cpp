@@ -31,7 +31,7 @@ void ASTGraphView::setAST(const QJsonObject &ast) {
 
             QString label = nodeLabel(c);
 
-            auto *rect = scene_->addRect(x, y, w, h,
+            scene_->addRect(x, y, w, h,
                                          QPen(Qt::black),
                                          QBrush(QColor(230, 244, 255)));
             auto *txt = scene_->addText(label);

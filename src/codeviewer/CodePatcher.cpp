@@ -62,7 +62,8 @@ bool CodePatcher::renameMethod(const NodeData &method, const QString &newName){
 
 bool CodePatcher::addMethodStub(const NodeData &clazz, const QString &retType, const QString &name, const QVector<ParamInfo>& params){
     if(clazz.loc.file.isEmpty()) return false;
-    QFile f(clazz.loc.file); if(!f.open(QIODevice::ReadOnly)) return false;
+    QFile f(clazz.loc.file);
+    if(!f.open(QIODevice::ReadOnly)) return false;
     const QByteArray eol = TextFileLines::fromBytes(f.readAll()).eol; f.close();
     QString paramStr; for(int i=0;i<params.size();++i){ if(i) paramStr+=", "; paramStr+=params[i].type+" "+params[i].name; }
     QString retDefault = (retType=="void") ? "" : ("    return "+retType+"{};\n");
