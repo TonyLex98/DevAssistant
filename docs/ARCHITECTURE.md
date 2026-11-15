@@ -62,6 +62,7 @@ flowchart TB
 | `context/` | `WorkingContext` (command history, opened files, program output, search results; watches the opened files), `ContextManager` (the command history, with `ContextArchive` for older chunks brought back when a subject returns and `ContextGraph` for the tree of topics), `FileContext`, `PromptResolver` (fills the templates' placeholders from the session). |
 | `project/` | `Project` (the folder, its files, structure and descriptions), `DevAssManager` (changes with checks and undo), `ChangeApplier`, `PathGuard`, `TextFileLines`, `DescriptionGenerator`. |
 | `code/` | `ProjectIndexer` (tree-sitter: classes, methods, fields, calls for C/C++, Python, Dart), `CodePatcher`. |
+| `web/` | web search for `SEARCH_WEB`: HTTP with timeouts and caches (`WebFetch`), the search providers (`SearchProviders`), an extractive summary (`TextSummary`). |
 | `rag/` | document search: SQLite store, chunking, embeddings, the index (worker thread); the LightRAG client. |
 | `util/` | settings (`AppConfig`), logging categories, JSON helpers. |
 

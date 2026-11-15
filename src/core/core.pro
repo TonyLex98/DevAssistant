@@ -6,6 +6,7 @@
 #   commands/  the commands the model can use, their parser, registry and policy
 #   context/   what the model is shown: executed commands, opened files, prompt templates
 #   workflow/  prompt sequences, solution templates and the agent that runs them
+#   web/       web search: fetching, the search providers, extractive summaries
 #   rag/       document search and the LightRAG client
 #   util/      settings, logging, JSON helpers
 #
