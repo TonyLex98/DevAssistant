@@ -10,10 +10,10 @@
 
 namespace {
 
-class FasterWhisperRecognizer : public SpeechRecognizer
+class FasterWhisperEngine : public SpeechRecognizer
 {
 public:
-    explicit FasterWhisperRecognizer(QObject* parent)
+    explicit FasterWhisperEngine(QObject* parent)
         : SpeechRecognizer(parent), m_runner(new FasterWhisperRunner(this))
     {
         connect(m_runner, &FasterWhisperRunner::recognitionFinished, this, &SpeechRecognizer::recognitionFinished);
@@ -31,10 +31,10 @@ private:
     FasterWhisperRunner* m_runner;
 };
 
-class VoskRecognizer : public SpeechRecognizer
+class VoskEngine : public SpeechRecognizer
 {
 public:
-    explicit VoskRecognizer(QObject* parent)
+    explicit VoskEngine(QObject* parent)
         : SpeechRecognizer(parent), m_runner(new VoskRunner(this))
     {
         connect(m_runner, &VoskRunner::finalText, this, [this](const QString& text) {
@@ -73,10 +73,10 @@ private:
     VoskRunner* m_runner;
 };
 
-class WhisperCppRecognizer : public SpeechRecognizer
+class WhisperCppEngine : public SpeechRecognizer
 {
 public:
-    explicit WhisperCppRecognizer(QObject* parent)
+    explicit WhisperCppEngine(QObject* parent)
         : SpeechRecognizer(parent), m_runner(new MicTranscriber(this))
     {
         connect(m_runner, &MicTranscriber::textReady, this, [this](const QString& text) {
@@ -108,10 +108,10 @@ private:
     MicTranscriber* m_runner;
 };
 
-class OmniAsrRecognizer : public SpeechRecognizer
+class OmniAsrEngine : public SpeechRecognizer
 {
 public:
-    explicit OmniAsrRecognizer(QObject* parent)
+    explicit OmniAsrEngine(QObject* parent)
         : SpeechRecognizer(parent), m_runner(new OmniAsrRunner(this))
     {
         connect(m_runner, &OmniAsrRunner::recognitionFinished, this, [this](const QString& text) {
@@ -172,10 +172,10 @@ QString SpeechRecognizer::engineTitle(Engine engine)
 SpeechRecognizer* SpeechRecognizer::create(Engine engine, QObject* parent)
 {
     switch (engine) {
-    case Engine::Vosk:       return new VoskRecognizer(parent);
-    case Engine::WhisperCpp: return new WhisperCppRecognizer(parent);
-    case Engine::OmniAsr:    return new OmniAsrRecognizer(parent);
+    case Engine::Vosk:       return new VoskEngine(parent);
+    case Engine::WhisperCpp: return new WhisperCppEngine(parent);
+    case Engine::OmniAsr:    return new OmniAsrEngine(parent);
     case Engine::FasterWhisper:
-    default:                 return new FasterWhisperRecognizer(parent);
+    default:                 return new FasterWhisperEngine(parent);
     }
 }

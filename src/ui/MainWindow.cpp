@@ -1,4 +1,5 @@
 ﻿#include "MainWindow.h"
+#include "../utils/DescriptionGenerator.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QFileDialog>
