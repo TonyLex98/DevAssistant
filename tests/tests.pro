@@ -10,4 +10,7 @@ SUBDIRS += \
     tst_commandparser \
     tst_filecommands \
     tst_promptdata \
-    tst_codeviewer \n    tst_session \n    tst_llmclient \n    tst_agentengine
+    tst_codeviewer \
+    tst_session \
+    tst_llmclient \
+    tst_agentengine
