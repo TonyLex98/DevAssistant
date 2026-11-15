@@ -46,7 +46,9 @@ QStringList splitLines(const QString& text)
 // Keeps the newest `max` entries.
 QStringList newest(const QStringList& list, int max)
 {
-    return list.size() > max ? list.mid(list.size() - max) : list;
+    if (list.size() <= max)
+        return list;
+    return list.mid(list.size() - max);
 }
 
 } // namespace

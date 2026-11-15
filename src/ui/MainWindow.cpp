@@ -36,7 +36,7 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_host(this)
-    , m_engine(m_session, m_host)
+    , m_engine(m_session, m_session.model(), m_host)
     , m_describer(m_session.model(), m_session.project().manager())
 {
     AppConfig config;

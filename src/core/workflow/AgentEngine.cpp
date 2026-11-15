@@ -94,9 +94,10 @@ QString stepSummary(const QList<CommandPtr>& batch)
 
 } // namespace
 
-AgentEngine::AgentEngine(Session& session, AgentHost& host, QObject* parent)
+AgentEngine::AgentEngine(Session& session, ModelClient& model, AgentHost& host, QObject* parent)
     : QObject(parent)
     , m_session(session)
+    , m_model(model)
     , m_host(host)
     , m_runner(session.project().manager())
 {
@@ -122,11 +123,6 @@ AgentEngine::ConfirmMode AgentEngine::confirmModeFromString(const QString& name)
 bool AgentEngine::isRunning() const
 {
     return m_session.run().isActive() || m_chatting;
-}
-
-LlmClient& AgentEngine::stepModel()
-{
-    return m_session.model();
 }
 
 // ---------------------------------------------------------------- starting and stopping
@@ -166,7 +162,7 @@ void AgentEngine::chat(const QString& text)
     request.stream = true;
     request.timeoutMs = 0;
     emit promptSent(text);
-    ask(stepModel(), request,
+    ask(request,
         [this](const QString& answer) {
             m_chatting = false;
             m_session.conversation().addAssistantMessage(answer);
@@ -209,12 +205,12 @@ void AgentEngine::endRun(const QString& message)
 
 // ---------------------------------------------------------------- talking to the model
 
-void AgentEngine::ask(LlmClient& model, const ModelRequest& request, Callback onAnswer,
+void AgentEngine::ask(const ModelRequest& request, Callback onAnswer,
                       std::function<void(const QString&)> onError)
 {
     if (m_reply)
         m_reply->abort();
-    ModelReply* reply = model.send(request);
+    ModelReply* reply = m_model.send(request);
     m_reply = reply;
     const int runId = m_runId;
     if (request.stream)
@@ -259,7 +255,7 @@ void AgentEngine::runStep()
     m_inRepair = false;
 
     const PromptResolver::ResolvedPrompt prompt = PromptResolver::resolve(*step, m_session);
-    const int tokens = stepModel().estimateTokens(prompt.systemPrompt + QLatin1Char('\n') + prompt.userPrompt);
+    const int tokens = m_model.estimateTokens(prompt.systemPrompt + QLatin1Char('\n') + prompt.userPrompt);
     emit log(QStringLiteral("[Step %1] Context ≈ %2 tokens").arg(run.stepIndex + 1).arg(tokens));
     emit log(QStringLiteral("\n--- Step %1 ------------------------------------------------").arg(run.stepIndex + 1));
     if (!prompt.userPrompt.isEmpty())
@@ -282,7 +278,7 @@ void AgentEngine::askChatModel(const PromptResolver::ResolvedPrompt& prompt)
     request.imagesBase64 = m_session.conversation().images().base64;
     request.stream = true;
     request.timeoutMs = 0;
-    ask(stepModel(), request, [this](const QString& answer) {
+    ask(request, [this](const QString& answer) {
         emit answerFinished();
         handleAnswer(answer);
     });
@@ -303,7 +299,7 @@ void AgentEngine::askAgentModel(const PromptResolver::ResolvedPrompt& prompt)
         emit log(tr("Agent mode: the planning call failed (%1); asking for the commands directly.").arg(error));
         askChatModel(prompt);
     };
-    ask(stepModel(), draft, [this, prompt, fallBack](const QString& plan) {
+    ask(draft, [this, prompt, fallBack](const QString& plan) {
         if (!plan.trimmed().isEmpty())
             m_session.context().addConsoleOutput(QStringLiteral("AGENT_RAW_DRAFT"), plan.trimmed(), QString(), 0);
         ModelRequest compile;
@@ -314,7 +310,7 @@ void AgentEngine::askAgentModel(const PromptResolver::ResolvedPrompt& prompt)
         compile.user = prompt.userPrompt;
         compile.options = {{QStringLiteral("temperature"), 0.1}, {QStringLiteral("num_predict"), 1400}};
         compile.timeoutMs = 90000;
-        ask(stepModel(), compile, [this](const QString& answer) { handleAnswer(answer); }, fallBack);
+        ask(compile, [this](const QString& answer) { handleAnswer(answer); }, fallBack);
     }, fallBack);
 }
 
@@ -337,7 +333,7 @@ void AgentEngine::repairJson(const QString& answer, std::function<void(const QBy
     request.user = answer;
     request.options = {{QStringLiteral("temperature"), 0.05}, {QStringLiteral("num_predict"), 800}};
     request.timeoutMs = 45000;
-    ask(stepModel(), request,
+    ask(request,
         [then](const QString& text) { then(CommandParser::extractJson(text.toUtf8())); },
         [then](const QString&) { then(QByteArray()); });
 }
@@ -491,7 +487,7 @@ void AgentEngine::handleInteractive(const QList<CommandPtr>& batch, int index, s
         } else if (name == QLatin1String("SHOW_RESULT")) {
             QString title = p.value(QStringLiteral("title")).toString();
             if (title.isEmpty())
-                title = tr("Answer from %1:").arg(stepModel().model()) + QStringLiteral("\n\n");
+                title = tr("Answer from %1:").arg(m_model.model()) + QStringLiteral("\n\n");
             QString content = p.value(QStringLiteral("content")).toString();
             const QString spoken = content;
             content = content.isEmpty() ? tr("SHOW_RESULT was called without text.") + QStringLiteral("\n\n\n")
@@ -632,7 +628,7 @@ void AgentEngine::afterBatch(const CommandRunner::Outcome& outcome, const QList<
 // The pages a web search found, summarized by the model for the next steps.
 void AgentEngine::summarizeSearches(QList<CommandPtr> searches, std::function<void()> then)
 {
-    if (searches.isEmpty() || stepModel().model().isEmpty()) {
+    if (searches.isEmpty() || m_model.model().isEmpty()) {
         then();
         return;
     }
@@ -657,7 +653,7 @@ void AgentEngine::summarizeSearches(QList<CommandPtr> searches, std::function<vo
                            .arg(query, content, note);
     request.timeoutMs = 120000;
     const auto next = [this, searches, then]() { summarizeSearches(searches, then); };
-    ask(stepModel(), request,
+    ask(request,
         [this, query, next](const QString& summary) {
             if (!summary.trimmed().isEmpty())
                 m_session.context().addExternal(QStringLiteral("==== SEARCH_WEB SUMMARY: %1 ====\n%2").arg(query, summary.trimmed()));
@@ -702,7 +698,7 @@ bool AgentEngine::tryRepair(const CommandRunner::Outcome& outcome, const QList<C
 
     ++m_repairsThisStep;
     m_inRepair = true;
-    ask(stepModel(), repair,
+    ask(repair,
         [this](const QString& text) {
             const QByteArray json = CommandParser::extractJson(text.toUtf8());
             if (json.isEmpty()) {

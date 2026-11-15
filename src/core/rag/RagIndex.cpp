@@ -259,10 +259,10 @@ void Index::startAsking(const QString& folder, const QString& question)
         ModelReply* reply = model.send(request);
         reply->waitForFinished();
         const QString answer = reply->text();
-        const QString error = reply->errorString();
-        post([answer, error, hits](Index* i) {
-            if (!error.isEmpty())
-                emit i->failed(error);
+        const QString answerError = reply->errorString();
+        post([answer, answerError, hits](Index* i) {
+            if (!answerError.isEmpty())
+                emit i->failed(answerError);
             else
                 emit i->answerReady(answer, hits);
         });

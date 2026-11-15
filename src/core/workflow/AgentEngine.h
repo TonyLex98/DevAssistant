@@ -12,7 +12,6 @@
 #include "core/workflow/WorkflowLibrary.h"
 
 class AgentHost;
-class LlmClient;
 class Session;
 
 // Runs prompt sequences: for each step it fills the prompt, asks the model, reads the commands
@@ -37,7 +36,7 @@ public:
     enum class ResultKind { Answer, Reasoning, Context, Error };
     Q_ENUM(ResultKind)
 
-    AgentEngine(Session& session, AgentHost& host, QObject* parent = nullptr);
+    AgentEngine(Session& session, ModelClient& model, AgentHost& host, QObject* parent = nullptr);
     ~AgentEngine() override;
 
     void setConfirmMode(ConfirmMode mode) { m_confirmMode = mode; }
@@ -77,7 +76,7 @@ private:
     using Callback = std::function<void(const QString& text)>;
 
     // One model call; `onAnswer` gets the text, a failure ends the run unless `onError` is given.
-    void ask(LlmClient& model, const ModelRequest& request, Callback onAnswer,
+    void ask(const ModelRequest& request, Callback onAnswer,
              std::function<void(const QString& error)> onError = nullptr);
     void runStep();
     void scheduleStep(int delayMs = 200);
@@ -101,9 +100,8 @@ private:
     void endRun(const QString& message);
     void showResult(const QString& title, const QString& content, ResultKind kind);
     void addConsole(const QString& title, const QString& text);
-    LlmClient& stepModel();
-
     Session& m_session;
+    ModelClient& m_model;
     AgentHost& m_host;
     CommandRunner m_runner;
     LoopGuard m_guard;

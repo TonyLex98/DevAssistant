@@ -5,7 +5,6 @@
 #include <QPointF>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QPixmap>
 
 class SolutionTemplate
 {
