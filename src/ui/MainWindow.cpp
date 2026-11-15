@@ -2249,8 +2249,10 @@ QString MainWindow::currentSeqId() const { return m_currentSeqId; }
 void MainWindow::setCurrentSeqId(const QString& id) { m_currentSeqId = id; }
 QString MainWindow::currentTemplatePath() const { return m_currentTemplatePath; }
 void MainWindow::setCurrentTemplatePath(const QString& path) { m_currentTemplatePath = path; }
-bool MainWindow::useAgentPipeline() const { return m_useAgentPipeline; }
-void MainWindow::setUseAgentPipeline(bool v) { m_useAgentPipeline = v; }
+// Agent mode (a planning call and an execution call per step) is off by default: it doubles
+// the model calls and turns streaming off. Settings > System switches it.
+bool MainWindow::useAgentPipeline() const { return QSettings().value("agent/enabled", false).toBool(); }
+void MainWindow::setUseAgentPipeline(bool v) { QSettings().setValue("agent/enabled", v); }
 int MainWindow::agentRepairCount() const { return m_agentRepairCountThisStep; }
 void MainWindow::setAgentRepairCount(int v) { m_agentRepairCountThisStep = v; }
 int MainWindow::agentMaxRepairs() const { return m_agentMaxRepairsPerStep; }

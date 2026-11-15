@@ -1,4 +1,5 @@
 #include "FasterWhisperRunner.h"
+#include "PythonScripts.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QAudioDeviceInfo>
@@ -58,18 +59,14 @@ FasterWhisperRunner::~FasterWhisperRunner() {
 }
 
 void FasterWhisperRunner::checkAndInstallDependencies() {
-    emit statusMessage("ASR: checking Python runtime...");
-
-    QProcess checkProcess;
-    checkProcess.start("python", QStringList() << "--version");
-    checkProcess.waitForFinished(5000);
-
-    if (checkProcess.exitCode() != 0) {
-        emit errorOccurred("ASR: Python is not available. Install Python and restart.");
-        return;
-    }
-
-    startServer();
+    emit statusMessage(tr("Speech recognition: starting..."));
+    PythonScripts::checkPython(this, [this](bool ok, const QString& error) {
+        if (!ok) {
+            emit errorOccurred(tr("Speech recognition: %1").arg(error));
+            return;
+        }
+        startServer();
+    });
 }
 void FasterWhisperRunner::startServer() {
     if (m_process && m_process->state() != QProcess::NotRunning) return;
@@ -82,20 +79,17 @@ void FasterWhisperRunner::startServer() {
         if (!msg.isEmpty()) {
             qCDebug(logAudio) << "Whisper Server Stderr:" << msg;
             emit statusMessage(msg);
-            QCoreApplication::processEvents(); // Force UI update
         }
     });
 
-    QString scriptPath = QCoreApplication::applicationDirPath() + "/scripts/run_faster_whisper_server.py";
-    if (!QFile::exists(scriptPath)) {
-         scriptPath = QCoreApplication::applicationDirPath() + "/../scripts/run_faster_whisper_server.py";
-    }
-    if (!QFile::exists(scriptPath)) {
-        scriptPath = "c:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/scripts/run_faster_whisper_server.py";
+    const QString scriptPath = PythonScripts::findScript(QStringLiteral("run_faster_whisper_server.py"));
+    if (scriptPath.isEmpty()) {
+        emit errorOccurred(tr("Speech recognition: scripts/run_faster_whisper_server.py was not found next to the program."));
+        return;
     }
 
     qCDebug(logAudio) << "Starting Faster Whisper Server: " << scriptPath;
-    m_process->start("python", QStringList() << "-u" << scriptPath);
+    m_process->start(PythonScripts::pythonProgram(), QStringList() << "-u" << scriptPath);
 }
 
 void FasterWhisperRunner::stopServer() {

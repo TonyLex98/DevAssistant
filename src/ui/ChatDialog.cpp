@@ -175,24 +175,31 @@ ChatDialog::ChatDialog(OllamaAdapter* model, QWidget* parent):QWidget(parent),m_
         cfg.save();
     });
 
-    pslot_updateModelsList();
+    // After the window is shown: asking the server for its models must not delay the window.
+    QTimer::singleShot(0, this, &ChatDialog::pslot_updateModelsList);
 
     connect(m_input,  &InputTextEdit::signal_textEdited, this, [this](const QString &str){
 
         emit signal_updatelastUserMessage(str);
     });
 
-    m_whisperRunner = new FasterWhisperRunner(this);
-    
+    // Speech recognition starts on the first click of the microphone, not with the window:
+    // it launches a Python server and loads a model.
     connect(m_micBtn, &StyledButton::clicked, this, &ChatDialog::onMicClicked);
-    
+}
+
+void ChatDialog::ensureSpeechRecognizer()
+{
+    if (m_whisperRunner)
+        return;
+    m_whisperRunner = new FasterWhisperRunner(this);
     connect(m_whisperRunner, &FasterWhisperRunner::recognitionFinished, this, &ChatDialog::onAsrFinished);
     connect(m_whisperRunner, &FasterWhisperRunner::errorOccurred, this, &ChatDialog::onAsrError);
     connect(m_whisperRunner, &FasterWhisperRunner::silenceDetected, this, &ChatDialog::onSilenceDetected);
-      connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg){
+    connect(m_whisperRunner, &FasterWhisperRunner::statusMessage, this, [this](const QString& msg) {
         if (m_chat) {
-            m_chat->setVisible(true); // Ensure chat is visible
-            m_chat->append("<i>" + msg + "</i>");
+            m_chat->setVisible(true);
+            m_chat->append("<i>" + msg.toHtmlEscaped() + "</i>");
         }
     });
 }
@@ -484,6 +491,7 @@ QString ChatDialog::buildAugmentedTextWithImages(const QString& text, const QVec
 }
 
 void ChatDialog::onMicClicked() {
+    ensureSpeechRecognizer();
     if (m_isRecording) {
         m_whisperRunner->stopRecording();
         
@@ -650,6 +658,14 @@ void ChatDialog::pslot_updateModelsList(){
 
     QStringList models = m_model->listModels();
     m_cb_model->setItems(models);
+    if (models.isEmpty() && m_chat) {
+        // Say it where the user looks, instead of only in a hidden log.
+        m_chat->setVisible(true);
+        m_chat->append("<b>" + tr("No models found at %1.").arg(m_model->endpoint().toString().toHtmlEscaped())
+                       + "</b><br>"
+                       + tr("Start Ollama and download a model, for example <code>ollama pull qwen2.5-coder:7b</code>, "
+                            "or choose another server in Settings &rarr; Model. Then press the refresh button next to the model list."));
+    }
 
     int selectedIdx = -1;
     if (!preferredModel.isEmpty())

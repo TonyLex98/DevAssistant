@@ -1184,8 +1184,13 @@ bool SequenceRunner::ensureAgentModelConfigured()
     if (!m_seq->useAgentPipeline())
         return false;
 
+    // The agent uses the model chosen in the chat unless one was set for it; there is no
+    // hidden default model that the user may not have installed.
     if (m_model->agentModelPtr()->selectedModel().isEmpty()) {
-        m_model->agentModelPtr()->configure(QStringLiteral("gpt-oss:20b"), QVariantMap());
+        const QString chatModel = m_model->modelPtr()->selectedModel();
+        if (chatModel.isEmpty())
+            return false;
+        m_model->agentModelPtr()->configure(chatModel, QVariantMap());
     }
 
     QString err;

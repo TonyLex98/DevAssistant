@@ -38,6 +38,7 @@ SOURCES += \
     src/audio/OmniAsrWidget.cpp \
     src/audio/FasterWhisperRunner.cpp \
     src/audio/TtsRunner.cpp \
+    src/audio/PythonScripts.cpp \
     src/core/ContextManager.cpp \
     src/core/ContextChainResolver.cpp \
     src/codeviewer/CodePatcher.cpp \
@@ -164,6 +165,7 @@ HEADERS += \
     src/audio/OmniAsrWidget.h \
     src/audio/FasterWhisperRunner.h \
     src/audio/TtsRunner.h \
+    src/audio/PythonScripts.h \
     src/core/ContextManager.h \
     src/core/ContextChainResolver.h \
     src/codeviewer/CodePatcher.h \

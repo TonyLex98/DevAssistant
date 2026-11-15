@@ -10,8 +10,10 @@ TtsController::TtsController(QObject* parent)
     , m_toggleBtn(nullptr)
     , m_chat(nullptr)
 {
+    // Off until the user turns it on: it starts a Python server that downloads voices.
+    // (A new key, so the old on-by-default value does not carry over.)
     QSettings settings;
-    m_enabled = settings.value("tts/enabled", true).toBool();
+    m_enabled = settings.value("speech/ttsEnabled", false).toBool();
 
     m_toggleBtn = new StyledButton(m_enabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"), nullptr);
     connect(m_toggleBtn, &StyledButton::clicked, this, &TtsController::onToggleClicked);
@@ -41,7 +43,7 @@ void TtsController::onToggleClicked()
 {
     m_enabled = !m_enabled;
     QSettings settings;
-    settings.setValue("tts/enabled", m_enabled);
+    settings.setValue("speech/ttsEnabled", m_enabled);
 
     m_toggleBtn->setText(m_enabled ? tr("Озвучка: Вкл") : tr("Озвучка: Выкл"));
 

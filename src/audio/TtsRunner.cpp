@@ -1,4 +1,5 @@
 #include "TtsRunner.h"
+#include "PythonScripts.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -18,18 +19,15 @@ TtsRunner::~TtsRunner()
 
 void TtsRunner::checkAndInstallDependencies()
 {
-    emit statusMessage("TTS: checking Python runtime...");
-
-    QProcess checkProcess;
-    checkProcess.start("python", QStringList() << "--version");
-    checkProcess.waitForFinished(5000);
-
-    if (checkProcess.exitCode() != 0) {
-        emit errorOccurred("TTS: Python is not available. Install Python and restart.");
-        return;
-    }
-
-    startServer();
+    // Asynchronous: the window stays responsive, and the result arrives after the owner has
+    // connected to our signals.
+    PythonScripts::checkPython(this, [this](bool ok, const QString& error) {
+        if (!ok) {
+            emit errorOccurred(tr("Text to speech: %1").arg(error));
+            return;
+        }
+        startServer();
+    });
 }
 
 void TtsRunner::startServer()
@@ -52,23 +50,9 @@ void TtsRunner::startServer()
             emit statusMessage(msg);
     });
 
-    QStringList possiblePaths;
-    possiblePaths << QCoreApplication::applicationDirPath() + "/scripts/run_tts_server.py";
-    possiblePaths << QCoreApplication::applicationDirPath() + "/../scripts/run_tts_server.py";
-    possiblePaths << QCoreApplication::applicationDirPath() + "/../../scripts/run_tts_server.py";
-    possiblePaths << "c:/Users/user/Documents/DevAssistantQt_qt5_qmake/DevAss/scripts/run_tts_server.py";
-
-    QString scriptPath;
-    for (const QString& p : possiblePaths) {
-        QFileInfo fi(p);
-        if (fi.exists()) {
-            scriptPath = fi.absoluteFilePath();
-            break;
-        }
-    }
-
+    const QString scriptPath = PythonScripts::findScript(QStringLiteral("run_tts_server.py"));
     if (scriptPath.isEmpty()) {
-        emit errorOccurred("TTS: script run_tts_server.py not found.");
+        emit errorOccurred(tr("Text to speech: scripts/run_tts_server.py was not found next to the program."));
         return;
     }
 
@@ -79,7 +63,7 @@ void TtsRunner::startServer()
     m_process->setProcessEnvironment(env);
 
     emit statusMessage(QString("TTS: starting backend (%1)").arg(scriptPath));
-    m_process->start("python", QStringList() << "-u" << scriptPath);
+    m_process->start(PythonScripts::pythonProgram(), QStringList() << "-u" << scriptPath);
 }
 
 void TtsRunner::onProcessReadyRead()

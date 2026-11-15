@@ -391,7 +391,7 @@ private:
     QStringList m_activeImageSummaries;
     bool m_preserveActiveImagesForNextRun = false;
 
-    bool m_useAgentPipeline = true;
+
     int m_agentRepairCountThisStep = 0;
     int m_agentMaxRepairsPerStep = 2;
     bool m_inAgentAutoRepair = false;

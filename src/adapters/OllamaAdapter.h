@@ -65,6 +65,7 @@ public:
     explicit OllamaAdapter(QObject* parent=nullptr);
 
     void setEndpoint(const QUrl& url);
+    QUrl endpoint() const { return m_endpoint; }
     void setProvider(Provider provider);
     void setProvider(const QString& providerName);
     Provider provider() const { return m_provider; }

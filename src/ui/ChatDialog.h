@@ -90,7 +90,8 @@ private:
     class SolutionTemplateManager* m_templateManager = nullptr;
     class MainWindow* m_mainWnd = nullptr;
     StyledButton* m_micBtn = nullptr;
-    FasterWhisperRunner* m_whisperRunner = nullptr;
+    FasterWhisperRunner* m_whisperRunner = nullptr; // created on first use
+    void ensureSpeechRecognizer();
     bool m_isRecording = false;
 
     QScrollArea* m_imagesScroll = nullptr;

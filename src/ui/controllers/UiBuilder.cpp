@@ -18,6 +18,8 @@
 #include <QFile>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QCheckBox>
+#include <QSettings>
 #include "MemoryLineEdit.h"
 #include "StyledButton.h"
 #include "MemoryComboBox.h"
@@ -331,6 +333,15 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
     ui.confirmModeCombo->setToolTip(tr_fn("Read-only commands open and search files. Commands that "
                                           "change files, run programs or delete anything are confirmed "
                                           "in a dialog that shows exactly what they will do."));
+
+    addDiv(sysLay);
+    addSection(tr_fn("Agent mode"), sysLay);
+    auto* agentMode = new QCheckBox(tr_fn("Plan each step with a separate model call (slower, no streaming)"), parent);
+    agentMode->setChecked(QSettings().value("agent/enabled", false).toBool());
+    agentMode->setToolTip(tr_fn("Each step first asks the model for a plan and then for the commands. "
+                                "It uses the model selected in the chat."));
+    QObject::connect(agentMode, &QCheckBox::toggled, [](bool on) { QSettings().setValue("agent/enabled", on); });
+    sysLay->addWidget(agentMode);
     sysLay->addWidget(ui.confirmModeCombo);
 
     addDiv(sysLay);
