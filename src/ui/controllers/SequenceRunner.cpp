@@ -949,6 +949,10 @@ void SequenceRunner::handleAssistantFinished()
             m_ctx->appendConsoleContext(fullTitle, result, QString(), errorMessage.isEmpty() ? (cmd->wasSuccessful() ? 0 : 1) : 1);
 
             m_model->history().push_back(qMakePair(QString("system"), result));
+        } else if (!errorMessage.isEmpty()) {
+            // Tell the model why its command failed, so the next step can correct it.
+            m_model->history().push_back(qMakePair(QString("system"),
+                    QStringLiteral("%1 failed: %2").arg(cmd->name(), errorMessage)));
         }
 
         if (m_ctx->contextManagerPtr()) {

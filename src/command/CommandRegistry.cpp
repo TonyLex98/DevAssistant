@@ -15,6 +15,7 @@
 #include "RunPythonCommand.h"
 #include "RunShellCommand.h"
 #include "SearchWebCommand.h"
+#include "SearchDocsCommand.h"
 #include "SearchProjectCommand.h"
 #include "ShowResultCommand.h"
 #include "CallSequenceCommand.h"
@@ -109,6 +110,9 @@ static QString canonicalCommandName(const QString& raw)
         {"shell", "RUN_SHELL"},
         {"cmd", "RUN_SHELL"},
         {"terminal", "RUN_SHELL"},
+        {"search_docs", "SEARCH_DOCS"},
+        {"docs_search", "SEARCH_DOCS"},
+        {"rag_search", "SEARCH_DOCS"},
         {"search_web", "SEARCH_WEB"},
         {"web_search", "SEARCH_WEB"},
         {"internet_search", "SEARCH_WEB"},
@@ -516,6 +520,13 @@ static QHash<QString, FactoryFn>& registry()
             return new SearchWebCommand(query, maxResults, description);
         });
 
+        REGISTER_COMMAND(SEARCH_DOCS, [](const QJsonObject& obj) {
+            const QJsonObject p = normalizedParams(obj);
+            const QString query = firstNonEmptyString(p, {"query", "search_query", "question"});
+            const int k = firstNonZeroInt(p, {"k", "maxResults", "max_results", "limit"}, 5);
+            return new SearchDocsCommand(query, k, obj["description"].toString());
+        });
+
         REGISTER_COMMAND(SEARCH_PROJECT, [](const QJsonObject& obj) {
             const QJsonObject p = normalizedParams(obj);
             QString query = firstNonEmptyString(p, {"query", "search_query"});
@@ -773,6 +784,7 @@ QVector<Command*> CommandRegistry::all()
         new RunPythonCommand(QString(), QByteArray()),
         new RunShellCommand(QString()),
         new SearchWebCommand(QString()),
+        new SearchDocsCommand(QString()),
         new SearchProjectCommand(QString()),
         new SearchProjectCaseInsensitiveCommand(QString()),
         new ShowResultCommand(QString()),

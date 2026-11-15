@@ -428,6 +428,18 @@ CommandDoc CommandDocs::doc(const QString& commandName)
         return d;
     }
 
+    if (commandName == "SEARCH_DOCS") {
+        d.summary = QStringLiteral("Semantic search in the project's indexed documents (code, notes, specs, PDFs). "
+                                   "Returns the closest excerpts with file names; cite them in the answer.");
+        d.params = {
+            req("query", "string", QStringLiteral("What to look for, in natural language.")),
+            opt("k", "int", QStringLiteral("How many excerpts to return (default 5, at most 20)."))
+        };
+        d.notes = { QStringLiteral("Works after the project was indexed in Settings > Documents; otherwise it fails with that hint.") };
+        d.example = baseExample(QJsonObject{{"query", "how are settings saved"}, {"k", 5}});
+        return d;
+    }
+
     if (commandName == "CLIPBOARD_GET") {
         d.summary = QStringLiteral("Reads text from the system clipboard.");
         d.params = { opt("maxChars", "int", QStringLiteral("Limit returned text size (default 4000).")) };

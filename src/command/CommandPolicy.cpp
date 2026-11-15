@@ -23,6 +23,7 @@ const QSet<QString>& readOnlyCommands()
         QStringLiteral("OPEN_FILE"),          QStringLiteral("OPEN_FILE_REGION"),
         QStringLiteral("SEARCH_PROJECT"),     QStringLiteral("SEARCH_PROJECT_CASE_INSENSITIVE"),
         QStringLiteral("LIST_FILES_IN_FOLDER"), QStringLiteral("SEARCH_WEB"),
+        QStringLiteral("SEARCH_DOCS"),
         QStringLiteral("GIT_STATUS"),         QStringLiteral("GIT_DIFF"),
         QStringLiteral("CONTEXT_SHOW"),       QStringLiteral("REASONING"),
         QStringLiteral("SHOW_RESULT"),        QStringLiteral("ASK_USER"),

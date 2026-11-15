@@ -298,9 +298,13 @@ void UiBuilder::buildGraphsPage(UIWidgets& ui,
     ui.graphBtn = new StyledButton(tr_fn("Граф контекста"), parent);
     ui.seqGraphBtn = new StyledButton(tr_fn("Граф последовательностей"), parent);
     ui.lightRagBtn = new StyledButton(tr_fn("LightRAG"), parent);
+    ui.documentsBtn = new StyledButton(tr_fn("Documents: search and questions"), parent);
+    ui.documentsBtn->setToolTip(tr_fn("Index the project's documents and ask questions about them. "
+                                      "The agent can then search them with SEARCH_DOCS."));
 
     graphLay->addWidget(ui.graphBtn);
     graphLay->addWidget(ui.seqGraphBtn);
+    graphLay->addWidget(ui.documentsBtn);
     graphLay->addWidget(ui.lightRagBtn);
     graphLay->addStretch();
 }

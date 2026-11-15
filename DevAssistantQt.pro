@@ -2,7 +2,7 @@
 TEMPLATE = app
 TARGET = DevAssistantQt
 CONFIG += qt warn_on release
-QT += widgets network multimedia core gui widgets
+QT += widgets network multimedia core gui sql
 QMAKE_CXXFLAGS += -std=gnu++1z
 QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
 QMAKE_CFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
@@ -12,6 +12,7 @@ CONFIG += c++17 object_parallel_to_source
 
 INCLUDEPATH += \
     src src/core \
+    ragmodule \
     src/adapters \
     src/ui \
     src/utils \
@@ -64,6 +65,7 @@ SOURCES += \
     src/command/RenameFileCommand.cpp \
     src/command/ReplaceInFileCommand.cpp \
     src/command/SearchProjectCommand.cpp \
+    src/command/SearchDocsCommand.cpp \
     src/command/SearchProjectCaseInsensitiveCommand.cpp \
     src/command/SearchWebCommand.cpp \
     src/command/ShowResultCommand.cpp \
@@ -142,6 +144,11 @@ SOURCES += \
     src/utils/json_utils.cpp \
     src/utils/PathGuard.cpp \
     src/utils/TextFileLines.cpp \
+    ragmodule/RagStore.cpp \
+    ragmodule/RagText.cpp \
+    ragmodule/RagEmbedder.cpp \
+    ragmodule/RagIndex.cpp \
+    ragmodule/RagWidget.cpp \
     src/uiide/tree-sitter/lib/src/lib.c \
     src/uiide/tree-sitter-cpp/src/parser.c \
     src/uiide/tree-sitter-cpp/src/scanner.c \
@@ -183,6 +190,12 @@ HEADERS += \
     src/command/CommandPolicy.h \
     src/utils/PathGuard.h \
     src/utils/TextFileLines.h \
+    ragmodule/RagTypes.h \
+    ragmodule/RagStore.h \
+    ragmodule/RagText.h \
+    ragmodule/RagEmbedder.h \
+    ragmodule/RagIndex.h \
+    ragmodule/RagWidget.h \
     src/command/CommandFactory.h \
     src/command/CommandParser.h \
     src/command/CommandRegistry.h \
@@ -194,6 +207,7 @@ HEADERS += \
     src/command/RenameFileCommand.h \
     src/command/ReplaceInFileCommand.h \
     src/command/SearchProjectCommand.h \
+    src/command/SearchDocsCommand.h \
     src/command/SearchProjectCaseInsensitiveCommand.h \
     src/command/SearchWebCommand.h \
     src/command/ShowResultCommand.h \

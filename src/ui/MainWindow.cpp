@@ -148,6 +148,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(graphBtn, &StyledButton::clicked, this, &MainWindow::openGraph);
     connect(seqGraphBtn, &StyledButton::clicked, this, [this]() { m_sequenceEditor->openSequenceGraph(); });
     connect(lightRagBtn, &StyledButton::clicked, this, &MainWindow::openLightRag);
+    connect(ui.documentsBtn, &StyledButton::clicked, this, &MainWindow::openDocuments);
     connect(m_ttsController, &TtsController::statusMessage, this, [this](const QString& m){ log("TTS: "+m); });
     connect(m_ttsController, &TtsController::errorMessage, this, [this](const QString& e){ log("TTS Error: "+e); });
     connect(newSeqBtn, &StyledButton::clicked, this, [this]() { m_sequenceEditor->createNewSequence(); });
@@ -406,6 +407,19 @@ void MainWindow::openGraph()
     m_graphWindow->show();
     m_graphWindow->raise();
     m_graphWindow->activateWindow();
+}
+
+void MainWindow::openDocuments()
+{
+    // QPointer: the window deletes itself on close.
+    if (!m_documentsWidget) {
+        m_documentsWidget = new Rag::RagWidget();
+        m_documentsWidget->setAttribute(Qt::WA_DeleteOnClose, true);
+        m_documentsWidget->setFolder(projectRootPath());
+    }
+    m_documentsWidget->show();
+    m_documentsWidget->raise();
+    m_documentsWidget->activateWindow();
 }
 
 void MainWindow::openLightRag()

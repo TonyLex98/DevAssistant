@@ -1,41 +1,49 @@
 #pragma once
+#include "RagTypes.h"
 
-/// @file RagWidget.h
-/// @brief A simple Qt widget integrating the RAGProcessor.
-
-#include "RAGProcessor.h"
 #include <QWidget>
-#include <QTreeView>
-#include "../src/ui/customWidgets/StyledButton.h"
-#include "../src/ui/customWidgets/MemoryLineEdit.h"
-#include "../src/ui/customWidgets/StyledProgressBar.h"
-#include "../src/ui/customWidgets/StyledTextEdit.h"
 
-namespace Rag
-{
+class QLabel;
+class QLineEdit;
+class QListWidget;
+class QProgressBar;
+class QPushButton;
+class QSpinBox;
+class QTextBrowser;
+
+namespace Rag {
+
+class Index;
+
+// "Documents" window: index a folder and ask questions about it.
 class RagWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit RagWidget(QWidget *parent = nullptr);
+    explicit RagWidget(QWidget* parent = nullptr);
 
-private slots:
-    void onIndexButtonClicked();
-    void onAskButtonClicked();
-    void onProgress(int processed, int total);
-    void onIndexingFinished();
-    void onAnswered(const QString &answer);
+    // The folder offered by default: the open project.
+    void setFolder(const QString& folder);
 
 private:
-    QTreeView *mTree;
-    MemoryLineEdit *mRootEdit;
-    StyledButton *mIndexBtn;
-    MemoryLineEdit *mQueryEdit;
-    StyledButton *mAskBtn;
-    StyledProgressBar *mProgress;
-    StyledTextEdit *mResult;
-    RAGProcessor *mProcessor;
+    void startIndexing();
+    void ask();
+    void setBusy(bool busy);
+    void showAnswer(const QString& answer, const QVector<Hit>& sources);
+    void updateIndexInfo();
+
+    Index* m_index = nullptr;
+    QLineEdit* m_folder = nullptr;
+    QLineEdit* m_embeddingModel = nullptr;
+    QSpinBox* m_topK = nullptr;
+    QPushButton* m_indexButton = nullptr;
+    QPushButton* m_stopButton = nullptr;
+    QProgressBar* m_progress = nullptr;
+    QLabel* m_status = nullptr;
+    QLineEdit* m_question = nullptr;
+    QPushButton* m_askButton = nullptr;
+    QTextBrowser* m_answer = nullptr;
+    QListWidget* m_sources = nullptr;
 };
 
 } // namespace Rag
-

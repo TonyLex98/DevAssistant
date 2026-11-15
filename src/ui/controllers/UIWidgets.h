@@ -77,6 +77,7 @@ struct UIWidgets {
     StyledButton* chatToggleBtn = nullptr;
     StyledButton* logToggleBtn = nullptr;
     StyledButton* lightRagBtn = nullptr;
+    StyledButton* documentsBtn = nullptr;
 
     // Combo boxes
     MemoryComboBox* confirmModeCombo = nullptr;
