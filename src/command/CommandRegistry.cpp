@@ -204,7 +204,7 @@ static QJsonObject normalizeParamAliases(QJsonObject p)
     mapAliasValue(p, "startLine", {"start_line", "start", "line_start", "from_line"});
     mapAliasValue(p, "endLine", {"end_line", "end", "line_end", "to_line"});
     mapAliasValue(p, "oldPath", {"old_path", "source_path", "source", "from_path", "src", "from"});
-    mapAliasValue(p, "newPath", {"new_path", "destination_path", "destination", "dest", "dst", "to_path"});
+    mapAliasValue(p, "newPath", {"new_path", "destination_path", "destination", "dest", "dst", "to_path", "to"});
     mapAliasValue(p, "line", {"line_number", "lineNumber", "row"});
     mapAliasValue(p, "folderPath", {"folder_path", "folder", "directory", "dir", "path"});
     mapAliasValue(p, "scriptPath", {"script_path", "script", "py", "python_file"});
@@ -226,6 +226,39 @@ static QJsonObject normalizeParamAliases(QJsonObject p)
 
     if (p.contains("include_globs") && !p.contains("include"))
         p.insert("include", p.value("include_globs"));
+
+    // Models (and the one-line DSL form) often send numbers and flags as strings: "2",
+    // "true". The commands read them with toInt()/toBool(), which would turn those into 0
+    // and false, so convert them here once.
+    static const QStringList intKeys = {
+        "startLine", "endLine", "line", "maxChars", "maxResults", "maxMatches", "waitMs",
+        "timeoutMs", "contextLines", "strip"
+    };
+    static const QStringList boolKeys = {
+        "recursive", "caseSensitive", "useRegex", "overwrite", "staged", "detached",
+        "ensureNewline", "porcelain", "worktree"
+    };
+    for (const QString& key : intKeys) {
+        const QJsonValue v = p.value(key);
+        if (v.isString()) {
+            bool ok = false;
+            const int n = v.toString().trimmed().toInt(&ok);
+            if (ok)
+                p.insert(key, n);
+        }
+    }
+    for (const QString& key : boolKeys) {
+        const QJsonValue v = p.value(key);
+        if (v.isString()) {
+            const QString s = v.toString().trimmed().toLower();
+            if (s == "true" || s == "1" || s == "yes")
+                p.insert(key, true);
+            else if (s == "false" || s == "0" || s == "no")
+                p.insert(key, false);
+        } else if (v.isDouble()) {
+            p.insert(key, v.toDouble() != 0.0);
+        }
+    }
 
     return p;
 }

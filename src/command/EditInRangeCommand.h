@@ -3,6 +3,7 @@
 #include "Command.h"
 #include <QStringList>
 #include <QJsonArray>
+#include "../utils/TextFileLines.h"
 
 class EditInRangeCommand : public Command
 {
@@ -31,11 +32,10 @@ public:
 
 private:
     bool applyToLines(QStringList& lines, QString* err) const;
-    static bool loadFileLines(const QString& path, QStringList& out, QString* err);
-    static bool saveFileLines(const QString& path,
-                              const QStringList& lines,
-                              DevAssManager* devAss,
-                              QString* err);
+    static bool saveFile(const QString& path,
+                         const TextFileLines& file,
+                         DevAssManager* devAss,
+                         QString* err);
 
     QJsonObject m_params;
     QString m_description;

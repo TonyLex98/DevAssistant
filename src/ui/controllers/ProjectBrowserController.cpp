@@ -146,7 +146,7 @@ QString ProjectBrowserController::buildProjectContext() const
     }
 
     if (file_counter == 0) {
-        s += "Файлов в проекте пока нет." + '\n';
+        s += QStringLiteral("Файлов в проекте пока нет.\n");
     }
 
     if (!m_ctx->contextContent().isEmpty())

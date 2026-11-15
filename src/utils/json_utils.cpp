@@ -22,6 +22,8 @@ QList<QByteArray> splitConcatenatedJson_fromText(const QString& text){
             if (depth==0) start=i;
             depth++;
         } else if (c=='}' || c==']'){
+            if (depth == 0)
+                continue; // a stray closing bracket in prose before the JSON
             depth--;
             if (depth==0 && start!=-1){
                 parts.append(raw.mid(start, i-start+1));

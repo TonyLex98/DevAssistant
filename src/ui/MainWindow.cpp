@@ -410,6 +410,7 @@ void MainWindow::openGraph()
 
 void MainWindow::openLightRag()
 {
+    // QPointer: the window deletes itself on close and the pointer then becomes null.
     if (!m_lightRagWidget) {
         m_lightRagWidget = new LightRagWidget();
         m_lightRagWidget->setAttribute(Qt::WA_DeleteOnClose, true);
@@ -777,7 +778,7 @@ QString MainWindow::buildProjectContext() const
     }
 
     if(file_counter == 0){
-        s += "Файлов в проекте пока нет." + '\n';
+        s += QStringLiteral("Файлов в проекте пока нет.\n");
     }
 
     // ---------- Контент файлов, открытых командой OPEN_FILE ----------
@@ -1155,13 +1156,12 @@ void MainWindow::appendConsoleContext(const QString& title,
     }
 
     m_contextCache.appendConsoleLog(block.trimmed());
-    // Limit to 5 logs
-    while (m_contextCache.consoleLogs().size() > 5) {
-        auto logs = m_contextCache.consoleLogs();
+    // Keep the 5 most recent logs: the newest output is what the model needs next.
+    const auto logs = m_contextCache.consoleLogs();
+    if (logs.size() > 5) {
         m_contextCache.clearConsoleLogs();
-        for (int i = 0; i < qMin(5, logs.size()); ++i) {
+        for (int i = logs.size() - 5; i < logs.size(); ++i)
             m_contextCache.appendConsoleLog(logs.at(i));
-        }
     }
 }
 
@@ -1170,14 +1170,12 @@ void MainWindow::appendExternalContext(const QString& block)
     if (block.trimmed().isEmpty())
         return;
     m_contextCache.appendExternalSource(block.trimmed());
-    // Limit to 5 blocks
-    while (m_contextCache.externalSources().size() > 5) {
-        // Workaround: clear and re-add all but first 5
-        auto sources = m_contextCache.externalSources();
+    // Keep the 5 most recent blocks.
+    const auto sources = m_contextCache.externalSources();
+    if (sources.size() > 5) {
         m_contextCache.clearExternalSources();
-        for (int i = 0; i < qMin(5, sources.size()); ++i) {
+        for (int i = sources.size() - 5; i < sources.size(); ++i)
             m_contextCache.appendExternalSource(sources.at(i));
-        }
     }
 }
 

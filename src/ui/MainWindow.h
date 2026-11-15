@@ -52,6 +52,7 @@
 #include "customWidgets/MemoryComboBox.h"
 #include "../core/ContextManager.h"
 #include "LightRagWidget.h"
+#include <QPointer>
 
 // Need the complete definition for sequence graph widget
 #include "../codeviewer/SequenceGraphWidget.h"
@@ -459,7 +460,7 @@ private:
     QWidget *m_settingsPanel{nullptr};
     GraphWidget  *m_graphWindow{nullptr};   // окно-виджет графа
     SequenceGraphWidget  *m_seqGraphWindow{nullptr};   // окно-виджет графа последовательностей
-    LightRagWidget *m_lightRagWidget{nullptr}; // LightRAG widget
+    QPointer<LightRagWidget> m_lightRagWidget; // deletes itself on close
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
     SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
     ContextCacheManager m_contextCache; // Manages context slices cache

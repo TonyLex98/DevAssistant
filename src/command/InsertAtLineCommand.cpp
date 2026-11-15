@@ -3,7 +3,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
-#include <QTextStream>
+#include "../utils/TextFileLines.h"
 
 static QString normalizePathMaybe(DevAssManager* devAss, const QString& p)
 {
@@ -14,10 +14,6 @@ static QString normalizePathMaybe(DevAssManager* devAss, const QString& p)
     return QDir(devAss->projectRoot().absolutePath()).filePath(p);
 }
 
-static QStringList splitPreserveEmpty(const QString& text)
-{
-    return text.split('\n', QString::KeepEmptyParts);
-}
 
 InsertAtLineCommand::InsertAtLineCommand(const QString& path,
                                          int line,
@@ -53,36 +49,28 @@ bool InsertAtLineCommand::apply(DevAssManager* devAss, QString* err)
         return false;
     }
 
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    TextFileLines file;
+    if (!TextFileLines::load(path, &file, nullptr)) {
         if (err) *err = QString("INSERT_AT_LINE: cannot read file: %1").arg(path);
         return false;
     }
-    QTextStream in(&f);
-    QStringList lines;
-    while (!in.atEnd())
-        lines << in.readLine();
-    f.close();
+    QStringList& lines = file.lines;
 
     if (line > lines.size() + 1) {
         if (err) *err = QString("INSERT_AT_LINE: line %1 is beyond end of file (%2 lines)").arg(line).arg(lines.size());
         return false;
     }
 
-    QStringList toInsert = splitPreserveEmpty(contentText);
-    if (contentText.endsWith('\n') && !toInsert.isEmpty())
-        toInsert.removeLast();
+    const QStringList toInsert = splitInsertedText(contentText);
 
     const int idx = qMax(0, qMin(line - 1, lines.size()));
     for (int i = 0; i < toInsert.size(); ++i) {
         lines.insert(idx + i, toInsert.at(i));
     }
 
-    QByteArray outBytes;
-    for (const QString& l : lines) {
-        outBytes += l.toUtf8();
-        outBytes += '\n';
-    }
+    if (lines.size() == toInsert.size())
+        file.trailingNewline = true; // the file was empty: end it with a newline
+    const QByteArray outBytes = file.toBytes();
 
     if (devAss) {
         QList<Change> changes;

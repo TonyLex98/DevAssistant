@@ -220,9 +220,12 @@ void DevAssManager::markFileChanged(const QString &filePath)
         }
     }
 
-    // Если файла ещё нет – добавляем
+    // Not tracked yet: add it. addFileDescription() skips files that do not exist, so only
+    // mark the new entry, never whatever happens to be last in the list.
+    const int before = m_fileDescriptions.size();
     addFileDescription(filePath);
-    m_fileDescriptions.last().isDescriptionUpToDate = false;
+    if (m_fileDescriptions.size() > before)
+        m_fileDescriptions.last().isDescriptionUpToDate = false;
 }
 
 void DevAssManager::setHistoryFile(const QString &historyPath)

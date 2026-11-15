@@ -1,14 +1,8 @@
 #include "EditInRangeCommand.h"
 #include <QFile>
-#include <QTextStream>
 #include <QDebug>
 #include <QDateTime>
 #include <algorithm>
-
-static QStringList splitPreserveEmpty(const QString& text)
-{
-    return text.split('\n', QString::KeepEmptyParts);
-}
 
 EditInRangeCommand::EditInRangeCommand(const QString& path,
                                        int startLine, int endLine,
@@ -47,7 +41,8 @@ EditInRangeCommand::EditInRangeCommand(const QString& path,
     } else {
         const QString asText = QString::fromUtf8(content);
         m_params["content"] = asText;
-        m_newLines = splitPreserveEmpty(asText);
+        // "X\n" is one line "X", not "X" plus an empty line.
+        m_newLines = splitInsertedText(asText);
 
         QJsonArray normalized;
         for (int i = 0; i < m_newLines.size(); ++i) {
@@ -101,8 +96,8 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
         }
     }
 
-    QStringList lines;
-    if (!loadFileLines(path, lines, err))
+    TextFileLines file;
+    if (!TextFileLines::load(path, &file, err))
         return false;
 
     QList<EditInRangeCommand*> sorted = commands;
@@ -112,11 +107,11 @@ bool EditInRangeCommand::applyBatch(const QList<EditInRangeCommand*>& commands,
               });
 
     for (EditInRangeCommand* cmd : sorted) {
-        if (!cmd->applyToLines(lines, err))
+        if (!cmd->applyToLines(file.lines, err))
             return false;
     }
 
-    return saveFileLines(path, lines, devAss, err);
+    return saveFile(path, file, devAss, err);
 }
 
 bool EditInRangeCommand::applyToLines(QStringList& lines, QString* err) const
@@ -141,24 +136,10 @@ bool EditInRangeCommand::applyToLines(QStringList& lines, QString* err) const
     return true;
 }
 
-bool EditInRangeCommand::loadFileLines(const QString& path, QStringList& out, QString* err)
-{
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        if (err) *err = QString("Cannot open %1 for reading").arg(path);
-        return false;
-    }
-    QTextStream in(&f);
-    while (!in.atEnd())
-        out << in.readLine();
-    f.close();
-    return true;
-}
-
-bool EditInRangeCommand::saveFileLines(const QString& path,
-                                       const QStringList& lines,
-                                       DevAssManager* devAss,
-                                       QString* err)
+bool EditInRangeCommand::saveFile(const QString& path,
+                                  const TextFileLines& file,
+                                  DevAssManager* devAss,
+                                  QString* err)
 {
     // Нормализуем путь: если путь относительный, делаем его относительно корневой директории проекта
     QString normalizedPath = path;
@@ -173,12 +154,7 @@ bool EditInRangeCommand::saveFileLines(const QString& path,
         return false;
     }
 
-    QByteArray outBytes;
-    outBytes.reserve(1024);
-    for (int i = 0; i < lines.size(); ++i) {
-        outBytes += lines.at(i).toUtf8();
-        outBytes += '\n';
-    }
+    const QByteArray outBytes = file.toBytes();
 
     if (devAss) {
         QList<Change> changes;
@@ -187,7 +163,7 @@ bool EditInRangeCommand::saveFileLines(const QString& path,
     }
 
     QFile f(normalizedPath);
-    if (!f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (err) *err = QString("Cannot open %1 for writing").arg(normalizedPath);
         return false;
     }

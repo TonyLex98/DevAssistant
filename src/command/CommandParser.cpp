@@ -3,6 +3,7 @@
 #include "CommandRegistry.h"
 #include <QRegularExpression>
 #include <QJsonArray>
+#include <QSet>
 #include "utils/Logging.h"
 
 /* Преобразование объекта с path/content в команду */
@@ -196,16 +197,15 @@ static QJsonObject parseDslParams(const QString& tail)
     if (!params.isEmpty())
         return params;
 
-    // path: value form
-    if (trimmed.contains(':')) {
-        const QStringList parts = trimmed.split(':');
-        if (parts.size() >= 2) {
-            const QString key = parts.first().trimmed();
-            const QString value = stripWrappingQuotes(trimmed.mid(trimmed.indexOf(':') + 1));
-            if (!key.isEmpty() && !value.isEmpty()) {
-                params.insert(key, value);
-                return params;
-            }
+    // "key: value" form. The key must be a parameter name of at least two characters, so a
+    // Windows path such as C:\src\main.cpp is not split at its drive letter.
+    static const QRegularExpression keyValueRe(R"(^([A-Za-z_][A-Za-z0-9_]+)\s*:\s*(.+)$)");
+    const QRegularExpressionMatch kv = keyValueRe.match(trimmed);
+    if (kv.hasMatch()) {
+        const QString value = stripWrappingQuotes(kv.captured(2));
+        if (!value.isEmpty()) {
+            params.insert(kv.captured(1), value);
+            return params;
         }
     }
 
@@ -217,7 +217,15 @@ static QList<QByteArray> findDslCommandsInText(const QByteArray& rawText)
     QList<QByteArray> out;
     const QString text = QString::fromUtf8(rawText);
     const QStringList lines = text.split('\n', QString::SkipEmptyParts);
-    QRegularExpression lineRe(R"(^\s*(?:[-*•]\s*)?(?:\d+[\.\)]\s*)?([A-Za-z_][A-Za-z0-9_\-]*)\s*(.*)$)");
+    // Only an upper-case command name of a known command starts a DSL line
+    // ("OPEN_FILE src/main.cpp"). Ordinary prose such as "2. Undo the previous change" or
+    // "Open the file" must not turn into commands.
+    QRegularExpression lineRe(R"(^\s*(?:[-*•]\s*)?(?:\d+[\.\)]\s*)?([A-Z][A-Z0-9_]{2,})\b\s*(.*)$)");
+    QSet<QString> knownCommands;
+    for (Command* c : CommandRegistry::all()) {
+        knownCommands.insert(c->name());
+        delete c;
+    }
 
     for (const QString& rawLine : lines) {
         const QString line = rawLine.trimmed();
@@ -230,7 +238,7 @@ static QList<QByteArray> findDslCommandsInText(const QByteArray& rawText)
 
         QString cmd = m.captured(1).trimmed();
         QString tail = m.captured(2).trimmed();
-        if (cmd.isEmpty())
+        if (cmd.isEmpty() || !knownCommands.contains(cmd))
             continue;
 
         QJsonObject obj;
@@ -446,29 +454,58 @@ static QByteArray attemptJsonFix(const QByteArray& rawJson)
 /* Исправление кавычек вокруг ключей JSON */
 static QString fixJsonKeys(const QString& input)
 {
-    QString result = input;
-    
-    // Используем более сложный регулярное выражение, чтобы различать ключи и значения
-    // Находим слова, которые идут перед двоеточием и не обрамлены кавычками
-    QRegularExpression keyPattern(R"((\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=:(\s*["\[{])))");
-    QRegularExpressionMatchIterator iter = keyPattern.globalMatch(result);
-    
-    // Проходим через все совпадения и добавляем двойные кавычки вокруг ключей
-    int offset = 0;
-    while (iter.hasNext()) {
-        QRegularExpressionMatch match = iter.next();
-        int pos = match.capturedStart(2); // позиция самого ключа
-        int len = match.capturedLength(2); // длина ключа
-        
-        // Вставляем открывающую кавычку перед ключом
-        result.insert(pos + offset, "\"");
-        offset++;
-        // Вставляем закрывающую кавычку после ключа
-        result.insert(pos + offset + len, "\"");
-        offset++;
+    // Quotes bare keys ({key: ...} -> {"key": ...}). It walks the text and only looks at
+    // words right after '{' or ',' outside string values, so text such as
+    // "content": "Result: [ok]" inside a value is never touched.
+    QString out;
+    out.reserve(input.size() + 16);
+    bool inString = false;
+    bool escaped = false;
+    QChar lastSignificant;
+    const int n = input.size();
+    int i = 0;
+    while (i < n) {
+        const QChar c = input.at(i);
+        if (inString) {
+            out += c;
+            if (escaped)
+                escaped = false;
+            else if (c == QLatin1Char('\\'))
+                escaped = true;
+            else if (c == QLatin1Char('"')) {
+                inString = false;
+                lastSignificant = c;
+            }
+            ++i;
+            continue;
+        }
+        if (c == QLatin1Char('"')) {
+            inString = true;
+            out += c;
+            ++i;
+            continue;
+        }
+        if ((c.isLetter() || c == QLatin1Char('_'))
+                && (lastSignificant == QLatin1Char('{') || lastSignificant == QLatin1Char(','))) {
+            int end = i;
+            while (end < n && (input.at(end).isLetterOrNumber() || input.at(end) == QLatin1Char('_')))
+                ++end;
+            int colon = end;
+            while (colon < n && input.at(colon).isSpace())
+                ++colon;
+            if (colon < n && input.at(colon) == QLatin1Char(':')) {
+                out += QLatin1Char('"') + input.mid(i, end - i) + QLatin1Char('"');
+                lastSignificant = QLatin1Char('"');
+                i = end;
+                continue;
+            }
+        }
+        out += c;
+        if (!c.isSpace())
+            lastSignificant = c;
+        ++i;
     }
-    
-    return result;
+    return out;
 }
 
 QByteArray CommandParser::toJson(const QVector<Command*>& cmds)

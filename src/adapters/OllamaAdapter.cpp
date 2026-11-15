@@ -1,4 +1,5 @@
 #include "OllamaAdapter.h"
+#include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonValue>
@@ -212,6 +213,15 @@ QString OllamaAdapter::generateWithSystemAndImages(const QString& userPrompt,
 
     loop.exec();
 
+    // A timeout leaves the request running: stop it and report it, instead of returning
+    // whatever partial text has arrived as if it were the answer.
+    if (!r->isFinished()) {
+        r->abort();
+        r->deleteLater();
+        return QString("[Ollama error] %1").arg(QCoreApplication::translate("OllamaAdapter",
+                "no answer within %1 s").arg(qMax(1000, timeoutMs) / 1000));
+    }
+
     if (r->error() != QNetworkReply::NoError) {
         const QString err = r->errorString();
         r->deleteLater();
@@ -266,6 +276,14 @@ bool OllamaAdapter::isAvailable(QString* errorOut)
 
     loop.exec();
 
+    if (!r->isFinished()) {
+        r->abort();
+        if (errorOut)
+            *errorOut = QCoreApplication::translate("OllamaAdapter", "no answer from %1 within 8 s")
+                    .arg(m_endpoint.toString());
+        r->deleteLater();
+        return false;
+    }
     if (r->error() != QNetworkReply::NoError) {
         if (errorOut)
             *errorOut = r->errorString();
@@ -294,6 +312,11 @@ QStringList OllamaAdapter::listModels()
         t.start(8000);
         loop.exec();
 
+        if (!r->isFinished()) {
+            r->abort();
+            r->deleteLater();
+            return false;
+        }
         if (r->error() != QNetworkReply::NoError) {
             r->deleteLater();
             return false;

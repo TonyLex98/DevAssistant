@@ -4,7 +4,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QRegularExpression>
-#include <QTextStream>
+#include "../utils/TextFileLines.h"
 
 struct PatchHunkLine {
     QChar kind; // ' ', '+', '-', '\\'
@@ -43,28 +43,24 @@ static QString stripPathComponents(QString p, int strip)
     return p;
 }
 
-static bool loadTextFileLines(const QString& path, QStringList& outLines, QString* err)
+// The path from a "--- " / "+++ " header: anything after a tab (diff -u puts a timestamp
+// there) is dropped; with strip == 0 git's a/ and b/ prefixes are removed, otherwise `strip`
+// leading components are, the prefix counting as one of them.
+static QString headerPath(const QString& headerLine, int strip)
 {
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        if (err) *err = QString("APPLY_PATCH: cannot read file: %1").arg(path);
-        return false;
+    QString p = headerLine.mid(4);
+    const int tab = p.indexOf(QLatin1Char('\t'));
+    if (tab >= 0)
+        p = p.left(tab);
+    p = p.trimmed();
+    if (p == QLatin1String("/dev/null"))
+        return p;
+    if (strip == 0) {
+        if (p.startsWith(QLatin1String("a/")) || p.startsWith(QLatin1String("b/")))
+            p = p.mid(2);
+        return p;
     }
-    QTextStream in(&f);
-    while (!in.atEnd())
-        outLines << in.readLine();
-    f.close();
-    return true;
-}
-
-static QByteArray joinLinesWithTrailingNewline(const QStringList& lines)
-{
-    QByteArray out;
-    for (const QString& l : lines) {
-        out += l.toUtf8();
-        out += '\n';
-    }
-    return out;
+    return stripPathComponents(p, strip);
 }
 
 static bool applyHunks(QStringList& lines, const QList<PatchHunk>& hunks, QString* err)
@@ -143,24 +139,44 @@ static bool parseUnifiedDiff(const QString& text, int strip, QList<FilePatch>& o
 
     QRegularExpression hunkRe(R"(^@@\s*-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s*@@)");
 
+    // Lines still expected by the current hunk, from its header counts. While a hunk is
+    // not complete every line belongs to it, so a removed line "-- x" (shown as "--- x")
+    // is not mistaken for the next file's header.
+    int oldLeft = 0;
+    int newLeft = 0;
+
     for (int i = 0; i < lines.size(); ++i) {
         QString line = lines.at(i);
         if (!line.isEmpty() && line.endsWith('\r'))
             line.chop(1);
+
+        if (inHunk && (oldLeft > 0 || newLeft > 0)) {
+            const QChar kind = line.isEmpty() ? QChar(' ') : line.at(0);
+            if (kind == '\\') {
+                currentHunk.lines.append(PatchHunkLine{kind, line});
+                continue;
+            }
+            if (kind == ' ' || kind == '+' || kind == '-') {
+                currentHunk.lines.append(PatchHunkLine{kind, line.isEmpty() ? QString() : line.mid(1)});
+                if (kind != '+') --oldLeft;
+                if (kind != '-') --newLeft;
+                continue;
+            }
+            // Anything else ends a hunk whose header undercounted.
+        }
+        if (inHunk && !line.isEmpty() && line.at(0) == '\\') {
+            currentHunk.lines.append(PatchHunkLine{line.at(0), line});
+            continue;
+        }
+
         if (line.startsWith("--- ")) {
             flushFile();
             hasFile = true;
-            current.oldPath = line.mid(4).trimmed();
-            if (current.oldPath.startsWith("a/"))
-                current.oldPath = current.oldPath.mid(2);
-            current.oldPath = stripPathComponents(current.oldPath, strip);
+            current.oldPath = headerPath(line, strip);
             continue;
         }
         if (hasFile && line.startsWith("+++ ")) {
-            current.newPath = line.mid(4).trimmed();
-            if (current.newPath.startsWith("b/"))
-                current.newPath = current.newPath.mid(2);
-            current.newPath = stripPathComponents(current.newPath, strip);
+            current.newPath = headerPath(line, strip);
             current.isCreate = (current.oldPath == "/dev/null");
             current.isDelete = (current.newPath == "/dev/null");
             continue;
@@ -174,23 +190,9 @@ static bool parseUnifiedDiff(const QString& text, int strip, QList<FilePatch>& o
             currentHunk.oldCount = m.captured(2).isEmpty() ? 1 : m.captured(2).toInt();
             currentHunk.newStart = m.captured(3).toInt();
             currentHunk.newCount = m.captured(4).isEmpty() ? 1 : m.captured(4).toInt();
+            oldLeft = currentHunk.oldCount;
+            newLeft = currentHunk.newCount;
             continue;
-        }
-
-        if (inHunk) {
-            if (line.isEmpty()) {
-                currentHunk.lines.append(PatchHunkLine{QChar(' '), QString()});
-                continue;
-            }
-            const QChar kind = line.at(0);
-            if (kind == ' ' || kind == '+' || kind == '-') {
-                currentHunk.lines.append(PatchHunkLine{kind, line.mid(1)});
-                continue;
-            }
-            if (kind == '\\') {
-                currentHunk.lines.append(PatchHunkLine{kind, line});
-                continue;
-            }
         }
     }
 
@@ -260,8 +262,9 @@ bool ApplyPatchCommand::apply(DevAssManager* devAss, QString* err)
                         newLines << hl.text;
                 }
             }
-            const QByteArray outBytes = joinLinesWithTrailingNewline(newLines);
-            changes << Change::createFile(absTarget, outBytes);
+            TextFileLines created;
+            created.lines = newLines;
+            changes << Change::createFile(absTarget, created.toBytes());
             applied << QString("CREATE %1").arg(relTarget);
             continue;
         }
@@ -278,9 +281,10 @@ bool ApplyPatchCommand::apply(DevAssManager* devAss, QString* err)
             return false;
         }
 
-        QStringList fileLines;
-        if (!loadTextFileLines(absTarget, fileLines, err))
+        TextFileLines file;
+        if (!TextFileLines::load(absTarget, &file, err))
             return false;
+        QStringList& fileLines = file.lines;
 
         if (!applyHunks(fileLines, fp.hunks, err)) {
             if (err && !fp.newPath.trimmed().isEmpty())
@@ -288,7 +292,7 @@ bool ApplyPatchCommand::apply(DevAssManager* devAss, QString* err)
             return false;
         }
 
-        changes << Change::replaceInFile(absTarget, joinLinesWithTrailingNewline(fileLines));
+        changes << Change::replaceInFile(absTarget, file.toBytes());
         applied << QString("PATCH %1").arg(relTarget);
     }
 

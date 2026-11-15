@@ -140,6 +140,7 @@ SOURCES += \
     src/utils/PromptManager.cpp\
     src/utils/json_utils.cpp \
     src/utils/PathGuard.cpp \
+    src/utils/TextFileLines.cpp \
     src/uiide/tree-sitter/lib/src/lib.c \
     src/uiide/tree-sitter-cpp/src/parser.c \
     src/uiide/tree-sitter-cpp/src/scanner.c \
@@ -179,6 +180,7 @@ HEADERS += \
     src/command/CommandConfirmDialog.h \
     src/command/CommandPolicy.h \
     src/utils/PathGuard.h \
+    src/utils/TextFileLines.h \
     src/command/CommandFactory.h \
     src/command/CommandParser.h \
     src/command/CommandRegistry.h \

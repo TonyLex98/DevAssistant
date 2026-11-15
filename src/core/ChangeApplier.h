@@ -11,6 +11,7 @@ struct Change {
     QByteArray prevContent;     // for undo
     bool recursive = false;     // for DeleteDir
     bool wasNoop = false;       // for cases where apply does nothing
+    bool existedBefore = false; // for ReplaceInFile: undo deletes a file that did not exist
 
     static Change createFile(const QString& abs, const QByteArray& content) {
         Change c; c.type=CreateFile; c.targetPath=abs; c.newContent=content; return c;
@@ -32,11 +33,24 @@ struct Change {
     }
 };
 
+// Applies file changes in batches and keeps an undo history.
+//
+// A batch is all or nothing: if one change fails, the ones already made are rolled back and
+// the history is left as it was. Each successful batch becomes one undo step; up to
+// kMaxUndoSteps steps are kept.
 class ChangeApplier {
 public:
+    static constexpr int kMaxUndoSteps = 50;
+
     bool apply(QList<Change>& changes, QString* errorOut=nullptr);
+    // Reverts the most recent batch.
     bool undo(QString* errorOut=nullptr);
+    bool canUndo() const { return !m_history.isEmpty(); }
+    int undoSteps() const { return m_history.size(); }
 
 private:
-    QList<Change> m_last;
+    static bool applyOne(Change& c, QString* errorOut);
+    static bool revertOne(const Change& c, QString* errorOut);
+
+    QList<QList<Change>> m_history;
 };
