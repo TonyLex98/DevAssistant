@@ -50,7 +50,7 @@ PromptSequenceEditor::PromptSequenceEditor(QWidget *parent)
         "  border: 1px solid #0f766e;"
         "  border-radius: 6px;"
         "  padding: 6px 10px;"
-        "  font: 10pt \"Segoe UI Variable\";"
+        "  font: 10pt \"Segoe UI\";"
         "}"
     );
 

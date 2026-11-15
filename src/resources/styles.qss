@@ -3,7 +3,7 @@
 QMainWindow, QDialog, QWidget {
     background: #f2fbf9;
     color: #0f172a;
-    font: 10pt "Segoe UI Variable";
+    font: 10pt "Segoe UI";
 }
 
 QLabel {
@@ -26,7 +26,7 @@ QHeaderView::section {
     border: none;
     border-bottom: 1px solid #bfeee6;
     padding: 4px 8px;
-    font: 600 9pt "Segoe UI Variable";
+    font: 600 9pt "Segoe UI";
 }
 
 QTabWidget::pane {

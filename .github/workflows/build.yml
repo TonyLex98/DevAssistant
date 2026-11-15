@@ -119,12 +119,13 @@ jobs:
         shell: pwsh
         env:
           QT_QPA_PLATFORM: offscreen
+          QT_QPA_FONTDIR: C:\Windows\Fonts   # offscreen reads fonts with FreeType from this folder
         run: |
           # windeployqt ships only the Windows platform plugin; the headless run needs offscreen.
           Copy-Item "$env:QT_ROOT_DIR\plugins\platforms\qoffscreen.dll" dist/DevAssistant/platforms/
           $exe = "dist/DevAssistant/DevAssistantQt.exe"
           foreach ($lang in @("en", "ru")) {
-            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang" -PassThru
+            $p = Start-Process $exe -ArgumentList "--lang", $lang, "--screenshots", "screenshots/$lang", "--project", "$PWD" -PassThru
             if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "The program did not finish the screenshot run in 60 s ($lang)" }
             if ($p.ExitCode -ne 0) { throw "The program exited with code $($p.ExitCode) ($lang)" }
           }

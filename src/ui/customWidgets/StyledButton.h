@@ -16,7 +16,7 @@ public:
             "  border-radius: 8px;"
             "  padding: 5px 10px;"
             "  min-height: 30px;"
-            "  font: 10pt \"Segoe UI Variable\";"
+            "  font: 10pt \"Segoe UI\";"
             "  font-weight: 600;"
             "  background-color: #14b8a6;"
             "  color: #083b36;"

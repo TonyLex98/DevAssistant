@@ -181,9 +181,12 @@ static void installTranslations(QApplication& app, const QString& requested)
 
 // --screenshots <dir>: opens the main windows, saves them as PNG and exits. CI runs it with
 // QT_QPA_PLATFORM=offscreen to keep the README pictures up to date.
-static void scheduleScreenshots(MainWindow& window, const QString& dir)
+static void scheduleScreenshots(MainWindow& window, const QString& dir, const QString& project)
 {
     QDir().mkpath(dir);
+    window.resize(1440, 880);
+    if (!project.isEmpty())
+        window.openProject(project);
     QTimer::singleShot(2500, &window, [&window, dir]() {
         window.grab().save(dir + "/main.png");
         if (auto* tabs = qobject_cast<QTabWidget*>(window.centralWidget())) {
@@ -258,7 +261,7 @@ int main(int argc, char** argv)
     w.show();
     const QString screenshotDir = argValue(argc, argv, "--screenshots");
     if (!screenshotDir.isEmpty())
-        scheduleScreenshots(w, screenshotDir);
+        scheduleScreenshots(w, screenshotDir, argValue(argc, argv, "--project"));
     return app.exec();
 }
 

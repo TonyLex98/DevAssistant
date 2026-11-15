@@ -149,7 +149,7 @@ void UiBuilder::buildSettingsPanel(UIWidgets& ui,
     ui.m_settingsSidebar->setMinimumWidth(140);
     ui.m_settingsSidebar->setStyleSheet(
         "QListWidget { background: #fff; border: 1px solid #8ed9cf; border-radius: 8px; padding: 6px; }"
-        "QListWidget::item { padding: 8px 12px; border-radius: 6px; margin: 2px 0; font: 9pt \"Segoe UI Variable\"; color: #334155; }"
+        "QListWidget::item { padding: 8px 12px; border-radius: 6px; margin: 2px 0; font: 9pt \"Segoe UI\"; color: #334155; }"
         "QListWidget::item:selected { background: #dff8f3; color: #0f766e; font-weight: 600; }"
         "QListWidget::item:hover { background: #e6f5f1; }"
     );
@@ -214,7 +214,7 @@ QVBoxLayout* UiBuilder::pageLay(QWidget* w)
 void UiBuilder::addSection(const QString& title, QVBoxLayout* layout)
 {
     auto* lb = new QLabel(title);
-    lb->setStyleSheet("QLabel { color: #0f766e; font: 600 11pt \"Segoe UI Variable\"; padding: 4px 0; }");
+    lb->setStyleSheet("QLabel { color: #0f766e; font: 600 11pt \"Segoe UI\"; padding: 4px 0; }");
     layout->addWidget(lb);
 }
 

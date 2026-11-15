@@ -20,7 +20,7 @@ public:
             "  background-color: #ffffff;"
             "}"
             "QTabBar::tab {"
-            "  font: 600 10pt \"Segoe UI Variable\";"
+            "  font: 600 10pt \"Segoe UI\";"
             "  color: #0f172a;"
             "  background-color: #dff8f3;"
             "  border: 1px solid #8ed9cf;"

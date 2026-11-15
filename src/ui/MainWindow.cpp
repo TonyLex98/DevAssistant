@@ -688,10 +688,10 @@ void MainWindow::rescan(){
 
         if (needRed){
             needRed_set.insert(absPath);
-            item->setBackground(Qt::red);
+            item->setBackground(QColor(0xFD, 0xE8, 0xE8));   // no description yet, or out of date
         }
         else
-            item->setBackground(Qt::green);
+            item->setBackground(QColor(0xE3, 0xF6, 0xEA));   // description up to date
 
         item->setData(Qt::UserRole, absPath);
     }
@@ -1273,6 +1273,12 @@ void MainWindow::slot_updatelastUserMessage(const QString &lastUserMessage)
         return;
     m_lastUserMessage = lastUserMessage;
     qCDebug(logUI)<<"m_lastUserMessage = "<<m_lastUserMessage;
+}
+
+void MainWindow::openProject(const QString& path)
+{
+    m_projectRoot = QDir::cleanPath(QDir(path).absolutePath());
+    reOpenRootDir();
 }
 
 /* ────────────────────────────────────────────────────── */

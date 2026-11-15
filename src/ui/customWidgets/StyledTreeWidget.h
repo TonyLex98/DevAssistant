@@ -13,7 +13,7 @@ public:
             "QTreeWidget {"
             "  border: 1px solid #8ed9cf;"
             "  border-radius: 6px;"
-            "  font: 10pt \"Segoe UI Variable\";"
+            "  font: 10pt \"Segoe UI\";"
             "  color: #0f172a;"
             "  background-color: #ffffff;"
             "  padding: 2px;"
@@ -34,7 +34,7 @@ public:
             "  border: none;"
             "  border-bottom: 1px solid #bfeee6;"
             "  padding: 4px 8px;"
-            "  font: 600 9pt \"Segoe UI Variable\";"
+            "  font: 600 9pt \"Segoe UI\";"
             "}"
         );
     }

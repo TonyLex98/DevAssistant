@@ -74,7 +74,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
         "  background-color: #ffffff;"
         "}"
         "QTabBar::tab {"
-        "  font: 600 9pt \"Segoe UI Variable\";"
+        "  font: 600 9pt \"Segoe UI\";"
         "  color: #0f172a;"
         "  background-color: #dff8f3;"
         "  border: 1px solid #8ed9cf;"
@@ -106,7 +106,7 @@ PromptStepDialog::PromptStepDialog(QWidget *parent)
     rightLay->setSpacing(6);
 
     auto *editorTitle = new QLabel(tr("Step template"), rightPanel);
-    editorTitle->setStyleSheet("QLabel { font: 13px \"Segoe UI Variable\", sans-serif; font-weight: 600; color: #0f172a; }");
+    editorTitle->setStyleSheet("QLabel { font: 13px \"Segoe UI\", sans-serif; font-weight: 600; color: #0f172a; }");
     rightLay->addWidget(editorTitle);
 
     m_templateEdit = new StyleTextEdit(rightPanel);

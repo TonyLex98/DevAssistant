@@ -93,6 +93,9 @@ class MainWindow : public QMainWindow,
 public:
     explicit MainWindow(QWidget* parent=nullptr);
 
+    // Opens a project folder, as choosing it in the window does.
+    void openProject(const QString& path);
+
     const QString& projectRootPath() const { return m_projectRoot; }
     PromptManager*  promptManager() { return &m_promptMgr; }
     const QString& openedFilesContent() const { return m_contextContent; }

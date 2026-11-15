@@ -118,7 +118,7 @@ QWidget *ResultDisplayWidget::createEntryWidget(const QString &title,
         "QTextBrowser {"
         "  border: none;"
         "  padding: 0;"
-        "  font-family: \"Segoe UI Variable\", sans-serif;"
+        "  font-family: \"Segoe UI\", sans-serif;"
         "  font-size: 14px;"
         "  line-height: 1.4;"
         "}"
