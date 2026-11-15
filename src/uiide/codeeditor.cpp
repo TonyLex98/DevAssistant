@@ -11,6 +11,7 @@ CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent) {
     f.setStyleHint(QFont::Monospace);
     f.setPointSize(10);
     setFont(f);
+    setLineWrapMode(QPlainTextEdit::NoWrap);   // code keeps its lines; scroll sideways instead
 
     connect(this, &QPlainTextEdit::blockCountChanged, this, &CodeEditor::updateLineNumberAreaWidth);
     connect(this, &QPlainTextEdit::updateRequest, this, &CodeEditor::updateLineNumberArea);

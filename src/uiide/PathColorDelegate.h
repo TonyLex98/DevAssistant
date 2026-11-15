@@ -15,7 +15,7 @@ public:
 
     // red = path exists; green = parent of a missing path
     void setMarkSets(const QSet<QString>& red, const QSet<QString>& green,
-                     int greenAlpha = 40, int redAlpha = 40) {
+                     int greenAlpha = 28, int redAlpha = 28) {
         m_markRed   = red;
         m_markGreen = green;
         m_greenAlpha = greenAlpha;
@@ -60,6 +60,6 @@ private:
     QFileSystemModel* m_fsModel = nullptr;
     QSet<QString> m_markRed;
     QSet<QString> m_markGreen;
-    int m_greenAlpha = 40;
-    int m_redAlpha   = 40;
+    int m_greenAlpha = 28;
+    int m_redAlpha   = 28;
 };

@@ -1052,6 +1052,12 @@ void SequenceRelationView::fitToContents()
 
     bounds = bounds.adjusted(-80, -80, 80, 80);
     fitInView(bounds, Qt::KeepAspectRatio);
+    const qreal scale = transform().m11();
+    const qreal readable = qBound<qreal>(0.5, scale, 1.0);
+    if (!qFuzzyCompare(scale, readable)) {
+        setTransform(QTransform::fromScale(readable, readable));
+        centerOn(bounds.center());
+    }
     m_totalScale = transform().m11();
 }
 

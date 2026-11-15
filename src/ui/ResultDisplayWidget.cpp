@@ -41,6 +41,13 @@ ResultDisplayWidget::ResultDisplayWidget(QWidget *parent)
     m_contentWidget->setLayout(m_layout);
     m_scrollArea->setWidget(m_contentWidget);
 
+    m_placeholder = new QLabel(tr("Ask about the project in the field below. The answers, and the "
+                                  "results of the commands the assistant runs, appear here."), m_contentWidget);
+    m_placeholder->setWordWrap(true);
+    m_placeholder->setAlignment(Qt::AlignCenter);
+    m_placeholder->setStyleSheet("QLabel { color: #64748b; padding: 24px; }");
+    m_layout->addWidget(m_placeholder, 1);
+
     QVBoxLayout *outerLayout = new QVBoxLayout(this);
     outerLayout->setContentsMargins(0, 0, 0, 0);
     outerLayout->addWidget(m_scrollArea);
@@ -57,6 +64,11 @@ void ResultDisplayWidget::appendResult(const QString &title,
     convertMarkdownToHtml(htmlContent);
 
     QWidget *entry = createEntryWidget(title, htmlContent, sourceText, type, metadata);
+    if (m_placeholder) {
+        m_layout->removeWidget(m_placeholder);
+        delete m_placeholder;
+        m_placeholder = nullptr;
+    }
     m_layout->addWidget(entry);
 
     scrollToBottom();

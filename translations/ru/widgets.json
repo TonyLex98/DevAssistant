@@ -19,6 +19,7 @@
   "Answered.": "Ответ получен.",
   "Are you sure you want to delete the template '%1'?": "Удалить шаблон «%1»?",
   "Ask": "Задать вопрос",
+  "Ask about the project in the field below. The answers, and the results of the commands the assistant runs, appear here.": "Задайте вопрос о проекте в поле ниже. Здесь появятся ответы и результаты команд, которые выполняет ассистент.",
   "Ask about these documents": "Вопрос по этим документам",
   "Auto-Layout": "Авторасстановка",
   "Available Sequences": "Доступные последовательности",

@@ -9,6 +9,8 @@
 class QScrollArea;
 class QVBoxLayout;
 
+class QLabel;
+
 class ResultDisplayWidget : public QWidget
 {
     Q_OBJECT
@@ -47,6 +49,7 @@ private:
     QString reasoningSnippet(const QString &source) const;
     void scrollToBottom();
 
+    QLabel *m_placeholder = nullptr;   // shown until the first answer
     QScrollArea *m_scrollArea = nullptr;
     QWidget *m_contentWidget = nullptr;
     QVBoxLayout *m_layout = nullptr;
