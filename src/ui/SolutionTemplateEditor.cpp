@@ -16,7 +16,6 @@
 SolutionTemplateEditor::SolutionTemplateEditor(SolutionTemplateManager *templateManager, PromptSequenceManager *sequenceManager, QWidget *parent)
     : QWidget(parent), m_templateManager(templateManager), m_sequenceManager(sequenceManager)
 {
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Constructor called with templateManager:" << templateManager << "and sequenceManager:" << sequenceManager;
     setupUI();
     updateAvailableSequences();
 }
@@ -106,21 +105,13 @@ void SolutionTemplateEditor::setupUI()
     m_tabWidget->addTab(basicInfoWidget, tr("Basic Info"));
 
     // Create and configure the graph widget
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Creating TemplateSequenceGraphWidget";
     m_graphWidget = new TemplateSequenceGraphWidget(this);
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Created graph widget:" << m_graphWidget;
     m_graphWidget->setTemplateManager(m_templateManager);
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Template manager set for graph widget";
     if (m_sequenceManager) {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Setting sequence manager for graph widget";
         m_graphWidget->setSequenceManager(m_sequenceManager);
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Sequence manager set for graph widget";
     } else {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Sequence manager is null, skipping setSequenceManager call";
     }
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Adding graph widget tab";
     m_tabWidget->addTab(m_graphWidget, tr("Sequence Graph"));
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Graph widget tab added";
 
     layout->addWidget(m_tabWidget);
 
@@ -136,25 +127,18 @@ void SolutionTemplateEditor::setupUI()
 
 void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
 {
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] setTemplate called with template name:" << templateValue.name();
     m_currentTemplate = templateValue;
 
     // Update UI elements
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Updating UI elements";
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Setting template name:" << m_currentTemplate.name();
     // Block signals temporarily to prevent auto-saving during initial setup
     m_nameEdit->blockSignals(true);
     m_nameEdit->setText(m_currentTemplate.name());
     m_nameEdit->blockSignals(false);
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Name set successfully";
     m_descriptionEdit->setText(m_currentTemplate.description());
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Description set successfully";
 
     // Load image if exists
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Checking image path:" << m_currentTemplate.imagePath();
     if (!m_currentTemplate.imagePath().isEmpty()) {
         QString imagePath = m_currentTemplate.imagePath();
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Image path is not empty:" << imagePath;
         
         // If the path is relative (contains "images/"), make it absolute relative to the template directory
         QString absoluteImagePath;
@@ -167,72 +151,51 @@ void SolutionTemplateEditor::setTemplate(const SolutionTemplate &templateValue)
             absoluteImagePath = imagePath; // Already absolute path
         }
         
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Final image path to check:" << absoluteImagePath;
         if (QFileInfo::exists(absoluteImagePath)) {
-            if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Image file exists, loading pixmap";
             QPixmap pixmap(absoluteImagePath);
             if (!pixmap.isNull()) {
-                if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Pixmap loaded successfully, setting to label";
                 m_imageLabel->setPixmap(pixmap.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Pixmap set to label";
                 m_imagePathLabel->setText(QFileInfo(absoluteImagePath).fileName());
                 m_imagePath = imagePath; // Keep the original relative path
             } else {
-                if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Failed to load pixmap, clearing image";
                 m_imageLabel->clear();
                 m_imagePathLabel->setText(tr("Image not found"));
                 m_imagePath.clear();
             }
         } else {
-            if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Image file does not exist";
             m_imageLabel->clear();
             m_imagePathLabel->setText(tr("Image not found"));
             m_imagePath.clear();
         }
     } else {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] No image path provided";
         m_imageLabel->clear();
         m_imagePathLabel->setText(tr("No image selected"));
         m_imagePath.clear();
     }
 
     // Populate template sequences list
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Populating template sequences list";
     m_templateSequencesList->clear();
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Cleared template sequences list";
     for (const QString &seqPath : m_currentTemplate.sequences()) {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Processing sequence:" << seqPath;
         QFileInfo info(seqPath);
         QString displayName = info.fileName();
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Creating list item for:" << displayName;
         auto *item = new QListWidgetItem(displayName, m_templateSequencesList);
         item->setData(Qt::UserRole, seqPath);
         
         // Mark main sequence
         if (seqPath == m_currentTemplate.mainSequencePath()) {
-            if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Marking as main sequence";
             item->setCheckState(Qt::Checked);
         } else {
-            if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Marking as regular sequence";
             item->setCheckState(Qt::Unchecked);
         }
     }
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Finished populating template sequences list";
     
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Calling updateAvailableSequences";
     updateAvailableSequences();
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] updateAvailableSequences completed";
     
     // Update the graph widget with the current template
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Checking if graph widget exists";
     if (m_graphWidget) {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Graph widget exists, setting template";
         m_graphWidget->setTemplate(m_currentTemplate);
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Graph widget template set";
     } else {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Graph widget is null";
     }
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] setTemplate method completed";
 }
 
 SolutionTemplate SolutionTemplateEditor::templateValue() const
@@ -264,9 +227,7 @@ SolutionTemplate SolutionTemplateEditor::templateValue() const
 
 void SolutionTemplateEditor::updateAvailableSequences()
 {
-    if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] updateAvailableSequences called, templateManager:" << m_templateManager << "sequenceManager:" << m_sequenceManager;
     if (!m_templateManager || !m_sequenceManager) {
-        if (false) qCDebug(logTemplate) << "[SolutionTemplateEditor] Either templateManager or sequenceManager is null, returning early";
         return;
     }
 

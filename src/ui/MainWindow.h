@@ -4,7 +4,6 @@
 #include <StyleTextEdit.h>
 #include <QPair>
 #include <QFileSystemWatcher>
-#include <runSequenceDialog.h>
 #include "../core/ProjectIndex.h"
 #include "../core/ChangeApplier.h"
 #include "../adapters/OllamaAdapter.h"
@@ -12,7 +11,6 @@
 #include <StyledButton.h>
 #include <DevAssManager.h>
 #include <QProgressDialog>
-#include "DescriptionDialog.h"      // ← новый диалог
 #include <CommandParser.h>
 #include <CommandConfirmDialog.h>
 #include <OpenFileContextCommand.h>
@@ -66,21 +64,13 @@
 // Controllers
 #include "controllers/TtsController.h"
 #include "controllers/TaskStatusController.h"
-#include "controllers/ProjectBrowserController.h"
-#include "controllers/SettingsPageBuilder.h"
 #include "controllers/ContextCacheManager.h"
 #include "controllers/SequenceRunner.h"
 #include "controllers/SequenceEditorController.h"
-#include "controllers/GraphController.h"
-#include "controllers/DescriptionController.h"
-#include "controllers/ModelConfigController.h"
-#include "controllers/ContextDisplayController.h"
-#include "controllers/ChatController.h"
 #include "controllers/UiBuilder.h"
 #include "../services/IService.h"
 
 class ChatDialog;
-class ModelsDialog;
 class OllamaSettingsDialog;
 class PromptEditorDialog;
 class ChangesDialog;
@@ -447,8 +437,6 @@ private:
     MemorySplitter *mainSplitter;
     MemorySplitter *m_centerSplitter{nullptr};
 
-    QTabWidget *project_view_tabs = new QTabWidget();
-    ProjectRelationView *project_view = new ProjectRelationView;
 
     StyledButton *graphBtn{nullptr};    // кнопка «Show Graph»
     StyledButton *seqGraphBtn{nullptr}; // кнопка «Show Sequence Graph»
@@ -461,16 +449,9 @@ private:
     QPointer<LightRagWidget> m_lightRagWidget; // deletes itself on close
     QPointer<Rag::RagWidget> m_documentsWidget; // deletes itself on close
     TtsController* m_ttsController{nullptr}; // TTS controller (toggle + runner)
-    SettingsPageBuilder m_settingsBuilder; // Builds 6 settings pages
     ContextCacheManager m_contextCache; // Manages context slices cache
     SequenceRunner* m_sequenceRunner{nullptr}; // Sequence execution orchestrator
     SequenceEditorController* m_sequenceEditor{nullptr}; // Sequence editor controller
-    GraphController* m_graphController{nullptr};
-    DescriptionController* m_descriptionController{nullptr};
-    ModelConfigController* m_modelConfigController{nullptr};
-    ContextDisplayController* m_contextDisplayController{nullptr};
-    ChatController* m_chatController{nullptr};
-    ProjectBrowserController* m_projectBrowserController{nullptr};
 
     ResultDisplayWidget* m_resultDisplayWidget = nullptr;
     QStringList buildAllowedCommandsDocsCompact(const PromptStep& step) const;

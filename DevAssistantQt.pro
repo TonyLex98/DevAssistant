@@ -51,7 +51,6 @@ SOURCES += \
     src/command/Command.cpp \
     src/command/CommandConfirmDialog.cpp \
     src/command/CommandPolicy.cpp \
-    src/command/CommandFactory.cpp \
     src/command/CommandParser.cpp \
     src/command/CommandRegistry.cpp \
     src/command/CommandDocs.cpp \
@@ -94,13 +93,11 @@ SOURCES += \
     src/core/ProjectStructureResolver.cpp \
     src/core/ChangeApplier.cpp \
     src/adapters/OllamaAdapter.cpp \
-    src/ui/DescriptionDialog.cpp \
     src/ui/InputTextEdit.cpp \
     src/ui/MainWindow.cpp \
     src/ui/ChatDialog.cpp \
     src/ui/ContextGraphWidget.cpp \
     src/ui/ResultDisplayWidget.cpp \
-    src/ui/ModelsDialog.cpp \
     src/ui/OllamaSettingsDialog.cpp \
     src/ui/PromptEditorDialog.cpp \
     src/ui/ChangesDialog.cpp \
@@ -108,7 +105,6 @@ SOURCES += \
     src/ui/LightRagWidget.cpp \
     src/ui/PromptSequenceEditor.cpp \
     src/ui/PromptStepDialog.cpp \
-    src/ui/RunSequenceDialog.cpp \
     src/ui/SolutionTemplateEditor.cpp \
     src/ui/customWidgets/MemoryComboBox.cpp \
     src/ui/customWidgets/MemoryLineEdit.cpp \
@@ -118,14 +114,10 @@ SOURCES += \
     src/ui/customWidgets/StyledCheckBox.cpp \
     src/ui/customWidgets/StyledLabel.cpp \
     src/ui/customWidgets/StyledListWidget.cpp \
-    src/ui/customWidgets/StyledProgressBar.cpp \
-    src/ui/customWidgets/StyledRadioButton.cpp \
     src/ui/customWidgets/StyledSpinBox.cpp \
-    src/ui/customWidgets/StyledDoubleSpinBox.cpp \
     src/ui/customWidgets/StyledTabWidget.cpp \
     src/ui/customWidgets/StyledTextEdit.cpp \
     src/ui/customWidgets/StyledTreeWidget.cpp \
-    src/ui/customWidgets/StyledPlainTextEdit.cpp \
     src/ui/customWidgets/CustomTextTabBar.cpp \
     src/uiide/DartHighlighter.cpp \
     src/uiide/IDEWidget.cpp \
@@ -189,7 +181,6 @@ HEADERS += \
     ragmodule/RagEmbedder.h \
     ragmodule/RagIndex.h \
     ragmodule/RagWidget.h \
-    src/command/CommandFactory.h \
     src/command/CommandParser.h \
     src/command/CommandRegistry.h \
     src/command/CommandDocs.h \
@@ -234,13 +225,11 @@ HEADERS += \
     src/core/PromptStep.h \
     src/core/SolutionTemplate.h \
     src/core/SolutionTemplateManager.h \
-    src/ui/DescriptionDialog.h \
     src/ui/InputTextEdit.h \
     src/ui/MainWindow.h \
     src/ui/ChatDialog.h \
     src/ui/ContextGraphWidget.h \
     src/ui/ResultDisplayWidget.h \
-    src/ui/ModelsDialog.h \
     src/ui/OllamaSettingsDialog.h \
     src/ui/PromptEditorDialog.h \
     src/ui/ChangesDialog.h \
@@ -248,7 +237,6 @@ HEADERS += \
     src/ui/LightRagWidget.h \
     src/ui/PromptSequenceEditor.h \
     src/ui/PromptStepDialog.h \
-    src/ui/RunSequenceDialog.h \
     src/ui/SolutionTemplateEditor.h \
     src/ui/RunTemplateOrSequenceDialog.h \
     src/ui/SolutionTemplateViewer.h \
@@ -260,14 +248,10 @@ HEADERS += \
     src/ui/customWidgets/StyledCheckBox.h \
     src/ui/customWidgets/StyledLabel.h \
     src/ui/customWidgets/StyledListWidget.h \
-    src/ui/customWidgets/StyledProgressBar.h \
-    src/ui/customWidgets/StyledRadioButton.h \
     src/ui/customWidgets/StyledSpinBox.h \
-    src/ui/customWidgets/StyledDoubleSpinBox.h \
     src/ui/customWidgets/StyledTabWidget.h \
     src/ui/customWidgets/StyledTextEdit.h \
     src/ui/customWidgets/StyledTreeWidget.h \
-    src/ui/customWidgets/StyledPlainTextEdit.h \
     src/ui/customWidgets/CustomTextTabBar.h \
     src/uiide/DartHighlighter.h \
     src/uiide/IDEWidget.h \
@@ -298,26 +282,14 @@ SOURCES += $$PWD/src/ui/RunTemplateOrSequenceDialog.cpp
 SOURCES += $$PWD/src/ui/SolutionTemplateViewer.cpp
 SOURCES += $$PWD/src/ui/controllers/TtsController.cpp
 SOURCES += $$PWD/src/ui/controllers/TaskStatusController.cpp
-SOURCES += $$PWD/src/ui/controllers/ProjectBrowserController.cpp
-SOURCES += $$PWD/src/ui/controllers/SettingsPageBuilder.cpp
 SOURCES += $$PWD/src/ui/controllers/ContextCacheManager.cpp
 SOURCES += $$PWD/src/ui/controllers/SequenceRunner.cpp
 SOURCES += $$PWD/src/ui/controllers/SequenceEditorController.cpp
-SOURCES += $$PWD/src/ui/controllers/GraphController.cpp
-SOURCES += $$PWD/src/ui/controllers/DescriptionController.cpp
-SOURCES += $$PWD/src/ui/controllers/ModelConfigController.cpp
-SOURCES += $$PWD/src/ui/controllers/ContextDisplayController.cpp
-SOURCES += $$PWD/src/ui/controllers/ChatController.cpp
 SOURCES += $$PWD/src/ui/controllers/UiBuilder.cpp
 HEADERS += $$PWD/src/utils/AppConfig.h
 HEADERS += $$PWD/src/utils/json_utils.h
 HEADERS += $$PWD/src/ui/controllers/SequenceRunner.h
 HEADERS += $$PWD/src/ui/controllers/SequenceEditorController.h
-HEADERS += $$PWD/src/ui/controllers/GraphController.h
-HEADERS += $$PWD/src/ui/controllers/DescriptionController.h
-HEADERS += $$PWD/src/ui/controllers/ModelConfigController.h
-HEADERS += $$PWD/src/ui/controllers/ContextDisplayController.h
-HEADERS += $$PWD/src/ui/controllers/ChatController.h
 HEADERS += $$PWD/src/ui/controllers/UiBuilder.h
 HEADERS += $$PWD/src/command/OpenFileRegionCommand.h
 HEADERS += $$PWD/src/command/AskUserCommand.h
@@ -327,8 +299,6 @@ HEADERS += $$PWD/src/command/ClipboardSetCommand.h
 HEADERS += $$PWD/src/command/ClipboardGetCommand.h
 HEADERS += $$PWD/src/ui/controllers/TtsController.h
 HEADERS += $$PWD/src/ui/controllers/TaskStatusController.h
-HEADERS += $$PWD/src/ui/controllers/ProjectBrowserController.h
-HEADERS += $$PWD/src/ui/controllers/SettingsPageBuilder.h
 HEADERS += $$PWD/src/ui/controllers/ContextCacheManager.h
 
 FORMS += \

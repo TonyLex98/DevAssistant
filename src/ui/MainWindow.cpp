@@ -16,7 +16,6 @@
 #include <QLabel>
 #include <QFrame>
 #include "../ui/ChatDialog.h"
-#include "../ui/ModelsDialog.h"
 #include "../ui/OllamaSettingsDialog.h"
 #include "../utils/AppConfig.h"
 #include "../ui/PromptEditorDialog.h"
@@ -86,12 +85,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_ttsController = new TtsController(this);
     m_sequenceRunner = new SequenceRunner(this, this, this, this, this, this, this, this, this);
     m_sequenceEditor = new SequenceEditorController(this, this, this, this);
-    m_graphController = new GraphController(this); // IGraphService
-    m_descriptionController = new DescriptionController(this, this, this); // IModelService, IProjectService, IUIUpdater
-    m_modelConfigController = new ModelConfigController(this, this, this, this); // IModelService, ISettingsService, IUIUpdater, IProjectService
-    m_contextDisplayController = new ContextDisplayController(this, this); // IContextService, IUIUpdater
-    m_chatController = new ChatController(this, this, this, this); // IContextService, IModelService, ISequenceService, IUIUpdater
-    m_projectBrowserController = new ProjectBrowserController(this, this, this); // IProjectService, IContextService, IUIUpdater
 
     AppConfig startupCfg;
     startupCfg.load();
