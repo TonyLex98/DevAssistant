@@ -1,62 +1,102 @@
 <?xml version='1.0' encoding='utf-8'?>
 <TS version="2.1" language="ru_RU">
 <context>
-    <name>ChangesDialog</name>
+    <name>AgentEngine</name>
     <message>
-        <source>Confirm changes</source>
-        <translation>Подтверждение изменений</translation>
+        <source>The model did not answer: %1</source>
+        <translation>Модель не ответила: %1</translation>
     </message>
     <message>
-        <source>CREATE %1</source>
-        <translation>СОЗДАТЬ %1</translation>
+        <source>Template execution stopped by the user.</source>
+        <translation>Выполнение шаблона остановлено пользователем.</translation>
     </message>
     <message>
-        <source>REPLACE %1</source>
-        <translation>ЗАМЕНИТЬ %1</translation>
+        <source>Template execution was stopped by the user.</source>
+        <translation>Выполнение шаблона остановлено пользователем.</translation>
     </message>
     <message>
-        <source>DELETE %1</source>
-        <translation>УДАЛИТЬ %1</translation>
+        <source>Model error: %1</source>
+        <translation>Ошибка модели: %1</translation>
     </message>
     <message>
-        <source>RENAME %1 -&gt; %2</source>
-        <translation>ПЕРЕИМЕНОВАТЬ %1 -&gt; %2</translation>
+        <source>Agent mode: the planning call failed (%1); asking for the commands directly.</source>
+        <translation>Режим агента: запрос плана не удался (%1); прошу команды напрямую.</translation>
     </message>
     <message>
-        <source>MKDIR %1</source>
-        <translation>СОЗДАТЬ ПАПКУ %1</translation>
+        <source>No JSON found in the model's answer; it was saved as context. Trying to parse the raw answer.</source>
+        <translation>В ответе модели нет JSON; ответ сохранён в контекст. Пробую разобрать его как есть.</translation>
     </message>
     <message>
-        <source>RMDIR %1%2</source>
-        <translation>УДАЛИТЬ ПАПКУ %1%2</translation>
+        <source>The model returned no commands. The raw answer was added to the context.</source>
+        <translation>Модель не вернула команд. Её ответ добавлен в контекст.</translation>
     </message>
     <message>
-        <source> (recursive)</source>
-        <translation> (рекурсивно)</translation>
+        <source>Rejected commands:</source>
+        <translation>Отклонённые команды:</translation>
     </message>
     <message>
-        <source>Created directory: %1</source>
-        <translation>Создана папка: %1</translation>
+        <source>the model keeps proposing commands that are not allowed</source>
+        <translation>модель продолжает предлагать недопустимые команды</translation>
     </message>
     <message>
-        <source>Deleted directory: %1</source>
-        <translation>Удалена папка: %1</translation>
+        <source>The commands were declined.</source>
+        <translation>Команды отклонены.</translation>
     </message>
     <message>
-        <source>&lt;b&gt;Before:&lt;/b&gt;</source>
-        <translation>&lt;b&gt;До:&lt;/b&gt;</translation>
+        <source>Answer from %1:</source>
+        <translation>Ответ от %1:</translation>
     </message>
     <message>
-        <source>&lt;b&gt;After:&lt;/b&gt;</source>
-        <translation>&lt;b&gt;После:&lt;/b&gt;</translation>
+        <source>SHOW_RESULT was called without text.</source>
+        <translation>SHOW_RESULT вызван без текста.</translation>
+    </message>
+    <message>
+        <source>Context</source>
+        <translation>Контекст</translation>
+    </message>
+    <message>
+        <source>Execution error: %1</source>
+        <translation>Ошибка выполнения: %1</translation>
+    </message>
+    <message>
+        <source>Execution error</source>
+        <translation>Ошибка выполнения</translation>
+    </message>
+    <message>
+        <source>Sequence not found: %1</source>
+        <translation>Последовательность не найдена: %1</translation>
+    </message>
+    <message>
+        <source>The sequence has finished.</source>
+        <translation>Последовательность выполнена полностью.</translation>
+    </message>
+    <message>
+        <source>I stopped automatically so as not to run in a loop.</source>
+        <translation>Я завершил выполнение автоматически, чтобы не допустить зацикливания.</translation>
+    </message>
+    <message>
+        <source>Request: %1</source>
+        <translation>Запрос: %1</translation>
+    </message>
+    <message>
+        <source>Sources found:</source>
+        <translation>Найденные источники:</translation>
+    </message>
+    <message>
+        <source>Last commands run: %1</source>
+        <translation>Последние выполненные команды: %1</translation>
+    </message>
+    <message>
+        <source>If needed, make the request a little more specific: period, region, sources.</source>
+        <translation>Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.</translation>
+    </message>
+    <message>
+        <source>Model's answer</source>
+        <translation>Ответ нейросети</translation>
     </message>
 </context>
 <context>
-    <name>ChatDialog</name>
-    <message>
-        <source>Chat / Instruction</source>
-        <translation>Чат / Инструкция</translation>
-    </message>
+    <name>ChatPanel</name>
     <message>
         <source>Send</source>
         <translation>Отправить</translation>
@@ -64,10 +104,6 @@
     <message>
         <source>Stop</source>
         <translation>Остановить</translation>
-    </message>
-    <message>
-        <source>Voice input (click to record)</source>
-        <translation>Голосовой ввод (нажмите для записи)</translation>
     </message>
     <message>
         <source>Image</source>
@@ -78,12 +114,8 @@
         <translation>Прикрепить изображение (png/jpg/webp)</translation>
     </message>
     <message>
-        <source>Choose a default template</source>
-        <translation>Выберите шаблон по умолчанию</translation>
-    </message>
-    <message>
-        <source>Simple chat</source>
-        <translation>Простой чат</translation>
+        <source>Voice input (click to record)</source>
+        <translation>Голосовой ввод (нажмите для записи)</translation>
     </message>
     <message>
         <source>Select images</source>
@@ -92,6 +124,34 @@
     <message>
         <source>Images (*.png *.jpg *.jpeg *.webp *.bmp);;All files (*.*)</source>
         <translation>Изображения (*.png *.jpg *.jpeg *.webp *.bmp);;Все файлы (*.*)</translation>
+    </message>
+    <message>
+        <source>Choose a default template</source>
+        <translation>Выберите шаблон по умолчанию</translation>
+    </message>
+    <message>
+        <source>Simple chat</source>
+        <translation>Простой чат</translation>
+    </message>
+    <message>
+        <source>No models found at %1.</source>
+        <translation>На %1 не найдено ни одной модели.</translation>
+    </message>
+    <message>
+        <source>Start Ollama and download a model, for example &lt;code&gt;ollama pull qwen2.5-coder:7b&lt;/code&gt;, or choose another server in Settings &amp;rarr; Model. Then press the refresh button next to the model list.</source>
+        <translation>Запустите Ollama и скачайте модель, например &lt;code&gt;ollama pull qwen2.5-coder:7b&lt;/code&gt;, или выберите другой сервер в разделе Настройки &amp;rarr; Модель. Затем нажмите кнопку обновления рядом со списком моделей.</translation>
+    </message>
+    <message>
+        <source>Describing the attached images...</source>
+        <translation>Описываю прикреплённые изображения...</translation>
+    </message>
+    <message>
+        <source>You: %1</source>
+        <translation>Вы: %1</translation>
+    </message>
+    <message>
+        <source>Assistant:</source>
+        <translation>Ассистент:</translation>
     </message>
     <message>
         <source>Remove</source>
@@ -104,26 +164,6 @@
     <message>
         <source>Speech recognition error: %1</source>
         <translation>Ошибка распознавания речи: %1</translation>
-    </message>
-    <message>
-        <source>No models found at %1.</source>
-        <translation>На %1 не найдено ни одной модели.</translation>
-    </message>
-    <message>
-        <source>Start Ollama and download a model, for example &lt;code&gt;ollama pull qwen2.5-coder:7b&lt;/code&gt;, or choose another server in Settings &amp;rarr; Model. Then press the refresh button next to the model list.</source>
-        <translation>Запустите Ollama и скачайте модель, например &lt;code&gt;ollama pull qwen2.5-coder:7b&lt;/code&gt;, или выберите другой сервер в разделе Настройки &amp;rarr; Модель. Затем нажмите кнопку обновления рядом со списком моделей.</translation>
-    </message>
-    <message>
-        <source>Assistant:</source>
-        <translation>Ассистент:</translation>
-    </message>
-    <message>
-        <source>&lt;&lt; stream finished &gt;&gt;</source>
-        <translation>&lt;&lt; поток завершён &gt;&gt;</translation>
-    </message>
-    <message>
-        <source>You: %1</source>
-        <translation>Вы: %1</translation>
     </message>
 </context>
 <context>
@@ -238,6 +278,33 @@
     </message>
 </context>
 <context>
+    <name>ContextTreeView</name>
+    <message>
+        <source>Active in context</source>
+        <translation>Активна в контексте</translation>
+    </message>
+    <message>
+        <source>Invalidated: %1</source>
+        <translation>Устарела: %1</translation>
+    </message>
+    <message>
+        <source>Command was removed from context</source>
+        <translation>Команда удалена из контекста</translation>
+    </message>
+    <message>
+        <source>Result:</source>
+        <translation>Результат:</translation>
+    </message>
+    <message>
+        <source>... (click to expand)</source>
+        <translation>... (нажмите, чтобы развернуть)</translation>
+    </message>
+    <message>
+        <source>SEQUENCE: %1</source>
+        <translation>ПОСЛЕДОВАТЕЛЬНОСТЬ: %1</translation>
+    </message>
+</context>
+<context>
     <name>DevAssManager</name>
     <message>
         <source>No project is open.</source>
@@ -246,6 +313,13 @@
     <message>
         <source>%1 is outside the project folder.</source>
         <translation>%1 находится вне папки проекта.</translation>
+    </message>
+</context>
+<context>
+    <name>DialogAgentHost</name>
+    <message>
+        <source>Answer the model's question</source>
+        <translation>Ответьте на вопрос нейросети</translation>
     </message>
 </context>
 <context>
@@ -488,11 +562,18 @@
     </message>
 </context>
 <context>
-    <name>MainWindow</name>
+    <name>LlmClient</name>
     <message>
-        <source>MainWindow</source>
-        <translation type="unfinished" />
+        <source>No model is selected.</source>
+        <translation>Модель не выбрана.</translation>
     </message>
+    <message>
+        <source>No answer within %1 s.</source>
+        <translation>Нет ответа за %1 с.</translation>
+    </message>
+</context>
+<context>
+    <name>MainWindow</name>
     <message>
         <source>Undo last change</source>
         <translation>Отменить последнее изменение</translation>
@@ -534,68 +615,8 @@
         <translation>Необходимо выбрать шаблон.</translation>
     </message>
     <message>
-        <source>Sequence not found.</source>
-        <translation>Последовательность не найдена.</translation>
-    </message>
-    <message>
         <source>Could not load the sequence.</source>
         <translation>Не удалось загрузить последовательность.</translation>
-    </message>
-    <message>
-        <source>Solution Templates</source>
-        <translation>Шаблоны решений</translation>
-    </message>
-    <message>
-        <source>No sequences</source>
-        <translation>Нет последовательностей</translation>
-    </message>
-    <message>
-        <source>No sequences found.</source>
-        <translation>Последовательности не найдены.</translation>
-    </message>
-    <message>
-        <source>Export</source>
-        <translation>Экспорт</translation>
-    </message>
-    <message>
-        <source>Choose:</source>
-        <translation>Выберите:</translation>
-    </message>
-    <message>
-        <source>Name</source>
-        <translation>Имя</translation>
-    </message>
-    <message>
-        <source>Template name:</source>
-        <translation>Имя шаблона:</translation>
-    </message>
-    <message>
-        <source>Description</source>
-        <translation>Описание</translation>
-    </message>
-    <message>
-        <source>Description:</source>
-        <translation>Описание:</translation>
-    </message>
-    <message>
-        <source>Failed</source>
-        <translation>Ошибка</translation>
-    </message>
-    <message>
-        <source>A template with this name already exists.</source>
-        <translation>Шаблон с таким именем уже существует.</translation>
-    </message>
-    <message>
-        <source>OK</source>
-        <translation>OK</translation>
-    </message>
-    <message>
-        <source>Exported.</source>
-        <translation>Экспортировано.</translation>
-    </message>
-    <message>
-        <source>Export failed.</source>
-        <translation>Не удалось экспортировать.</translation>
     </message>
     <message>
         <source>Provider: %1 | Model: %2</source>
@@ -616,18 +637,6 @@
     <message>
         <source>Hide LLM settings</source>
         <translation>Скрыть настройки LLM</translation>
-    </message>
-    <message>
-        <source>Nothing to apply</source>
-        <translation>Нечего применять</translation>
-    </message>
-    <message>
-        <source>No pending changes.</source>
-        <translation>Нет ожидающих изменений.</translation>
-    </message>
-    <message>
-        <source>Apply failed</source>
-        <translation>Не удалось применить</translation>
     </message>
     <message>
         <source>Undo</source>
@@ -657,53 +666,13 @@
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
-    <message>
-        <source>Active in context</source>
-        <translation>Активна в контексте</translation>
-    </message>
-    <message>
-        <source>Invalidated: %1</source>
-        <translation>Устарела: %1</translation>
-    </message>
-    <message>
-        <source>Command was removed from context</source>
-        <translation>Команда удалена из контекста</translation>
-    </message>
-    <message>
-        <source>Result:</source>
-        <translation>Результат:</translation>
-    </message>
-    <message>
-        <source>... (click to expand)</source>
-        <translation>... (нажмите, чтобы развернуть)</translation>
-    </message>
-    <message>
-        <source>SEQUENCE: %1</source>
-        <translation>ПОСЛЕДОВАТЕЛЬНОСТЬ: %1</translation>
-    </message>
-    <message>
-        <source>Selected template not found: %1</source>
-        <translation>Выбранный шаблон не найден: %1</translation>
-    </message>
-    <message>
-        <source>No valid sequence found for template: %1</source>
-        <translation>Для шаблона не найдена подходящая последовательность: %1</translation>
-    </message>
-    <message>
-        <source>Could not load the sequence for template: %1</source>
-        <translation>Не удалось загрузить последовательность шаблона: %1</translation>
-    </message>
     <message numerus="yes">
         <source>[Images attached: %n]</source>
         <translation><numerusform>[Прикреплено изображений: %n]</numerusform><numerusform>[Прикреплено изображений: %n]</numerusform><numerusform>[Прикреплено изображений: %n]</numerusform></translation>
     </message>
     <message>
-        <source>Console</source>
-        <translation>Консоль</translation>
-    </message>
-    <message>
-        <source>External</source>
-        <translation>Внешние источники</translation>
+        <source>User question</source>
+        <translation>Вопрос пользователя</translation>
     </message>
 </context>
 <context>
@@ -749,18 +718,18 @@
     </message>
 </context>
 <context>
-    <name>OllamaAdapter</name>
+    <name>ModelReply</name>
     <message>
-        <source>no answer within %1 s</source>
-        <translation>нет ответа в течение %1 с</translation>
+        <source>The request was cancelled.</source>
+        <translation>Запрос отменён.</translation>
     </message>
     <message>
-        <source>no answer from %1 within 8 s</source>
-        <translation>нет ответа от %1 в течение 8 с</translation>
+        <source>The model server returned an error.</source>
+        <translation>Сервер модели вернул ошибку.</translation>
     </message>
 </context>
 <context>
-    <name>OllamaSettingsDialog</name>
+    <name>ModelSettingsPanel</name>
     <message>
         <source>Generation and Connection</source>
         <translation>Генерация и подключение</translation>
@@ -924,7 +893,7 @@
     <name>ProjectIndexer</name>
     <message>
         <source>Indexing the project with tree-sitter...</source>
-        <translation type="unfinished" />
+        <translation>Индексирую проект с помощью tree-sitter...</translation>
     </message>
 </context>
 <context>
@@ -995,21 +964,6 @@
     </message>
 </context>
 <context>
-    <name>PromptEditorDialog</name>
-    <message>
-        <source>Base Prompt &amp; History</source>
-        <translation>Базовый промпт и история</translation>
-    </message>
-    <message>
-        <source>Base prompt text (stored on disk):</source>
-        <translation>Текст базового промпта (хранится на диске):</translation>
-    </message>
-    <message>
-        <source>History turns (N):</source>
-        <translation>Ходов диалога в истории (N):</translation>
-    </message>
-</context>
-<context>
     <name>PromptResolver</name>
     <message>
         <source>Project root folder</source>
@@ -1054,10 +1008,6 @@
     <message>
         <source>Last assistant response</source>
         <translation>Последний ответ ассистента</translation>
-    </message>
-    <message>
-        <source>Open files</source>
-        <translation>Открытые файлы</translation>
     </message>
     <message>
         <source>Add project file descriptions</source>
@@ -1607,6 +1557,54 @@
         <translation>Последовательность создана в шаблоне:
 %1</translation>
     </message>
+    <message>
+        <source>Solution Templates</source>
+        <translation>Шаблоны решений</translation>
+    </message>
+    <message>
+        <source>No sequences found.</source>
+        <translation>Последовательности не найдены.</translation>
+    </message>
+    <message>
+        <source>Export</source>
+        <translation>Экспорт</translation>
+    </message>
+    <message>
+        <source>Choose:</source>
+        <translation>Выберите:</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Имя</translation>
+    </message>
+    <message>
+        <source>Template name:</source>
+        <translation>Имя шаблона:</translation>
+    </message>
+    <message>
+        <source>Description</source>
+        <translation>Описание</translation>
+    </message>
+    <message>
+        <source>Description:</source>
+        <translation>Описание:</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <source>A template with this name already exists.</source>
+        <translation>Шаблон с таким именем уже существует.</translation>
+    </message>
+    <message>
+        <source>Export failed.</source>
+        <translation>Не удалось экспортировать.</translation>
+    </message>
+    <message>
+        <source>Exported.</source>
+        <translation>Экспортировано.</translation>
+    </message>
 </context>
 <context>
     <name>SequenceGraphWidget</name>
@@ -1700,101 +1698,6 @@
     <message>
         <source>Delete Link</source>
         <translation>Удалить связь</translation>
-    </message>
-</context>
-<context>
-    <name>SequenceRunner</name>
-    <message>
-        <source>Error</source>
-        <translation>Ошибка</translation>
-    </message>
-    <message>
-        <source>Sequence file not found.</source>
-        <translation>Файл последовательности не найден.</translation>
-    </message>
-    <message>
-        <source>The sequence selected for the template was not found.</source>
-        <translation>Последовательность, выбранная для шаблона, не найдена.</translation>
-    </message>
-    <message>
-        <source>Could not load the selected sequence.</source>
-        <translation>Не удалось загрузить выбранную последовательность.</translation>
-    </message>
-    <message>
-        <source>Stopped</source>
-        <translation>Остановлено</translation>
-    </message>
-    <message>
-        <source>Template execution was stopped by the user.</source>
-        <translation>Выполнение шаблона остановлено пользователем.</translation>
-    </message>
-    <message>
-        <source>Done</source>
-        <translation>Готово</translation>
-    </message>
-    <message>
-        <source>The sequence has finished.</source>
-        <translation>Последовательность выполнена полностью.</translation>
-    </message>
-    <message>
-        <source>Rejected commands:</source>
-        <translation>Отклонённые команды:</translation>
-    </message>
-    <message>
-        <source>the model keeps proposing commands that are not allowed</source>
-        <translation>модель продолжает предлагать недопустимые команды</translation>
-    </message>
-    <message>
-        <source>The commands were declined.</source>
-        <translation>Команды отклонены.</translation>
-    </message>
-    <message>
-        <source>Answer the model's question</source>
-        <translation>Ответьте на вопрос нейросети</translation>
-    </message>
-    <message>
-        <source>Answer from %1:</source>
-        <translation>Ответ от %1:</translation>
-    </message>
-    <message>
-        <source>SHOW_RESULT was called without text.</source>
-        <translation>SHOW_RESULT вызван без текста.</translation>
-    </message>
-    <message>
-        <source>Context</source>
-        <translation>Контекст</translation>
-    </message>
-    <message>
-        <source>Execution error</source>
-        <translation>Ошибка выполнения</translation>
-    </message>
-    <message>
-        <source>I stopped automatically so as not to run in a loop.</source>
-        <translation>Я завершил выполнение автоматически, чтобы не допустить зацикливания.</translation>
-    </message>
-    <message>
-        <source>Request: %1</source>
-        <translation>Запрос: %1</translation>
-    </message>
-    <message>
-        <source>Sources found:</source>
-        <translation>Найденные источники:</translation>
-    </message>
-    <message>
-        <source>Last commands run: %1</source>
-        <translation>Последние выполненные команды: %1</translation>
-    </message>
-    <message>
-        <source>If needed, make the request a little more specific: period, region, sources.</source>
-        <translation>Если нужно, сформулируйте запрос чуть точнее: период, регион, источники.</translation>
-    </message>
-    <message>
-        <source>Model's answer</source>
-        <translation>Ответ нейросети</translation>
-    </message>
-    <message>
-        <source>User question</source>
-        <translation>Вопрос пользователя</translation>
     </message>
 </context>
 <context>
@@ -2366,10 +2269,6 @@
         <translation>Система</translation>
     </message>
     <message>
-        <source>Apply</source>
-        <translation>Применить</translation>
-    </message>
-    <message>
         <source>Undo</source>
         <translation>Отменить</translation>
     </message>
@@ -2400,10 +2299,6 @@
     <message>
         <source>Open LLM settings</source>
         <translation>Открыть настройки LLM</translation>
-    </message>
-    <message>
-        <source>Edit base prompt</source>
-        <translation>Редактировать базовый промпт</translation>
     </message>
     <message>
         <source>Edit</source>
@@ -2564,6 +2459,17 @@
     <message>
         <source>Show log</source>
         <translation>Показать лог</translation>
+    </message>
+</context>
+<context>
+    <name>WorkflowLibrary</name>
+    <message>
+        <source>Template not found: %1</source>
+        <translation>Шаблон не найден: %1</translation>
+    </message>
+    <message>
+        <source>The template "%1" has no sequence that can be loaded.</source>
+        <translation>В шаблоне «%1» нет последовательности, которую можно загрузить.</translation>
     </message>
 </context>
 </TS>
