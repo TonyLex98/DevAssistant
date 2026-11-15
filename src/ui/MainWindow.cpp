@@ -119,6 +119,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_contextGraphWidget = ui.m_contextGraphWidget; m_contextTabs = ui.m_contextTabs;
     m_settingsPanel = ui.m_settingsPanel;
     applyBtn = ui.applyBtn; undoBtn = ui.undoBtn; runSeqBtn = ui.runSeqBtn;
+    // Always at hand: undoes the assistant's last change to the project files.
+    undoBtn->setText(tr("Undo last change"));
+    undoBtn->setToolTip(tr("Reverts the last change the assistant made to the project files "
+                           "(up to 50 steps back)."));
+    statusBar()->addPermanentWidget(undoBtn);
+    undoBtn->show();
     rescanBtn = ui.rescanBtn; descBtn = ui.descBtn;
     settingsBtn = ui.settingsBtn; promptBtn = ui.promptBtn;
     editSeqBtn = ui.editSeqBtn; newSeqBtn = ui.newSeqBtn;
@@ -801,8 +807,16 @@ void MainWindow::applyChanges(){
 }
 
 void MainWindow::undoLast(){
-    QString err; if (!m_applier.undo(&err)) { QMessageBox::warning(this, tr("Undo"), err.isEmpty() ? tr("Nothing to undo") : err); }
-    else { log("Undo done."); rescan(); }
+    // The commands apply their changes through DevAssManager, so that is where the history is.
+    QString err;
+    if (!m_dev_manager.undoLastChange(&err)) {
+        QMessageBox::information(this, tr("Undo"), err.isEmpty() || err == QLatin1String("Nothing to undo")
+                                 ? tr("There is nothing to undo.") : err);
+        return;
+    }
+    log("Undo done.");
+    statusBar()->showMessage(tr("The last change was undone."), 5000);
+    rescan();
 }
 
 void MainWindow::sendUserMessage(const QString& text){

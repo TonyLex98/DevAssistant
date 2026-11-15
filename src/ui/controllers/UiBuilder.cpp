@@ -402,6 +402,23 @@ void UiBuilder::buildSystemPage(UIWidgets& ui,
     addDiv(sysLay);
     addSection(tr_fn("Interface"), sysLay);
 
+    // Read once at startup (main.cpp), so a change applies after a restart.
+    auto* languageRow = new QHBoxLayout;
+    auto* language = new QComboBox(parent);
+    language->addItem(tr_fn("As in the system"), "auto");
+    language->addItem(QStringLiteral("English"), "en");
+    language->addItem(QStringLiteral("Русский"), "ru");
+    language->setCurrentIndex(qMax(0, language->findData(QSettings().value("ui/language", "auto").toString())));
+    auto* languageNote = new QLabel(parent);
+    QObject::connect(language, QOverload<int>::of(&QComboBox::currentIndexChanged), [language, languageNote, tr_fn](int) {
+        QSettings().setValue("ui/language", language->currentData().toString());
+        languageNote->setText(tr_fn("Restart DevAssistant to switch the language."));
+    });
+    languageRow->addWidget(new QLabel(tr_fn("Language"), parent));
+    languageRow->addWidget(language, 1);
+    sysLay->addLayout(languageRow);
+    sysLay->addWidget(languageNote);
+
     ui.chatToggleBtn = new StyledButton(tr_fn("Show chat"), parent);
     ui.logToggleBtn = new StyledButton(tr_fn("Show log"), parent);
     ui.chatToggleBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
