@@ -1,0 +1,16 @@
+{
+  "Agent mode: the planning call failed (%1); asking for the commands directly.": "Режим агента: запрос плана не удался (%1); прошу команды напрямую.",
+  "The model did not answer: %1": "Модель не ответила: %1",
+  "Model error: %1": "Ошибка модели: %1",
+  "Execution error: %1": "Ошибка выполнения: %1",
+  "Template execution stopped by the user.": "Выполнение шаблона остановлено пользователем.",
+  "No JSON found in the model's answer; it was saved as context. Trying to parse the raw answer.": "В ответе модели нет JSON; ответ сохранён в контекст. Пробую разобрать его как есть.",
+  "The model returned no commands. The raw answer was added to the context.": "Модель не вернула команд. Её ответ добавлен в контекст.",
+  "The request was cancelled.": "Запрос отменён.",
+  "The model server returned an error.": "Сервер модели вернул ошибку.",
+  "No model is selected.": "Модель не выбрана.",
+  "No answer within %1 s.": "Нет ответа за %1 с.",
+  "Template not found: %1": "Шаблон не найден: %1",
+  "The template \"%1\" has no sequence that can be loaded.": "В шаблоне «%1» нет последовательности, которую можно загрузить.",
+  "Describing the attached images...": "Описываю прикреплённые изображения..."
+}

@@ -11,6 +11,8 @@
 #include <QStringList>
 #include <QJsonArray>
 #include <QStandardPaths>
+#include "core/context/ContextArchive.h"
+#include "core/context/ContextGraph.h"
 
 // Forward declarations
 class Command;
@@ -50,31 +52,6 @@ struct CommandSequenceInfo {
     CommandSequenceInfo() {}
 };
 
-// Archived context chunk (for topic changes / context compaction).
-struct ArchivedContextChunk {
-    QString id;
-    QDateTime timestamp;
-    QString title;
-    QString reason;
-    QString triggerQuery;
-    QStringList keywords;
-    QString contextText;
-};
-
-// Graph node for hierarchical context memory.
-struct ContextGraphNodeInfo {
-    QString id;
-    QString parentId;
-    QString category;
-    QString title;
-    QString summary;
-    QDateTime createdAt;
-    QDateTime updatedAt;
-    QStringList characteristicTags;
-    QStringList actions;
-    bool milestone = false;
-};
-
 class ContextManager : public QObject
 {
     Q_OBJECT
@@ -111,8 +88,8 @@ public:
     void observeUserQuery(const QString& text);
 
     // Graph context snapshot for UI visualization.
-    QList<ContextGraphNodeInfo> getContextGraphNodes() const;
-    QString activeContextGraphNodeId() const { return m_lastActiveGraphNodeId; }
+    QList<ContextGraphNodeInfo> getContextGraphNodes() const { return m_graph.nodes(); }
+    QString activeContextGraphNodeId() const { return m_graph.activeNodeId(); }
 
     // Clear all context
     void clearAll();
@@ -155,19 +132,9 @@ private:
     int m_commandCounter; // To generate unique IDs
     int m_sequenceCounter; // To generate unique sequence IDs
 
-    QList<ArchivedContextChunk> m_archive;
-    QStringList m_exhumedArchiveIds;
-    QSet<QString> m_currentTopicKeywords;
-    QString m_currentTopicTitle;
-    QString m_archiveFilePath;
+    ContextArchive m_archive;
+    ContextGraph m_graph;
 
-    QMap<QString, ContextGraphNodeInfo> m_contextGraphNodes;
-    QMap<QString, QString> m_categoryRootNodeIds;
-    QMap<QString, QString> m_activeGraphNodeByCategory;
-    QString m_lastActiveGraphNodeId;
-    QString m_contextGraphFilePath;
-    int m_graphNodeCounter = 0;
-    
     QString generateUniqueId(const QString& commandName);
     void rebuildFileWatcher();
     QStringList collectPathsFromParams(const QJsonObject& params) const;
@@ -181,36 +148,7 @@ private:
     QString formatCommandForContext(const CommandContextInfo& cmdInfo, int maxChars) const;
     QString formatSequenceForContext(const CommandSequenceInfo& seqInfo, int maxCharsPerCommand) const;
 
-    void loadArchive();
-    void saveArchive() const;
-    void pruneArchive();
-    void archiveAllActiveContext(const QString& reason, const QString& triggerQuery);
     void archiveOldestUntilFit(int maxActiveChars);
-    void updateExhumedArchivesForQuery(const QString& queryText);
-    QString graphContextText(int maxNodes, int maxActionsPerNode) const;
-    void loadContextGraph();
-    void saveContextGraph() const;
-    void clearContextGraph();
-    QString inferCategoryFromText(const QString& text) const;
-    QString inferCategoryForCommand(const CommandContextInfo& info) const;
-    QString ensureCategoryRootNode(const QString& category);
-    QString createGraphNode(const QString& parentId,
-                            const QString& category,
-                            const QString& title,
-                            const QString& summary,
-                            const QStringList& tags,
-                            bool milestone = false);
-    void addActionToGraphNode(const QString& nodeId, const QString& action, bool milestone = false);
-    void advanceContextGraphByUserQuery(const QString& text);
-    void attachCommandToContextGraph(const CommandContextInfo& info);
-    static QString normalizeCategory(const QString& category);
-    static QString shortText(const QString& text, int maxChars);
-    static QString defaultCategoryTitle(const QString& category);
-    void pruneContextGraph();
-
-    static QSet<QString> extractKeywords(const QString& text);
-    static double jaccardSimilarity(const QSet<QString>& a, const QSet<QString>& b);
-    static QString makeTopicTitle(const QString& text);
 };
 
 #endif // CONTEXTMANAGER_H
