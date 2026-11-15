@@ -46,3 +46,47 @@ jobs:
           name: DevAssistantQt-windows-mingw
           path: release/DevAssistantQt.exe
           if-no-files-found: error
+
+      # The tests build and run even if the app build failed, so both kinds of breakage show up.
+      # Folders with sh.exe (Git) are dropped from PATH: with sh.exe found, mingw32-make runs
+      # commands through it, while qmake's MinGW makefiles are written for cmd.exe.
+      - name: Build tests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $dirs = $env:PATH -split ';' | Where-Object { $_ }
+          $withSh = $dirs | Where-Object { Test-Path (Join-Path $_ 'sh.exe') }
+          if ($withSh) { Write-Host "Left out of PATH: $($withSh -join '; ')" }
+          $env:PATH = ($dirs | Where-Object { $withSh -notcontains $_ }) -join ';'
+          Write-Host "qmake: $((Get-Command qmake).Source); make: $((Get-Command mingw32-make).Source)"
+          New-Item -ItemType Directory -Force build-tests | Out-Null
+          Set-Location build-tests
+          qmake ../tests/tests.pro CONFIG+=release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          mingw32-make -k -j4
+          exit $LASTEXITCODE
+
+      - name: Run tests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $failed = @()
+          foreach ($dir in Get-ChildItem tests -Directory -Filter 'tst_*') {
+            $name = $dir.Name
+            $exe = Get-ChildItem build-tests -Recurse -Filter "$name.exe" | Select-Object -First 1
+            if (-not $exe) {
+              Write-Host "::error::$name was not built"
+              $failed += $name
+              continue
+            }
+            Write-Host "===== $name"
+            & $exe.FullName
+            if ($LASTEXITCODE -ne 0) { $failed += $name }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Host "::error::Failed: $($failed -join ', ')"
+            exit 1
+          }
