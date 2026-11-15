@@ -59,10 +59,15 @@ public:
             return false;
         }
 
+        QRegularExpression regex(regionExpr);
+        if (!regionExpr.isEmpty() && !regex.isValid()) {
+            if (err) *err = QString("OPEN_FILE_REGION: invalid region regex: %1").arg(regex.errorString());
+            return false;
+        }
         QTextStream in(&f);
+        in.setCodec("UTF-8");
         QStringList lines;
         int lineNum = 1;
-        QRegularExpression regex(regionExpr);
 
         while (!in.atEnd()) {
             QString line = in.readLine();

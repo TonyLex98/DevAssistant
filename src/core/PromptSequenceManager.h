@@ -39,4 +39,5 @@ private:
     QString m_root;                     // директория PromptSequences
     QMap<QString, PromptSequence> m_sequences; // key = абсолютный путь к файлу
     QStringList m_fileList;
+    QMap<QString, PromptSequence> m_cachedExtra; // added via addSequenceToCache, kept on refresh()
 };

@@ -23,7 +23,10 @@ QString CodePatcher::stashFile(const QString &filePath){
 bool CodePatcher::restoreFromStash(const QString &filePath){
     QString stashDir = stashDirForFile(filePath);
     QDir d(stashDir);
-    auto list = d.entryInfoList(QStringList()<<"*.bak", QDir::Files, QDir::Time|QDir::Reversed);
+    // Only this file's backups (stashFile names them "<file name>_<msecs>.bak"); the folder
+    // also holds backups of other files.
+    auto list = d.entryInfoList(QStringList() << (QFileInfo(filePath).fileName() + "_*.bak"),
+                                QDir::Files, QDir::Time|QDir::Reversed);
     if(list.isEmpty()) return false;
     QFileInfo last = list.last();
     QFile in(last.absoluteFilePath()); if(!in.open(QIODevice::ReadOnly)) return false;

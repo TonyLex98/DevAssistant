@@ -69,8 +69,14 @@ PromptResolver::ResolvedPrompt PromptResolver::resolve(const QString &tmpl,
                                                        const PromptStep &step,
                                                        MainWindow *ctx)
 {
+    if (!ctx) {
+        // Nothing to fill the placeholders from: return the template as it is.
+        ResolvedPrompt plain;
+        plain.userPrompt = tmpl;
+        return plain;
+    }
     QString result = tmpl;
-    QString userQuery = ctx ? ctx->lastUserMessage() : QString();
+    QString userQuery = ctx->lastUserMessage();
     const QDateTime now = QDateTime::currentDateTime();
     const QString currentDate = now.date().toString(QStringLiteral("yyyy-MM-dd"));
     const QString currentDateTime = QStringLiteral("%1 %2 (%3)")

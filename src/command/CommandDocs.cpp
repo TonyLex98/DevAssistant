@@ -322,7 +322,7 @@ CommandDoc CommandDocs::doc(const QString& commandName)
             opt("createIfMissing", "bool", QStringLiteral("If true, creates file if missing (default true).")),
             opt("ensureNewline", "bool", QStringLiteral("If true, inserts a newline between old content and appended content when needed."))
         };
-        d.example = baseExample(QJsonObject{{"path", "README.md"}, {"content", "\\nMore..."}, {"createIfMissing", true}});
+        d.example = baseExample(QJsonObject{{"path", "README.md"}, {"content", "\nMore..."}, {"createIfMissing", true}});
         return d;
     }
 
@@ -333,7 +333,7 @@ CommandDoc CommandDocs::doc(const QString& commandName)
             req("line", "int", QStringLiteral("1-based line number to insert before. Use OPEN_FILE first.")),
             req("content", "string", QStringLiteral("Text to insert (may be multi-line)."))
         };
-        d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}, {"line", 10}, {"content", "// inserted\\n"}});
+        d.example = baseExample(QJsonObject{{"path", "src/main.cpp"}, {"line", 10}, {"content", "// inserted\n"}});
         return d;
     }
 
@@ -343,7 +343,7 @@ CommandDoc CommandDocs::doc(const QString& commandName)
             req("patch", "string", QStringLiteral("Unified diff text.")),
             opt("strip", "int", QStringLiteral("Strip N leading path components (like patch -p). Default 0."))
         };
-        d.example = baseExample(QJsonObject{{"patch", "diff --git a/a.txt b/a.txt\\n--- a/a.txt\\n+++ b/a.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n"}, {"strip", 0}});
+        d.example = baseExample(QJsonObject{{"patch", "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-old\n+new\n"}, {"strip", 0}});
         return d;
     }
 

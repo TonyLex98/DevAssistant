@@ -77,6 +77,15 @@ bool SearchProjectCommand::apply(DevAssManager* devAss, QString* err)
     QDir root = devAss->projectRoot();
     QString rootPath = root.absolutePath();
 
+    // includePaths / excludePaths are usually relative ("src", "build"); the files they are
+    // compared with are absolute, so resolve them against the project first.
+    for (QStringList* list : {&m_includePaths, &m_excludePaths}) {
+        for (QString& p : *list) {
+            if (!QFileInfo(p).isAbsolute())
+                p = QDir::cleanPath(QDir(rootPath).absoluteFilePath(p));
+        }
+    }
+
     // Сначала соберем список файлов для поиска (предварительная фильтрация)
     QStringList filePaths;
     QDirIterator it(rootPath, QDir::Files, QDirIterator::Subdirectories);

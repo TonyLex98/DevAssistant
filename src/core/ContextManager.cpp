@@ -1435,6 +1435,9 @@ void ContextManager::addCommandToSequence(Command* cmd, const QString& sequenceI
         // Update existing active command with sequence info
         CommandContextInfo& info = m_commandHistory[existingActiveId];
         info.result = result;
+        // A command belongs to one sequence: take it out of the one it was in before.
+        if (info.sequenceId != sequenceId && m_sequenceHistory.contains(info.sequenceId))
+            m_sequenceHistory[info.sequenceId].commandIds.removeAll(existingActiveId);
         info.sequenceId = sequenceId; // Link to the sequence
         info.state = CommandState::Active; // Reset to active
         info.reason.clear(); // Clear any previous reason

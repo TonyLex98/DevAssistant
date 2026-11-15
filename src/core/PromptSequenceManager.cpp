@@ -52,6 +52,14 @@ void PromptSequenceManager::refresh()
         m_sequences.insert(path, seq);
         m_fileList << path;
     }
+
+    // Sequences added from elsewhere (solution templates) survive a rescan of the folder.
+    for (auto it = m_cachedExtra.constBegin(); it != m_cachedExtra.constEnd(); ++it) {
+        if (!m_sequences.contains(it.key())) {
+            m_sequences.insert(it.key(), it.value());
+            m_fileList << it.key();
+        }
+    }
 }
 
 const QMap<QString, PromptSequence> &PromptSequenceManager::sequences()
@@ -91,6 +99,7 @@ bool PromptSequenceManager::remove(const QString &filePath)
 /* Добавить/обновить отдельную последовательность в кэш (для использования с шаблонами) */
 void PromptSequenceManager::addSequenceToCache(const QString& filePath, const PromptSequence& sequence)
 {
+    m_cachedExtra.insert(filePath, sequence);
     m_sequences.insert(filePath, sequence);
     if (!m_fileList.contains(filePath))
         m_fileList << filePath;

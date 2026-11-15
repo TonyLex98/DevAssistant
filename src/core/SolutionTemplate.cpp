@@ -52,6 +52,18 @@ SolutionTemplate SolutionTemplate::fromJson(const QJsonObject& obj)
     // Deserialize sequence targets (directed links)
     if (obj.contains("sequenceTargets")) {
         tmpl.m_sequenceTargets = obj.value("sequenceTargets").toObject();
+    } else if (obj.contains("connections")) {
+        // Older templates list links as [{"from": a, "to": b}]; turn them into a -> [b, ...].
+        for (const QJsonValue& v : obj.value("connections").toArray()) {
+            const QJsonObject link = v.toObject();
+            const QString from = link.value("from").toString();
+            const QString to = link.value("to").toString();
+            if (from.isEmpty() || to.isEmpty())
+                continue;
+            QJsonArray targets = tmpl.m_sequenceTargets.value(from).toArray();
+            targets.append(to);
+            tmpl.m_sequenceTargets.insert(from, targets);
+        }
     }
     
     // Deserialize positions
